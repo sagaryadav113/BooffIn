@@ -159,19 +159,32 @@ export default function PaperDetailScreen() {
             <Typography variant="captionMedium" color={colors.textSecondary}>
               {paper.journal} ({paper.publicationYear})
             </Typography>
-
-            <TouchableOpacity onPress={handleOpenPublisher} style={styles.publisherLink} activeOpacity={0.7}>
-              <Typography variant="captionBold" color={colors.accentBlue}>
-                View on Publisher
-              </Typography>
-              <Icon name="ExternalLink" size="xs" color={colors.accentBlue} />
-            </TouchableOpacity>
           </View>
 
           {/* Authors */}
           <Typography variant="caption" color={colors.textSecondary} style={styles.authorsText}>
             {authorsString}
           </Typography>
+
+          {/* Read Paper External Publisher Action */}
+          <TouchableOpacity
+            onPress={handleOpenPublisher}
+            style={styles.readPaperExternalBtn}
+            activeOpacity={0.85}
+          >
+            <View style={styles.readPaperLeft}>
+              <Icon name="ExternalLink" size="sm" color={colors.white} />
+              <View>
+                <Typography variant="captionBold" color={colors.white}>
+                  Read Paper on Publisher / Repository
+                </Typography>
+                <Typography variant="micro" color="rgba(255,255,255,0.8)" numberOfLines={1}>
+                  {paper.canonicalUrl}
+                </Typography>
+              </View>
+            </View>
+            <Icon name="ArrowRight" size="xs" color={colors.white} />
+          </TouchableOpacity>
 
           {/* Abstract Section */}
           <View style={styles.abstractSection}>
@@ -338,8 +351,25 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
   },
   authorsText: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     lineHeight: 20,
+  },
+  readPaperExternalBtn: {
+    backgroundColor: colors.black,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  readPaperLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
   },
   abstractSection: {
     marginBottom: spacing.lg,

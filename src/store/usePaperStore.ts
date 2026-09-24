@@ -83,11 +83,14 @@ export const usePaperStore = create<PaperState>((set, get) => ({
         return p;
       }),
     })),
-  getPaperById: (id) => get().papers.find((p) => p.id === id || p.doi === id),
-  getPaperByDoi: (doi) => get().papers.find((p) => p.doi.toLowerCase() === doi.toLowerCase()),
+  getPaperById: (id) => get().papers.find((p) => p.id === id || (p.doi && p.doi === id)),
+  getPaperByDoi: (doi) => get().papers.find((p) => p.doi && p.doi.toLowerCase() === doi.toLowerCase()),
   addPaper: (paper) =>
     set((state) => ({
-      papers: [paper, ...state.papers.filter((p) => p.id !== paper.id && p.doi !== paper.doi)],
+      papers: [
+        paper,
+        ...state.papers.filter((p) => p.id !== paper.id && (!paper.doi || p.doi !== paper.doi)),
+      ],
     })),
   searchPapers: (query) => {
     const q = query.toLowerCase().trim();
@@ -97,7 +100,7 @@ export const usePaperStore = create<PaperState>((set, get) => ({
         p.title.toLowerCase().includes(q) ||
         p.abstract.toLowerCase().includes(q) ||
         p.journal.toLowerCase().includes(q) ||
-        p.doi.toLowerCase().includes(q) ||
+        (p.doi && p.doi.toLowerCase().includes(q)) ||
         p.authors.some((a) => a.name.toLowerCase().includes(q)) ||
         p.topics.some((t) => t.toLowerCase().includes(q))
     );

@@ -15,7 +15,7 @@ export interface PaperFigure {
 
 export interface Paper {
   id: string;
-  doi: string;
+  doi?: string;
   title: string;
   abstract: string;
   authors: Author[];
