@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,10 @@ import {
   CheckCircle2,
   ArrowLeft,
   Share2,
+  Sparkles,
+  Clock,
+  Users,
+  UserPlus,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -30,8 +34,15 @@ import { TopicChip } from '../../components/core/TopicChip';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { PostCard } from '../../components/cards/PostCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
+import { ConnectModal } from '../../components/modals/ConnectModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
+import {
+  getConnectionStatus,
+  getSharedResearchInterests,
+  getResearcherDiscussedTopics,
+} from '../../api/connectionService';
+import { ConnectionStatus } from '../../types';
 
 export default function OtherResearcherProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -41,9 +52,21 @@ export default function OtherResearcherProfileScreen() {
   const allPosts = usePostStore((s) => s.posts);
 
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Papers' | 'Activity'>('Posts');
+  const [connectModalVisible, setConnectModalVisible] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('none');
 
   const researcher = users.find((u) => u.id === id || u.handle === id) || (id === currentUser.id ? currentUser : users[1]);
   const isOwnProfile = researcher.id === currentUser.id;
+
+  const loadConnectionStatus = useCallback(async () => {
+    if (isOwnProfile) return;
+    const status = await getConnectionStatus(currentUser.id, researcher.id);
+    setConnectionStatus(status);
+  }, [currentUser.id, researcher.id, isOwnProfile]);
+
+  useEffect(() => {
+    loadConnectionStatus();
+  }, [loadConnectionStatus]);
 
   const posts = React.useMemo(() => {
     return allPosts.filter((p) => p.author.id === researcher.id);
@@ -52,6 +75,16 @@ export default function OtherResearcherProfileScreen() {
   const paperPosts = React.useMemo(() => {
     return posts.filter((p) => !!p.paper);
   }, [posts]);
+
+  // Shared / mutual research interests
+  const mutualInterests = React.useMemo(() => {
+    return getSharedResearchInterests(currentUser, researcher);
+  }, [currentUser, researcher]);
+
+  // Topics the researcher discusses in posts and paper references
+  const discussedTopics = React.useMemo(() => {
+    return getResearcherDiscussedTopics(researcher.id, allPosts);
+  }, [researcher.id, allPosts]);
 
   const handleFollowToggle = () => {
     if (isOwnProfile) {
@@ -62,6 +95,14 @@ export default function OtherResearcherProfileScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     toggleFollowUser(researcher.id);
+  };
+
+  const handleConnectPress = () => {
+    if (isOwnProfile) return;
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+    setConnectModalVisible(true);
   };
 
   const handleShare = async () => {
@@ -138,7 +179,7 @@ export default function OtherResearcherProfileScreen() {
 
         {/* Profile Info Header */}
         <View style={styles.profileHeader}>
-          {/* Avatar & Follow Action */}
+          {/* Avatar & Action Row: Distinct Follow & Connect Actions */}
           <View style={styles.avatarActionRow}>
             <Avatar
               url={researcher.avatarUrl}
@@ -148,13 +189,52 @@ export default function OtherResearcherProfileScreen() {
               style={styles.avatarOverBanner}
             />
 
-            <Button
-              title={isOwnProfile ? 'Edit Profile' : researcher.isFollowing ? 'Following' : 'Follow'}
-              variant={isOwnProfile || researcher.isFollowing ? 'outline' : 'primary'}
-              size="sm"
-              onPress={handleFollowToggle}
-              style={styles.followButton}
-            />
+            <View style={styles.actionButtonsGroup}>
+              {/* Follow Button */}
+              <Button
+                title={isOwnProfile ? 'Edit Profile' : researcher.isFollowing ? 'Following' : 'Follow'}
+                variant={isOwnProfile || researcher.isFollowing ? 'outline' : 'primary'}
+                size="sm"
+                onPress={handleFollowToggle}
+                style={styles.followButton}
+              />
+
+              {/* Connect Button (Separate from Follow) */}
+              {!isOwnProfile && (
+                <TouchableOpacity
+                  style={[
+                    styles.connectButton,
+                    connectionStatus === 'connected' && styles.connectButtonConnected,
+                    connectionStatus === 'pending_sent' && styles.connectButtonPending,
+                    connectionStatus === 'pending_received' && styles.connectButtonAction,
+                  ]}
+                  onPress={handleConnectPress}
+                  activeOpacity={0.8}
+                >
+                  {connectionStatus === 'connected' ? (
+                    <>
+                      <Users size={13} color="#059669" style={{ marginRight: 4 }} />
+                      <Text style={styles.connectButtonTextConnected}>Connected</Text>
+                    </>
+                  ) : connectionStatus === 'pending_sent' ? (
+                    <>
+                      <Clock size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                      <Text style={styles.connectButtonTextPending}>Request Sent</Text>
+                    </>
+                  ) : connectionStatus === 'pending_received' ? (
+                    <>
+                      <Sparkles size={13} color={colors.white} style={{ marginRight: 4 }} />
+                      <Text style={styles.connectButtonTextAction}>Respond</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={13} color={colors.textPrimary} style={{ marginRight: 4 }} />
+                      <Text style={styles.connectButtonText}>Connect</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* Name & Handle */}
@@ -184,24 +264,87 @@ export default function OtherResearcherProfileScreen() {
             <Text style={styles.bio}>{researcher.bio}</Text>
           ) : null}
 
-          {/* Research Interests */}
-          {researcher.researchInterests && researcher.researchInterests.length > 0 && (
-            <View style={styles.interestsSection}>
-              <Text style={styles.interestsLabel}>Research Interests:</Text>
+          {/* MUTUAL RESEARCH INTERESTS SECTION (When shared interests exist) */}
+          {!isOwnProfile && mutualInterests.length > 0 && (
+            <View style={styles.mutualInterestsCard}>
+              <View style={styles.mutualHeader}>
+                <Sparkles size={15} color="#2563EB" style={{ marginRight: 6 }} />
+                <Text style={styles.mutualTitle}>
+                  Mutual Research Interests ({mutualInterests.length})
+                </Text>
+              </View>
+              <Text style={styles.mutualDesc}>
+                You and {researcher.fullName.split(' ')[0]} share research overlap in:
+              </Text>
               <View style={styles.interestsRow}>
-                {researcher.researchInterests.map((interest) => (
-                  <TopicChip
+                {mutualInterests.map((interest) => (
+                  <TouchableOpacity
                     key={interest}
-                    label={interest}
-                    size="sm"
+                    style={styles.mutualInterestBadge}
                     onPress={() =>
                       router.push({
                         pathname: '/topic/[slug]',
                         params: { slug: interest.toLowerCase().replace(/\s+/g, '-') },
                       })
                     }
-                  />
+                    activeOpacity={0.7}
+                  >
+                    <Sparkles size={11} color="#1E40AF" style={{ marginRight: 4 }} />
+                    <Text style={styles.mutualInterestBadgeText}>{interest}</Text>
+                  </TouchableOpacity>
                 ))}
+              </View>
+            </View>
+          )}
+
+          {/* TOPICS DISCUSSED & SHARED */}
+          {discussedTopics.length > 0 && (
+            <View style={styles.discussedSection}>
+              <Text style={styles.interestsLabel}>Topics Discussed & Shared:</Text>
+              <View style={styles.interestsRow}>
+                {discussedTopics.map(({ topic, count }) => (
+                  <TouchableOpacity
+                    key={topic}
+                    style={styles.discussedChip}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/topic/[slug]',
+                        params: { slug: topic.toLowerCase().replace(/\s+/g, '-') },
+                      })
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.discussedChipLabel}>{topic}</Text>
+                    <View style={styles.discussedCountBadge}>
+                      <Text style={styles.discussedCountText}>{count}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* All Research Interests */}
+          {researcher.researchInterests && researcher.researchInterests.length > 0 && (
+            <View style={styles.interestsSection}>
+              <Text style={styles.interestsLabel}>All Research Interests:</Text>
+              <View style={styles.interestsRow}>
+                {researcher.researchInterests.map((interest) => {
+                  const isMutual = mutualInterests.includes(interest);
+                  return (
+                    <TopicChip
+                      key={interest}
+                      label={isMutual ? `${interest} ★` : interest}
+                      size="sm"
+                      onPress={() =>
+                        router.push({
+                          pathname: '/topic/[slug]',
+                          params: { slug: interest.toLowerCase().replace(/\s+/g, '-') },
+                        })
+                      }
+                    />
+                  );
+                })}
               </View>
             </View>
           )}
@@ -327,6 +470,19 @@ export default function OtherResearcherProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Connect & Collaboration Request Modal */}
+      {!isOwnProfile && (
+        <ConnectModal
+          visible={connectModalVisible}
+          onClose={() => {
+            setConnectModalVisible(false);
+            loadConnectionStatus();
+          }}
+          recipient={researcher}
+          onSuccess={loadConnectionStatus}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -375,9 +531,57 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.white,
   },
+  actionButtonsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+  },
   followButton: {
-    minWidth: 104,
+    minWidth: 84,
     borderRadius: radii.full,
+  },
+  connectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.full,
+  },
+  connectButtonConnected: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  connectButtonPending: {
+    backgroundColor: colors.backgroundSecondary,
+    borderColor: colors.borderLight,
+  },
+  connectButtonAction: {
+    backgroundColor: colors.black,
+    borderColor: colors.black,
+  },
+  connectButtonText: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 12,
+  },
+  connectButtonTextConnected: {
+    ...typography.captionBold,
+    color: '#059669',
+    fontSize: 12,
+  },
+  connectButtonTextPending: {
+    ...typography.captionMedium,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  connectButtonTextAction: {
+    ...typography.captionBold,
+    color: colors.white,
+    fontSize: 12,
   },
   nameSection: {
     marginBottom: spacing.xs,
@@ -436,6 +640,78 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.textPrimary,
     marginVertical: spacing.xs,
+  },
+  mutualInterestsCard: {
+    backgroundColor: '#F0F7FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginVertical: spacing.sm,
+  },
+  mutualHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  mutualTitle: {
+    ...typography.captionBold,
+    color: '#1E40AF',
+    fontSize: 13,
+  },
+  mutualDesc: {
+    ...typography.micro,
+    color: '#3B82F6',
+    marginBottom: spacing.xs + 2,
+  },
+  mutualInterestBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+  },
+  mutualInterestBadgeText: {
+    ...typography.captionBold,
+    color: '#1E40AF',
+    fontSize: 11,
+  },
+  discussedSection: {
+    marginVertical: spacing.xs + 2,
+  },
+  discussedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    paddingLeft: spacing.sm + 2,
+    paddingRight: spacing.xs + 2,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: 4,
+  },
+  discussedChipLabel: {
+    ...typography.captionMedium,
+    color: colors.textPrimary,
+    fontSize: 12,
+  },
+  discussedCountBadge: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+  },
+  discussedCountText: {
+    ...typography.micro,
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontWeight: '700',
   },
   interestsSection: {
     marginVertical: spacing.xs + 2,
@@ -555,3 +831,4 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
 });
+

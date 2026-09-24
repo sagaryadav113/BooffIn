@@ -23,6 +23,11 @@ import {
   Calendar,
   CheckCircle2,
   LogIn,
+  Users,
+  Sparkles,
+  Clock,
+  Check,
+  X as XIcon,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -37,6 +42,13 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 import { usePaperStore } from '../../store/usePaperStore';
 import { currentUser } from '../../data/mockData';
+import {
+  getCollaborationRequests,
+  respondToCollaborationRequest,
+  withdrawCollaborationRequest,
+  getResearcherDiscussedTopics,
+} from '../../api/connectionService';
+import { CollaborationRequest } from '../../types';
 
 export default function CurrentUserProfileScreen() {
   const storeUser = useAuthStore((s) => s.user);
@@ -45,10 +57,39 @@ export default function CurrentUserProfileScreen() {
   const papers = usePaperStore((s) => s.papers);
   const savedPaperIds = usePaperStore((s) => s.savedPaperIds);
 
-  const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Saved' | 'Cited' | 'Activity'>('Posts');
+  const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Saved' | 'Connects' | 'Cited' | 'Activity'>('Posts');
+  const [collaborationRequests, setCollaborationRequests] = useState<{
+    incoming: CollaborationRequest[];
+    outgoing: CollaborationRequest[];
+  }>({ incoming: [], outgoing: [] });
 
   // Active user profile (fall back to currentUser if null for preview)
   const user = storeUser || currentUser;
+
+  const loadRequests = React.useCallback(async () => {
+    if (!user?.id) return;
+    const reqs = await getCollaborationRequests(user.id);
+    setCollaborationRequests(reqs);
+  }, [user?.id]);
+
+  React.useEffect(() => {
+    loadRequests();
+  }, [loadRequests]);
+
+  const discussedTopics = React.useMemo(() => {
+    if (!user?.id) return [];
+    return getResearcherDiscussedTopics(user.id, allPosts);
+  }, [user?.id, allPosts]);
+
+  const handleRespond = async (requestId: string, status: 'accepted' | 'declined') => {
+    await respondToCollaborationRequest(requestId, status);
+    loadRequests();
+  };
+
+  const handleWithdraw = async (requestId: string) => {
+    await withdrawCollaborationRequest(requestId);
+    loadRequests();
+  };
 
   // Memoize filtered posts to prevent infinite re-render loops
   const posts = useMemo(() => {
@@ -214,6 +255,33 @@ export default function CurrentUserProfileScreen() {
             </View>
           )}
 
+          {/* TOPICS DISCUSSED & SHARED */}
+          {discussedTopics.length > 0 && (
+            <View style={styles.discussedSection}>
+              <Text style={styles.interestsLabel}>Topics Discussed & Shared:</Text>
+              <View style={styles.interestsRow}>
+                {discussedTopics.map(({ topic, count }) => (
+                  <TouchableOpacity
+                    key={topic}
+                    style={styles.discussedChip}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/topic/[slug]',
+                        params: { slug: topic.toLowerCase().replace(/\s+/g, '-') },
+                      })
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.discussedChipLabel}>{topic}</Text>
+                    <View style={styles.discussedCountBadge}>
+                      <Text style={styles.discussedCountText}>{count}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
           {/* Metadata: Country, Location, ORCID, Website, Joined */}
           <View style={styles.metaContainer}>
             {(user.location || user.country) && (
@@ -270,28 +338,38 @@ export default function CurrentUserProfileScreen() {
           </View>
         </View>
 
-        {/* Sub-Tabs: Posts | Saved | Cited | Activity */}
+        {/* Sub-Tabs: Posts | Saved | Connects | Cited | Activity */}
         <View style={styles.tabsRow}>
-          {(['Posts', 'Saved', 'Cited', 'Activity'] as const).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              onPress={() => setActiveSubTab(tab)}
-              style={[
-                styles.tabButton,
-                activeSubTab === tab && styles.tabButtonActive,
-              ]}
-              activeOpacity={0.7}
-            >
-              <Text
+          {(['Posts', 'Saved', 'Connects', 'Cited', 'Activity'] as const).map((tab) => {
+            const pendingIncomingCount = collaborationRequests.incoming.filter((r) => r.status === 'pending').length;
+            return (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => setActiveSubTab(tab)}
                 style={[
-                  styles.tabText,
-                  activeSubTab === tab && styles.tabTextActive,
+                  styles.tabButton,
+                  activeSubTab === tab && styles.tabButtonActive,
                 ]}
+                activeOpacity={0.7}
               >
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <View style={styles.tabContentRow}>
+                  <Text
+                    style={[
+                      styles.tabText,
+                      activeSubTab === tab && styles.tabTextActive,
+                    ]}
+                  >
+                    {tab}
+                  </Text>
+                  {tab === 'Connects' && pendingIncomingCount > 0 && (
+                    <View style={styles.tabBadge}>
+                      <Text style={styles.tabBadgeText}>{pendingIncomingCount}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Tab Content */}
@@ -325,6 +403,159 @@ export default function CurrentUserProfileScreen() {
                 actionTitle="Explore Papers"
                 onAction={() => router.push('/(tabs)/explore')}
               />
+            )}
+          </View>
+        )}
+
+        {activeSubTab === 'Connects' && (
+          <View style={styles.connectsList}>
+            {/* Incoming Collaboration Requests */}
+            <Text style={styles.connectSectionHeading}>
+              Incoming Collaboration Requests ({collaborationRequests.incoming.length})
+            </Text>
+
+            {collaborationRequests.incoming.length > 0 ? (
+              collaborationRequests.incoming.map((req) => (
+                <View key={req.id} style={styles.requestCard}>
+                  <View style={styles.requestHeader}>
+                    <Avatar
+                      url={req.sender?.avatarUrl}
+                      name={req.sender?.fullName || 'Researcher'}
+                      size={40}
+                      verified={req.sender?.orcidVerified}
+                    />
+                    <View style={styles.requestMeta}>
+                      <Text style={styles.requestSenderName}>
+                        {req.sender?.fullName || 'Researcher'}
+                      </Text>
+                      <Text style={styles.requestSenderRole} numberOfLines={1}>
+                        {req.sender?.academicTitle} · {req.sender?.institution}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.statusTag,
+                        req.status === 'accepted' && styles.statusTagAccepted,
+                        req.status === 'declined' && styles.statusTagDeclined,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusTagText,
+                          req.status === 'accepted' && styles.statusTagTextAccepted,
+                          req.status === 'declined' && styles.statusTagTextDeclined,
+                        ]}
+                      >
+                        {req.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.requestTopicPill}>
+                    <Sparkles size={12} color="#2563EB" style={{ marginRight: 4 }} />
+                    <Text style={styles.requestTopicText}>Topic: {req.topic}</Text>
+                  </View>
+
+                  <Text style={styles.requestMessage}>{req.message}</Text>
+
+                  {req.status === 'pending' && (
+                    <View style={styles.requestActionsRow}>
+                      <TouchableOpacity
+                        style={styles.acceptButton}
+                        onPress={() => handleRespond(req.id, 'accepted')}
+                        activeOpacity={0.8}
+                      >
+                        <Check size={14} color={colors.white} style={{ marginRight: 4 }} />
+                        <Text style={styles.acceptButtonText}>Accept Collaboration</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.declineButton}
+                        onPress={() => handleRespond(req.id, 'declined')}
+                        activeOpacity={0.8}
+                      >
+                        <XIcon size={14} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                        <Text style={styles.declineButtonText}>Decline</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyRequests}>
+                <Typography variant="caption" color={colors.textMuted} align="center">
+                  No incoming collaboration proposals right now.
+                </Typography>
+              </View>
+            )}
+
+            {/* Sent Collaboration Requests */}
+            <Text style={[styles.connectSectionHeading, { marginTop: spacing.xl }]}>
+              Sent Collaboration Proposals ({collaborationRequests.outgoing.length})
+            </Text>
+
+            {collaborationRequests.outgoing.length > 0 ? (
+              collaborationRequests.outgoing.map((req) => (
+                <View key={req.id} style={styles.requestCard}>
+                  <View style={styles.requestHeader}>
+                    <Avatar
+                      url={req.recipient?.avatarUrl}
+                      name={req.recipient?.fullName || 'Researcher'}
+                      size={40}
+                      verified={req.recipient?.orcidVerified}
+                    />
+                    <View style={styles.requestMeta}>
+                      <Text style={styles.requestSenderName}>
+                        To: {req.recipient?.fullName || 'Researcher'}
+                      </Text>
+                      <Text style={styles.requestSenderRole} numberOfLines={1}>
+                        {req.recipient?.academicTitle} · {req.recipient?.institution}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.statusTag,
+                        req.status === 'accepted' && styles.statusTagAccepted,
+                        req.status === 'declined' && styles.statusTagDeclined,
+                        req.status === 'withdrawn' && styles.statusTagDeclined,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusTagText,
+                          req.status === 'accepted' && styles.statusTagTextAccepted,
+                          req.status === 'declined' && styles.statusTagTextDeclined,
+                          req.status === 'withdrawn' && styles.statusTagTextDeclined,
+                        ]}
+                      >
+                        {req.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.requestTopicPill}>
+                    <Sparkles size={12} color="#2563EB" style={{ marginRight: 4 }} />
+                    <Text style={styles.requestTopicText}>Topic: {req.topic}</Text>
+                  </View>
+
+                  <Text style={styles.requestMessage}>{req.message}</Text>
+
+                  {req.status === 'pending' && (
+                    <TouchableOpacity
+                      style={styles.withdrawLink}
+                      onPress={() => handleWithdraw(req.id)}
+                    >
+                      <Text style={styles.withdrawLinkText}>Withdraw Proposal</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyRequests}>
+                <Typography variant="caption" color={colors.textMuted} align="center">
+                  You haven't sent any research collaboration requests yet. Visit a researcher's profile and tap "Connect"!
+                </Typography>
+              </View>
             )}
           </View>
         )}
@@ -475,6 +706,9 @@ const styles = StyleSheet.create({
   interestsSection: {
     marginVertical: spacing.xs + 2,
   },
+  discussedSection: {
+    marginVertical: spacing.xs + 2,
+  },
   interestsLabel: {
     ...typography.micro,
     color: colors.textSecondary,
@@ -485,6 +719,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
+  },
+  discussedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingLeft: spacing.sm,
+    paddingRight: 4,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    gap: 6,
+  },
+  discussedChipLabel: {
+    ...typography.micro,
+    color: colors.textPrimary,
+    fontWeight: '500',
+    fontSize: 12,
+  },
+  discussedCountBadge: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.full,
+  },
+  discussedCountText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 10,
   },
   metaContainer: {
     flexDirection: 'row',
@@ -571,6 +835,23 @@ const styles = StyleSheet.create({
   tabButtonActive: {
     borderBottomColor: colors.black,
   },
+  tabContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tabBadge: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: radii.full,
+  },
+  tabBadgeText: {
+    ...typography.micro,
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: 10,
+  },
   tabText: {
     ...typography.captionMedium,
     color: colors.textSecondary,
@@ -591,5 +872,137 @@ const styles = StyleSheet.create({
   },
   activityList: {
     padding: spacing.lg,
+  },
+  connectsList: {
+    padding: spacing.lg,
+  },
+  connectSectionHeading: {
+    ...typography.captionBold,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 12,
+    marginBottom: spacing.md,
+  },
+  requestCard: {
+    backgroundColor: colors.cardBackground,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  requestMeta: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    marginRight: spacing.xs,
+  },
+  requestSenderName: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 14,
+  },
+  requestSenderRole: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 1,
+  },
+  statusTag: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  statusTagAccepted: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusTagDeclined: {
+    backgroundColor: '#F3F4F6',
+  },
+  statusTagText: {
+    ...typography.micro,
+    color: '#D97706',
+    fontWeight: '700',
+    fontSize: 10,
+  },
+  statusTagTextAccepted: {
+    color: '#16A34A',
+  },
+  statusTagTextDeclined: {
+    color: '#6B7280',
+  },
+  requestTopicPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    marginBottom: spacing.sm,
+  },
+  requestTopicText: {
+    ...typography.micro,
+    color: '#2563EB',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  requestMessage: {
+    ...typography.body,
+    color: colors.textPrimary,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: spacing.md,
+  },
+  requestActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  acceptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.black,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.full,
+  },
+  acceptButtonText: {
+    ...typography.captionBold,
+    color: colors.white,
+    fontSize: 12,
+  },
+  declineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.borderLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.full,
+  },
+  declineButtonText: {
+    ...typography.captionBold,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  withdrawLink: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  withdrawLinkText: {
+    ...typography.micro,
+    color: colors.textMuted,
+    textDecorationLine: 'underline',
+  },
+  emptyRequests: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -7,17 +7,30 @@ import { Avatar } from '../core/Avatar';
 import { Typography } from '../core/Typography';
 import { Button } from '../core/Button';
 
+import { useAuthStore } from '../../store/useAuthStore';
+import { getSharedResearchInterests } from '../../api/connectionService';
+import { Sparkles } from 'lucide-react-native';
+
 export interface ResearcherCardProps {
   researcher: UserProfile;
   onFollowToggle?: () => void;
   style?: ViewStyle;
+  showMutualInterests?: boolean;
 }
 
 export const ResearcherCard: React.FC<ResearcherCardProps> = ({
   researcher,
   onFollowToggle,
   style,
+  showMutualInterests = true,
 }) => {
+  const currentUser = useAuthStore((s) => s.user);
+
+  const mutualInterests = React.useMemo(() => {
+    if (!showMutualInterests || !currentUser || currentUser.id === researcher.id) return [];
+    return getSharedResearchInterests(currentUser, researcher);
+  }, [currentUser, researcher, showMutualInterests]);
+
   const handlePress = () => {
     router.push({
       pathname: '/profile/[id]',
@@ -51,6 +64,15 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
         <Typography variant="micro" color={colors.textSecondary} numberOfLines={1} style={styles.roleText}>
           {researcher.academicTitle} · {researcher.institution}
         </Typography>
+
+        {mutualInterests.length > 0 && (
+          <View style={styles.mutualRow}>
+            <Sparkles size={11} color="#2563EB" style={{ marginRight: 3 }} />
+            <Typography variant="micro" color="#1E40AF" style={{ fontSize: 10, fontWeight: '600' }} numberOfLines={1}>
+              Mutual: {mutualInterests.slice(0, 2).join(', ')}{mutualInterests.length > 2 ? ` +${mutualInterests.length - 2}` : ''}
+            </Typography>
+          </View>
+        )}
       </View>
 
       {onFollowToggle && (
@@ -89,6 +111,11 @@ const styles = StyleSheet.create({
   },
   roleText: {
     marginTop: 2,
+  },
+  mutualRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
   },
   followButton: {
     minWidth: 86,

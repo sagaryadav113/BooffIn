@@ -5,4 +5,5 @@ export * from './post';
 export * from './notification';
 export * from './discussion';
 export * from './search';
+export * from './connection';
 

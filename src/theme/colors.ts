@@ -55,6 +55,7 @@ export const colors = {
   accentBlueHover: '#1D4ED8',
   accentGreen: '#10B981', // Open Access / verified
   accentRed: '#EF4444', // Likes and error alerts
+  error: '#EF4444',
   accentOrange: '#F59E0B', // Trending alerts
 
   // Overlays & Backdrop
