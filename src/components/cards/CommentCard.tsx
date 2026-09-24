@@ -5,10 +5,13 @@ import { Comment } from '../../types';
 import { Avatar } from '../core/Avatar';
 import { Typography } from '../core/Typography';
 import { Icon } from '../core/Icon';
+import { Trash2 } from 'lucide-react-native';
 
 export interface CommentCardProps {
   comment: Comment;
   onReply?: (comment: Comment) => void;
+  onDelete?: (commentId: string) => void;
+  currentUserId?: string;
   isReply?: boolean;
   style?: ViewStyle;
 }
@@ -16,9 +19,17 @@ export interface CommentCardProps {
 export const CommentCard: React.FC<CommentCardProps> = ({
   comment,
   onReply,
+  onDelete,
+  currentUserId,
   isReply = false,
   style,
 }) => {
+  const isOwnComment = Boolean(
+    currentUserId &&
+      (comment.author.id === currentUserId ||
+        (comment.author.id === 'usr_me' && currentUserId === 'usr_me'))
+  );
+
   return (
     <View
       style={[
@@ -42,14 +53,24 @@ export const CommentCard: React.FC<CommentCardProps> = ({
             @{comment.author.handle} · {comment.createdAt}
           </Typography>
         </View>
+
+        {isOwnComment && onDelete && (
+          <TouchableOpacity
+            onPress={() => onDelete(comment.id)}
+            style={styles.deleteButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Trash2 size={14} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <Typography variant="body" color={colors.textPrimary} style={styles.content}>
         {comment.content}
       </Typography>
 
-      {onReply && (
-        <View style={styles.actionsRow}>
+      <View style={styles.actionsRow}>
+        {onReply && (
           <TouchableOpacity
             onPress={() => onReply(comment)}
             style={styles.replyButton}
@@ -60,8 +81,20 @@ export const CommentCard: React.FC<CommentCardProps> = ({
               Reply
             </Typography>
           </TouchableOpacity>
-        </View>
-      )}
+        )}
+
+        {isOwnComment && onDelete && !onReply && (
+          <TouchableOpacity
+            onPress={() => onDelete(comment.id)}
+            style={styles.deleteTextButton}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Typography variant="micro" color={colors.accentRed} style={{ fontWeight: '600' }}>
+              Delete
+            </Typography>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Nested Replies Recursion */}
       {comment.replies && comment.replies.length > 0 && (
@@ -71,6 +104,8 @@ export const CommentCard: React.FC<CommentCardProps> = ({
               key={reply.id}
               comment={reply}
               onReply={onReply}
+              onDelete={onDelete}
+              currentUserId={currentUserId}
               isReply
             />
           ))}
@@ -102,6 +137,13 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     flex: 1,
   },
+  deleteButton: {
+    padding: spacing.xs,
+    opacity: 0.8,
+  },
+  deleteTextButton: {
+    marginLeft: 'auto',
+  },
   content: {
     fontSize: 14,
     lineHeight: 20,
@@ -110,6 +152,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: spacing.xs + 2,
   },
   replyButton: {

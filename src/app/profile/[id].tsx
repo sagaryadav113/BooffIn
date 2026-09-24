@@ -36,16 +36,22 @@ import { usePostStore } from '../../store/usePostStore';
 export default function OtherResearcherProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const users = useAuthStore((s) => s.users);
+  const currentUser = useAuthStore((s) => s.user);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
   const getPostsByUser = usePostStore((s) => s.getPostsByUser);
 
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Papers' | 'Activity'>('Posts');
 
-  const researcher = users.find((u) => u.id === id || u.handle === id) || users[1];
+  const researcher = users.find((u) => u.id === id || u.handle === id) || (id === currentUser.id ? currentUser : users[1]);
+  const isOwnProfile = researcher.id === currentUser.id;
   const posts = getPostsByUser(researcher.id);
   const paperPosts = posts.filter((p) => !!p.paper);
 
   const handleFollowToggle = () => {
+    if (isOwnProfile) {
+      router.push('/profile/edit');
+      return;
+    }
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
@@ -137,8 +143,8 @@ export default function OtherResearcherProfileScreen() {
             />
 
             <Button
-              title={researcher.isFollowing ? 'Following' : 'Follow'}
-              variant={researcher.isFollowing ? 'outline' : 'primary'}
+              title={isOwnProfile ? 'Edit Profile' : researcher.isFollowing ? 'Following' : 'Follow'}
+              variant={isOwnProfile || researcher.isFollowing ? 'outline' : 'primary'}
               size="sm"
               onPress={handleFollowToggle}
               style={styles.followButton}

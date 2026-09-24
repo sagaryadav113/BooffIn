@@ -20,6 +20,7 @@ import { colors, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { PaperCard } from './PaperCard';
 import { usePostStore } from '../../store/usePostStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 interface PostCardProps {
   post: Post;
@@ -30,6 +31,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
   const toggleLike = usePostStore((s) => s.toggleLikePost);
   const toggleRepost = usePostStore((s) => s.toggleRepost);
   const toggleSave = usePostStore((s) => s.toggleSavePost);
+  const currentUser = useAuthStore((s) => s.user);
 
   const handlePostPress = () => {
     router.push({
@@ -51,7 +53,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleLike(post.id);
+    toggleLike(post.id, currentUser?.id);
   };
 
   const handleRepost = (e: any) => {
@@ -59,7 +61,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleRepost(post.id);
+    toggleRepost(post.id, currentUser?.id);
   };
 
   const handleSave = (e: any) => {
@@ -67,7 +69,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleSave(post.id);
+    toggleSave(post.id, currentUser?.id);
   };
 
   const authorRole = [post.author.academicTitle, post.author.institution]

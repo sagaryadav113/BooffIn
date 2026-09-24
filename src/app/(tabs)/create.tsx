@@ -40,21 +40,32 @@ export default function CreatePostScreen() {
   const [paperModalVisible, setPaperModalVisible] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState<string[]>(['Neuroscience']);
   const [visibility, setVisibility] = useState<'public' | 'followers'>('public');
+  const [isPublishing, setIsPublishing] = useState(false);
 
-  const handlePublish = () => {
-    if (!content.trim() && !attachedPaper) return;
+  const handlePublish = async () => {
+    if ((!content.trim() && !attachedPaper) || isPublishing) return;
 
-    createPost({
-      content: content.trim(),
-      postType: attachedPaper ? 'research_share' : postType,
-      paper: attachedPaper || undefined,
-      topics: selectedTopics,
-      visibility,
-    });
+    setIsPublishing(true);
+    try {
+      await createPost(
+        {
+          content: content.trim(),
+          postType: attachedPaper ? 'research_share' : postType,
+          paper: attachedPaper || undefined,
+          topics: selectedTopics,
+          visibility,
+        },
+        user.id
+      );
 
-    setContent('');
-    setAttachedPaper(null);
-    router.replace('/(tabs)');
+      setContent('');
+      setAttachedPaper(null);
+      router.replace('/(tabs)');
+    } catch (err) {
+      console.error('[CreatePost] Error publishing post:', err);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleCancel = () => {
@@ -81,11 +92,11 @@ export default function CreatePostScreen() {
           <Text style={styles.headerTitle}>Create Post</Text>
 
           <Button
-            title="Post"
+            title={isPublishing ? 'Posting...' : 'Post'}
             variant="primary"
             size="sm"
             onPress={handlePublish}
-            disabled={!content.trim() && !attachedPaper}
+            disabled={isPublishing || (!content.trim() && !attachedPaper)}
             style={styles.postButton}
           />
         </View>

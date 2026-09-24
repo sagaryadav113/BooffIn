@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -27,14 +28,23 @@ export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const getPostById = usePostStore((s) => s.getPostById);
   const getCommentsForPost = usePostStore((s) => s.getCommentsForPost);
+  const fetchCommentsForPost = usePostStore((s) => s.fetchCommentsForPost);
   const addComment = usePostStore((s) => s.addComment);
+  const deleteComment = usePostStore((s) => s.deleteComment);
   const currentUser = useAuthStore((s) => s.user);
 
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const post = getPostById(id || 'post_1');
   const comments = post ? getCommentsForPost(post.id) : [];
+
+  useEffect(() => {
+    if (post) {
+      fetchCommentsForPost(post.id, currentUser.id);
+    }
+  }, [post?.id, currentUser.id]);
 
   if (!post) {
     return (
@@ -49,11 +59,39 @@ export default function PostDetailScreen() {
     );
   }
 
-  const handleSendComment = () => {
-    if (!commentText.trim()) return;
-    addComment(post.id, commentText.trim(), replyingTo?.id);
+  const handleSendComment = async () => {
+    if (!commentText.trim() || isSubmitting) return;
+
+    const textToSend = commentText.trim();
     setCommentText('');
+    const targetParentId = replyingTo?.id;
     setReplyingTo(null);
+
+    setIsSubmitting(true);
+    await addComment(post.id, textToSend, targetParentId, currentUser.id);
+    setIsSubmitting(false);
+  };
+
+  const handleDeleteComment = (commentId: string) => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to delete this comment?');
+      if (confirmed) {
+        deleteComment(commentId, post.id, currentUser.id);
+      }
+    } else {
+      Alert.alert(
+        'Delete Comment',
+        'Are you sure you want to delete this critique?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => deleteComment(commentId, post.id, currentUser.id),
+          },
+        ]
+      );
+    }
   };
 
   return (
@@ -89,6 +127,8 @@ export default function PostDetailScreen() {
                   key={c.id}
                   comment={c}
                   onReply={(target) => setReplyingTo(target)}
+                  onDelete={handleDeleteComment}
+                  currentUserId={currentUser.id}
                 />
               ))
             ) : (
@@ -130,13 +170,16 @@ export default function PostDetailScreen() {
               value={commentText}
               onChangeText={setCommentText}
               multiline
+              editable={!isSubmitting}
             />
             <TouchableOpacity
               onPress={handleSendComment}
-              disabled={!commentText.trim()}
+              disabled={!commentText.trim() || isSubmitting}
               style={[
                 styles.sendButton,
-                commentText.trim() ? styles.sendButtonActive : styles.sendButtonDisabled,
+                commentText.trim() && !isSubmitting
+                  ? styles.sendButtonActive
+                  : styles.sendButtonDisabled,
               ]}
             >
               <Icon name="Send" size="xs" color={colors.white} />

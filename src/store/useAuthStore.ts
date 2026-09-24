@@ -12,6 +12,7 @@ import {
   fetchUserProfile,
   SignUpParams,
 } from '../api/authService';
+import { followUser, unfollowUser } from '../api/socialService';
 import { supabase } from '../api/client';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -36,7 +37,7 @@ interface AuthState {
   signOut: () => Promise<void>;
   clearError: () => void;
   updateProfile: (updated: Partial<UserProfile>) => void;
-  toggleFollowUser: (userId: string) => void;
+  toggleFollowUser: (userId: string) => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -236,30 +237,67 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       };
     }),
 
-  toggleFollowUser: (userId) =>
-    set((state) => {
-      const updatedUsers = state.users.map((u) => {
+  toggleFollowUser: async (userId: string) => {
+    const currentUserId = get().user.id;
+    if (!currentUserId || currentUserId === userId) {
+      console.warn('[useAuthStore] Cannot follow self or unauthenticated');
+      return false;
+    }
+
+    const target = get().users.find((u) => u.id === userId);
+    const wasFollowing = Boolean(target?.isFollowing);
+    const isNowFollowing = !wasFollowing;
+    const followingDelta = isNowFollowing ? 1 : -1;
+
+    // 1. Optimistic update
+    set((state) => ({
+      users: state.users.map((u) => {
         if (u.id === userId) {
-          const isNowFollowing = !u.isFollowing;
           return {
             ...u,
             isFollowing: isNowFollowing,
-            followersCount: isNowFollowing ? u.followersCount + 1 : Math.max(0, u.followersCount - 1),
+            followersCount: isNowFollowing
+              ? u.followersCount + 1
+              : Math.max(0, u.followersCount - 1),
           };
         }
         return u;
-      });
+      }),
+      user: {
+        ...state.user,
+        followingCount: Math.max(0, state.user.followingCount + followingDelta),
+      },
+    }));
 
-      const target = state.users.find((u) => u.id === userId);
-      const isNowFollowing = !target?.isFollowing;
-      const followingDelta = isNowFollowing ? 1 : -1;
+    // 2. Real API mutation
+    const res = isNowFollowing
+      ? await followUser(userId, currentUserId)
+      : await unfollowUser(userId, currentUserId);
 
-      return {
-        users: updatedUsers,
+    // 3. Rollback if error
+    if (!res.success) {
+      console.warn('[useAuthStore] toggleFollowUser failed, rolling back:', res.error);
+      set((state) => ({
+        users: state.users.map((u) => {
+          if (u.id === userId) {
+            return {
+              ...u,
+              isFollowing: wasFollowing,
+              followersCount: wasFollowing
+                ? u.followersCount + 1
+                : Math.max(0, u.followersCount - 1),
+            };
+          }
+          return u;
+        }),
         user: {
           ...state.user,
-          followingCount: Math.max(0, state.user.followingCount + followingDelta),
+          followingCount: Math.max(0, state.user.followingCount - followingDelta),
         },
-      };
-    }),
+      }));
+      return false;
+    }
+
+    return true;
+  },
 }));

@@ -1,27 +1,40 @@
 import { createClient } from '@supabase/supabase-js';
-import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 
 const ExpoSecureStoreAdapter = {
-  getItem: (key: string) => {
-    if (Platform.OS === 'web') {
-      return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+  getItem: async (key: string) => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem(key);
     }
-    return SecureStore.getItemAsync(key);
+    try {
+      const SecureStore = require('expo-secure-store');
+      return await SecureStore.getItemAsync(key);
+    } catch {
+      return null;
+    }
   },
-  setItem: (key: string, value: string) => {
-    if (Platform.OS === 'web') {
-      if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+  setItem: async (key: string, value: string) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, value);
       return;
     }
-    return SecureStore.setItemAsync(key, value);
+    try {
+      const SecureStore = require('expo-secure-store');
+      await SecureStore.setItemAsync(key, value);
+    } catch {
+      // noop
+    }
   },
-  removeItem: (key: string) => {
-    if (Platform.OS === 'web') {
-      if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
+  removeItem: async (key: string) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(key);
       return;
     }
-    return SecureStore.deleteItemAsync(key);
+    try {
+      const SecureStore = require('expo-secure-store');
+      await SecureStore.deleteItemAsync(key);
+    } catch {
+      // noop
+    }
   },
 };
 

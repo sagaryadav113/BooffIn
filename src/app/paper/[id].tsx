@@ -23,6 +23,7 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { PostCard } from '../../components/cards/PostCard';
 import { usePaperStore } from '../../store/usePaperStore';
 import { usePostStore } from '../../store/usePostStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function PaperDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,6 +31,7 @@ export default function PaperDetailScreen() {
   const toggleSavePaper = usePaperStore((s) => s.toggleSavePaper);
   const toggleLikePaper = usePaperStore((s) => s.toggleLikePaper);
   const getPostsByPaper = usePostStore((s) => s.getPostsByPaper);
+  const currentUser = useAuthStore((s) => s.user);
 
   const [abstractExpanded, setAbstractExpanded] = useState(false);
 
@@ -63,7 +65,7 @@ export default function PaperDetailScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleSavePaper(paper.id);
+    toggleSavePaper(paper.id, currentUser?.id);
   };
 
   const handleLike = () => {

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { Paper } from '../types';
-import { mockPapers } from '../data/mockData';
+import { mockPapers, currentUser } from '../data/mockData';
+import { toggleBookmark as apiToggleBookmark } from '../api/socialService';
 
 interface PaperState {
   papers: Paper[];
   savedPaperIds: Set<string>;
-  toggleSavePaper: (paperId: string) => void;
+  toggleSavePaper: (paperId: string, currentUserId?: string) => Promise<void>;
   toggleLikePaper: (paperId: string) => void;
   getPaperById: (id: string) => Paper | undefined;
   getPaperByDoi: (doi: string) => Paper | undefined;
@@ -16,17 +17,18 @@ interface PaperState {
 export const usePaperStore = create<PaperState>((set, get) => ({
   papers: mockPapers,
   savedPaperIds: new Set(['paper_1', 'paper_3']),
-  toggleSavePaper: (paperId) =>
-    set((state) => {
-      const nextSaved = new Set(state.savedPaperIds);
-      const isCurrentlySaved = nextSaved.has(paperId);
-      if (isCurrentlySaved) {
-        nextSaved.delete(paperId);
-      } else {
-        nextSaved.add(paperId);
-      }
+  toggleSavePaper: async (paperId, currentUserId) => {
+    const isCurrentlySaved = get().savedPaperIds.has(paperId);
+    const nextSaved = new Set(get().savedPaperIds);
+    if (isCurrentlySaved) {
+      nextSaved.delete(paperId);
+    } else {
+      nextSaved.add(paperId);
+    }
 
-      const updatedPapers = state.papers.map((p) => {
+    // 1. Optimistic update
+    set((state) => ({
+      papers: state.papers.map((p) => {
         if (p.id === paperId) {
           return {
             ...p,
@@ -35,13 +37,38 @@ export const usePaperStore = create<PaperState>((set, get) => ({
           };
         }
         return p;
-      });
+      }),
+      savedPaperIds: nextSaved,
+    }));
 
-      return {
-        papers: updatedPapers,
-        savedPaperIds: nextSaved,
-      };
-    }),
+    // 2. Real API mutation
+    const userId = currentUserId || currentUser.id;
+    const res = await apiToggleBookmark({ paperId }, isCurrentlySaved, userId);
+
+    // 3. Rollback if error
+    if (!res.success) {
+      console.warn('[usePaperStore] Save paper mutation failed, rolling back:', res.error);
+      const rollbackSaved = new Set(get().savedPaperIds);
+      if (isCurrentlySaved) {
+        rollbackSaved.add(paperId);
+      } else {
+        rollbackSaved.delete(paperId);
+      }
+      set((state) => ({
+        papers: state.papers.map((p) => {
+          if (p.id === paperId) {
+            return {
+              ...p,
+              isSaved: isCurrentlySaved,
+              savesCount: isCurrentlySaved ? p.savesCount + 1 : Math.max(0, p.savesCount - 1),
+            };
+          }
+          return p;
+        }),
+        savedPaperIds: rollbackSaved,
+      }));
+    }
+  },
   toggleLikePaper: (paperId) =>
     set((state) => ({
       papers: state.papers.map((p) => {
