@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors, shadows } from '../theme';
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary';
+import { WebInstallBanner } from '../components/layout/WebInstallBanner';
 import { useAuthStore } from '../store/useAuthStore';
 
 export default function RootLayout() {
@@ -19,6 +20,7 @@ export default function RootLayout() {
       <ErrorBoundary>
         <View style={styles.outerContainer}>
           <View style={styles.mobileFrame}>
+            <WebInstallBanner />
             <Stack
               screenOptions={{
                 headerShown: false,

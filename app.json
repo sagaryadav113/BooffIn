@@ -21,7 +21,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "BooffIn",
+      "shortName": "BooffIn",
+      "description": "Research finds it's people. A modern academic and scientific discussion community.",
+      "themeColor": "#0F172A",
+      "backgroundColor": "#FFFFFF",
+      "display": "standalone",
+      "startUrl": "/"
     },
     "plugins": [
       "expo-router",

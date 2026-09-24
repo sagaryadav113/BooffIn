@@ -33,6 +33,7 @@ export * from './layout/BottomTabBar';
 export * from './layout/Header';
 export * from './layout/FeedNavigation';
 export * from './layout/ScreenContainer';
+export * from './layout/WebInstallBanner';
 
 // Feedback Components
 export * from './feedback/EmptyState';
@@ -45,3 +46,5 @@ export * from './feedback/Skeleton';
 // Modals
 export * from './modals/EditProfileModal';
 export * from './modals/PaperLookupModal';
+export * from './modals/InstallAppModal';
+

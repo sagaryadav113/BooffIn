@@ -9,6 +9,9 @@ import { Icon, IconName } from '../../components/core/Icon';
 import { Divider } from '../../components/core/Divider';
 import { env } from '../../config/env';
 
+import { InstallAppModal } from '../../components/modals/InstallAppModal';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
+
 interface SettingRowProps {
   icon: IconName;
   title: string;
@@ -55,12 +58,34 @@ const SettingRow: React.FC<SettingRowProps> = ({
 export default function SettingsScreen() {
   const [pushEnabled, setPushEnabled] = React.useState(true);
   const [digestEnabled, setDigestEnabled] = React.useState(true);
+  const [installModalVisible, setInstallModalVisible] = React.useState(false);
+  const { isInstalled, canInstall, isIOS } = usePWAInstall();
 
   return (
     <ScreenContainer scrollable>
       <Header title="Settings" showBack onBack={() => router.back()} />
 
       <View style={styles.content}>
+        {/* Section: App Installation & Offline Access */}
+        <Typography variant="captionBold" color={colors.textSecondary} style={styles.sectionHeader}>
+          APP INSTALLATION & EXPERIENCE
+        </Typography>
+
+        <View style={styles.cardGroup}>
+          <SettingRow
+            icon="Download"
+            title={isInstalled ? "App Installed (Standalone)" : "Install BooffIn App"}
+            subtitle={
+              isInstalled
+                ? "Running in dedicated standalone application mode"
+                : isIOS
+                ? "Add BooffIn to your iOS Home Screen for full-screen experience"
+                : "Install as a desktop or mobile application for instant access"
+            }
+            onPress={() => setInstallModalVisible(true)}
+          />
+        </View>
+
         {/* Section: Academic Identity */}
         <Typography variant="captionBold" color={colors.textSecondary} style={styles.sectionHeader}>
           ACADEMIC IDENTITY & VERIFICATION
@@ -161,6 +186,11 @@ export default function SettingsScreen() {
             Research finds it's people.
           </Typography>
         </View>
+
+        <InstallAppModal
+          visible={installModalVisible}
+          onClose={() => setInstallModalVisible(false)}
+        />
       </View>
     </ScreenContainer>
   );

@@ -10,10 +10,11 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowRight, LogIn } from 'lucide-react-native';
+import { ArrowRight, LogIn, Download, Smartphone } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { BooffinLogo } from '../../components/core/BooffinLogo';
 import { Button } from '../../components/core/Button';
+import { InstallAppModal } from '../../components/modals/InstallAppModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { currentUser } from '../../data/mockData';
 
@@ -21,6 +22,7 @@ export default function WelcomeScreen() {
   const { signInWithGoogle, signInWithORCID, signInWithDemoUser, isLoading, authError } = useAuthStore();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [orcidLoading, setOrcidLoading] = useState(false);
+  const [installModalVisible, setInstallModalVisible] = useState(false);
 
   const handleCreateAccount = () => {
     router.push('/(auth)/signup');
@@ -139,6 +141,16 @@ export default function WelcomeScreen() {
             style={styles.actionButton}
           />
 
+          {/* Install App Trigger Button */}
+          <TouchableOpacity
+            style={styles.installAppLink}
+            onPress={() => setInstallModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Download size={14} color={colors.textPrimary} style={{ marginRight: 6 }} />
+            <Text style={styles.installAppLinkText}>Install App for Web & Mobile</Text>
+          </TouchableOpacity>
+
           {/* Guest / Demo Explore Option */}
           <TouchableOpacity
             onPress={handleGuestDemo}
@@ -150,6 +162,11 @@ export default function WelcomeScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        <InstallAppModal
+          visible={installModalVisible}
+          onClose={() => setInstallModalVisible(false)}
+        />
       </View>
     </SafeAreaView>
   );
@@ -278,6 +295,24 @@ const styles = StyleSheet.create({
   actionButton: {
     width: '100%',
     paddingVertical: spacing.md - 2,
+  },
+  installAppLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.full,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    marginTop: 2,
+  },
+  installAppLinkText: {
+    ...typography.captionMedium,
+    color: colors.textPrimary,
+    fontWeight: '600',
+    fontSize: 12,
   },
   guestLink: {
     paddingVertical: spacing.xs,

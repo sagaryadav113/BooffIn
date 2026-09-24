@@ -61,6 +61,7 @@ export type IconName =
   | 'Lock'
   | 'Mail'
   | 'Key'
+  | 'Download'
   | 'LogOut';
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
