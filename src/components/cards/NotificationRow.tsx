@@ -2,10 +2,12 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import { colors, radii, spacing } from '../../theme';
-import { AppNotification } from '../../types';
+import { AppNotification } from '../../types/notification';
 import { Avatar } from '../core/Avatar';
 import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
+import { getNotificationDeepLink } from '../../api/notificationService';
+import { useNotificationStore } from '../../store/useNotificationStore';
 
 export interface NotificationRowProps {
   notification: AppNotification;
@@ -18,28 +20,24 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
   onPress,
   style,
 }) => {
+  const markAsRead = useNotificationStore((s) => s.markAsRead);
+
   const handlePress = () => {
+    // Automatically mark as read on tap
+    if (!notification.isRead) {
+      markAsRead(notification.id);
+    }
+
     if (onPress) {
       onPress();
       return;
     }
 
-    if (notification.targetPost) {
-      router.push({
-        pathname: '/post/[id]',
-        params: { id: notification.targetPost.id },
-      });
-    } else if (notification.targetPaper) {
-      router.push({
-        pathname: '/paper/[id]',
-        params: { id: notification.targetPaper.id },
-      });
-    } else {
-      router.push({
-        pathname: '/profile/[id]',
-        params: { id: notification.actor.id },
-      });
-    }
+    const { pathname, params } = getNotificationDeepLink(notification);
+    router.push({
+      pathname: pathname as any,
+      params,
+    });
   };
 
   const getEventBadge = (): { icon: IconName; bg: string } => {
@@ -48,10 +46,20 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
         return { icon: 'Heart', bg: colors.accentRed };
       case 'comment':
         return { icon: 'MessageCircle', bg: colors.accentBlue };
+      case 'reply':
+        return { icon: 'MessageSquare', bg: colors.accentBlue };
       case 'repost':
         return { icon: 'Repeat2', bg: colors.accentGreen };
       case 'follow':
         return { icon: 'User', bg: colors.black };
+      case 'paper_discussion':
+        return { icon: 'FileText', bg: '#8B5CF6' };
+      case 'researcher_post':
+        return { icon: 'Sparkles', bg: colors.accentGreen };
+      case 'topic_activity':
+        return { icon: 'Tag', bg: colors.accentOrange };
+      case 'mention':
+        return { icon: 'MessageCircle', bg: colors.accentBlue };
       case 'trending':
         return { icon: 'Zap', bg: colors.accentOrange };
       default:
@@ -96,7 +104,8 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
       </View>
 
       <View style={styles.rightAction}>
-        <Icon name="MoreHorizontal" size="xs" color={colors.textMuted} />
+        {!notification.isRead && <View style={styles.unreadDot} />}
+        <Icon name="ArrowUpRight" size="xs" color={colors.textMuted} />
       </View>
     </TouchableOpacity>
   );
@@ -113,7 +122,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderLight,
   },
   unread: {
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F8FAFC',
   },
   avatarWrapper: {
     position: 'relative',
@@ -141,6 +150,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   rightAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingLeft: spacing.sm,
+    gap: spacing.xs,
+  },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radii.full,
+    backgroundColor: colors.accentBlue,
   },
 });

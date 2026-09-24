@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,22 +6,69 @@ import {
   StatusBar,
   FlatList,
   ScrollView,
+  RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { colors, spacing } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { TopicChip } from '../../components/core/TopicChip';
 import { NotificationRow } from '../../components/cards/NotificationRow';
 import { EmptyState } from '../../components/feedback/EmptyState';
+import { LoadingState } from '../../components/feedback/LoadingState';
+import { Typography } from '../../components/core/Typography';
+import { Icon } from '../../components/core/Icon';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { NotificationFilter } from '../../types/notification';
 
 export default function NotificationsScreen() {
+  const notifications = useNotificationStore((s) => s.notifications);
   const activeFilter = useNotificationStore((s) => s.activeFilter);
   const setActiveFilter = useNotificationStore((s) => s.setActiveFilter);
   const getFilteredNotifications = useNotificationStore((s) => s.getFilteredNotifications);
   const markAllAsRead = useNotificationStore((s) => s.markAllAsRead);
+  const loadNotifications = useNotificationStore((s) => s.loadNotifications);
+  const isLoading = useNotificationStore((s) => s.isLoading);
+  const isRefreshing = useNotificationStore((s) => s.isRefreshing);
+  const unreadCount = useNotificationStore((s) => s.unreadCount());
 
-  const notifications = getFilteredNotifications();
-  const filterOptions = ['All', 'Mentions', 'Follows', 'Updates'];
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  const filteredNotifications = getFilteredNotifications();
+  const filterOptions: NotificationFilter[] = ['All', 'Mentions', 'Follows', 'Discussions', 'Updates'];
+
+  const getEmptyStateContent = () => {
+    switch (activeFilter) {
+      case 'Mentions':
+        return {
+          title: 'No mentions or replies',
+          description: 'When peers reply to your comments or mention your research, they will appear here.',
+        };
+      case 'Follows':
+        return {
+          title: 'No new followers',
+          description: 'When researchers start following your scientific profile, they will appear here.',
+        };
+      case 'Discussions':
+        return {
+          title: 'No paper discussions yet',
+          description: 'New activity on referenced papers and discussions you interacted with will show up here.',
+        };
+      case 'Updates':
+        return {
+          title: 'No updates yet',
+          description: 'New publications from followed researchers and topics will appear here.',
+        };
+      default:
+        return {
+          title: 'No notifications yet',
+          description: 'When researchers interact with your research discussions or citations, they will appear here.',
+        };
+    }
+  };
+
+  const emptyInfo = getEmptyStateContent();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -30,8 +77,20 @@ export default function NotificationsScreen() {
       {/* Header */}
       <AppHeader
         title="Notifications"
-        rightIcon="Check"
-        onRightIconPress={markAllAsRead}
+        rightElement={
+          unreadCount > 0 ? (
+            <TouchableOpacity
+              onPress={markAllAsRead}
+              style={styles.markAllButton}
+              activeOpacity={0.7}
+            >
+              <Icon name="Check" size="xs" color={colors.textSecondary} />
+              <Typography variant="caption" color={colors.textSecondary}>
+                Mark read
+              </Typography>
+            </TouchableOpacity>
+          ) : null
+        }
       />
 
       {/* Filter Tabs */}
@@ -46,26 +105,37 @@ export default function NotificationsScreen() {
               key={opt}
               label={opt}
               selected={activeFilter === opt}
-              onPress={() => setActiveFilter(opt as any)}
+              onPress={() => setActiveFilter(opt)}
             />
           ))}
         </ScrollView>
       </View>
 
       {/* Notifications List */}
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <NotificationRow notification={item} />}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <EmptyState
-            icon="Bell"
-            title="No notifications yet"
-            description="When researchers interact with your research discussions or citations, they will appear here."
-          />
-        }
-      />
+      {isLoading && notifications.length === 0 ? (
+        <LoadingState message="Loading notifications..." />
+      ) : (
+        <FlatList
+          data={filteredNotifications}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <NotificationRow notification={item} />}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => loadNotifications(true)}
+              tintColor={colors.black}
+            />
+          }
+          ListEmptyComponent={
+            <EmptyState
+              icon="Bell"
+              title={emptyInfo.title}
+              description={emptyInfo.description}
+            />
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -88,5 +158,15 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: spacing.xxxl,
+    flexGrow: 1,
+  },
+  markAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 6,
+    backgroundColor: colors.backgroundSecondary,
   },
 });

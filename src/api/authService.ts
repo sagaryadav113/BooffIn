@@ -113,6 +113,8 @@ export async function getInitialAuthSession(): Promise<UserProfile | null> {
   }
 }
 
+export const getCurrentUser = getInitialAuthSession;
+
 /**
  * Sign In with Email & Password
  */

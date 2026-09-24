@@ -10,16 +10,20 @@ import { router } from 'expo-router';
 import {
   Heart,
   MessageCircle,
+  MessageSquare,
   Repeat2,
   UserPlus,
   TrendingUp,
   FileText,
+  Sparkles,
+  Tag,
   MoreHorizontal,
 } from 'lucide-react-native';
 import { AppNotification } from '../../types';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { getNotificationDeepLink } from '../../api/notificationService';
 
 interface NotificationCardProps {
   notification: AppNotification;
@@ -33,23 +37,14 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
   const markAsRead = useNotificationStore((s) => s.markAsRead);
 
   const handlePress = () => {
-    markAsRead(notification.id);
-    if (notification.targetPost) {
-      router.push({
-        pathname: '/post/[id]',
-        params: { id: notification.targetPost.id },
-      });
-    } else if (notification.targetPaper) {
-      router.push({
-        pathname: '/paper/[id]',
-        params: { id: notification.targetPaper.id },
-      });
-    } else {
-      router.push({
-        pathname: '/profile/[id]',
-        params: { id: notification.actor.id },
-      });
+    if (!notification.isRead) {
+      markAsRead(notification.id);
     }
+    const { pathname, params } = getNotificationDeepLink(notification);
+    router.push({
+      pathname: pathname as any,
+      params,
+    });
   };
 
   const getEventIcon = () => {
@@ -67,6 +62,12 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
             <MessageCircle size={size} color={colors.white} />
           </View>
         );
+      case 'reply':
+        return (
+          <View style={[styles.badgeContainer, { backgroundColor: colors.accentLink }]}>
+            <MessageSquare size={size} color={colors.white} />
+          </View>
+        );
       case 'repost':
         return (
           <View style={[styles.badgeContainer, { backgroundColor: colors.accentGreen }]}>
@@ -77,6 +78,24 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
         return (
           <View style={[styles.badgeContainer, { backgroundColor: colors.black }]}>
             <UserPlus size={size} color={colors.white} />
+          </View>
+        );
+      case 'paper_discussion':
+        return (
+          <View style={[styles.badgeContainer, { backgroundColor: '#8B5CF6' }]}>
+            <FileText size={size} color={colors.white} />
+          </View>
+        );
+      case 'researcher_post':
+        return (
+          <View style={[styles.badgeContainer, { backgroundColor: colors.accentGreen }]}>
+            <Sparkles size={size} color={colors.white} />
+          </View>
+        );
+      case 'topic_activity':
+        return (
+          <View style={[styles.badgeContainer, { backgroundColor: colors.accentOrange }]}>
+            <Tag size={size} color={colors.white} />
           </View>
         );
       case 'trending':
@@ -143,7 +162,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.backgroundCard,
   },
   unreadContainer: {
     backgroundColor: '#FAFAFA',

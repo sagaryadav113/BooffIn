@@ -10,13 +10,19 @@ export type PostTypeEnum = 'discussion' | 'research_share' | 'question' | 'insig
 export type VisibilityEnum = 'public' | 'followers' | 'unlisted';
 export type OpenAccessStatusEnum = 'gold' | 'green' | 'bronze' | 'hybrid' | 'closed' | 'preprint';
 export type NotificationTypeEnum =
-  | 'like'
-  | 'repost'
-  | 'comment'
   | 'follow'
+  | 'like'
+  | 'comment'
+  | 'reply'
+  | 'repost'
+  | 'paper_discussion'
+  | 'researcher_post'
+  | 'topic_activity'
   | 'mention'
   | 'paper_share'
   | 'topic_update'
+  | 'trending'
+  | 'publisher_update'
   | 'system';
 export type EntityTypeEnum = 'post' | 'comment' | 'paper' | 'profile' | 'topic';
 
@@ -416,6 +422,7 @@ export interface Database {
           entity_type: EntityTypeEnum;
           entity_id: string;
           message_snippet: string | null;
+          metadata?: Json;
           read_status: boolean;
           created_at: string;
         };
@@ -427,6 +434,7 @@ export interface Database {
           entity_type: EntityTypeEnum;
           entity_id: string;
           message_snippet?: string | null;
+          metadata?: Json;
           read_status?: boolean;
           created_at?: string;
         };
@@ -438,6 +446,7 @@ export interface Database {
           entity_type?: EntityTypeEnum;
           entity_id?: string;
           message_snippet?: string | null;
+          metadata?: Json;
           read_status?: boolean;
           created_at?: string;
         };
