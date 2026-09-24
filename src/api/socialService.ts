@@ -2,6 +2,7 @@ import { supabase } from './client';
 import { Post, Comment, PostType, Paper, UserProfile } from '../types';
 import { mockPosts, mockComments, mockUsers, mockPapers } from '../data/mockData';
 import { getFollowedTopicsForUser } from './topicService';
+import { getFeedRanker, buildUserRankingContext } from './ranking/feedRanker';
 
 /**
  * Explainable "For You" Feed Ranking Function
@@ -69,7 +70,7 @@ export function isSupabaseConfigured(): boolean {
 const localLikes = new Set<string>();
 const localReposts = new Set<string>();
 const localBookmarks = new Set<string>();
-const localFollows = new Set<string>();
+const localFollows = new Set<string>(['usr_me:usr_1', 'usr_me:usr_2']);
 const localCommentsStore: Record<string, Comment[]> = { ...mockComments };
 const localCreatedPosts: Post[] = [];
 
@@ -343,12 +344,19 @@ export async function fetchFeed(
 
     let filtered = mappedPosts;
     if (tab === 'For You') {
-      const followedTopics = currentUserId ? getFollowedTopicsForUser(currentUserId) : [];
-      filtered = [...mappedPosts].sort(
-        (a, b) =>
-          calculateExplainableFeedScore(b, followedTopics) -
-          calculateExplainableFeedScore(a, followedTopics)
-      );
+      const followedUserIds = currentUserId
+        ? Array.from(localFollows).filter((f) => f.startsWith(`${currentUserId}:`)).map((f) => f.split(':')[1])
+        : ['usr_1', 'usr_2'];
+      const context = buildUserRankingContext(currentUserId, followedUserIds);
+      if (currentUserId) {
+        for (const key of localLikes) {
+          if (key.startsWith(`${currentUserId}:`)) context.userLikedPostIds.add(key.split(':')[1]);
+        }
+        for (const key of localBookmarks) {
+          if (key.startsWith(`${currentUserId}:post:`)) context.userSavedPostIds.add(key.replace(`${currentUserId}:post:`, ''));
+        }
+      }
+      filtered = getFeedRanker().rank(mappedPosts, context);
     } else if (tab !== 'For You' && tab !== 'Following') {
       const targetTopic = tab.toLowerCase();
       filtered = mappedPosts.filter((p) =>
@@ -388,12 +396,19 @@ function getFallbackFeed(
   let filtered = allPosts;
 
   if (tab === 'For You') {
-    const followedTopics = currentUserId ? getFollowedTopicsForUser(currentUserId) : [];
-    filtered = [...allPosts].sort(
-      (a, b) =>
-        calculateExplainableFeedScore(b, followedTopics) -
-        calculateExplainableFeedScore(a, followedTopics)
-    );
+    const followedUserIds = currentUserId
+      ? Array.from(localFollows).filter((f) => f.startsWith(`${currentUserId}:`)).map((f) => f.split(':')[1])
+      : ['usr_1', 'usr_2'];
+    const context = buildUserRankingContext(currentUserId, followedUserIds);
+    if (currentUserId) {
+      for (const key of localLikes) {
+        if (key.startsWith(`${currentUserId}:`)) context.userLikedPostIds.add(key.split(':')[1]);
+      }
+      for (const key of localBookmarks) {
+        if (key.startsWith(`${currentUserId}:post:`)) context.userSavedPostIds.add(key.replace(`${currentUserId}:post:`, ''));
+      }
+    }
+    filtered = getFeedRanker().rank(allPosts, context);
   } else if (tab === 'Following' && currentUserId) {
     filtered = allPosts.filter((p) => localFollows.has(`${currentUserId}:${p.author.id}`));
   } else if (tab !== 'For You' && tab !== 'Following') {
