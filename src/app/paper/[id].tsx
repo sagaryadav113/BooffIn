@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,31 +12,87 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing } from '../../theme';
+import {
+  ExternalLink,
+  ArrowRight,
+  Heart,
+  MessageSquare,
+  TrendingUp,
+  Bookmark,
+  Share2,
+} from 'lucide-react-native';
+import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Badge } from '../../components/core/Badge';
 import { TopicChip } from '../../components/core/TopicChip';
 import { IconButton } from '../../components/core/IconButton';
 import { Typography } from '../../components/core/Typography';
-import { Icon } from '../../components/core/Icon';
 import { EmptyState } from '../../components/feedback/EmptyState';
-import { PostCard } from '../../components/cards/PostCard';
 import { usePaperStore } from '../../store/usePaperStore';
-import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useDiscussionStore } from '../../store/useDiscussionStore';
+import {
+  DiscussionTypePills,
+  DiscussionComposer,
+  DiscussionCard,
+  ParticipatingResearchers,
+  PeopleInterestedSection,
+} from '../../components/discussion';
+import { currentUser as fallbackUser } from '../../data/mockData';
+import { DiscussionType } from '../../types';
 
 export default function PaperDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const paperId = id || 'paper_1';
+
   const getPaperById = usePaperStore((s) => s.getPaperById);
   const toggleSavePaper = usePaperStore((s) => s.toggleSavePaper);
   const toggleLikePaper = usePaperStore((s) => s.toggleLikePaper);
-  const getPostsByPaper = usePostStore((s) => s.getPostsByPaper);
-  const currentUser = useAuthStore((s) => s.user);
+  const authUser = useAuthStore((s) => s.user);
+  const currentUser = authUser || fallbackUser;
+
+  // Discussion store hooks
+  const discussions = useDiscussionStore((s) => s.discussions[paperId] || []);
+  const activeFilter = useDiscussionStore((s) => s.activeFilter);
+  const setActiveFilter = useDiscussionStore((s) => s.setActiveFilter);
+  const addDiscussion = useDiscussionStore((s) => s.addDiscussion);
+  const addReply = useDiscussionStore((s) => s.addReply);
+  const toggleLikeDiscussion = useDiscussionStore((s) => s.toggleLikeDiscussion);
+  const toggleLikeReply = useDiscussionStore((s) => s.toggleLikeReply);
+  const getParticipatingResearchers = useDiscussionStore((s) => s.getParticipatingResearchers);
+  const getInterestedPeople = useDiscussionStore((s) => s.getInterestedPeople);
 
   const [abstractExpanded, setAbstractExpanded] = useState(false);
 
-  const paper = getPaperById(id || 'paper_1');
-  const relatedPosts = paper ? getPostsByPaper(paper.id) : [];
+  const paper = getPaperById(paperId);
+
+  // Compute counts for structured discussion types
+  const counts = useMemo(() => {
+    return {
+      all: discussions.length,
+      discussion: discussions.filter((d) => d.type === 'discussion').length,
+      question: discussions.filter((d) => d.type === 'question').length,
+      insight: discussions.filter((d) => d.type === 'insight').length,
+      methodology: discussions.filter((d) => d.type === 'methodology').length,
+    };
+  }, [discussions]);
+
+  // Filtered discussions list
+  const filteredDiscussions = useMemo(() => {
+    if (activeFilter === 'all') return discussions;
+    return discussions.filter((d) => d.type === activeFilter);
+  }, [discussions, activeFilter]);
+
+  // Participating researchers for this paper
+  const participatingResearchers = useMemo(() => {
+    return getParticipatingResearchers(paperId);
+  }, [discussions, paperId, getParticipatingResearchers]);
+
+  // People interested in this paper (deterministic recommendations based on topics & interactions)
+  const interestedPeople = useMemo(() => {
+    if (!paper) return [];
+    return getInterestedPeople(paper, currentUser.id);
+  }, [paper, currentUser.id, getInterestedPeople]);
 
   if (!paper) {
     return (
@@ -56,7 +112,7 @@ export default function PaperDetailScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `${paper.title}\n${paper.canonicalUrl}\nDiscussed on BooffIn: Research finds it's people.`,
+        message: `${paper.title}\n${paper.canonicalUrl}\nDiscussed on BooffIn: Where scientific research finds its people.`,
       });
     } catch {}
   };
@@ -65,7 +121,7 @@ export default function PaperDetailScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleSavePaper(paper.id, currentUser?.id);
+    toggleSavePaper(paper.id, currentUser.id);
   };
 
   const handleLike = () => {
@@ -81,7 +137,7 @@ export default function PaperDetailScreen() {
     }
   };
 
-  const getJournalVariant = (journal: string) => {
+  const getJournalVariant = (journal: string): 'nature' | 'science' | 'cell' | 'generic' => {
     const j = journal.toLowerCase();
     if (j.includes('nature')) return 'nature';
     if (j.includes('science')) return 'science';
@@ -89,7 +145,34 @@ export default function PaperDetailScreen() {
     return 'generic';
   };
 
+  const handlePostDiscussion = (params: {
+    type: DiscussionType;
+    content: string;
+    title?: string;
+  }) => {
+    addDiscussion({
+      paperId: paper.id,
+      author: currentUser,
+      type: params.type,
+      content: params.content,
+      title: params.title,
+    });
+  };
+
+  const handleAddReply = (discussionId: string, content: string) => {
+    addReply({
+      paperId: paper.id,
+      discussionId,
+      author: currentUser,
+      content,
+    });
+  };
+
   const authorsString = paper.authors.map((a) => a.name).join(', ');
+  const totalDiscussionCount = discussions.reduce(
+    (acc, d) => acc + 1 + (d.replies?.length || 0),
+    0
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -98,7 +181,7 @@ export default function PaperDetailScreen() {
       {/* Header */}
       <AppHeader
         showBack
-        title="Research Reference"
+        title="Paper Reference"
         rightAction={
           <View style={styles.headerRightActions}>
             <IconButton
@@ -120,7 +203,7 @@ export default function PaperDetailScreen() {
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Figures Gallery Carousel */}
+        {/* Figures Gallery Carousel (if available) */}
         {paper.figures && paper.figures.length > 0 && (
           <View style={styles.figuresContainer}>
             <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
@@ -143,38 +226,41 @@ export default function PaperDetailScreen() {
           </View>
         )}
 
-        {/* Paper Main Metadata */}
+        {/* ================================================================ */}
+        {/* PAPER REFERENCE METADATA CARD */}
+        {/* ================================================================ */}
         <View style={styles.metaContainer}>
-          {/* Title */}
+          {/* Paper Title */}
           <Typography variant="titleSerif" style={styles.title}>
             {paper.title}
           </Typography>
 
-          {/* Journal Badge & Publisher Link */}
+          {/* Journal Badge & Publication Date */}
           <View style={styles.journalRow}>
             <Badge
               label={paper.journal}
               variant={getJournalVariant(paper.journal)}
             />
+            {paper.isOpenAccess && <Badge label="Open Access" variant="oa" />}
             <Typography variant="captionMedium" color={colors.textSecondary}>
-              {paper.journal} ({paper.publicationYear})
+              {paper.publicationDate ? `${paper.journal} · ${paper.publicationDate}` : `${paper.journal} (${paper.publicationYear})`}
             </Typography>
           </View>
 
-          {/* Authors */}
+          {/* Authors List */}
           <Typography variant="caption" color={colors.textSecondary} style={styles.authorsText}>
             {authorsString}
           </Typography>
 
-          {/* Read Paper External Publisher Action */}
+          {/* Canonical External "Read Paper" Button */}
           <TouchableOpacity
             onPress={handleOpenPublisher}
             style={styles.readPaperExternalBtn}
             activeOpacity={0.85}
           >
             <View style={styles.readPaperLeft}>
-              <Icon name="ExternalLink" size="sm" color={colors.white} />
-              <View>
+              <ExternalLink size={18} color={colors.white} />
+              <View style={styles.readPaperTextWrap}>
                 <Typography variant="captionBold" color={colors.white}>
                   Read Paper on Publisher / Repository
                 </Typography>
@@ -183,35 +269,37 @@ export default function PaperDetailScreen() {
                 </Typography>
               </View>
             </View>
-            <Icon name="ArrowRight" size="xs" color={colors.white} />
+            <ArrowRight size={16} color={colors.white} />
           </TouchableOpacity>
 
           {/* Abstract Section */}
-          <View style={styles.abstractSection}>
-            <Typography variant="captionBold" color={colors.textPrimary} style={styles.abstractHeading}>
-              Abstract
-            </Typography>
-            <Typography
-              variant="body"
-              numberOfLines={abstractExpanded ? undefined : 4}
-              style={styles.abstractText}
-            >
-              {paper.abstract}
-            </Typography>
-            {paper.abstract.length > 150 && (
-              <TouchableOpacity
-                onPress={() => setAbstractExpanded(!abstractExpanded)}
-                style={styles.readMoreButton}
-                activeOpacity={0.7}
+          {paper.abstract && (
+            <View style={styles.abstractSection}>
+              <Typography variant="captionBold" color={colors.textPrimary} style={styles.abstractHeading}>
+                Abstract
+              </Typography>
+              <Typography
+                variant="body"
+                numberOfLines={abstractExpanded ? undefined : 4}
+                style={styles.abstractText}
               >
-                <Typography variant="captionBold" color={colors.textPrimary}>
-                  {abstractExpanded ? 'Show less' : 'Read more'}
-                </Typography>
-              </TouchableOpacity>
-            )}
-          </View>
+                {paper.abstract}
+              </Typography>
+              {paper.abstract.length > 150 && (
+                <TouchableOpacity
+                  onPress={() => setAbstractExpanded(!abstractExpanded)}
+                  style={styles.readMoreButton}
+                  activeOpacity={0.7}
+                >
+                  <Typography variant="captionBold" color={colors.textPrimary}>
+                    {abstractExpanded ? 'Show less' : 'Read more'}
+                  </Typography>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
-          {/* Topic Tags */}
+          {/* Topics & Disciplines */}
           <View style={styles.topicsSection}>
             <Typography variant="captionBold" color={colors.textPrimary} style={styles.topicsHeading}>
               Topics & Disciplines
@@ -228,13 +316,13 @@ export default function PaperDetailScreen() {
             </View>
           </View>
 
-          {/* Interaction Bar */}
+          {/* Interaction & Metric Bar */}
           <View style={styles.interactionBar}>
             <TouchableOpacity onPress={handleLike} style={styles.interactionItem} activeOpacity={0.7}>
-              <Icon
-                name="Heart"
-                size="sm"
+              <Heart
+                size={16}
                 color={paper.isLiked ? colors.accentRed : colors.textSecondary}
+                fill={paper.isLiked ? colors.accentRed : 'transparent'}
               />
               <Typography
                 variant="captionMedium"
@@ -245,49 +333,95 @@ export default function PaperDetailScreen() {
             </TouchableOpacity>
 
             <View style={styles.interactionItem}>
-              <Icon name="MessageSquare" size="sm" color={colors.textSecondary} />
+              <MessageSquare size={16} color={colors.textSecondary} />
               <Typography variant="captionMedium" color={colors.textSecondary}>
-                {paper.discussionCount}
+                {totalDiscussionCount} Discussions
               </Typography>
             </View>
 
             <View style={styles.interactionItem}>
-              <Icon name="TrendingUp" size="sm" color={colors.textSecondary} />
+              <TrendingUp size={16} color={colors.textSecondary} />
               <Typography variant="captionMedium" color={colors.textSecondary}>
-                18 Citations
+                {paper.citationCount || 18} Citations
               </Typography>
             </View>
 
-            <IconButton
-              icon="Share2"
-              size="sm"
-              variant="ghost"
-              color={colors.textSecondary}
-              onPress={handleShare}
-            />
+            <TouchableOpacity onPress={handleShare} style={styles.interactionItem} activeOpacity={0.7}>
+              <Share2 size={16} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Community Discussions Header */}
-        <View style={styles.discussionsHeader}>
-          <Typography variant="captionBold" color={colors.textPrimary}>
-            Community Discussions
-          </Typography>
-          <Typography variant="caption" color={colors.textSecondary}>
-            ({relatedPosts.length})
+        {/* ================================================================ */}
+        {/* PARTICIPATING RESEARCHERS BANNER */}
+        {/* ================================================================ */}
+        <ParticipatingResearchers researchers={participatingResearchers} />
+
+        {/* ================================================================ */}
+        {/* STRUCTURED DISCUSSION SECTION */}
+        {/* ================================================================ */}
+        <View style={styles.discussionHeader}>
+          <View style={styles.discussionTitleRow}>
+            <MessageSquare size={18} color={colors.textPrimary} />
+            <Typography variant="h4" style={styles.discussionTitle}>
+              Discussion
+            </Typography>
+            <View style={styles.discussionCountBadge}>
+              <Typography variant="micro" color={colors.textSecondary} style={{ fontWeight: '700' }}>
+                {totalDiscussionCount}
+              </Typography>
+            </View>
+          </View>
+          <Typography variant="micro" color={colors.textSecondary}>
+            Constructive scientific inquiry & insights
           </Typography>
         </View>
 
-        {/* Related Posts */}
-        {relatedPosts.length > 0 ? (
-          relatedPosts.map((post) => <PostCard key={post.id} post={post} />)
+        {/* Discussion Type Filter Tabs */}
+        <DiscussionTypePills
+          activeType={activeFilter}
+          counts={counts}
+          onSelectType={setActiveFilter}
+        />
+
+        {/* Discussion Contribution Composer */}
+        <DiscussionComposer
+          currentUser={currentUser}
+          onSubmit={handlePostDiscussion}
+        />
+
+        {/* Threaded Discussion List */}
+        {filteredDiscussions.length > 0 ? (
+          <View style={styles.discussionList}>
+            {filteredDiscussions.map((disc) => (
+              <DiscussionCard
+                key={disc.id}
+                discussion={disc}
+                currentUser={currentUser}
+                onLike={() => toggleLikeDiscussion(paper.id, disc.id)}
+                onLikeReply={(_, replyId) => toggleLikeReply(paper.id, disc.id, replyId)}
+                onAddReply={(_, replyContent) => handleAddReply(disc.id, replyContent)}
+              />
+            ))}
+          </View>
         ) : (
-          <EmptyState
-            icon="MessageSquare"
-            title="No discussions yet"
-            description="Start the first academic conversation or critique about this paper!"
-          />
+          <View style={styles.emptyDiscussionWrap}>
+            <EmptyState
+              icon="MessageSquare"
+              title={
+                activeFilter === 'all'
+                  ? 'No discussions yet'
+                  : `No ${activeFilter}s yet`
+              }
+              description="Start the first academic conversation, question, or insight about this paper!"
+            />
+          </View>
         )}
+
+        {/* ================================================================ */}
+        {/* PEOPLE INTERESTED IN THIS SECTION (DETERMINISTIC RECOMMENDATIONS) */}
+        {/* ================================================================ */}
+        <PeopleInterestedSection people={interestedPeople} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -304,7 +438,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   scrollContent: {
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xxxl * 1.5,
   },
   figuresContainer: {
     width: '100%',
@@ -344,12 +478,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginBottom: spacing.md,
   },
-  publisherLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 'auto',
-  },
   authorsText: {
     marginBottom: spacing.md,
     lineHeight: 20,
@@ -369,6 +497,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    flex: 1,
+  },
+  readPaperTextWrap: {
     flex: 1,
   },
   abstractSection: {
@@ -413,14 +544,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs + 2,
   },
-  discussionsHeader: {
+  discussionHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs + 2,
+    backgroundColor: colors.background,
+  },
+  discussionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    gap: spacing.xs + 2,
+    marginBottom: 2,
+  },
+  discussionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  discussionCountBadge: {
     backgroundColor: colors.backgroundSecondary,
-    gap: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  discussionList: {
+    marginTop: spacing.xs,
+  },
+  emptyDiscussionWrap: {
+    paddingVertical: spacing.lg,
   },
 });
