@@ -1,6 +1,55 @@
 import { supabase } from './client';
 import { Post, Comment, PostType, Paper, UserProfile } from '../types';
 import { mockPosts, mockComments, mockUsers, mockPapers } from '../data/mockData';
+import { getFollowedTopicsForUser } from './topicService';
+
+/**
+ * Explainable "For You" Feed Ranking Function
+ * Transparent, deterministic scoring:
+ * 1. Followed Topic Match (+50 pts per matching topic followed by the user)
+ * 2. Peer-Reviewed Paper Reference (+15 pts if referencing an external paper / DOI)
+ * 3. Social Interaction Weight (+2 per like, +3 per comment, +4 per repost)
+ * 4. Recency Score (up to +30 pts for fresh scientific discussions)
+ */
+export function calculateExplainableFeedScore(
+  post: Post,
+  followedTopicNames: string[]
+): number {
+  let score = 0;
+
+  // 1. Followed Topic Match (+150 per matching followed topic)
+  if (followedTopicNames && followedTopicNames.length > 0) {
+    const matchingCount = post.topics.filter((pt) =>
+      followedTopicNames.some(
+        (ft) => ft.includes(pt.toLowerCase()) || pt.toLowerCase().includes(ft)
+      )
+    ).length;
+    score += matchingCount * 150;
+  }
+
+  // 2. Peer-Reviewed Paper Reference Bonus
+  if (post.paper) {
+    score += 25;
+  }
+
+  // 3. Social Interaction Weight
+  score += (post.likesCount || 0) * 1.5;
+  score += (post.commentsCount || 0) * 2.5;
+  score += (post.repostsCount || 0) * 3;
+
+  // 4. Recency Bonus
+  if (post.createdAt.includes('m ago') || post.createdAt.includes('Just now')) {
+    score += 40;
+  } else if (post.createdAt.includes('h ago')) {
+    const hours = parseInt(post.createdAt, 10) || 1;
+    score += Math.max(0, 30 - hours * 2);
+  } else if (post.createdAt.includes('d ago')) {
+    const days = parseInt(post.createdAt, 10) || 1;
+    score += Math.max(0, 15 - days * 2);
+  }
+
+  return Math.round(score);
+}
 
 // Helper to determine if we're in real Supabase mode vs local mock mode
 export function isSupabaseConfigured(): boolean {
@@ -293,7 +342,14 @@ export async function fetchFeed(
     const mappedPosts = data.map((row: any) => mapSupabasePost(row, currentUserId));
 
     let filtered = mappedPosts;
-    if (tab !== 'For You' && tab !== 'Following') {
+    if (tab === 'For You') {
+      const followedTopics = currentUserId ? getFollowedTopicsForUser(currentUserId) : [];
+      filtered = [...mappedPosts].sort(
+        (a, b) =>
+          calculateExplainableFeedScore(b, followedTopics) -
+          calculateExplainableFeedScore(a, followedTopics)
+      );
+    } else if (tab !== 'For You' && tab !== 'Following') {
       const targetTopic = tab.toLowerCase();
       filtered = mappedPosts.filter((p) =>
         p.topics.some((t) => t.toLowerCase().includes(targetTopic))
@@ -331,7 +387,14 @@ function getFallbackFeed(
 
   let filtered = allPosts;
 
-  if (tab === 'Following' && currentUserId) {
+  if (tab === 'For You') {
+    const followedTopics = currentUserId ? getFollowedTopicsForUser(currentUserId) : [];
+    filtered = [...allPosts].sort(
+      (a, b) =>
+        calculateExplainableFeedScore(b, followedTopics) -
+        calculateExplainableFeedScore(a, followedTopics)
+    );
+  } else if (tab === 'Following' && currentUserId) {
     filtered = allPosts.filter((p) => localFollows.has(`${currentUserId}:${p.author.id}`));
   } else if (tab !== 'For You' && tab !== 'Following') {
     if (tab === 'AI & Bio') {
