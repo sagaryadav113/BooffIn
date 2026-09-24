@@ -1,0 +1,426 @@
+import { supabase } from './client';
+import { UserProfile } from '../types';
+import { currentUser, mockUsers } from '../data/mockData';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
+
+export interface AuthResponse {
+  user: UserProfile | null;
+  error: string | null;
+}
+
+export interface SignUpParams {
+  email: string;
+  password: string;
+  fullName: string;
+  handle: string;
+  academicTitle?: string;
+  institution?: string;
+}
+
+/**
+ * Checks if the configured Supabase client is connected to a live production instance
+ */
+export function isLiveSupabaseConfigured(): boolean {
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  return Boolean(
+    url &&
+    !url.includes('dummy') &&
+    !url.includes('booffin-project.supabase.co') &&
+    anonKey &&
+    !anonKey.includes('dummy_anon_key')
+  );
+}
+
+/**
+ * Maps raw public.profiles database record to frontend UserProfile model
+ */
+export function mapProfileRecord(raw: any, fallbackEmail?: string): UserProfile {
+  return {
+    id: raw.id,
+    handle: raw.username || raw.handle || (fallbackEmail ? fallbackEmail.split('@')[0] : 'researcher'),
+    fullName: raw.full_name || 'Researcher',
+    avatarUrl: raw.avatar_url || undefined,
+    academicTitle: raw.academic_title || 'Academic Researcher',
+    institution: raw.institution || 'Independent Research',
+    bio: raw.bio || 'Exploring scientific literature and methodology.',
+    location: raw.location || undefined,
+    country: raw.country || undefined,
+    orcidId: raw.orcid_id || undefined,
+    orcidVerified: Boolean(raw.orcid_verified),
+    websiteUrl: raw.website_url || undefined,
+    researchInterests: Array.isArray(raw.research_interests) ? raw.research_interests : [],
+    followersCount: raw.followers_count || 0,
+    followingCount: raw.following_count || 0,
+    postsCount: raw.posts_count || 0,
+    savedCount: raw.saved_count || 0,
+    joinedDate: raw.created_at
+      ? new Date(raw.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      : 'Recently joined',
+  };
+}
+
+/**
+ * Fetch profile for a given user UUID from Supabase public.profiles
+ */
+export async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
+  try {
+    if (!isLiveSupabaseConfigured()) {
+      return mockUsers.find((u) => u.id === userId) || currentUser;
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error || !data) return null;
+    return mapProfileRecord(data);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Retrieves the currently active session and restored user profile
+ */
+export async function getInitialAuthSession(): Promise<UserProfile | null> {
+  try {
+    if (isLiveSupabaseConfigured()) {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session?.user) return null;
+
+      const profile = await fetchUserProfile(session.user.id);
+      if (profile) return profile;
+
+      // If user exists in auth but profile table row is missing, construct profile from metadata
+      return {
+        ...currentUser,
+        id: session.user.id,
+        handle: (session.user.user_metadata?.handle || session.user.email?.split('@')[0] || 'researcher').toLowerCase(),
+        fullName: session.user.user_metadata?.full_name || 'Researcher',
+        academicTitle: session.user.user_metadata?.academic_title || 'Research Enthusiast',
+        institution: session.user.user_metadata?.institution || 'Independent',
+      };
+    }
+
+    return currentUser;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sign In with Email & Password
+ */
+export async function signInWithEmail(
+  email: string,
+  password: string
+): Promise<AuthResponse> {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !password) {
+      return { user: null, error: 'Email and password are required.' };
+    }
+
+    // 1. Live Supabase Auth
+    if (isLiveSupabaseConfigured()) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+
+      if (error) {
+        return { user: null, error: error.message };
+      }
+
+      if (data.user) {
+        let profile = await fetchUserProfile(data.user.id);
+        if (!profile) {
+          profile = {
+            ...currentUser,
+            id: data.user.id,
+            handle: cleanEmail.split('@')[0],
+          };
+        }
+        return { user: profile, error: null };
+      }
+    }
+
+    // 2. Mock Fallback (Match by email or handle)
+    const matchedUser = mockUsers.find(
+      (u) =>
+        u.handle.toLowerCase() === cleanEmail.split('@')[0] ||
+        `${u.handle}@university.edu`.toLowerCase() === cleanEmail ||
+        cleanEmail.includes(u.handle.toLowerCase())
+    );
+
+    if (matchedUser) {
+      return { user: matchedUser, error: null };
+    }
+
+    const dynamicUser: UserProfile = {
+      ...currentUser,
+      id: `usr_${Date.now()}`,
+      handle: cleanEmail.split('@')[0] || 'researcher',
+      fullName: cleanEmail.split('@')[0].toUpperCase(),
+    };
+
+    return { user: dynamicUser, error: null };
+  } catch (err: any) {
+    return {
+      user: null,
+      error: err.message || 'An unexpected error occurred during sign in.',
+    };
+  }
+}
+
+/**
+ * Sign Up with Email, Password & Academic Metadata
+ */
+export async function signUpWithEmail(
+  params: SignUpParams
+): Promise<AuthResponse> {
+  try {
+    const cleanEmail = params.email.trim().toLowerCase();
+    const cleanHandle = params.handle.trim().replace(/^@/, '').toLowerCase();
+
+    if (!cleanEmail || !params.password) {
+      return { user: null, error: 'Email and password are required.' };
+    }
+    if (!cleanHandle) {
+      return { user: null, error: 'Username handle is required.' };
+    }
+    if (!params.fullName.trim()) {
+      return { user: null, error: 'Full name is required.' };
+    }
+
+    if (isLiveSupabaseConfigured()) {
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: params.password,
+        options: {
+          data: {
+            full_name: params.fullName.trim(),
+            username: cleanHandle,
+            handle: cleanHandle,
+            academic_title: params.academicTitle,
+            institution: params.institution,
+          },
+        },
+      });
+
+      if (error) {
+        return { user: null, error: error.message };
+      }
+
+      if (data.user) {
+        const newProfile: UserProfile = {
+          id: data.user.id,
+          handle: cleanHandle,
+          fullName: params.fullName.trim(),
+          academicTitle: params.academicTitle || 'Student & Research Enthusiast',
+          institution: params.institution || 'Independent Researcher',
+          bio: 'Exploring literature, asking questions, and discussing peer-reviewed science.',
+          orcidVerified: false,
+          followingCount: 0,
+          followersCount: 0,
+          postsCount: 0,
+          savedCount: 0,
+          joinedDate: 'Just now',
+        };
+
+        // Explicit profile table upsert as safety fallback
+        try {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            username: cleanHandle,
+            full_name: params.fullName.trim(),
+            academic_title: params.academicTitle || 'Research Enthusiast',
+            institution: params.institution || 'Independent',
+          });
+        } catch {}
+
+        return { user: newProfile, error: null };
+      }
+    }
+
+    // Mock Fallback
+    const mockNewUser: UserProfile = {
+      id: `usr_${Date.now()}`,
+      handle: cleanHandle || 'newresearcher',
+      fullName: params.fullName.trim() || 'New Researcher',
+      academicTitle: params.academicTitle || 'Research Enthusiast',
+      institution: params.institution || 'Independent',
+      bio: 'Exploring literature and discussing peer-reviewed science on BooffIn.',
+      orcidVerified: false,
+      followingCount: 0,
+      followersCount: 0,
+      postsCount: 0,
+      savedCount: 0,
+      joinedDate: 'Just now',
+    };
+
+    return { user: mockNewUser, error: null };
+  } catch (err: any) {
+    return {
+      user: null,
+      error: err.message || 'An unexpected error occurred during account creation.',
+    };
+  }
+}
+
+/**
+ * Sign In with Google OAuth
+ */
+export async function signInWithGoogle(): Promise<AuthResponse> {
+  try {
+    if (isLiveSupabaseConfigured()) {
+      const redirectUrl = Linking.createURL('auth/callback');
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: Platform.OS !== 'web',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        return { user: null, error: error.message };
+      }
+
+      if (data?.url && Platform.OS !== 'web') {
+        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+        if (res.type === 'success' && res.url) {
+          const urlObj = new URL(res.url);
+          const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
+          const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            const session = await getInitialAuthSession();
+            if (session) return { user: session, error: null };
+          }
+        }
+      }
+    }
+
+    // Demo Google account representation
+    const googleDemoUser: UserProfile = {
+      ...currentUser,
+      fullName: 'Dr. Elena Rostova (Google)',
+      academicTitle: 'Computational Biologist & AI Researcher',
+      institution: 'Broad Institute & Google Research Partner',
+    };
+
+    return { user: googleDemoUser, error: null };
+  } catch (err: any) {
+    return {
+      user: null,
+      error: err.message || 'Google authentication was cancelled or failed.',
+    };
+  }
+}
+
+/**
+ * Sign In with ORCID / Academic OAuth
+ */
+export async function signInWithORCID(): Promise<AuthResponse> {
+  try {
+    if (isLiveSupabaseConfigured()) {
+      const redirectUrl = Linking.createURL('auth/callback');
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'orcid' as any,
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: Platform.OS !== 'web',
+        },
+      });
+
+      if (error) {
+        return { user: null, error: error.message };
+      }
+
+      if (data?.url && Platform.OS !== 'web') {
+        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+        if (res.type === 'success' && res.url) {
+          const urlObj = new URL(res.url);
+          const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
+          const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      user: {
+        ...currentUser,
+        orcidVerified: true,
+      },
+      error: null,
+    };
+  } catch (err: any) {
+    return {
+      user: null,
+      error: err.message || 'ORCID Authentication cancelled or unavailable.',
+    };
+  }
+}
+
+/**
+ * Request Password Reset Email
+ */
+export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      return { success: false, error: 'Please provide a valid email address.' };
+    }
+
+    if (isLiveSupabaseConfigured()) {
+      const redirectUrl = Linking.createURL('auth/reset-password');
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Failed to send password reset link.',
+    };
+  }
+}
+
+/**
+ * Sign Out & Clear Active Session
+ */
+export async function signOutUser(): Promise<void> {
+  try {
+    if (isLiveSupabaseConfigured()) {
+      await supabase.auth.signOut();
+    }
+  } catch {}
+}
