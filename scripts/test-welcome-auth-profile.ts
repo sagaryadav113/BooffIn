@@ -1,4 +1,15 @@
-import assert from 'assert';
+const assert = {
+  ok: (val: any, msg?: string) => {
+    if (!val) throw new Error(msg || `Expected truthy, got ${val}`);
+  },
+  strictEqual: (a: any, b: any, msg?: string) => {
+    if (a !== b) throw new Error(msg || `Expected ${JSON.stringify(a)} === ${JSON.stringify(b)}`);
+  },
+  deepStrictEqual: (a: any, b: any, msg?: string) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(msg || `Expected deep equality`);
+  },
+};
+
 import {
   signInWithEmail,
   signUpWithEmail,
@@ -115,7 +126,7 @@ async function runWelcomeAuthProfileTests() {
     const res = await signInWithEmail('elena.rostova@broadinstitute.org', 'password123');
     assert.strictEqual(res.error, null);
     assert.ok(res.user);
-    assert.ok(res.user?.fullName.length > 0);
+    assert.ok((res.user?.fullName || '').length > 0);
   });
 
   // TEST 6: Sign Out & Return to Welcome

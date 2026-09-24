@@ -1,9 +1,27 @@
 import { supabase } from './client';
 import { UserProfile } from '../types';
 import { currentUser, mockUsers } from '../data/mockData';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import { Platform } from 'react-native';
+
+const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
+
+function createAuthRedirectUrl(path: string): string {
+  try {
+    const Linking = require('expo-linking');
+    return Linking.createURL(path);
+  } catch {
+    return `https://booffin.app/${path}`;
+  }
+}
+
+async function openAuthSession(url: string, redirectUrl: string): Promise<any> {
+  try {
+    const WebBrowser = require('expo-web-browser');
+    return await WebBrowser.openAuthSessionAsync(url, redirectUrl);
+  } catch {
+    return { type: 'cancel' };
+  }
+}
+
 
 export interface AuthResponse {
   user: UserProfile | null;
@@ -85,6 +103,7 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile | nu
 }
 
 const LOCAL_SESSION_KEY = 'booffin_active_user_session';
+let memoryLocalSession: UserProfile | null = null;
 
 export function getStoredLocalSession(): UserProfile | null {
   try {
@@ -95,10 +114,11 @@ export function getStoredLocalSession(): UserProfile | null {
       }
     }
   } catch {}
-  return null;
+  return memoryLocalSession;
 }
 
 export function setStoredLocalSession(profile: UserProfile | null): void {
+  memoryLocalSession = profile;
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       if (profile) {
@@ -317,13 +337,13 @@ export async function signUpWithEmail(
 export async function signInWithGoogle(): Promise<AuthResponse> {
   try {
     if (isLiveSupabaseConfigured()) {
-      const redirectUrl = Linking.createURL('auth/callback');
+      const redirectUrl = createAuthRedirectUrl('auth/callback');
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: Platform.OS !== 'web',
+          skipBrowserRedirect: !isWeb,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -335,8 +355,8 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
         return { user: null, error: error.message };
       }
 
-      if (data?.url && Platform.OS !== 'web') {
-        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      if (data?.url && !isWeb) {
+        const res = await openAuthSession(data.url, redirectUrl);
         if (res.type === 'success' && res.url) {
           const urlObj = new URL(res.url);
           const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
@@ -383,13 +403,13 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
 export async function signInWithORCID(): Promise<AuthResponse> {
   try {
     if (isLiveSupabaseConfigured()) {
-      const redirectUrl = Linking.createURL('auth/callback');
+      const redirectUrl = createAuthRedirectUrl('auth/callback');
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'orcid' as any,
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: Platform.OS !== 'web',
+          skipBrowserRedirect: !isWeb,
         },
       });
 
@@ -397,8 +417,8 @@ export async function signInWithORCID(): Promise<AuthResponse> {
         return { user: null, error: error.message };
       }
 
-      if (data?.url && Platform.OS !== 'web') {
-        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      if (data?.url && !isWeb) {
+        const res = await openAuthSession(data.url, redirectUrl);
         if (res.type === 'success' && res.url) {
           const urlObj = new URL(res.url);
           const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
@@ -442,7 +462,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
     }
 
     if (isLiveSupabaseConfigured()) {
-      const redirectUrl = Linking.createURL('auth/reset-password');
+      const redirectUrl = createAuthRedirectUrl('auth/reset-password');
       const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
         redirectTo: redirectUrl,
       });

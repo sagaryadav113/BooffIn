@@ -148,6 +148,27 @@ export const mockUsers: UserProfile[] = [
     joinedDate: 'Nov 2022',
     isFollowing: false,
   },
+  {
+    id: 'usr_7',
+    handle: 'drsmith',
+    fullName: 'Dr. Christopher Smith',
+    avatarUrl: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400&auto=format&fit=crop&q=80',
+    academicTitle: 'Associate Professor of Neuroscience',
+    institution: 'Harvard Medical School',
+    bio: 'Investigating experience-dependent plasticity, synaptic consolidation, and visual cortex remodeling.',
+    location: 'Boston, MA',
+    country: 'United States',
+    researchInterests: ['Neuroscience', 'Synaptic Plasticity', 'Visual Cortex', 'Neural Circuits'],
+    orcidId: '0000-0002-1825-0097',
+    orcidVerified: true,
+    websiteUrl: 'https://hms.harvard.edu/faculty/christopher-smith',
+    followingCount: 180,
+    followersCount: 11400,
+    postsCount: 64,
+    savedCount: 95,
+    joinedDate: 'Feb 2021',
+    isFollowing: false,
+  },
 ];
 
 export const mockTopics: Topic[] = [
@@ -568,6 +589,24 @@ export const mockPosts: Post[] = [
     isReposted: false,
     isSaved: true,
     createdAt: '2d ago',
+  },
+  {
+    id: 'post_7',
+    author: mockUsers[4], // Prof. Arjun Mehta
+    postType: 'discussion',
+    content:
+      'Detailed discussion on CRISPR off target effects in human neural progenitor cells: evaluating high-fidelity Cas9 variants vs prime editing. Off-target cleavage drops by >92% with engineered SpCas9-HF1 while preserving on-target efficacy.',
+    paper: mockPapers[2], // Efficient CRISPR screens in human organoids
+    topics: ['Genetics', 'CRISPR', 'Organoids'],
+    visibility: 'public',
+    likesCount: 189,
+    commentsCount: 31,
+    repostsCount: 27,
+    savesCount: 84,
+    isLiked: false,
+    isReposted: true,
+    isSaved: true,
+    createdAt: '3d ago',
   },
 ];
 
