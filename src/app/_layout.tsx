@@ -33,6 +33,7 @@ export default function RootLayout() {
 
               {/* Authentication & Onboarding Group */}
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
 
               {/* Detail & Feature Routes */}
               <Stack.Screen

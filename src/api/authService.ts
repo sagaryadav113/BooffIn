@@ -6,6 +6,10 @@ const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
 
 function createAuthRedirectUrl(path: string): string {
   try {
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      const cleanPath = path.startsWith('/') ? path : `/${path}`;
+      return `${window.location.origin}${cleanPath}`;
+    }
     const Linking = require('expo-linking');
     return Linking.createURL(path);
   } catch {
@@ -343,16 +347,21 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: !isWeb,
+          skipBrowserRedirect: true,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
+            prompt: 'select_account consent',
           },
         },
       });
 
       if (error) {
         return { user: null, error: error.message };
+      }
+
+      if (typeof window !== 'undefined' && data?.url) {
+        window.location.href = data.url;
+        return { user: null, error: null };
       }
 
       if (data?.url && !isWeb) {
@@ -373,22 +382,16 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
             }
           }
         }
+        return { user: null, error: 'Google sign-in was cancelled.' };
       }
+
+      return { user: null, error: 'Could not obtain Google authentication URL.' };
     }
 
-    // Demo Google account representation
-    const googleDemoUser: UserProfile = {
-      ...currentUser,
-      id: 'usr_google_elena',
-      fullName: 'Dr. Elena Rostova (Google)',
-      handle: 'elenarostova',
-      academicTitle: 'Computational Biologist & AI Researcher',
-      institution: 'Broad Institute & Google Research Partner',
-      bio: 'Leading computational biology at Broad Institute. Focused on deep learning for structural genomics.',
+    return {
+      user: null,
+      error: 'Google Sign-In requires Supabase credentials (EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY). Please set these in your environment, or use "Create Account with Email".',
     };
-
-    setStoredLocalSession(googleDemoUser);
-    return { user: googleDemoUser, error: null };
   } catch (err: any) {
     return {
       user: null,
@@ -409,12 +412,17 @@ export async function signInWithORCID(): Promise<AuthResponse> {
         provider: 'orcid' as any,
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: !isWeb,
+          skipBrowserRedirect: true,
         },
       });
 
       if (error) {
         return { user: null, error: error.message };
+      }
+
+      if (typeof window !== 'undefined' && data?.url) {
+        window.location.href = data.url;
+        return { user: null, error: null };
       }
 
       if (data?.url && !isWeb) {
@@ -428,20 +436,22 @@ export async function signInWithORCID(): Promise<AuthResponse> {
               access_token: accessToken,
               refresh_token: refreshToken,
             });
+            const session = await getInitialAuthSession();
+            if (session) {
+              setStoredLocalSession(session);
+              return { user: session, error: null };
+            }
           }
         }
+        return { user: null, error: 'ORCID authentication was cancelled.' };
       }
+
+      return { user: null, error: 'Could not obtain ORCID authentication URL.' };
     }
 
-    const orcidUser: UserProfile = {
-      ...currentUser,
-      orcidVerified: true,
-    };
-
-    setStoredLocalSession(orcidUser);
     return {
-      user: orcidUser,
-      error: null,
+      user: null,
+      error: 'ORCID Sign-In requires live Supabase credentials (EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY). Please set these in your environment, or use "Create Account with Email".',
     };
   } catch (err: any) {
     return {

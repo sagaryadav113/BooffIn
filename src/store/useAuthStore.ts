@@ -78,15 +78,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 2. Set up listener for real-time auth state changes
       supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
-          const profile = await fetchUserProfile(session.user.id);
-          const activeUser = profile || {
-            ...currentUser,
-            id: session.user.id,
-            handle: session.user.email?.split('@')[0] || 'researcher',
-          };
-          setStoredLocalSession(activeUser);
+          let profile = await fetchUserProfile(session.user.id);
+          if (!profile) {
+            const metadata = session.user.user_metadata || {};
+            const fullName = metadata.full_name || metadata.name || session.user.email?.split('@')[0] || 'Researcher';
+            const rawHandle = metadata.user_name || metadata.preferred_username || session.user.email?.split('@')[0] || 'researcher';
+            const cleanHandle = rawHandle.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+            const avatarUrl = metadata.avatar_url || metadata.picture;
+
+            profile = {
+              ...currentUser,
+              id: session.user.id,
+              handle: cleanHandle || 'researcher',
+              fullName,
+              avatarUrl,
+              academicTitle: metadata.academic_title || 'Research Enthusiast',
+              institution: metadata.institution || 'Independent Researcher',
+              bio: 'Exploring literature, asking questions, and discussing peer-reviewed science.',
+              orcidVerified: Boolean(metadata.orcid_id),
+              orcidId: metadata.orcid_id,
+              followersCount: 0,
+              followingCount: 0,
+              postsCount: 0,
+              savedCount: 0,
+              joinedDate: 'Just now',
+            };
+
+            try {
+              await supabase.from('profiles').upsert({
+                id: session.user.id,
+                username: profile.handle,
+                full_name: fullName,
+                avatar_url: avatarUrl,
+                academic_title: profile.academicTitle,
+                institution: profile.institution,
+              });
+            } catch {}
+          }
+          setStoredLocalSession(profile);
           set({
-            user: activeUser,
+            user: profile,
             authStatus: 'authenticated',
             isAuthenticated: true,
             isLoading: false,
@@ -160,44 +191,53 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signInWithGoogle: async () => {
     set({ isLoading: true, authStatus: 'loading', authError: null });
     const { user, error } = await authServiceSignInWithGoogle();
-    if (error || !user) {
+    if (error) {
       set({
         isLoading: false,
         authStatus: 'unauthenticated',
         isAuthenticated: false,
-        authError: error || 'Google sign-in failed.',
+        authError: error,
       });
       return false;
     }
-    set({
-      user,
-      authStatus: 'authenticated',
-      isAuthenticated: true,
-      isLoading: false,
-      authError: null,
-    });
+    if (user) {
+      set({
+        user,
+        authStatus: 'authenticated',
+        isAuthenticated: true,
+        isLoading: false,
+        authError: null,
+      });
+      return true;
+    }
+    // Browser is navigating to Google OAuth consent page
+    set({ isLoading: false });
     return true;
   },
 
   signInWithORCID: async () => {
     set({ isLoading: true, authStatus: 'loading', authError: null });
     const { user, error } = await authServiceSignInWithORCID();
-    if (error || !user) {
+    if (error) {
       set({
         isLoading: false,
         authStatus: 'unauthenticated',
         isAuthenticated: false,
-        authError: error || 'ORCID authentication failed.',
+        authError: error,
       });
       return false;
     }
-    set({
-      user,
-      authStatus: 'authenticated',
-      isAuthenticated: true,
-      isLoading: false,
-      authError: null,
-    });
+    if (user) {
+      set({
+        user,
+        authStatus: 'authenticated',
+        isAuthenticated: true,
+        isLoading: false,
+        authError: null,
+      });
+      return true;
+    }
+    set({ isLoading: false });
     return true;
   },
 

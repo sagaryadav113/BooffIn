@@ -61,11 +61,14 @@ export default function LoginScreen() {
     setValidationError(null);
     clearError();
     const success = await signInWithGoogle();
-    if (success) {
+    const state = useAuthStore.getState();
+    if (success && state.isAuthenticated) {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
       router.replace('/(tabs)');
+    } else if (state.authError) {
+      setValidationError(state.authError);
     }
   };
 
@@ -73,11 +76,14 @@ export default function LoginScreen() {
     setValidationError(null);
     clearError();
     const success = await signInWithORCID();
-    if (success) {
+    const state = useAuthStore.getState();
+    if (success && state.isAuthenticated) {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
       router.replace('/(tabs)');
+    } else if (state.authError) {
+      setValidationError(state.authError);
     }
   };
 

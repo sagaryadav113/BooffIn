@@ -36,10 +36,11 @@ export default function WelcomeScreen() {
     setGoogleLoading(true);
     const success = await signInWithGoogle();
     setGoogleLoading(false);
-    if (success) {
+    const state = useAuthStore.getState();
+    if (success && state.isAuthenticated) {
       router.replace('/(tabs)');
-    } else if (authError) {
-      Alert.alert('Authentication Error', authError);
+    } else if (state.authError) {
+      Alert.alert('Google Sign-In', state.authError);
     }
   };
 
@@ -47,10 +48,11 @@ export default function WelcomeScreen() {
     setOrcidLoading(true);
     const success = await signInWithORCID();
     setOrcidLoading(false);
-    if (success) {
+    const state = useAuthStore.getState();
+    if (success && state.isAuthenticated) {
       router.replace('/(tabs)');
-    } else if (authError) {
-      Alert.alert('Authentication Error', authError);
+    } else if (state.authError) {
+      Alert.alert('ORCID Authentication', state.authError);
     }
   };
 
