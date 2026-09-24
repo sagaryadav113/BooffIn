@@ -84,6 +84,32 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile | nu
   }
 }
 
+const LOCAL_SESSION_KEY = 'booffin_active_user_session';
+
+export function getStoredLocalSession(): UserProfile | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const stored = window.localStorage.getItem(LOCAL_SESSION_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    }
+  } catch {}
+  return null;
+}
+
+export function setStoredLocalSession(profile: UserProfile | null): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      if (profile) {
+        window.localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(profile));
+      } else {
+        window.localStorage.removeItem(LOCAL_SESSION_KEY);
+      }
+    }
+  } catch {}
+}
+
 /**
  * Retrieves the currently active session and restored user profile
  */
@@ -94,10 +120,13 @@ export async function getInitialAuthSession(): Promise<UserProfile | null> {
       if (error || !session?.user) return null;
 
       const profile = await fetchUserProfile(session.user.id);
-      if (profile) return profile;
+      if (profile) {
+        setStoredLocalSession(profile);
+        return profile;
+      }
 
       // If user exists in auth but profile table row is missing, construct profile from metadata
-      return {
+      const fallbackProfile: UserProfile = {
         ...currentUser,
         id: session.user.id,
         handle: (session.user.user_metadata?.handle || session.user.email?.split('@')[0] || 'researcher').toLowerCase(),
@@ -105,9 +134,11 @@ export async function getInitialAuthSession(): Promise<UserProfile | null> {
         academicTitle: session.user.user_metadata?.academic_title || 'Research Enthusiast',
         institution: session.user.user_metadata?.institution || 'Independent',
       };
+      setStoredLocalSession(fallbackProfile);
+      return fallbackProfile;
     }
 
-    return currentUser;
+    return getStoredLocalSession();
   } catch {
     return null;
   }
@@ -162,6 +193,7 @@ export async function signInWithEmail(
     );
 
     if (matchedUser) {
+      setStoredLocalSession(matchedUser);
       return { user: matchedUser, error: null };
     }
 
@@ -172,6 +204,7 @@ export async function signInWithEmail(
       fullName: cleanEmail.split('@')[0].toUpperCase(),
     };
 
+    setStoredLocalSession(dynamicUser);
     return { user: dynamicUser, error: null };
   } catch (err: any) {
     return {
@@ -247,6 +280,7 @@ export async function signUpWithEmail(
           });
         } catch {}
 
+        setStoredLocalSession(newProfile);
         return { user: newProfile, error: null };
       }
     }
@@ -267,6 +301,7 @@ export async function signUpWithEmail(
       joinedDate: 'Just now',
     };
 
+    setStoredLocalSession(mockNewUser);
     return { user: mockNewUser, error: null };
   } catch (err: any) {
     return {
@@ -312,7 +347,10 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
               refresh_token: refreshToken,
             });
             const session = await getInitialAuthSession();
-            if (session) return { user: session, error: null };
+            if (session) {
+              setStoredLocalSession(session);
+              return { user: session, error: null };
+            }
           }
         }
       }
@@ -321,11 +359,15 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
     // Demo Google account representation
     const googleDemoUser: UserProfile = {
       ...currentUser,
+      id: 'usr_google_elena',
       fullName: 'Dr. Elena Rostova (Google)',
+      handle: 'elenarostova',
       academicTitle: 'Computational Biologist & AI Researcher',
       institution: 'Broad Institute & Google Research Partner',
+      bio: 'Leading computational biology at Broad Institute. Focused on deep learning for structural genomics.',
     };
 
+    setStoredLocalSession(googleDemoUser);
     return { user: googleDemoUser, error: null };
   } catch (err: any) {
     return {
@@ -371,11 +413,14 @@ export async function signInWithORCID(): Promise<AuthResponse> {
       }
     }
 
+    const orcidUser: UserProfile = {
+      ...currentUser,
+      orcidVerified: true,
+    };
+
+    setStoredLocalSession(orcidUser);
     return {
-      user: {
-        ...currentUser,
-        orcidVerified: true,
-      },
+      user: orcidUser,
       error: null,
     };
   } catch (err: any) {
@@ -421,8 +466,11 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
  */
 export async function signOutUser(): Promise<void> {
   try {
+    setStoredLocalSession(null);
     if (isLiveSupabaseConfigured()) {
       await supabase.auth.signOut();
     }
-  } catch {}
+  } catch {
+    setStoredLocalSession(null);
+  }
 }

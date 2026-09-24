@@ -10,6 +10,7 @@ import {
   sendPasswordResetEmail,
   getInitialAuthSession,
   fetchUserProfile,
+  setStoredLocalSession,
   SignUpParams,
 } from '../api/authService';
 import { followUser, unfollowUser } from '../api/socialService';
@@ -42,8 +43,8 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: currentUser,
-  authStatus: 'authenticated',
-  isAuthenticated: true,
+  authStatus: 'unauthenticated',
+  isAuthenticated: false,
   isLoading: false,
   authError: null,
   users: mockUsers,
@@ -78,17 +79,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
           const profile = await fetchUserProfile(session.user.id);
+          const activeUser = profile || {
+            ...currentUser,
+            id: session.user.id,
+            handle: session.user.email?.split('@')[0] || 'researcher',
+          };
+          setStoredLocalSession(activeUser);
           set({
-            user: profile || {
-              ...currentUser,
-              id: session.user.id,
-              handle: session.user.email?.split('@')[0] || 'researcher',
-            },
+            user: activeUser,
             authStatus: 'authenticated',
             isAuthenticated: true,
             isLoading: false,
           });
         } else if (event === 'SIGNED_OUT') {
+          setStoredLocalSession(null);
           set({
             user: currentUser,
             authStatus: 'unauthenticated',
@@ -100,8 +104,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       set({
         user: currentUser,
-        authStatus: 'authenticated',
-        isAuthenticated: true,
+        authStatus: 'unauthenticated',
+        isAuthenticated: false,
         isLoading: false,
         isInitialized: true,
       });
@@ -198,6 +202,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signInWithDemoUser: (demoUser: UserProfile) => {
+    setStoredLocalSession(demoUser);
     set({
       user: demoUser,
       authStatus: 'authenticated',
@@ -217,6 +222,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signOut: async () => {
     set({ isLoading: true });
     await signOutUser();
+    setStoredLocalSession(null);
     set({
       user: currentUser,
       authStatus: 'unauthenticated',
@@ -231,6 +237,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updateProfile: (updated) =>
     set((state) => {
       const updatedUser = { ...state.user, ...updated };
+      setStoredLocalSession(updatedUser);
       return {
         user: updatedUser,
         users: state.users.map((u) => (u.id === state.user.id ? updatedUser : u)),

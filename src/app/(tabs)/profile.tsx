@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import {
   BookOpen,
   Calendar,
   CheckCircle2,
+  LogIn,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -35,16 +36,29 @@ import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 import { usePaperStore } from '../../store/usePaperStore';
+import { currentUser } from '../../data/mockData';
 
 export default function CurrentUserProfileScreen() {
-  const user = useAuthStore((s) => s.user);
-  const posts = usePostStore((s) => s.getPostsByUser(user.id));
+  const storeUser = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const allPosts = usePostStore((s) => s.posts);
   const papers = usePaperStore((s) => s.papers);
   const savedPaperIds = usePaperStore((s) => s.savedPaperIds);
 
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Saved' | 'Cited' | 'Activity'>('Posts');
 
-  const savedPapers = papers.filter((p) => savedPaperIds.has(p.id) || p.isSaved);
+  // Active user profile (fall back to currentUser if null for preview)
+  const user = storeUser || currentUser;
+
+  // Memoize filtered posts to prevent infinite re-render loops
+  const posts = useMemo(() => {
+    if (!user?.id) return [];
+    return allPosts.filter((p) => p.author.id === user.id);
+  }, [allPosts, user?.id]);
+
+  const savedPapers = useMemo(() => {
+    return papers.filter((p) => savedPaperIds.has(p.id) || p.isSaved);
+  }, [papers, savedPaperIds]);
 
   const handleOpenOrcid = () => {
     if (user.orcidId) {
@@ -67,7 +81,7 @@ export default function CurrentUserProfileScreen() {
     } catch {}
   };
 
-  const formatCount = (count: number) => {
+  const formatCount = (count: number = 0) => {
     if (count >= 1000) {
       return `${(count / 1000).toFixed(1)}K`;
     }
@@ -130,13 +144,25 @@ export default function CurrentUserProfileScreen() {
               style={styles.avatarOverBanner}
             />
 
-            <Button
-              title="Edit Profile"
-              variant="outline"
-              size="sm"
-              onPress={() => router.push('/profile/edit')}
-              style={styles.editButton}
-            />
+            <View style={styles.actionButtonsRow}>
+              {!isAuthenticated ? (
+                <Button
+                  title="Sign In / Register"
+                  variant="primary"
+                  size="sm"
+                  onPress={() => router.push('/(auth)/welcome')}
+                  style={styles.editButton}
+                />
+              ) : (
+                <Button
+                  title="Edit Profile"
+                  variant="outline"
+                  size="sm"
+                  onPress={() => router.push('/profile/edit')}
+                  style={styles.editButton}
+                />
+              )}
+            </View>
           </View>
 
           {/* Name & Handle */}
@@ -156,9 +182,9 @@ export default function CurrentUserProfileScreen() {
           {/* Academic Role & Institution */}
           <View style={styles.roleBox}>
             <Text style={styles.roleTitle}>{user.academicTitle}</Text>
-            {user.institution && (
+            {user.institution ? (
               <Text style={styles.institutionText}>{user.institution}</Text>
-            )}
+            ) : null}
           </View>
 
           {/* Bio / Description */}
@@ -199,7 +225,7 @@ export default function CurrentUserProfileScreen() {
               </View>
             )}
 
-            {user.orcidId && (
+            {user.orcidId ? (
               <TouchableOpacity
                 onPress={handleOpenOrcid}
                 style={styles.orcidItem}
@@ -208,9 +234,9 @@ export default function CurrentUserProfileScreen() {
                 <Text style={styles.orcidText}>orcid.org/{user.orcidId}</Text>
                 <ExternalLink size={12} color={colors.accentBlue} />
               </TouchableOpacity>
-            )}
+            ) : null}
 
-            {cleanWebsiteDomain && (
+            {cleanWebsiteDomain ? (
               <TouchableOpacity
                 onPress={handleOpenWebsite}
                 style={styles.websiteItem}
@@ -219,18 +245,18 @@ export default function CurrentUserProfileScreen() {
                 <Globe size={14} color={colors.textSecondary} />
                 <Text style={styles.websiteText}>{cleanWebsiteDomain}</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
 
             <View style={styles.metaItem}>
               <Calendar size={14} color={colors.textSecondary} />
-              <Text style={styles.metaText}>Joined {user.joinedDate}</Text>
+              <Text style={styles.metaText}>Joined {user.joinedDate || 'Recently'}</Text>
             </View>
           </View>
 
           {/* Following / Followers Stats */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{user.followingCount}</Text>
+              <Text style={styles.statNumber}>{user.followingCount || 0}</Text>
               <Text style={styles.statLabel}>Following</Text>
             </View>
             <View style={styles.statItem}>
@@ -377,6 +403,11 @@ const styles = StyleSheet.create({
   avatarOverBanner: {
     borderWidth: 3,
     borderColor: colors.white,
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   editButton: {
     paddingHorizontal: spacing.lg,

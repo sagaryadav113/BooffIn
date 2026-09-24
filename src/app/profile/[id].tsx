@@ -38,14 +38,20 @@ export default function OtherResearcherProfileScreen() {
   const users = useAuthStore((s) => s.users);
   const currentUser = useAuthStore((s) => s.user);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
-  const getPostsByUser = usePostStore((s) => s.getPostsByUser);
+  const allPosts = usePostStore((s) => s.posts);
 
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Papers' | 'Activity'>('Posts');
 
   const researcher = users.find((u) => u.id === id || u.handle === id) || (id === currentUser.id ? currentUser : users[1]);
   const isOwnProfile = researcher.id === currentUser.id;
-  const posts = getPostsByUser(researcher.id);
-  const paperPosts = posts.filter((p) => !!p.paper);
+
+  const posts = React.useMemo(() => {
+    return allPosts.filter((p) => p.author.id === researcher.id);
+  }, [allPosts, researcher.id]);
+
+  const paperPosts = React.useMemo(() => {
+    return posts.filter((p) => !!p.paper);
+  }, [posts]);
 
   const handleFollowToggle = () => {
     if (isOwnProfile) {
