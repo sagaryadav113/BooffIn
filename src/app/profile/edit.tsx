@@ -11,58 +11,58 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Image } from 'expo-image';
-import { Camera, Check, Globe, MapPin, User, Building, BookOpen, ExternalLink } from 'lucide-react-native';
+import { Camera, Check, Globe, MapPin, User, Building, BookOpen, ExternalLink, X, Image as ImageIcon } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Button } from '../../components/core/Button';
 import { Avatar } from '../../components/core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
-
-const PRESET_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?w=400&auto=format&fit=crop&q=80',
-];
+import { persistUserProfile } from '../../api/authService';
 
 export default function EditProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const updateProfile = useAuthStore((s) => s.updateProfile);
 
-  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || PRESET_AVATARS[0]);
-  const [fullName, setFullName] = useState(user.fullName);
-  const [handle, setHandle] = useState(user.handle);
-  const [academicTitle, setAcademicTitle] = useState(user.academicTitle);
-  const [institution, setInstitution] = useState(user.institution);
-  const [bio, setBio] = useState(user.bio);
-  const [country, setCountry] = useState(user.country || 'India');
-  const [location, setLocation] = useState(user.location || '');
-  const [researchInterestsInput, setResearchInterestsInput] = useState(
-    (user.researchInterests || []).join(', ')
-  );
-  const [orcidId, setOrcidId] = useState(user.orcidId || '');
-  const [websiteUrl, setWebsiteUrl] = useState(user.websiteUrl || '');
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [tempPhotoUrl, setTempPhotoUrl] = useState(user?.avatarUrl || '');
 
-  const handleSave = () => {
+  const [fullName, setFullName] = useState(user?.fullName || '');
+  const [handle, setHandle] = useState(user?.handle || '');
+  const [academicTitle, setAcademicTitle] = useState(user?.academicTitle || '');
+  const [institution, setInstitution] = useState(user?.institution || '');
+  const [bio, setBio] = useState(user?.bio || '');
+  const [country, setCountry] = useState(user?.country || 'India');
+  const [location, setLocation] = useState(user?.location || '');
+  const [researchInterestsInput, setResearchInterestsInput] = useState(
+    (user?.researchInterests || []).join(', ')
+  );
+  const [orcidId, setOrcidId] = useState(user?.orcidId || '');
+  const [websiteUrl, setWebsiteUrl] = useState(user?.websiteUrl || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!fullName.trim()) {
       Alert.alert('Validation Error', 'Full Name cannot be empty.');
       return;
     }
 
+    setIsSaving(true);
     const parsedInterests = researchInterestsInput
       .split(',')
       .map((i) => i.trim())
       .filter((i) => i.length > 0);
 
-    updateProfile({
-      avatarUrl,
+    const cleanHandle = handle.trim().replace(/^@/, '').toLowerCase();
+
+    const updates = {
+      avatarUrl: avatarUrl.trim() || undefined,
       fullName: fullName.trim(),
-      handle: handle.trim().replace(/^@/, ''),
+      handle: cleanHandle,
       academicTitle: academicTitle.trim(),
       institution: institution.trim(),
       bio: bio.trim(),
@@ -72,13 +72,32 @@ export default function EditProfileScreen() {
       orcidId: orcidId.trim() || undefined,
       orcidVerified: !!orcidId.trim(),
       websiteUrl: websiteUrl.trim() || undefined,
-    });
+    };
+
+    updateProfile(updates);
+
+    if (user?.id) {
+      await persistUserProfile(user.id, updates);
+    }
+
+    setIsSaving(false);
 
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
 
     router.back();
+  };
+
+  const handleSavePhotoUrl = () => {
+    setAvatarUrl(tempPhotoUrl.trim());
+    setPhotoModalOpen(false);
+  };
+
+  const handleRemovePhoto = () => {
+    setAvatarUrl('');
+    setTempPhotoUrl('');
+    setPhotoModalOpen(false);
   };
 
   return (
@@ -89,8 +108,12 @@ export default function EditProfileScreen() {
         showBack
         title="Edit Researcher Profile"
         rightElement={
-          <TouchableOpacity onPress={handleSave} style={styles.saveHeaderButton}>
-            <Text style={styles.saveHeaderText}>Save</Text>
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={isSaving}
+            style={[styles.saveHeaderButton, isSaving && { opacity: 0.6 }]}
+          >
+            <Text style={styles.saveHeaderText}>{isSaving ? 'Saving...' : 'Save'}</Text>
           </TouchableOpacity>
         }
       />
@@ -103,36 +126,36 @@ export default function EditProfileScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Avatar Section */}
+          {/* Professional Avatar Section */}
           <View style={styles.avatarSection}>
             <View style={styles.avatarWrapper}>
               <Avatar
-                url={avatarUrl}
-                name={fullName}
+                url={avatarUrl || undefined}
+                name={fullName || 'Researcher'}
                 size={88}
                 verified={!!orcidId.trim()}
               />
+              <TouchableOpacity
+                onPress={() => {
+                  setTempPhotoUrl(avatarUrl);
+                  setPhotoModalOpen(true);
+                }}
+                style={styles.avatarBadgeButton}
+                activeOpacity={0.8}
+              >
+                <Camera size={14} color={colors.white} />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.avatarLabel}>Choose profile portrait:</Text>
-            <View style={styles.presetAvatarsRow}>
-              {PRESET_AVATARS.map((url, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  onPress={() => setAvatarUrl(url)}
-                  style={[
-                    styles.presetAvatarBtn,
-                    avatarUrl === url && styles.presetAvatarBtnSelected,
-                  ]}
-                >
-                  <Image source={{ uri: url }} style={styles.presetAvatarImg} />
-                  {avatarUrl === url && (
-                    <View style={styles.presetCheckmark}>
-                      <Check size={10} color={colors.white} strokeWidth={3} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                setTempPhotoUrl(avatarUrl);
+                setPhotoModalOpen(true);
+              }}
+              style={styles.changePhotoBtn}
+            >
+              <Text style={styles.changePhotoText}>Change Profile Photo</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Form Fields */}
@@ -277,15 +300,64 @@ export default function EditProfileScreen() {
 
             {/* Submit Button */}
             <Button
-              title="Save Changes"
+              title={isSaving ? 'Saving Changes...' : 'Save Changes'}
               variant="primary"
               size="lg"
               onPress={handleSave}
+              disabled={isSaving}
               style={styles.submitBtn}
             />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Photo URL Modal */}
+      <Modal
+        visible={photoModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Profile Photo</Text>
+              <TouchableOpacity onPress={() => setPhotoModalOpen(false)} style={styles.modalCloseBtn}>
+                <X size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Enter a direct image URL (JPEG, PNG, or WebP) for your academic portrait.
+            </Text>
+
+            <TextInput
+              style={styles.modalInput}
+              value={tempPhotoUrl}
+              onChangeText={setTempPhotoUrl}
+              placeholder="https://example.com/photo.jpg"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <View style={styles.modalActions}>
+              {avatarUrl ? (
+                <TouchableOpacity onPress={handleRemovePhoto} style={styles.modalRemoveBtn}>
+                  <Text style={styles.modalRemoveText}>Remove Photo</Text>
+                </TouchableOpacity>
+              ) : null}
+              <Button
+                title="Apply Photo"
+                variant="primary"
+                size="md"
+                onPress={handleSavePhotoUrl}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -317,43 +389,32 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderLight,
   },
   avatarWrapper: {
-    marginBottom: spacing.md,
-  },
-  avatarLabel: {
-    ...typography.micro,
-    color: colors.textSecondary,
+    position: 'relative',
     marginBottom: spacing.xs,
   },
-  presetAvatarsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  presetAvatarBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.full,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  presetAvatarBtnSelected: {
-    borderColor: colors.black,
-  },
-  presetAvatarImg: {
-    width: '100%',
-    height: '100%',
-  },
-  presetCheckmark: {
+  avatarBadgeButton: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
+    bottom: 0,
+    right: 0,
     backgroundColor: colors.black,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  changePhotoBtn: {
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+  },
+  changePhotoText: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   formCard: {
     padding: spacing.xl,
@@ -428,5 +489,70 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     marginTop: spacing.md,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: colors.background,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    ...typography.h3,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  modalCloseBtn: {
+    padding: spacing.xs,
+  },
+  modalSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  modalInput: {
+    ...typography.body,
+    fontSize: 14,
+    color: colors.textPrimary,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  modalRemoveBtn: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalRemoveText: {
+    ...typography.captionBold,
+    color: colors.accentRed,
   },
 });
