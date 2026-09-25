@@ -8,7 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing, typography } from '../../theme';
+import { colors, spacing, typography, layout } from '../../theme';
 
 export interface FeedNavigationProps {
   tabs: string[];
@@ -48,6 +48,7 @@ export const FeedNavigation: React.FC<FeedNavigationProps> = ({
               activeOpacity={0.8}
               onPress={() => handlePress(tab)}
               style={[styles.tabItem, isActive && styles.tabItemActive]}
+              hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
             >
               <Text
                 style={[
@@ -79,6 +80,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabItem: {
+    minHeight: layout.touchTargetMin - 4,
     paddingVertical: spacing.sm + 2,
     position: 'relative',
     alignItems: 'center',
@@ -86,8 +88,8 @@ const styles = StyleSheet.create({
   },
   tabItemActive: {},
   tabText: {
-    ...typography.captionMedium,
-    fontSize: 14,
+    ...typography.label,
+    fontSize: 14.5,
   },
   tabTextActive: {
     color: colors.textPrimary,
@@ -95,15 +97,15 @@ const styles = StyleSheet.create({
   },
   tabTextInactive: {
     color: colors.textSecondary,
-    fontWeight: '400',
+    fontWeight: '500',
   },
   activeIndicator: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 2,
+    height: 2.5,
     backgroundColor: colors.black,
-    borderRadius: 1,
+    borderRadius: 1.5,
   },
 });

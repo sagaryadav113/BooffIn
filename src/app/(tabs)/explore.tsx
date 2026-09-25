@@ -11,7 +11,7 @@ import {
 import { router } from 'expo-router';
 import { Compass, Sparkles, ArrowRight, SlidersHorizontal } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { SearchBar } from '../../components/core/SearchBar';
 import { FilterPills } from '../../components/core/FilterPills';
@@ -427,37 +427,39 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xs,
   },
   section: {
-    marginTop: spacing.xl,
+    marginTop: spacing.xxl,
     paddingHorizontal: spacing.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.md + 2,
   },
   sectionTitle: {
-    ...typography.h3,
-    fontSize: 18,
+    ...typography.sectionTitle,
+    fontSize: 20,
     color: colors.textPrimary,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   sectionSubtitle: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
+    fontSize: 13.5,
     marginTop: 2,
   },
   seeAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     paddingTop: 2,
+    minHeight: layout.touchTargetMin - 12,
   },
   seeAllText: {
-    ...typography.captionMedium,
+    ...typography.captionBold,
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 13.5,
   },
   topicGrid: {
     flexDirection: 'row',

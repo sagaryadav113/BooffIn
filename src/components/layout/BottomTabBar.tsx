@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, layout } from '../../theme';
+import { colors, layout, spacing } from '../../theme';
 import { Icon, IconName } from '../core/Icon';
 import { Typography } from '../core/Typography';
 import { useNotificationStore } from '../../store/useNotificationStore';
@@ -79,16 +79,17 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
             key={route.key}
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={options.tabBarAccessibilityLabel}
+            accessibilityLabel={options.tabBarAccessibilityLabel || meta.label}
             onPress={onPress}
             style={styles.tabItem}
-            activeOpacity={0.7}
+            activeOpacity={0.72}
           >
             <View style={styles.iconWrapper}>
               <Icon
                 name={meta.name}
                 size={isCreate ? 26 : 22}
                 color={isFocused ? colors.black : colors.textSecondary}
+                strokeWidth={isFocused ? 2.3 : 1.9}
               />
               {isNotifications && unreadCount > 0 && (
                 <View style={styles.badge}>
@@ -126,14 +127,17 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: layout.touchTargetMin,
   },
   iconWrapper: {
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -8,
+    top: -3,
+    right: -9,
     backgroundColor: colors.black,
     borderRadius: 8,
     minWidth: 16,
@@ -143,15 +147,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: '700',
+    color: colors.white,
   },
   label: {
-    marginTop: 2,
-    fontSize: 10,
+    marginTop: 3,
+    fontSize: 11.5,
     fontWeight: '500',
   },
   labelFocused: {
     fontWeight: '700',
+    color: colors.black,
   },
 });

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Post } from '../../types';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { PaperCard } from './PaperCard';
 import { usePostStore } from '../../store/usePostStore';
@@ -75,11 +75,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
 
   const authorRole = [post.author.academicTitle, post.author.institution]
     .filter(Boolean)
-    .join(' | ');
+    .join(' · ');
 
   return (
     <TouchableOpacity
-      activeOpacity={0.94}
+      activeOpacity={0.95}
       onPress={handlePostPress}
       style={[styles.container, style]}
     >
@@ -93,7 +93,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
           <Avatar
             url={post.author.avatarUrl}
             name={post.author.fullName}
-            size={42}
+            size="md"
             verified={post.author.orcidVerified}
           />
           <View style={styles.authorMeta}>
@@ -113,14 +113,14 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
 
         <TouchableOpacity
           style={styles.moreButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           onPress={(e) => e.stopPropagation()}
         >
-          <MoreHorizontal size={18} color={colors.textSecondary} />
+          <MoreHorizontal size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
-      {/* Post Text Body (Optional) */}
+      {/* Post Text Body */}
       {post.content ? (
         <Text style={styles.postBody}>{post.content}</Text>
       ) : null}
@@ -188,13 +188,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={post.isLiked ? 'Unlike post' : 'Like post'}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
           onPress={handleLike}
           activeOpacity={0.7}
           style={styles.actionItem}
         >
           <Heart
-            size={18}
+            size={20}
             color={post.isLiked ? colors.accentRed : colors.textSecondary}
             fill={post.isLiked ? colors.accentRed : 'transparent'}
           />
@@ -212,12 +212,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Comments"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
           onPress={handlePostPress}
           activeOpacity={0.7}
           style={styles.actionItem}
         >
-          <MessageCircle size={18} color={colors.textSecondary} />
+          <MessageCircle size={20} color={colors.textSecondary} />
           <Text style={styles.actionCount}>{post.commentsCount}</Text>
         </TouchableOpacity>
 
@@ -225,13 +225,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={post.isReposted ? 'Undo repost' : 'Repost'}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
           onPress={handleRepost}
           activeOpacity={0.7}
           style={styles.actionItem}
         >
           <Repeat2
-            size={18}
+            size={20}
             color={post.isReposted ? colors.accentGreen : colors.textSecondary}
           />
           <Text
@@ -248,13 +248,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={post.isSaved ? 'Remove bookmark' : 'Bookmark post'}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
           onPress={handleSave}
           activeOpacity={0.7}
           style={styles.actionItemRight}
         >
           <Bookmark
-            size={18}
+            size={20}
             color={post.isSaved ? colors.black : colors.textSecondary}
             fill={post.isSaved ? colors.black : 'transparent'}
           />
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cardBackground,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.md + 2,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
   },
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xs + 2,
   },
   authorRow: {
     flexDirection: 'row',
@@ -292,36 +292,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: spacing.xs,
+    gap: spacing.xs + 2,
   },
   authorName: {
-    ...typography.captionBold,
+    ...typography.bodyBold,
+    fontSize: 15.5,
     color: colors.textPrimary,
     fontWeight: '700',
   },
   handleText: {
     ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 13.5,
   },
   affiliationText: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
-    marginTop: 1,
+    fontSize: 13,
+    marginTop: 2,
   },
   moreButton: {
     padding: spacing.xs,
+    minHeight: layout.touchTargetMin - 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   postBody: {
     ...typography.body,
-    fontSize: 14.5,
+    fontSize: 15.5,
     color: colors.textPrimary,
-    lineHeight: 21,
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
+    lineHeight: 23,
+    marginTop: spacing.xs + 2,
+    marginBottom: spacing.xs + 2,
   },
   paperCardSpacing: {
-    marginTop: spacing.xs + 2,
+    marginTop: spacing.sm,
     marginBottom: spacing.xs,
   },
   actionsRow: {
@@ -335,20 +340,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs + 2,
+    minHeight: layout.touchTargetMin - 8,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.xs,
   },
   actionItemRight: {
+    minHeight: layout.touchTargetMin - 8,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionCount: {
     ...typography.captionMedium,
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 13.5,
   },
   imageGrid: {
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
     marginBottom: spacing.xs,
     borderRadius: radii.md,
     overflow: 'hidden',
@@ -357,83 +366,83 @@ const styles = StyleSheet.create({
   },
   postImage: {
     width: '100%',
-    height: 220,
+    height: 230,
     backgroundColor: colors.backgroundSecondary,
   },
   pollCard: {
     backgroundColor: colors.backgroundSecondary,
     borderRadius: radii.md,
-    padding: spacing.md,
-    marginTop: spacing.xs,
+    padding: spacing.md + 2,
+    marginTop: spacing.sm,
     marginBottom: spacing.xs,
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
   pollQuestion: {
-    ...typography.captionBold,
+    ...typography.bodyBold,
     color: colors.textPrimary,
     marginBottom: spacing.sm,
-    fontSize: 14,
+    fontSize: 15,
   },
   pollOptionsList: {
-    gap: spacing.xs,
+    gap: spacing.xs + 2,
   },
   pollOptionRow: {
     position: 'relative',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.sm,
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white,
+    borderRadius: radii.sm + 2,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     overflow: 'hidden',
+    minHeight: layout.touchTargetMin - 4,
   },
   pollProgressFill: {
     position: 'absolute',
-    top: 0,
     left: 0,
+    top: 0,
     bottom: 0,
-    backgroundColor: '#E2E8F0',
-    opacity: 0.6,
+    backgroundColor: 'rgba(17, 24, 39, 0.08)',
   },
   pollOptionText: {
-    ...typography.caption,
+    ...typography.captionBold,
     color: colors.textPrimary,
-    fontWeight: '500',
+    fontSize: 14,
     zIndex: 1,
   },
   pollOptionPercent: {
     ...typography.captionBold,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
     zIndex: 1,
   },
   pollVotesFooter: {
-    ...typography.micro,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
+    ...typography.metadata,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
   topicChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.xs + 2,
+    gap: spacing.xs + 2,
+    marginTop: spacing.sm,
   },
   topicChip: {
     backgroundColor: colors.backgroundSecondary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs,
     borderRadius: radii.full,
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
   topicChipText: {
-    ...typography.micro,
+    ...typography.captionMedium,
+    fontSize: 12.5,
     color: colors.textSecondary,
     fontWeight: '600',
-    fontSize: 11,
   },
 });

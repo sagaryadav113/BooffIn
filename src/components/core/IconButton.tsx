@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii } from '../../theme';
+import { colors, radii, layout } from '../../theme';
 import { Icon, IconName, IconSize } from './Icon';
 
 export interface IconButtonProps {
@@ -85,7 +85,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
     >
       <Icon
         name={icon}
-        size={iconSize || (size === 'sm' ? 'xs' : size === 'lg' ? 'md' : 'sm')}
+        size={iconSize || (size === 'sm' ? 18 : size === 'lg' ? 24 : 20)}
         color={getColor()}
       />
     </TouchableOpacity>
@@ -99,16 +99,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sm: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
+    minHeight: layout.touchTargetMin - 8,
   },
   md: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    minHeight: layout.touchTargetMin,
   },
   lg: {
-    width: 48,
-    height: 48,
+    width: 50,
+    height: 50,
+    minHeight: 50,
   },
   ghost: {
     backgroundColor: 'transparent',

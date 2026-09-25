@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import { Mail } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { BooffinLogo } from '../../components/core/BooffinLogo';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -71,17 +71,17 @@ export default function WelcomeScreen() {
         {/* Central Hero Section */}
         <View style={styles.heroSection}>
           <View style={styles.logoWrapper}>
-            <BooffinLogo size={108} />
+            <BooffinLogo size={88} />
           </View>
 
           <Text style={styles.title}>
             Let's <Text style={styles.titleBold}>BooffIn</Text>
           </Text>
 
-          <Text style={styles.tagline}>Research finds it's people.</Text>
+          <Text style={styles.tagline}>Research finds its people.</Text>
 
           <View style={styles.statementBox}>
-            <Text style={styles.statementText}>Ideas. Papers. People. Progress.</Text>
+            <Text style={styles.statementText}>Ideas · Papers · People · Progress</Text>
           </View>
         </View>
 
@@ -186,8 +186,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   tagline: {
-    ...typography.body,
-    fontSize: 16,
+    ...typography.bodyLargeMedium,
+    fontSize: 16.5,
     color: colors.textSecondary,
     textAlign: 'center',
     letterSpacing: 0.1,
@@ -201,9 +201,9 @@ const styles = StyleSheet.create({
   statementText: {
     ...typography.captionMedium,
     fontSize: 13,
-    color: colors.textPrimary,
+    color: colors.textSecondary,
     fontWeight: '600',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
     textAlign: 'center',
     textTransform: 'uppercase',
   },
@@ -221,16 +221,17 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   errorText: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.accentRed,
     textAlign: 'center',
+    fontSize: 13,
   },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    height: 50,
+    height: layout.buttonHeights.lg,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.borderDark,
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
       : {}),
   },
   googleButtonText: {
-    ...typography.bodyMedium,
+    ...typography.bodyBold,
     color: colors.textPrimary,
     fontSize: 15,
     fontWeight: '600',
@@ -254,7 +255,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    height: 50,
+    height: layout.buttonHeights.lg,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.borderDark,
@@ -268,7 +269,7 @@ const styles = StyleSheet.create({
       : {}),
   },
   emailButtonText: {
-    ...typography.bodyMedium,
+    ...typography.bodyBold,
     color: colors.textPrimary,
     fontSize: 15,
     fontWeight: '600',
@@ -279,9 +280,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   legalText: {
-    ...typography.micro,
+    ...typography.metadata,
     color: colors.textMuted,
-    fontSize: 12,
+    fontSize: 12.5,
     lineHeight: 17,
     textAlign: 'center',
   },

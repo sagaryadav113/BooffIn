@@ -11,7 +11,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { ArrowRight, ExternalLink, X } from 'lucide-react-native';
 import { Paper } from '../../types';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Badge } from '../core/Badge';
 
 interface PaperCardProps {
@@ -114,7 +114,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({
         )}
 
         <View style={{ flex: 1 }}>
-          {/* Title */}
+          {/* Paper Title (16–18px semibold) */}
           <Text
             numberOfLines={compact ? 2 : 3}
             style={[styles.title, compact && styles.compactTitle]}
@@ -137,13 +137,13 @@ export const PaperCard: React.FC<PaperCardProps> = ({
             <TouchableOpacity
               accessibilityRole="link"
               accessibilityLabel={`Read paper on publisher website: ${paper.journal}`}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
               onPress={handleOpenPublisher}
               style={styles.linkButton}
               activeOpacity={0.7}
             >
               <Text style={styles.linkText}>Read paper</Text>
-              <ExternalLink size={13} color={colors.accentLink} strokeWidth={2.2} />
+              <ExternalLink size={14} color={colors.accentLink} strokeWidth={2.2} />
             </TouchableOpacity>
           </View>
         </View>
@@ -169,9 +169,9 @@ const styles = StyleSheet.create({
     top: spacing.sm,
     right: spacing.sm,
     zIndex: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    width: 24,
-    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    width: 28,
+    height: 28,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   imageContainer: {
-    height: 130,
+    height: 140,
     width: '100%',
     backgroundColor: colors.backgroundTertiary,
     borderBottomWidth: 1,
@@ -204,49 +204,53 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   compactImage: {
-    width: 56,
-    height: 56,
+    width: 64,
+    height: 64,
     borderRadius: radii.sm,
     marginRight: spacing.md,
   },
   content: {
-    padding: spacing.md,
+    padding: spacing.md + 2,
     flexDirection: 'row',
   },
   title: {
-    ...typography.captionBold,
+    ...typography.contentTitle,
+    fontSize: 16.5,
+    lineHeight: 22.5,
     color: colors.textPrimary,
-    fontSize: 14,
-    lineHeight: 20,
     marginBottom: spacing.xs + 2,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   compactTitle: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14.5,
+    lineHeight: 20,
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing.xs,
+    marginTop: spacing.xs + 2,
   },
   journalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs + 2,
   },
   yearText: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
+    fontSize: 13,
   },
   linkButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
+    minHeight: layout.touchTargetMin - 12,
+    paddingVertical: 2,
   },
   linkText: {
-    ...typography.micro,
+    ...typography.captionMedium,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.accentLink,
   },

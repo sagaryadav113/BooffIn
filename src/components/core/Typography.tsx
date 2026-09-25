@@ -4,18 +4,27 @@ import { typography, colors } from '../../theme';
 
 export type TypographyVariant =
   | 'display'
+  | 'displaySmall'
+  | 'pageTitle'
+  | 'sectionTitle'
+  | 'contentTitle'
   | 'h1'
   | 'h2'
   | 'h3'
   | 'h4'
   | 'titleSerif'
   | 'bodyLarge'
+  | 'bodyLargeMedium'
+  | 'bodyLargeBold'
   | 'body'
   | 'bodyMedium'
   | 'bodyBold'
+  | 'label'
+  | 'labelBold'
   | 'caption'
   | 'captionMedium'
   | 'captionBold'
+  | 'metadata'
   | 'micro'
   | 'microBold';
 

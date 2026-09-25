@@ -53,6 +53,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
         disabled && styles.disabled,
         style,
       ]}
+      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
     >
       {/* Icon or Avatar */}
       {avatarUrl || avatarFallback ? (
@@ -67,7 +68,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
         <View style={[styles.iconCircle, { backgroundColor: iconBgColor || defaultIconBg }]}>
           <Icon
             name={icon}
-            size="sm"
+            size={20}
             color={iconColor || defaultIconColor}
           />
         </View>
@@ -76,7 +77,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
       {/* Title & Subtitle */}
       <View style={styles.metaContainer}>
         <Typography
-          variant="captionBold"
+          variant="bodyBold"
           color={destructive ? colors.error : colors.textPrimary}
           style={styles.title}
         >
@@ -85,7 +86,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
 
         {subtitle ? (
           <Typography
-            variant="micro"
+            variant="caption"
             color={colors.textSecondary}
             style={styles.subtitle}
           >
@@ -98,7 +99,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
       <View style={styles.rightSection}>
         {value ? (
           <Typography
-            variant="caption"
+            variant="captionMedium"
             color={colors.textSecondary}
             style={styles.valueText}
           >
@@ -109,7 +110,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
         {rightElement ? (
           rightElement
         ) : showChevron && isInteractive ? (
-          <Icon name="ArrowRight" size="xs" color={colors.textMuted} />
+          <Icon name="ArrowRight" size={16} color={colors.textMuted} />
         ) : null}
       </View>
     </TouchableOpacity>
@@ -121,7 +122,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     backgroundColor: colors.cardBackground,
     minHeight: 56,
   },
@@ -132,8 +133,8 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   iconCircle: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -145,22 +146,22 @@ const styles = StyleSheet.create({
     paddingRight: spacing.sm,
   },
   title: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 15.5,
+    lineHeight: 20,
     fontWeight: '600',
   },
   subtitle: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
     marginTop: 2,
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs + 2,
   },
   valueText: {
-    fontSize: 13,
+    fontSize: 13.5,
     marginRight: spacing.xs,
   },
 });

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { colors, spacing, layout } from '../../theme';
+import { colors, spacing, layout, typography } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
 
@@ -61,7 +61,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             accessibilityLabel="Go back"
             onPress={handleBack}
             style={styles.iconButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Icon name="ArrowLeft" size="md" color={colors.textPrimary} />
           </TouchableOpacity>
@@ -74,10 +74,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           />
         )}
         <Typography
-          variant={isBrandTitle ? 'h2' : 'h3'}
+          variant={isBrandTitle ? 'pageTitle' : 'sectionTitle'}
           style={[
             isBrandTitle ? styles.brandTitle : styles.title,
-            showBack && { marginLeft: spacing.xs },
+            showBack && { marginLeft: spacing.xs + 2 },
           ]}
           numberOfLines={1}
         >
@@ -93,7 +93,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             accessibilityLabel="Search discussions and papers"
             onPress={searchHandler}
             style={styles.iconButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Icon name="Search" size="sm" color={colors.textPrimary} />
           </TouchableOpacity>
@@ -105,7 +105,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             accessibilityLabel="Create research post or discussion"
             onPress={onCreatePress || (() => router.push('/(tabs)/create'))}
             style={[styles.iconButton, styles.createButton]}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Icon name="Plus" size="sm" color={colors.white} />
           </TouchableOpacity>
@@ -117,7 +117,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             accessibilityLabel={rightIcon}
             onPress={onRightIconPress}
             style={styles.iconButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Icon name={rightIcon} size="md" color={colors.textPrimary} />
           </TouchableOpacity>
@@ -131,7 +131,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    height: layout.headerHeight,
+    minHeight: layout.headerHeight,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -146,9 +146,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   brandIcon: {
-    width: 22,
-    height: 26,
-    marginRight: spacing.sm,
+    width: 24,
+    height: 28,
+    marginRight: spacing.sm + 2,
   },
   brandTitle: {
     fontSize: 24,
@@ -157,8 +157,9 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
+    letterSpacing: -0.3,
     color: colors.textPrimary,
   },
   rightSection: {
@@ -167,9 +168,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    minHeight: layout.touchTargetMin - 4,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },

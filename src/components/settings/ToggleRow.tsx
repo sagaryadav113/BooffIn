@@ -31,19 +31,19 @@ export const ToggleRow: React.FC<ToggleRowProps> = ({
         <View style={[styles.iconCircle, { backgroundColor: iconBgColor || colors.backgroundSecondary }]}>
           <Icon
             name={icon}
-            size="sm"
+            size={20}
             color={iconColor || colors.textPrimary}
           />
         </View>
       ) : null}
 
       <View style={styles.metaContainer}>
-        <Typography variant="captionBold" color={colors.textPrimary} style={styles.title}>
+        <Typography variant="bodyBold" color={colors.textPrimary} style={styles.title}>
           {title}
         </Typography>
 
         {subtitle ? (
-          <Typography variant="micro" color={colors.textSecondary} style={styles.subtitle}>
+          <Typography variant="caption" color={colors.textSecondary} style={styles.subtitle}>
             {subtitle}
           </Typography>
         ) : null}
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     backgroundColor: colors.cardBackground,
     minHeight: 56,
   },
@@ -77,8 +77,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   iconCircle: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -90,13 +90,13 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
   },
   title: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 15.5,
+    lineHeight: 20,
     fontWeight: '600',
   },
   subtitle: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
     marginTop: 2,
   },
 });

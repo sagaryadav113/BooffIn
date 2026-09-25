@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors, spacing } from '../../theme';
+import { colors, spacing, layout, typography } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Button } from '../core/Button';
 import { Icon, IconName } from '../core/Icon';
@@ -30,17 +30,17 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     <View style={[styles.container, style]}>
       {icon && (
         <View style={styles.iconCircle}>
-          <Icon name={icon} size="lg" color={colors.textSecondary} />
+          <Icon name={icon} size={28} color={colors.textSecondary} strokeWidth={1.75} />
         </View>
       )}
 
-      <Typography variant="captionBold" align="center" style={styles.title}>
+      <Typography variant="sectionTitle" align="center" style={styles.title}>
         {title}
       </Typography>
 
       {description && (
         <Typography
-          variant="caption"
+          variant="body"
           color={colors.textSecondary}
           align="center"
           style={styles.description}
@@ -52,8 +52,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       {actionTitle && handleAction && (
         <Button
           title={actionTitle}
-          variant="outline"
-          size="sm"
+          variant="primary"
+          size="md"
           onPress={handleAction}
           style={styles.actionButton}
         />
@@ -70,24 +70,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   title: {
-    fontSize: 16,
-    marginBottom: spacing.xs,
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs + 2,
+    letterSpacing: -0.3,
   },
   description: {
     textAlign: 'center',
-    maxWidth: 280,
-    lineHeight: 20,
+    maxWidth: 340,
+    fontSize: 14.5,
+    lineHeight: 22,
+    color: colors.textSecondary,
   },
   actionButton: {
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
+    minWidth: 160,
   },
 });

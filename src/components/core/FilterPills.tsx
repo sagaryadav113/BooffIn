@@ -7,7 +7,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 
 export interface FilterPillsProps {
   options?: string[];
@@ -58,6 +58,7 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
               styles.pill,
               isSelected ? styles.pillSelected : styles.pillUnselected,
             ]}
+            hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
           >
             <Text
               style={[
@@ -86,6 +87,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs + 3,
     borderRadius: radii.full,
     borderWidth: 1,
+    minHeight: layout.touchTargetMin - 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pillSelected: {
     backgroundColor: colors.black,
@@ -96,11 +100,12 @@ const styles = StyleSheet.create({
     borderColor: colors.borderLight,
   },
   pillText: {
-    ...typography.captionMedium,
+    ...typography.label,
+    fontSize: 14,
   },
   pillTextSelected: {
     color: colors.white,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   pillTextUnselected: {
     color: colors.textSecondary,

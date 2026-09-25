@@ -11,7 +11,7 @@ export interface BooffinLogoProps {
 }
 
 export const BooffinLogo: React.FC<BooffinLogoProps> = ({
-  size = 120,
+  size = 56,
   variant = 'symbol',
   showTagline = false,
   style,
@@ -21,12 +21,12 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
       <View style={[styles.container, style]}>
         <Image
           source={require('../../../assets/images/booffin-full-logo.jpg')}
-          style={{ width: size, height: size * 1.05 }}
+          style={{ width: size * 1.5, height: size * 1.5 }}
           contentFit="contain"
           transition={200}
         />
         {showTagline && (
-          <Text style={styles.tagline}>Research finds it's people.</Text>
+          <Text style={styles.tagline}>Research finds its people.</Text>
         )}
       </View>
     );
@@ -36,20 +36,21 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
     <View style={[styles.container, style]}>
       <Image
         source={require('../../../assets/images/booffin-symbol.png')}
-        style={{ width: size * 0.85, height: size }}
+        style={{ width: size, height: size * 1.15 }}
         contentFit="contain"
         transition={200}
       />
       {showTagline && (
         <View style={styles.taglineContainer}>
-          <Text style={styles.wordmark}>Let's <Text style={{ fontWeight: '800' }}>BooffIn</Text></Text>
-          <Text style={styles.tagline}>Research finds it's people.</Text>
+          <Text style={styles.wordmark}>
+            Let's <Text style={{ fontWeight: '800' }}>BooffIn</Text>
+          </Text>
+          <Text style={styles.tagline}>Research finds its people.</Text>
         </View>
       )}
     </View>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
@@ -61,17 +62,18 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   wordmark: {
-    ...typography.h2,
-    fontSize: 22,
+    ...typography.pageTitle,
+    fontSize: 26,
     color: colors.textPrimary,
     fontWeight: '700',
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
     marginBottom: 4,
   },
   tagline: {
     ...typography.captionMedium,
     color: colors.textSecondary,
-    fontSize: 14,
+    fontSize: 15,
     textAlign: 'center',
+    lineHeight: 20,
   },
 });

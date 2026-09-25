@@ -1,12 +1,11 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
-import { colors, spacing } from '../../theme';
+import { colors, spacing, layout, typography } from '../../theme';
 import { UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
 import { Typography } from '../core/Typography';
 import { Button } from '../core/Button';
-
 import { useAuthStore } from '../../store/useAuthStore';
 import { getSharedResearchInterests } from '../../api/connectionService';
 import { Sparkles } from 'lucide-react-native';
@@ -47,28 +46,28 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
       <Avatar
         url={researcher.avatarUrl}
         name={researcher.fullName}
-        size={44}
+        size="md"
         verified={researcher.orcidVerified}
       />
 
       <View style={styles.metaContainer}>
         <View style={styles.nameRow}>
-          <Typography variant="captionBold" color={colors.textPrimary}>
+          <Typography variant="bodyBold" color={colors.textPrimary} style={styles.nameText}>
             {researcher.fullName}
           </Typography>
-          <Typography variant="micro" color={colors.textSecondary}>
+          <Typography variant="caption" color={colors.textSecondary} style={styles.handleText}>
             @{researcher.handle}
           </Typography>
         </View>
 
-        <Typography variant="micro" color={colors.textSecondary} numberOfLines={1} style={styles.roleText}>
+        <Typography variant="caption" color={colors.textSecondary} numberOfLines={1} style={styles.roleText}>
           {researcher.academicTitle} · {researcher.institution}
         </Typography>
 
         {mutualInterests.length > 0 && (
           <View style={styles.mutualRow}>
-            <Sparkles size={11} color="#2563EB" style={{ marginRight: 3 }} />
-            <Typography variant="micro" color="#1E40AF" style={{ fontSize: 10, fontWeight: '600' }} numberOfLines={1}>
+            <Sparkles size={12} color="#2563EB" style={{ marginRight: 4 }} />
+            <Typography variant="metadata" color="#1E40AF" style={{ fontWeight: '600' }} numberOfLines={1}>
               Mutual: {mutualInterests.slice(0, 2).join(', ')}{mutualInterests.length > 2 ? ` +${mutualInterests.length - 2}` : ''}
             </Typography>
           </View>
@@ -92,11 +91,12 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md + 2,
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.backgroundCard,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
+    minHeight: layout.touchTargetMin + 16,
   },
   metaContainer: {
     flex: 1,
@@ -106,18 +106,26 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs + 2,
     flexWrap: 'wrap',
+  },
+  nameText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  handleText: {
+    fontSize: 13.5,
   },
   roleText: {
     marginTop: 2,
+    fontSize: 13,
   },
   mutualRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 3,
+    marginTop: 4,
   },
   followButton: {
-    minWidth: 86,
+    minWidth: 92,
   },
 });

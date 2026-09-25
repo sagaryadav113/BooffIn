@@ -29,7 +29,7 @@ import {
   Check,
   X as XIcon,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
 import { Button } from '../../components/core/Button';
 import { IconButton } from '../../components/core/IconButton';
@@ -670,9 +670,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   fullName: {
-    ...typography.h2,
+    ...typography.sectionTitle,
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
+    letterSpacing: -0.4,
     color: colors.textPrimary,
   },
   verifiedTag: {
@@ -685,38 +686,39 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
   },
   verifiedText: {
-    ...typography.micro,
+    ...typography.metadata,
     color: colors.accentGreen,
     fontWeight: '700',
-    fontSize: 11,
+    fontSize: 11.5,
   },
   handle: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginTop: 1,
+    fontSize: 14,
+    marginTop: 2,
   },
   roleBox: {
-    marginTop: spacing.xs,
+    marginTop: spacing.xs + 2,
     marginBottom: spacing.xs + 2,
   },
   roleTitle: {
-    ...typography.captionBold,
+    ...typography.bodyBold,
     color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
   },
   institutionText: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
     marginTop: 2,
-    fontSize: 13,
+    fontSize: 13.5,
   },
   bio: {
     ...typography.body,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 23,
     color: colors.textPrimary,
-    marginVertical: spacing.xs,
+    marginVertical: spacing.xs + 2,
   },
   interestsSection: {
     marginVertical: spacing.xs + 2,
@@ -725,15 +727,16 @@ const styles = StyleSheet.create({
     marginVertical: spacing.xs + 2,
   },
   interestsLabel: {
-    ...typography.micro,
+    ...typography.captionBold,
     color: colors.textSecondary,
     fontWeight: '600',
-    marginBottom: spacing.xs,
+    fontSize: 13,
+    marginBottom: spacing.xs + 2,
   },
   interestsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
+    gap: spacing.xs + 2,
   },
   discussedChip: {
     flexDirection: 'row',
@@ -741,17 +744,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingLeft: spacing.sm,
-    paddingRight: 4,
-    paddingVertical: 4,
+    paddingLeft: spacing.sm + 2,
+    paddingRight: 6,
+    paddingVertical: 5,
     borderRadius: radii.full,
     gap: 6,
   },
   discussedChipLabel: {
-    ...typography.micro,
+    ...typography.captionMedium,
     color: colors.textPrimary,
     fontWeight: '500',
-    fontSize: 12,
+    fontSize: 12.5,
   },
   discussedCountBadge: {
     backgroundColor: '#E2E8F0',
@@ -763,7 +766,7 @@ const styles = StyleSheet.create({
     ...typography.micro,
     color: colors.textSecondary,
     fontWeight: '700',
-    fontSize: 10,
+    fontSize: 10.5,
   },
   metaContainer: {
     flexDirection: 'row',
@@ -779,24 +782,24 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
   },
   orcidItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     backgroundColor: 'rgba(37, 99, 235, 0.08)',
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
     borderRadius: radii.sm,
   },
   orcidText: {
-    ...typography.micro,
+    ...typography.captionMedium,
     color: colors.accentBlue,
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 12.5,
   },
   websiteItem: {
     flexDirection: 'row',
@@ -804,33 +807,33 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   websiteText: {
-    ...typography.micro,
+    ...typography.captionMedium,
     color: colors.accentLink,
     fontWeight: '500',
-    fontSize: 12,
+    fontSize: 13,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xl,
+    gap: spacing.xxl,
     paddingTop: spacing.xs,
     paddingBottom: spacing.lg,
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   statNumber: {
-    ...typography.captionBold,
+    ...typography.bodyBold,
     color: colors.textPrimary,
     fontWeight: '700',
-    fontSize: 15,
+    fontSize: 16,
   },
   statLabel: {
     ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 14,
   },
   tabsRow: {
     flexDirection: 'row',
@@ -842,8 +845,10 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
+    minHeight: layout.touchTargetMin,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
@@ -857,8 +862,8 @@ const styles = StyleSheet.create({
   },
   tabBadge: {
     backgroundColor: '#2563EB',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
     borderRadius: radii.full,
   },
   tabBadgeText: {
@@ -868,9 +873,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   tabText: {
-    ...typography.captionMedium,
+    ...typography.label,
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '500',
   },
   tabTextActive: {
     color: colors.black,

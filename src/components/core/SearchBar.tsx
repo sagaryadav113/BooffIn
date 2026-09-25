@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Icon } from './Icon';
 
 export interface SearchBarProps {
@@ -39,7 +39,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <View style={[styles.container, style]}>
       <View style={styles.inputWrapper}>
-        <Icon name="Search" size="xs" color={colors.textSecondary} style={styles.searchIcon} />
+        <Icon name="Search" size="sm" color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -56,7 +56,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <TouchableOpacity
             onPress={onClear || (() => onChangeText(''))}
             style={styles.clearButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Icon name="X" size="xs" color={colors.textSecondary} />
           </TouchableOpacity>
@@ -92,7 +92,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
-    height: 42,
+    height: 46,
+    minHeight: layout.touchTargetMin,
   },
   searchIcon: {
     marginRight: spacing.sm,
@@ -100,16 +101,20 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     ...typography.body,
-    fontSize: 14,
+    fontSize: 15,
     color: colors.textPrimary,
     padding: 0,
   },
   clearButton: {
-    padding: spacing.xxs,
+    padding: spacing.xs,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterButton: {
-    width: 42,
-    height: 42,
+    width: 46,
+    height: 46,
+    minHeight: layout.touchTargetMin,
     borderRadius: radii.md,
     backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,

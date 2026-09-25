@@ -1,16 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { colors, radii } from '../../theme';
+import { colors, radii, layout } from '../../theme';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
 
 const sizeMap: Record<string, number> = {
-  xs: 24,
-  sm: 32,
-  md: 40,
-  lg: 52,
-  xl: 72,
+  xs: layout.avatarSizes.xs,
+  sm: layout.avatarSizes.sm,
+  md: layout.avatarSizes.md,
+  lg: layout.avatarSizes.lg,
+  xl: layout.avatarSizes.xl,
 };
 
 interface AvatarProps {
@@ -26,11 +26,11 @@ export const Avatar: React.FC<AvatarProps> = ({
   url,
   uri,
   name = 'User',
-  size = 40,
+  size = 'md',
   style,
   verified = false,
 }) => {
-  const pixelSize = typeof size === 'number' ? size : sizeMap[size] || 40;
+  const pixelSize = typeof size === 'number' ? size : sizeMap[size] || layout.avatarSizes.md;
   const imageSource = uri || url;
   const getInitials = (n: string) => {
     return n
@@ -57,7 +57,7 @@ export const Avatar: React.FC<AvatarProps> = ({
             { width: pixelSize, height: pixelSize, borderRadius: pixelSize / 2 },
           ]}
         >
-          <Text style={[styles.initials, { fontSize: pixelSize * 0.38 }]}>
+          <Text style={[styles.initials, { fontSize: Math.max(10, pixelSize * 0.38) }]}>
             {getInitials(name)}
           </Text>
         </View>
@@ -83,13 +83,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   initials: {
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   verifiedBadge: {
     position: 'absolute',
-    width: 14,
-    height: 14,
+    width: 15,
+    height: 15,
     borderRadius: radii.full,
     backgroundColor: colors.black,
     alignItems: 'center',
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   },
   verifiedCheck: {
     color: colors.white,
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: '800',
   },
 });

@@ -14,11 +14,11 @@ export const SettingsSectionHeader: React.FC<SettingsSectionHeaderProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <Typography variant="captionBold" color={colors.textSecondary} style={styles.title}>
+      <Typography variant="labelBold" color={colors.textSecondary} style={styles.title}>
         {title.toUpperCase()}
       </Typography>
       {description && (
-        <Typography variant="micro" color={colors.textMuted} style={styles.description}>
+        <Typography variant="caption" color={colors.textMuted} style={styles.description}>
           {description}
         </Typography>
       )}
@@ -28,18 +28,18 @@ export const SettingsSectionHeader: React.FC<SettingsSectionHeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm + 2,
     paddingHorizontal: spacing.xs,
   },
   title: {
-    fontSize: 12,
-    letterSpacing: 0.6,
+    fontSize: 12.5,
+    letterSpacing: 0.7,
     fontWeight: '700',
   },
   description: {
-    marginTop: 2,
-    fontSize: 12,
-    lineHeight: 16,
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Topic } from '../../types';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Button } from '../core/Button';
 import { useTopicStore } from '../../store/useTopicStore';
 
@@ -32,7 +32,7 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, style }) => {
   const toggleFollow = useTopicStore((s) => s.toggleFollowTopic);
 
   const getIcon = (name: string) => {
-    const props = { size: 24, color: colors.textPrimary };
+    const props = { size: 24, color: colors.textPrimary, strokeWidth: 1.85 };
     switch (name.toLowerCase()) {
       case 'brain':
         return <Brain {...props} />;
@@ -71,9 +71,9 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, style }) => {
 
   const formatFollowers = (count: number) => {
     if (count >= 1000) {
-      return `${Math.round(count / 1000)}K followers`;
+      return `${Math.round(count / 1000)}K researchers`;
     }
-    return `${count} followers`;
+    return `${count} researchers`;
   };
 
   return (
@@ -104,15 +104,16 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md + 2,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
     backgroundColor: colors.cardBackground,
+    minHeight: layout.touchTargetMin + 16,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: radii.full,
     backgroundColor: colors.backgroundSecondary,
     alignItems: 'center',
@@ -126,16 +127,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   name: {
-    ...typography.captionBold,
+    ...typography.bodyBold,
     color: colors.textPrimary,
-    fontSize: 15,
+    fontSize: 15.5,
+    fontWeight: '700',
   },
   followers: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
+    fontSize: 13,
     marginTop: 2,
   },
   followButton: {
-    minWidth: 90,
+    minWidth: 94,
   },
 });

@@ -8,12 +8,12 @@ import {
   TextStyle,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   disabled?: boolean;
@@ -55,6 +55,8 @@ export const Button: React.FC<ButtonProps> = ({
         return styles.outlineContainer;
       case 'ghost':
         return styles.ghostContainer;
+      case 'danger':
+        return styles.dangerContainer;
     }
   };
 
@@ -68,6 +70,8 @@ export const Button: React.FC<ButtonProps> = ({
         return styles.outlineText;
       case 'ghost':
         return styles.ghostText;
+      case 'danger':
+        return styles.dangerText;
     }
   };
 
@@ -87,7 +91,7 @@ export const Button: React.FC<ButtonProps> = ({
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
-      activeOpacity={0.8}
+      activeOpacity={0.82}
       onPress={handlePress}
       disabled={disabled || loading}
       style={[
@@ -97,16 +101,24 @@ export const Button: React.FC<ButtonProps> = ({
         disabled && styles.disabled,
         style,
       ]}
+      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
     >
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'primary' ? colors.white : colors.black}
+          color={variant === 'primary' || variant === 'danger' ? colors.white : colors.black}
         />
       ) : (
         <>
           {iconLeft}
-          <Text style={[getTextStyle(), textStyle, iconLeft ? { marginLeft: spacing.xs } : null, iconRight ? { marginRight: spacing.xs } : null]}>
+          <Text
+            style={[
+              getTextStyle(),
+              textStyle,
+              iconLeft ? { marginLeft: spacing.xs + 2 } : null,
+              iconRight ? { marginRight: spacing.xs + 2 } : null,
+            ]}
+          >
             {title}
           </Text>
           {iconRight}
@@ -124,17 +136,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   smSize: {
-    minHeight: 36,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
+    minHeight: layout.buttonHeights.sm,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.xs,
   },
   mdSize: {
-    minHeight: 44,
+    minHeight: layout.buttonHeights.md,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm + 2,
   },
   lgSize: {
-    minHeight: 50,
+    minHeight: layout.buttonHeights.lg,
     paddingHorizontal: spacing.xxl,
     paddingVertical: spacing.md,
   },
@@ -142,15 +154,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
   },
   primaryText: {
-    ...typography.captionBold,
+    ...typography.labelBold,
     color: colors.white,
+    fontSize: 14.5,
   },
   secondaryContainer: {
     backgroundColor: colors.backgroundTertiary,
   },
   secondaryText: {
-    ...typography.captionBold,
+    ...typography.labelBold,
     color: colors.textPrimary,
+    fontSize: 14.5,
   },
   outlineContainer: {
     backgroundColor: 'transparent',
@@ -158,17 +172,27 @@ const styles = StyleSheet.create({
     borderColor: colors.borderDark,
   },
   outlineText: {
-    ...typography.captionBold,
+    ...typography.labelBold,
     color: colors.textPrimary,
+    fontSize: 14.5,
   },
   ghostContainer: {
     backgroundColor: 'transparent',
   },
   ghostText: {
-    ...typography.captionBold,
+    ...typography.labelBold,
     color: colors.textPrimary,
+    fontSize: 14.5,
+  },
+  dangerContainer: {
+    backgroundColor: colors.accentRed,
+  },
+  dangerText: {
+    ...typography.labelBold,
+    color: colors.white,
+    fontSize: 14.5,
   },
   disabled: {
-    opacity: 0.4,
+    opacity: 0.45,
   },
 });

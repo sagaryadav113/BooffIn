@@ -11,7 +11,7 @@ import { router } from 'expo-router';
 import { Heart, MessageCircle, Bookmark } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Paper } from '../../types';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Badge } from '../core/Badge';
 import { usePaperStore } from '../../store/usePaperStore';
 
@@ -84,21 +84,22 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
         <View style={styles.actionsRow}>
           <View style={styles.metricsRow}>
             <View style={styles.metricItem}>
-              <Heart size={14} color={colors.textSecondary} />
+              <Heart size={15} color={colors.textSecondary} />
               <Text style={styles.metricText}>{paper.likesCount}</Text>
             </View>
             <View style={styles.metricItem}>
-              <MessageCircle size={14} color={colors.textSecondary} />
+              <MessageCircle size={15} color={colors.textSecondary} />
               <Text style={styles.metricText}>{paper.discussionCount}</Text>
             </View>
           </View>
 
           <TouchableOpacity
             onPress={handleSave}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={styles.saveBtn}
           >
             <Bookmark
-              size={17}
+              size={18}
               color={paper.isSaved ? colors.black : colors.textSecondary}
               fill={paper.isSaved ? colors.black : 'transparent'}
             />
@@ -115,14 +116,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.borderLight,
-    padding: spacing.md,
+    padding: spacing.md + 2,
     flexDirection: 'row',
     marginBottom: spacing.md,
   },
   thumbnail: {
-    width: 72,
-    height: 72,
-    borderRadius: radii.sm,
+    width: 80,
+    height: 80,
+    borderRadius: radii.sm + 2,
     backgroundColor: colors.backgroundTertiary,
     marginRight: spacing.md,
   },
@@ -131,25 +132,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: {
-    ...typography.captionBold,
+    ...typography.bodyBold,
     color: colors.textPrimary,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 20,
     marginBottom: spacing.xs,
+    fontWeight: '600',
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs + 2,
     marginBottom: spacing.xs,
   },
   yearText: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
+    fontSize: 12.5,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: spacing.xs,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -162,8 +167,15 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metricText: {
-    ...typography.micro,
+    ...typography.metadata,
     color: colors.textSecondary,
+    fontSize: 13,
     fontWeight: '500',
+  },
+  saveBtn: {
+    padding: spacing.xs,
+    minHeight: layout.touchTargetMin - 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

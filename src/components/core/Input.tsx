@@ -7,7 +7,7 @@ import {
   ViewStyle,
   TouchableOpacity,
 } from 'react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Typography } from './Typography';
 import { Icon, IconName } from './Icon';
 
@@ -37,7 +37,7 @@ export const Input: React.FC<InputProps> = ({
   return (
     <View style={[styles.container, containerStyle]}>
       {label && (
-        <Typography variant="captionBold" color={colors.textPrimary} style={styles.label}>
+        <Typography variant="labelBold" color={colors.textPrimary} style={styles.label}>
           {label}
         </Typography>
       )}
@@ -68,6 +68,7 @@ export const Input: React.FC<InputProps> = ({
             disabled={!onRightIconPress}
             onPress={onRightIconPress}
             style={styles.rightIconWrapper}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Icon name={rightIcon} size="sm" color={colors.textSecondary} />
           </TouchableOpacity>
@@ -75,11 +76,11 @@ export const Input: React.FC<InputProps> = ({
       </View>
 
       {error ? (
-        <Typography variant="micro" color={colors.accentRed} style={styles.helperText}>
+        <Typography variant="metadata" color={colors.accentRed} style={styles.helperText}>
           {error}
         </Typography>
       ) : hint ? (
-        <Typography variant="micro" color={colors.textSecondary} style={styles.helperText}>
+        <Typography variant="metadata" color={colors.textSecondary} style={styles.helperText}>
           {hint}
         </Typography>
       ) : null}
@@ -90,10 +91,12 @@ export const Input: React.FC<InputProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   label: {
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xs + 2,
+    fontSize: 14,
+    fontWeight: '600',
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -102,7 +105,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.md + 2,
+    minHeight: layout.inputHeights.md,
   },
   inputWrapperFocused: {
     borderColor: colors.black,
@@ -117,15 +121,19 @@ const styles = StyleSheet.create({
   rightIconWrapper: {
     marginLeft: spacing.sm,
     padding: spacing.xs,
+    minWidth: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     flex: 1,
     ...typography.body,
     color: colors.textPrimary,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm + 2,
     fontSize: 15,
   },
   helperText: {
-    marginTop: spacing.xs,
+    marginTop: spacing.xs + 1,
+    fontSize: 12.5,
   },
 });

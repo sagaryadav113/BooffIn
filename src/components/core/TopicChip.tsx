@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Typography } from './Typography';
 
 export interface TopicChipProps {
@@ -44,9 +44,13 @@ export const TopicChip: React.FC<TopicChipProps> = ({
       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
     >
       <Typography
-        variant={size === 'sm' ? 'micro' : 'captionMedium'}
+        variant={size === 'sm' ? 'caption' : 'captionMedium'}
         color={selected ? colors.white : colors.textSecondary}
-        style={selected && { fontWeight: '700' }}
+        style={[
+          styles.text,
+          size === 'sm' && styles.textSm,
+          selected && styles.textSelected,
+        ]}
       >
         {label}
       </Typography>
@@ -62,12 +66,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   mdSize: {
-    minHeight: 34,
+    minHeight: 36,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xs + 3,
+    paddingVertical: spacing.xs + 2,
   },
   smSize: {
-    minHeight: 28,
+    minHeight: 30,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
@@ -78,5 +82,16 @@ const styles = StyleSheet.create({
   unselected: {
     backgroundColor: colors.backgroundSecondary,
     borderColor: colors.borderLight,
+  },
+  text: {
+    fontSize: 13.5,
+    fontWeight: '500',
+  },
+  textSm: {
+    fontSize: 12.5,
+  },
+  textSelected: {
+    color: colors.white,
+    fontWeight: '700',
   },
 });

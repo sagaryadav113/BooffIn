@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-nativ
 import { router } from 'expo-router';
 import { MessageCircle, Heart, FileText, ArrowRight } from 'lucide-react-native';
 import { Post } from '../../types';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { Badge } from '../core/Badge';
 
@@ -38,7 +38,7 @@ export const TrendingDiscussionCard: React.FC<TrendingDiscussionCardProps> = ({
         <Avatar
           url={post.author.avatarUrl}
           name={post.author.fullName}
-          size={36}
+          size="sm"
           verified={post.author.orcidVerified}
         />
         <View style={styles.authorMeta}>
@@ -63,7 +63,7 @@ export const TrendingDiscussionCard: React.FC<TrendingDiscussionCardProps> = ({
       {/* Paper Context Pill if linked */}
       {post.paper && (
         <View style={styles.paperContextBox}>
-          <FileText size={13} color={colors.textSecondary} />
+          <FileText size={14} color={colors.textSecondary} />
           <Text style={styles.paperContextTitle} numberOfLines={1}>
             {post.paper.title}
           </Text>
@@ -75,11 +75,11 @@ export const TrendingDiscussionCard: React.FC<TrendingDiscussionCardProps> = ({
       <View style={styles.footer}>
         <View style={styles.metricsRow}>
           <View style={styles.metricItem}>
-            <MessageCircle size={14} color={colors.textSecondary} />
+            <MessageCircle size={15} color={colors.textSecondary} />
             <Text style={styles.metricText}>{post.commentsCount} replies</Text>
           </View>
           <View style={styles.metricItem}>
-            <Heart size={14} color={colors.textSecondary} />
+            <Heart size={15} color={colors.textSecondary} />
             <Text style={styles.metricText}>{post.likesCount}</Text>
           </View>
           {post.topics[0] && (
@@ -89,7 +89,7 @@ export const TrendingDiscussionCard: React.FC<TrendingDiscussionCardProps> = ({
 
         <View style={styles.joinAction}>
           <Text style={styles.joinText}>Join discussion</Text>
-          <ArrowRight size={12} color={colors.textPrimary} />
+          <ArrowRight size={13} color={colors.textPrimary} />
         </View>
       </View>
     </TouchableOpacity>
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.borderLight,
-    padding: spacing.md,
+    padding: spacing.md + 2,
     marginBottom: spacing.md,
   },
   header: {
@@ -117,32 +117,34 @@ const styles = StyleSheet.create({
   authorNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs + 2,
   },
   authorName: {
-    ...typography.captionBold,
+    ...typography.bodyBold,
     color: colors.textPrimary,
     fontWeight: '700',
+    fontSize: 14.5,
   },
   handleText: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
+    fontSize: 13,
   },
   roleText: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 11,
+    fontSize: 12.5,
     marginTop: 1,
   },
   timeText: {
-    ...typography.micro,
+    ...typography.metadata,
     color: colors.textMuted,
-    fontSize: 11,
+    fontSize: 12,
   },
   content: {
     ...typography.body,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 14.5,
+    lineHeight: 21,
     color: colors.textPrimary,
     marginBottom: spacing.xs + 2,
   },
@@ -150,27 +152,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.backgroundSecondary,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 1,
     borderRadius: radii.sm,
-    gap: spacing.xs,
+    gap: spacing.xs + 2,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
   paperContextTitle: {
-    ...typography.micro,
+    ...typography.caption,
     color: colors.textSecondary,
     flex: 1,
     fontWeight: '500',
+    fontSize: 13,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: spacing.xs,
+    paddingTop: spacing.xs + 2,
     borderTopWidth: 1,
     borderTopColor: colors.borderLight,
+    minHeight: layout.touchTargetMin - 8,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -183,23 +187,25 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metricText: {
-    ...typography.micro,
+    ...typography.metadata,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
   },
   topicTag: {
-    ...typography.micro,
+    ...typography.captionMedium,
     color: colors.accentBlue,
     fontWeight: '600',
+    fontSize: 12.5,
   },
   joinAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
   },
   joinText: {
-    ...typography.micro,
-    fontWeight: '600',
+    ...typography.captionBold,
+    fontWeight: '700',
     color: colors.textPrimary,
+    fontSize: 13,
   },
 });

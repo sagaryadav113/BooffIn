@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
-import { colors, radii, spacing } from '../../theme';
+import { colors, radii, spacing, layout, typography } from '../../theme';
 import { AppNotification } from '../../types/notification';
 import { Avatar } from '../core/Avatar';
 import { Typography } from '../core/Typography';
@@ -83,7 +83,7 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
         <Avatar
           url={notification.actor.avatarUrl}
           name={notification.actor.fullName}
-          size={42}
+          size="md"
           verified={notification.actor.orcidVerified}
         />
         <View style={[styles.badgeCircle, { backgroundColor: badge.bg }]}>
@@ -92,13 +92,13 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
       </View>
 
       <View style={styles.content}>
-        <Typography variant="caption" color={colors.textPrimary} style={styles.messageText}>
-          <Typography variant="captionBold" color={colors.textPrimary}>
+        <Typography variant="body" color={colors.textPrimary} style={styles.messageText}>
+          <Typography variant="bodyBold" color={colors.textPrimary} style={styles.actorName}>
             {notification.actor.fullName}{' '}
           </Typography>
           {notification.content}
         </Typography>
-        <Typography variant="micro" color={colors.textMuted} style={styles.timeText}>
+        <Typography variant="metadata" color={colors.textMuted} style={styles.timeText}>
           {notification.createdAt}
         </Typography>
       </View>
@@ -115,11 +115,12 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.md + 2,
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.backgroundCard,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
+    minHeight: layout.touchTargetMin + 16,
   },
   unread: {
     backgroundColor: '#F8FAFC',
@@ -132,8 +133,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    width: 18,
-    height: 18,
+    width: 20,
+    height: 20,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -144,10 +145,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messageText: {
-    lineHeight: 19,
+    fontSize: 14.5,
+    lineHeight: 20,
+  },
+  actorName: {
+    fontSize: 14.5,
+    fontWeight: '700',
   },
   timeText: {
-    marginTop: 2,
+    marginTop: 3,
+    fontSize: 12.5,
   },
   rightAction: {
     flexDirection: 'row',
@@ -156,8 +163,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   unreadDot: {
-    width: 7,
-    height: 7,
+    width: 8,
+    height: 8,
     borderRadius: radii.full,
     backgroundColor: colors.accentBlue,
   },
