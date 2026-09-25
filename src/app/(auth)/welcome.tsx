@@ -15,14 +15,15 @@ import { colors, radii, spacing, typography } from '../../theme';
 import { BooffinLogo } from '../../components/core/BooffinLogo';
 import { Button } from '../../components/core/Button';
 import { InstallAppModal } from '../../components/modals/InstallAppModal';
+import { QuickOAuthModal } from '../../components/modals/QuickOAuthModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { currentUser } from '../../data/mockData';
 
 export default function WelcomeScreen() {
-  const { signInWithGoogle, signInWithORCID, signInWithDemoUser, isLoading, authError } = useAuthStore();
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [orcidLoading, setOrcidLoading] = useState(false);
+  const { signInWithDemoUser, isLoading } = useAuthStore();
   const [installModalVisible, setInstallModalVisible] = useState(false);
+  const [oauthModalVisible, setOauthModalVisible] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<'google' | 'orcid'>('google');
 
   const handleCreateAccount = () => {
     router.push('/(auth)/signup');
@@ -32,28 +33,19 @@ export default function WelcomeScreen() {
     router.push('/(auth)/login');
   };
 
-  const handleGoogleAuth = async () => {
-    setGoogleLoading(true);
-    const success = await signInWithGoogle();
-    setGoogleLoading(false);
-    const state = useAuthStore.getState();
-    if (success && state.isAuthenticated) {
-      router.replace('/(tabs)');
-    } else if (state.authError) {
-      Alert.alert('Google Sign-In', state.authError);
-    }
+  const handleGoogleAuth = () => {
+    setOauthProvider('google');
+    setOauthModalVisible(true);
   };
 
-  const handleOrcidAuth = async () => {
-    setOrcidLoading(true);
-    const success = await signInWithORCID();
-    setOrcidLoading(false);
-    const state = useAuthStore.getState();
-    if (success && state.isAuthenticated) {
-      router.replace('/(tabs)');
-    } else if (state.authError) {
-      Alert.alert('ORCID Authentication', state.authError);
-    }
+  const handleOrcidAuth = () => {
+    setOauthProvider('orcid');
+    setOauthModalVisible(true);
+  };
+
+  const handleAuthSuccess = () => {
+    setOauthModalVisible(false);
+    router.replace('/(tabs)');
   };
 
   const handleGuestDemo = () => {
@@ -89,38 +81,30 @@ export default function WelcomeScreen() {
           <TouchableOpacity
             style={styles.googleButton}
             onPress={handleGoogleAuth}
-            disabled={googleLoading || isLoading}
+            disabled={isLoading}
             activeOpacity={0.88}
           >
-            {googleLoading ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
-            ) : (
-              <View style={styles.buttonContent}>
-                <View style={styles.googleBadge}>
-                  <Text style={styles.googleBadgeText}>G</Text>
-                </View>
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
+            <View style={styles.buttonContent}>
+              <View style={styles.googleBadge}>
+                <Text style={styles.googleBadgeText}>G</Text>
               </View>
-            )}
+              <Text style={styles.googleButtonText}>Continue with Google</Text>
+            </View>
           </TouchableOpacity>
 
           {/* ORCID iD Authentication Button */}
           <TouchableOpacity
             style={styles.orcidButton}
             onPress={handleOrcidAuth}
-            disabled={orcidLoading || isLoading}
+            disabled={isLoading}
             activeOpacity={0.88}
           >
-            {orcidLoading ? (
-              <ActivityIndicator size="small" color={colors.white} />
-            ) : (
-              <View style={styles.buttonContent}>
-                <View style={styles.orcidBadge}>
-                  <Text style={styles.orcidBadgeText}>iD</Text>
-                </View>
-                <Text style={styles.orcidButtonText}>Continue with ORCID</Text>
+            <View style={styles.buttonContent}>
+              <View style={styles.orcidBadge}>
+                <Text style={styles.orcidBadgeText}>iD</Text>
               </View>
-            )}
+              <Text style={styles.orcidButtonText}>Continue with ORCID</Text>
+            </View>
           </TouchableOpacity>
 
           {/* Primary Create Account Button */}
@@ -168,6 +152,13 @@ export default function WelcomeScreen() {
         <InstallAppModal
           visible={installModalVisible}
           onClose={() => setInstallModalVisible(false)}
+        />
+
+        <QuickOAuthModal
+          visible={oauthModalVisible}
+          provider={oauthProvider}
+          onClose={() => setOauthModalVisible(false)}
+          onSuccess={handleAuthSuccess}
         />
       </View>
     </SafeAreaView>

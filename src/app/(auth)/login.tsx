@@ -10,6 +10,7 @@ import { Typography } from '../../components/core/Typography';
 import { Input } from '../../components/core/Input';
 import { Button } from '../../components/core/Button';
 import { Avatar } from '../../components/core/Avatar';
+import { QuickOAuthModal } from '../../components/modals/QuickOAuthModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { mockUsers } from '../../data/mockData';
 import { UserProfile } from '../../types';
@@ -19,10 +20,10 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [oauthModalVisible, setOauthModalVisible] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<'google' | 'orcid'>('google');
 
   const signIn = useAuthStore((s) => s.signIn);
-  const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
-  const signInWithORCID = useAuthStore((s) => s.signInWithORCID);
   const signInWithDemoUser = useAuthStore((s) => s.signInWithDemoUser);
   const isLoading = useAuthStore((s) => s.isLoading);
   const authError = useAuthStore((s) => s.authError);
@@ -57,34 +58,19 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setValidationError(null);
-    clearError();
-    const success = await signInWithGoogle();
-    const state = useAuthStore.getState();
-    if (success && state.isAuthenticated) {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-      router.replace('/(tabs)');
-    } else if (state.authError) {
-      setValidationError(state.authError);
-    }
+  const handleGoogleSignIn = () => {
+    setOauthProvider('google');
+    setOauthModalVisible(true);
   };
 
-  const handleORCIDSignIn = async () => {
-    setValidationError(null);
-    clearError();
-    const success = await signInWithORCID();
-    const state = useAuthStore.getState();
-    if (success && state.isAuthenticated) {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-      router.replace('/(tabs)');
-    } else if (state.authError) {
-      setValidationError(state.authError);
-    }
+  const handleORCIDSignIn = () => {
+    setOauthProvider('orcid');
+    setOauthModalVisible(true);
+  };
+
+  const handleAuthSuccess = () => {
+    setOauthModalVisible(false);
+    router.replace('/(tabs)');
   };
 
   const handleDemoSignIn = (user: UserProfile) => {
@@ -253,6 +239,13 @@ export default function LoginScreen() {
             </Typography>
           </TouchableOpacity>
         </View>
+
+        <QuickOAuthModal
+          visible={oauthModalVisible}
+          provider={oauthProvider}
+          onClose={() => setOauthModalVisible(false)}
+          onSuccess={handleAuthSuccess}
+        />
       </View>
     </ScreenContainer>
   );

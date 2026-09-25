@@ -48,4 +48,5 @@ export * from './modals/EditProfileModal';
 export * from './modals/PaperLookupModal';
 export * from './modals/InstallAppModal';
 export * from './modals/ConnectModal';
+export * from './modals/QuickOAuthModal';
 

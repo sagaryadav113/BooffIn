@@ -9,6 +9,7 @@ import { Header } from '../../components/layout/Header';
 import { Typography } from '../../components/core/Typography';
 import { Input } from '../../components/core/Input';
 import { Button } from '../../components/core/Button';
+import { QuickOAuthModal } from '../../components/modals/QuickOAuthModal';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export default function SignupScreen() {
@@ -20,10 +21,10 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [oauthModalVisible, setOauthModalVisible] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<'google' | 'orcid'>('google');
 
   const signUp = useAuthStore((s) => s.signUp);
-  const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
-  const signInWithORCID = useAuthStore((s) => s.signInWithORCID);
   const isLoading = useAuthStore((s) => s.isLoading);
   const authError = useAuthStore((s) => s.authError);
   const clearError = useAuthStore((s) => s.clearError);
@@ -70,28 +71,19 @@ export default function SignupScreen() {
     }
   };
 
-  const handleGoogleSignUp = async () => {
-    setValidationError(null);
-    clearError();
-    const success = await signInWithGoogle();
-    if (success) {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-      router.replace('/(auth)/onboarding');
-    }
+  const handleGoogleSignUp = () => {
+    setOauthProvider('google');
+    setOauthModalVisible(true);
   };
 
-  const handleORCIDSignUp = async () => {
-    setValidationError(null);
-    clearError();
-    const success = await signInWithORCID();
-    if (success) {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-      router.replace('/(auth)/onboarding');
-    }
+  const handleORCIDSignUp = () => {
+    setOauthProvider('orcid');
+    setOauthModalVisible(true);
+  };
+
+  const handleAuthSuccess = () => {
+    setOauthModalVisible(false);
+    router.replace('/(auth)/onboarding');
   };
 
   const displayError = validationError || authError;
@@ -245,6 +237,13 @@ export default function SignupScreen() {
             </Typography>
           </TouchableOpacity>
         </View>
+
+        <QuickOAuthModal
+          visible={oauthModalVisible}
+          provider={oauthProvider}
+          onClose={() => setOauthModalVisible(false)}
+          onSuccess={handleAuthSuccess}
+        />
       </View>
     </ScreenContainer>
   );
