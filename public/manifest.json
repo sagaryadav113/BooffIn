@@ -1,25 +1,40 @@
 {
+  "id": "/",
   "short_name": "BooffIn",
   "name": "BooffIn - Research Finds Its People",
-  "description": "A modern scientific community and peer-reviewed research discussion platform in your pocket.",
+  "description": "A modern scientific community and peer-reviewed research discussion platform.",
   "icons": [
     {
-      "src": "/assets/images/booffin-symbol.png",
+      "src": "/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/assets/images/icon.png",
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
   "start_url": "/",
+  "scope": "/",
   "background_color": "#FFFFFF",
-  "theme_color": "#0F172A",
+  "theme_color": "#000000",
   "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay", "minimal-ui"],
   "orientation": "portrait",
   "categories": ["education", "science", "productivity", "social"]
 }
