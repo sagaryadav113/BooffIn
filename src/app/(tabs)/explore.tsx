@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,10 +20,13 @@ import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
 import { TrendingDiscussionCard } from '../../components/cards/TrendingDiscussionCard';
 import { ResearcherCard } from '../../components/cards/ResearcherCard';
 import { TopicCard } from '../../components/cards/TopicCard';
+import { EmptyState } from '../../components/feedback/EmptyState';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useTopicStore } from '../../store/useTopicStore';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { supabase } from '../../api/client';
+import { UserProfile } from '../../types';
 
 const QUICK_QUERIES = [
   'AlphaFold',
@@ -47,12 +50,56 @@ const EXPLORE_FILTERS = [
 export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [researchersList, setResearchersList] = useState<UserProfile[]>([]);
+  const [isLoadingResearchers, setIsLoadingResearchers] = useState(false);
 
   const papers = usePaperStore((s) => s.papers);
+  const fetchPapers = usePaperStore((s) => s.fetchPapers);
   const topics = useTopicStore((s) => s.topics);
+  const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const posts = usePostStore((s) => s.posts);
-  const users = useAuthStore((s) => s.users);
+  const fetchFeed = usePostStore((s) => s.fetchFeed);
+  const currentUser = useAuthStore((s) => s.user);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
+
+  useEffect(() => {
+    fetchPapers();
+    fetchTopics(currentUser?.id);
+    fetchFeed('For You', currentUser?.id);
+
+    async function loadResearchers() {
+      setIsLoadingResearchers(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url, academic_title, institution, bio, orcid_id, is_orcid_verified, followers_count, following_count')
+          .order('followers_count', { ascending: false })
+          .limit(10);
+
+        if (data && !error) {
+          const mapped: UserProfile[] = data.map((row: any) => ({
+            id: row.id,
+            handle: row.username || 'researcher',
+            fullName: row.full_name || 'Researcher',
+            avatarUrl: row.avatar_url,
+            academicTitle: row.academic_title || 'Researcher',
+            institution: row.institution || '',
+            bio: row.bio || '',
+            orcidVerified: Boolean(row.is_orcid_verified),
+            orcidId: row.orcid_id,
+            followersCount: row.followers_count || 0,
+            followingCount: row.following_count || 0,
+            postsCount: 0,
+            savedCount: 0,
+            joinedDate: '',
+          }));
+          setResearchersList(mapped);
+        }
+      } catch {}
+      setIsLoadingResearchers(false);
+    }
+    loadResearchers();
+  }, [currentUser?.id]);
 
   const handleSearchSubmit = (query?: string) => {
     const term = (query || searchQuery).trim();
@@ -83,8 +130,8 @@ export default function ExploreScreen() {
   }, [posts]);
 
   const recommendedResearchers = useMemo(() => {
-    return users.filter((u) => u.id !== 'usr_me');
-  }, [users]);
+    return researchersList.filter((u) => u.id !== currentUser?.id);
+  }, [researchersList, currentUser?.id]);
 
   const recommendedTopics = useMemo(() => {
     return topics.slice(0, 5);
@@ -163,23 +210,33 @@ export default function ExploreScreen() {
                   Explore literature across {topics.length} scientific disciplines
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={() => router.push('/topic')}
-                style={styles.seeAllRow}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.seeAllText}>All fields</Text>
-                <ArrowRight size={13} color={colors.textSecondary} />
-              </TouchableOpacity>
+              {topics.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => router.push('/topic')}
+                  style={styles.seeAllRow}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.seeAllText}>All fields</Text>
+                  <ArrowRight size={13} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
             </View>
 
-            <View style={styles.topicGrid}>
-              {topics.map((topic) => (
-                <View key={topic.id} style={styles.topicGridItem}>
-                  <TopicCategoryCard topic={topic} />
-                </View>
-              ))}
-            </View>
+            {topics.length > 0 ? (
+              <View style={styles.topicGrid}>
+                {topics.map((topic) => (
+                  <View key={topic.id} style={styles.topicGridItem}>
+                    <TopicCategoryCard topic={topic} />
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="Tag"
+                title="No topics found"
+                description="Follow or explore scientific fields to see them featured here."
+              />
+            )}
           </View>
         )}
 
@@ -193,21 +250,33 @@ export default function ExploreScreen() {
                   Peer-reviewed papers with high discussion velocity
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={() => router.push('/search')}
-                style={styles.seeAllRow}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.seeAllText}>See all</Text>
-                <ArrowRight size={13} color={colors.textSecondary} />
-              </TouchableOpacity>
+              {trendingPapers.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => router.push('/search')}
+                  style={styles.seeAllRow}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.seeAllText}>See all</Text>
+                  <ArrowRight size={13} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
             </View>
 
-            <View style={styles.cardList}>
-              {trendingPapers.map((paper) => (
-                <TrendingPaperCard key={paper.id} paper={paper} />
-              ))}
-            </View>
+            {trendingPapers.length > 0 ? (
+              <View style={styles.cardList}>
+                {trendingPapers.map((paper) => (
+                  <TrendingPaperCard key={paper.id} paper={paper} />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="FileText"
+                title="No papers have been published yet"
+                description="Search for DOI references or be the first to reference a paper in discussion."
+                actionTitle="Search Papers"
+                onAction={() => router.push('/search')}
+              />
+            )}
           </View>
         )}
 
@@ -223,11 +292,21 @@ export default function ExploreScreen() {
               </View>
             </View>
 
-            <View style={styles.cardList}>
-              {trendingDiscussions.map((post) => (
-                <TrendingDiscussionCard key={post.id} post={post} />
-              ))}
-            </View>
+            {trendingDiscussions.length > 0 ? (
+              <View style={styles.cardList}>
+                {trendingDiscussions.map((post) => (
+                  <TrendingDiscussionCard key={post.id} post={post} />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="MessageSquare"
+                title="No discussions yet"
+                description="Start a discussion or pose a research question on a paper."
+                actionTitle="Create Discussion"
+                onAction={() => router.push('/(tabs)/create')}
+              />
+            )}
           </View>
         )}
 
@@ -243,15 +322,23 @@ export default function ExploreScreen() {
               </View>
             </View>
 
-            <View style={styles.researchersCard}>
-              {recommendedResearchers.map((researcher) => (
-                <ResearcherCard
-                  key={researcher.id}
-                  researcher={researcher}
-                  onFollowToggle={() => toggleFollowUser(researcher.id)}
-                />
-              ))}
-            </View>
+            {recommendedResearchers.length > 0 ? (
+              <View style={styles.researchersCard}>
+                {recommendedResearchers.map((researcher) => (
+                  <ResearcherCard
+                    key={researcher.id}
+                    researcher={researcher}
+                    onFollowToggle={() => toggleFollowUser(researcher.id)}
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="Users"
+                title="Be one of the first researchers to join BooffIn"
+                description="Invite colleagues and peers to share literature and collaborate."
+              />
+            )}
           </View>
         )}
 
@@ -267,11 +354,19 @@ export default function ExploreScreen() {
               </View>
             </View>
 
-            <View style={styles.topicsCard}>
-              {recommendedTopics.map((topic) => (
-                <TopicCard key={topic.id} topic={topic} />
-              ))}
-            </View>
+            {recommendedTopics.length > 0 ? (
+              <View style={styles.topicsCard}>
+                {recommendedTopics.map((topic) => (
+                  <TopicCard key={topic.id} topic={topic} />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="Tag"
+                title="No topics found"
+                description="Discover and follow scientific disciplines to customize your feed."
+              />
+            )}
           </View>
         )}
       </ScrollView>

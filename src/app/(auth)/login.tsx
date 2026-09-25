@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
-import { router } from 'expo-router';
-import { CheckCircle2, ArrowRight } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { CheckCircle2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { ScreenContainer } from '../../components/layout/ScreenContainer';
@@ -9,22 +9,19 @@ import { Header } from '../../components/layout/Header';
 import { Typography } from '../../components/core/Typography';
 import { Input } from '../../components/core/Input';
 import { Button } from '../../components/core/Button';
-import { Avatar } from '../../components/core/Avatar';
-import { QuickOAuthModal } from '../../components/modals/QuickOAuthModal';
 import { useAuthStore } from '../../store/useAuthStore';
-import { mockUsers } from '../../data/mockData';
-import { UserProfile } from '../../types';
+import { isProfileComplete } from '../../api/authService';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
+  const params = useLocalSearchParams<{ email?: string }>();
+  const [email, setEmail] = useState(params.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [oauthModalVisible, setOauthModalVisible] = useState(false);
-  const [oauthProvider, setOauthProvider] = useState<'google' | 'orcid'>('google');
 
   const signIn = useAuthStore((s) => s.signIn);
-  const signInWithDemoUser = useAuthStore((s) => s.signInWithDemoUser);
+  const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
+  const signInWithORCID = useAuthStore((s) => s.signInWithORCID);
   const isLoading = useAuthStore((s) => s.isLoading);
   const authError = useAuthStore((s) => s.authError);
   const clearError = useAuthStore((s) => s.clearError);
@@ -54,38 +51,51 @@ export default function LoginScreen() {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
-      router.replace('/(tabs)');
+
+      const activeUser = useAuthStore.getState().user;
+      if (isProfileComplete(activeUser)) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/onboarding');
+      }
     }
   };
 
-  const handleGoogleSignIn = () => {
-    setOauthProvider('google');
-    setOauthModalVisible(true);
-  };
-
-  const handleORCIDSignIn = () => {
-    setOauthProvider('orcid');
-    setOauthModalVisible(true);
-  };
-
-  const handleAuthSuccess = () => {
-    setOauthModalVisible(false);
-    router.replace('/(tabs)');
-  };
-
-  const handleDemoSignIn = (user: UserProfile) => {
+  const handleGoogleSignIn = async () => {
     try {
-      Haptics.selectionAsync();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    signInWithDemoUser(user);
-    router.replace('/(tabs)');
+    const success = await signInWithGoogle();
+    if (success) {
+      const activeUser = useAuthStore.getState().user;
+      if (isProfileComplete(activeUser)) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/onboarding');
+      }
+    }
+  };
+
+  const handleORCIDSignIn = async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    const success = await signInWithORCID();
+    if (success) {
+      const activeUser = useAuthStore.getState().user;
+      if (isProfileComplete(activeUser)) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/onboarding');
+      }
+    }
   };
 
   const displayError = validationError || authError;
 
   return (
     <ScreenContainer scrollable>
-      <Header showBack onBack={() => router.replace('/(auth)/welcome')} />
+      <Header showBack onBack={() => router.back()} />
 
       <View style={styles.content}>
         <Typography variant="h1" style={styles.title}>
@@ -191,43 +201,6 @@ export default function LoginScreen() {
           />
         </View>
 
-        {/* Quick Demo Accounts Drawer for Fast Testing */}
-        <View style={styles.demoSection}>
-          <View style={styles.demoHeader}>
-            <Typography variant="captionBold" color={colors.textPrimary}>
-              Quick Demo Accounts (Instant Testing)
-            </Typography>
-            <Typography variant="micro" color={colors.textSecondary}>
-              Tap any profile to log in instantly
-            </Typography>
-          </View>
-
-          <View style={styles.demoList}>
-            {mockUsers.slice(0, 4).map((user) => (
-              <TouchableOpacity
-                key={user.id}
-                onPress={() => handleDemoSignIn(user)}
-                activeOpacity={0.8}
-                style={styles.demoUserCard}
-              >
-                <Avatar
-                  url={user.avatarUrl}
-                  name={user.fullName}
-                  size={36}
-                  verified={user.orcidVerified}
-                />
-                <View style={styles.demoUserMeta}>
-                  <Text style={styles.demoUserName}>{user.fullName}</Text>
-                  <Text style={styles.demoUserRole} numberOfLines={1}>
-                    {user.academicTitle} · {user.institution}
-                  </Text>
-                </View>
-                <ArrowRight size={14} color={colors.textSecondary} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {/* Footer Navigation */}
         <View style={styles.footerRow}>
           <Typography variant="caption" color={colors.textSecondary}>
@@ -239,13 +212,6 @@ export default function LoginScreen() {
             </Typography>
           </TouchableOpacity>
         </View>
-
-        <QuickOAuthModal
-          visible={oauthModalVisible}
-          provider={oauthProvider}
-          onClose={() => setOauthModalVisible(false)}
-          onSuccess={handleAuthSuccess}
-        />
       </View>
     </ScreenContainer>
   );

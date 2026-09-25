@@ -68,6 +68,9 @@ export const IconButton: React.FC<IconButtonProps> = ({
 
   return (
     <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={icon}
+      accessibilityState={{ disabled }}
       activeOpacity={0.7}
       onPress={handlePress}
       disabled={disabled}

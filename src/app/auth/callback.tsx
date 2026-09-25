@@ -5,8 +5,7 @@ import { supabase } from '../../api/client';
 import { fetchUserProfile, setStoredLocalSession } from '../../api/authService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { BooffinLogo } from '../../components/core/BooffinLogo';
-import { colors, spacing, typography, radii } from '../../theme';
-import { currentUser } from '../../data/mockData';
+import { colors, radii, spacing, typography } from '../../theme';
 import { UserProfile } from '../../types';
 
 export default function AuthCallbackScreen() {
@@ -97,14 +96,13 @@ export default function AuthCallbackScreen() {
           const avatarUrl = metadata.avatar_url || metadata.picture;
 
           const newProfile: UserProfile = {
-            ...currentUser,
             id: user.id,
             handle: cleanHandle || 'researcher',
             fullName,
             avatarUrl,
-            academicTitle: metadata.academic_title || 'Research Enthusiast',
+            academicTitle: metadata.academic_title || 'Researcher',
             institution: metadata.institution || 'Independent Researcher',
-            bio: 'Exploring literature, asking questions, and discussing peer-reviewed science on BooffIn.',
+            bio: '',
             orcidVerified: Boolean(metadata.orcid_id),
             orcidId: metadata.orcid_id,
             followersCount: 0,
@@ -140,8 +138,20 @@ export default function AuthCallbackScreen() {
           authError: null,
         });
 
-        // Navigate to home feed
-        router.replace('/(tabs)');
+        // If existing user has complete profile, enter home, otherwise onboarding
+        const isComplete = Boolean(
+          profile &&
+          profile.researchInterests &&
+          profile.researchInterests.length > 0 &&
+          profile.fullName &&
+          profile.fullName.toLowerCase() !== 'researcher'
+        );
+
+        if (isComplete) {
+          router.replace('/(tabs)');
+        } else {
+          router.replace('/(auth)/onboarding');
+        }
       } catch (err: any) {
         console.error('Auth callback error:', err);
         if (isMounted) {

@@ -217,7 +217,7 @@ export const PaperLookupModal: React.FC<PaperLookupModalProps> = ({
               <Text style={styles.label}>Authors (comma-separated)</Text>
               <TextInput
                 style={styles.formInput}
-                placeholder="e.g. Dr. Aanya Rao, Elena Park"
+                placeholder="e.g. Jennifer Doudna, Katalin Karikó"
                 placeholderTextColor={colors.textMuted}
                 value={manualAuthors}
                 onChangeText={setManualAuthors}

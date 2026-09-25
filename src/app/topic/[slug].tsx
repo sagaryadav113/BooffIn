@@ -71,17 +71,46 @@ export default function TopicDetailScreen() {
     loadTopicData();
   };
 
-  const currentTopic = storeTopic || data?.topic || {
-    id: 'top_1',
+  const currentTopic = storeTopic || data?.topic || (topicSlug ? {
+    id: topicSlug,
     slug: topicSlug,
-    name: topicSlug.charAt(0).toUpperCase() + topicSlug.slice(1),
+    name: topicSlug.charAt(0).toUpperCase() + topicSlug.slice(1).replace(/-/g, ' '),
     description: 'Academic discourse and peer-reviewed research in this field.',
-    iconName: 'Brain',
+    iconName: 'Tag',
     category: 'Science',
-    followersCount: 125000,
-    postsCount: 3400,
+    followersCount: 0,
+    postsCount: 0,
     isFollowing: false,
-  };
+  } : null);
+
+  if (isLoading && !currentTopic) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AppHeader showBack title="Research Topic" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="small" color={colors.textPrimary} />
+          <Typography variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.sm }}>
+            Loading field discussions...
+          </Typography>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!currentTopic) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AppHeader showBack title="Research Topic" />
+        <EmptyState
+          icon="Tag"
+          title="Topic not found"
+          description="The requested scientific field could not be found."
+          actionTitle="Back to Explore"
+          onAction={() => router.push('/(tabs)/explore')}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const handleToggleFollow = async () => {
     try {
@@ -90,7 +119,7 @@ export default function TopicDetailScreen() {
     await toggleFollowTopic(currentTopic.id, currentUser?.id);
   };
 
-  const formatFollowers = (count: number) => {
+  const formatFollowers = (count: number = 0) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
     if (count >= 1000) return `${Math.round(count / 1000)}K`;
     return `${count}`;

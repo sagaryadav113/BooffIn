@@ -1,9 +1,7 @@
 import { create } from 'zustand';
 import { Topic } from '../types';
-import { mockTopics } from '../data/mockData';
 import {
   fetchTopics as apiFetchTopics,
-  fetchTopicBySlug as apiFetchTopicBySlug,
   toggleFollowTopic as apiToggleFollowTopic,
 } from '../api/topicService';
 
@@ -20,20 +18,20 @@ interface TopicState {
 }
 
 export const useTopicStore = create<TopicState>((set, get) => ({
-  topics: mockTopics,
+  topics: [],
   isLoading: false,
 
   fetchTopics: async (currentUserId) => {
     set({ isLoading: true });
     const res = await apiFetchTopics(currentUserId);
-    if (!res.error && res.topics.length > 0) {
+    if (!res.error && res.topics) {
       set({ topics: res.topics, isLoading: false });
     } else {
       set({ isLoading: false });
     }
   },
 
-  toggleFollowTopic: async (topicId, currentUserId = 'usr_me') => {
+  toggleFollowTopic: async (topicId, currentUserId) => {
     // 1. Optimistic update in store
     let nextFollowState = false;
     set((state) => ({

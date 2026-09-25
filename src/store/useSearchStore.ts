@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SearchCategory, SearchResults, UserProfile, Paper, Topic, Post } from '../types';
+import { SearchCategory, SearchResults } from '../types';
 import { searchBoffIn } from '../api/search/searchService';
 
 interface SearchState {
@@ -42,13 +42,6 @@ const emptyResults: SearchResults = {
   page: 1,
 };
 
-const INITIAL_RECENT_SEARCHES = [
-  'Dr. Smith',
-  'experience dependent plasticity',
-  'neuroscience',
-  'CRISPR off target effects',
-];
-
 export const useSearchStore = create<SearchState>((set, get) => ({
   query: '',
   activeCategory: 'all',
@@ -58,7 +51,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   error: null,
   page: 1,
   hasMore: false,
-  recentSearches: INITIAL_RECENT_SEARCHES,
+  recentSearches: [],
 
   setQuery: (query: string) => {
     set({ query });

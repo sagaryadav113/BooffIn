@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { UserProfile } from '../types';
-import { currentUser, mockUsers } from '../data/mockData';
 import {
   signInWithEmail,
   signUpWithEmail,
@@ -11,12 +10,29 @@ import {
   getInitialAuthSession,
   fetchUserProfile,
   setStoredLocalSession,
+  persistUserProfile,
   SignUpParams,
 } from '../api/authService';
 import { followUser, unfollowUser } from '../api/socialService';
 import { supabase } from '../api/client';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
+
+export const emptyUserProfile: UserProfile = {
+  id: '',
+  handle: '',
+  fullName: '',
+  avatarUrl: undefined,
+  academicTitle: '',
+  institution: '',
+  bio: '',
+  orcidVerified: false,
+  followingCount: 0,
+  followersCount: 0,
+  postsCount: 0,
+  savedCount: 0,
+  joinedDate: '',
+};
 
 interface AuthState {
   user: UserProfile;
@@ -42,12 +58,12 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  user: currentUser,
+  user: emptyUserProfile,
   authStatus: 'unauthenticated',
   isAuthenticated: false,
   isLoading: false,
   authError: null,
-  users: mockUsers,
+  users: [],
   isInitialized: false,
 
   initializeAuth: async () => {
@@ -67,7 +83,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       } else {
         set({
-          user: currentUser,
+          user: emptyUserProfile,
           authStatus: 'unauthenticated',
           isAuthenticated: false,
           isLoading: false,
@@ -87,14 +103,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const avatarUrl = metadata.avatar_url || metadata.picture;
 
             profile = {
-              ...currentUser,
               id: session.user.id,
               handle: cleanHandle || 'researcher',
               fullName,
               avatarUrl,
-              academicTitle: metadata.academic_title || 'Research Enthusiast',
+              academicTitle: metadata.academic_title || 'Researcher',
               institution: metadata.institution || 'Independent Researcher',
-              bio: 'Exploring literature, asking questions, and discussing peer-reviewed science.',
+              bio: '',
               orcidVerified: Boolean(metadata.orcid_id),
               orcidId: metadata.orcid_id,
               followersCount: 0,
@@ -125,7 +140,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         } else if (event === 'SIGNED_OUT') {
           setStoredLocalSession(null);
           set({
-            user: currentUser,
+            user: emptyUserProfile,
             authStatus: 'unauthenticated',
             isAuthenticated: false,
             isLoading: false,
@@ -134,7 +149,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch {
       set({
-        user: currentUser,
+        user: emptyUserProfile,
         authStatus: 'unauthenticated',
         isAuthenticated: false,
         isLoading: false,
@@ -210,9 +225,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       return true;
     }
-    // Browser is navigating to Google OAuth consent page
-    set({ isLoading: false });
-    return true;
+    // Browser is actively navigating to Google OAuth consent page; keep loading active
+    return false;
   },
 
   signInWithORCID: async () => {
@@ -237,8 +251,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       return true;
     }
-    set({ isLoading: false });
-    return true;
+    // Browser is actively navigating to ORCID OAuth consent page; keep loading active
+    return false;
   },
 
   signInWithDemoUser: (demoUser: UserProfile) => {
@@ -264,7 +278,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await signOutUser();
     setStoredLocalSession(null);
     set({
-      user: currentUser,
+      user: emptyUserProfile,
       authStatus: 'unauthenticated',
       isAuthenticated: false,
       isLoading: false,
@@ -274,15 +288,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearError: () => set({ authError: null }),
 
-  updateProfile: (updated) =>
-    set((state) => {
-      const updatedUser = { ...state.user, ...updated };
-      setStoredLocalSession(updatedUser);
-      return {
-        user: updatedUser,
-        users: state.users.map((u) => (u.id === state.user.id ? updatedUser : u)),
-      };
-    }),
+  updateProfile: (updated) => {
+    const currentUserId = get().user?.id;
+    const updatedUser = { ...get().user, ...updated };
+    setStoredLocalSession(updatedUser);
+    set((state) => ({
+      user: updatedUser,
+      users: state.users.map((u) => (u.id === state.user.id ? updatedUser : u)),
+    }));
+
+    if (currentUserId) {
+      persistUserProfile(currentUserId, updated).catch((err) => {
+        console.warn('Profile background sync:', err);
+      });
+    }
+  },
 
   toggleFollowUser: async (userId: string) => {
     const currentUserId = get().user.id;

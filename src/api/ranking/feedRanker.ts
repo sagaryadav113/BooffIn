@@ -24,18 +24,18 @@ export function setFeedRanker(ranker: IFeedRanker): void {
  */
 export function buildUserRankingContext(
   userId?: string,
-  extraFollowedUserIds: string[] = ['usr_1', 'usr_2'], // Dr. Aanya Rao, PhD Diary followed by default
-  extraInteractedAuthors: string[] = ['usr_1', 'usr_3']
+  extraFollowedUserIds: string[] = [],
+  extraInteractedAuthors: string[] = []
 ): UserRankingContext {
-  const followedTopics = userId ? getFollowedTopicsForUser(userId) : ['neuroscience', 'molecular biology', 'ai in science'];
+  const followedTopics = userId ? getFollowedTopicsForUser(userId) : [];
 
   return {
     userId,
     followedUserIds: new Set<string>(extraFollowedUserIds),
-    followedTopicNames: new Set<string>(followedTopics.map((t) => t.toLowerCase())),
+    followedTopicNames: new Set<string>(followedTopics.map((t: string) => t.toLowerCase())),
     interactedAuthorIds: new Set<string>(extraInteractedAuthors),
-    interactedPaperIds: new Set<string>(['paper_1', 'paper_2']),
-    interactedTopicNames: new Set<string>(['neuroscience', 'synaptic plasticity', 'cell atlas']),
+    interactedPaperIds: new Set<string>(),
+    interactedTopicNames: new Set<string>(),
     userLikedPostIds: new Set<string>(),
     userSavedPostIds: new Set<string>(),
     userCommentedPostIds: new Set<string>(),

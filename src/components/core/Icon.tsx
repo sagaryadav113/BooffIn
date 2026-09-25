@@ -62,7 +62,18 @@ export type IconName =
   | 'Mail'
   | 'Key'
   | 'Download'
-  | 'LogOut';
+  | 'LogOut'
+  | 'Trash2'
+  | 'Sun'
+  | 'Moon'
+  | 'BookOpen'
+  | 'Award'
+  | 'UserCheck'
+  | 'UserX'
+  | 'Database'
+  | 'AtSign'
+  | 'Link'
+  | 'Slash';
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
 

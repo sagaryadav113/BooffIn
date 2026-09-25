@@ -39,9 +39,12 @@ export const Header: React.FC<HeaderProps> = ({
       <View style={styles.leftSection}>
         {showBack && (
           <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
             onPress={handleBack}
             style={styles.iconButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <Icon name="ArrowLeft" size="md" color={colors.textPrimary} />
           </TouchableOpacity>

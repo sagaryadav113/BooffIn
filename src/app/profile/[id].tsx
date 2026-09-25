@@ -42,35 +42,60 @@ import {
   getSharedResearchInterests,
   getResearcherDiscussedTopics,
 } from '../../api/connectionService';
-import { ConnectionStatus } from '../../types';
+import { fetchUserProfile } from '../../api/authService';
+import { ConnectionStatus, UserProfile } from '../../types';
+import { AppHeader } from '../../components/layout/AppHeader';
 
 export default function OtherResearcherProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const users = useAuthStore((s) => s.users);
   const currentUser = useAuthStore((s) => s.user);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
   const allPosts = usePostStore((s) => s.posts);
 
+  const [researcher, setResearcher] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Papers' | 'Activity'>('Posts');
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('none');
 
-  const researcher = users.find((u) => u.id === id || u.handle === id) || (id === currentUser.id ? currentUser : users[1]);
-  const isOwnProfile = researcher.id === currentUser.id;
+  useEffect(() => {
+    async function loadProfile() {
+      if (!id) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      if (id === currentUser.id) {
+        setResearcher(currentUser);
+        setIsLoading(false);
+        return;
+      }
+
+      const prof = await fetchUserProfile(id);
+      setResearcher(prof);
+      setIsLoading(false);
+    }
+
+    loadProfile();
+  }, [id, currentUser]);
+
+  const isOwnProfile = researcher?.id === currentUser?.id;
 
   const loadConnectionStatus = useCallback(async () => {
-    if (isOwnProfile) return;
+    if (!researcher?.id || isOwnProfile || !currentUser?.id) return;
     const status = await getConnectionStatus(currentUser.id, researcher.id);
     setConnectionStatus(status);
-  }, [currentUser.id, researcher.id, isOwnProfile]);
+  }, [currentUser?.id, researcher?.id, isOwnProfile]);
 
   useEffect(() => {
     loadConnectionStatus();
   }, [loadConnectionStatus]);
 
   const posts = React.useMemo(() => {
+    if (!researcher?.id) return [];
     return allPosts.filter((p) => p.author.id === researcher.id);
-  }, [allPosts, researcher.id]);
+  }, [allPosts, researcher?.id]);
 
   const paperPosts = React.useMemo(() => {
     return posts.filter((p) => !!p.paper);
@@ -78,15 +103,18 @@ export default function OtherResearcherProfileScreen() {
 
   // Shared / mutual research interests
   const mutualInterests = React.useMemo(() => {
+    if (!researcher) return [];
     return getSharedResearchInterests(currentUser, researcher);
   }, [currentUser, researcher]);
 
   // Topics the researcher discusses in posts and paper references
   const discussedTopics = React.useMemo(() => {
+    if (!researcher?.id) return [];
     return getResearcherDiscussedTopics(researcher.id, allPosts);
-  }, [researcher.id, allPosts]);
+  }, [researcher?.id, allPosts]);
 
   const handleFollowToggle = () => {
+    if (!researcher?.id) return;
     if (isOwnProfile) {
       router.push('/profile/edit');
       return;
@@ -98,12 +126,40 @@ export default function OtherResearcherProfileScreen() {
   };
 
   const handleConnectPress = () => {
-    if (isOwnProfile) return;
+    if (isOwnProfile || !researcher?.id) return;
     try {
       Haptics.selectionAsync();
     } catch {}
     setConnectModalVisible(true);
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <AppHeader showBack title="Researcher Profile" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ ...typography.caption, color: colors.textSecondary }}>Loading researcher profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!researcher) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <AppHeader showBack title="Researcher Profile" />
+        <EmptyState
+          icon="Users"
+          title="Researcher not found"
+          description="The researcher profile you are looking for does not exist in the database."
+          actionTitle="Back to Explore"
+          onAction={() => router.push('/(tabs)/explore')}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const handleShare = async () => {
     try {
@@ -128,7 +184,7 @@ export default function OtherResearcherProfileScreen() {
     }
   };
 
-  const formatCount = (count: number) => {
+  const formatCount = (count: number = 0) => {
     if (count >= 1000) {
       return `${(count / 1000).toFixed(1)}K`;
     }

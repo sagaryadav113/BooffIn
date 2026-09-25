@@ -42,6 +42,9 @@ export const FeedNavigation: React.FC<FeedNavigationProps> = ({
           return (
             <TouchableOpacity
               key={tab}
+              accessibilityRole="tab"
+              accessibilityLabel={`${tab} feed tab`}
+              accessibilityState={{ selected: isActive }}
               activeOpacity={0.8}
               onPress={() => handlePress(tab)}
               style={[styles.tabItem, isActive && styles.tabItemActive]}

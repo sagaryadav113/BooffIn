@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Post, Comment, PostType, Paper } from '../types';
-import { mockPosts, mockComments, currentUser } from '../data/mockData';
+import { useAuthStore } from './useAuthStore';
 import {
   fetchFeed as apiFetchFeed,
   createPost as apiCreatePost,
@@ -16,6 +16,8 @@ export interface CreatePostParams {
   content: string;
   postType: PostType;
   paper?: Paper;
+  images?: string[];
+  poll?: import('../types').Poll;
   topics: string[];
   visibility?: 'public' | 'followers';
   authorId?: string;
@@ -51,8 +53,8 @@ interface PostState {
 }
 
 export const usePostStore = create<PostState>((set, get) => ({
-  posts: mockPosts,
-  comments: mockComments,
+  posts: [],
+  comments: {},
   activeTab: 'For You',
   isLoading: false,
   isRefreshing: false,
@@ -63,26 +65,27 @@ export const usePostStore = create<PostState>((set, get) => ({
 
   fetchFeed: async (tab, currentUserId) => {
     const activeTab = tab || get().activeTab;
+    const resolvedUserId = currentUserId || useAuthStore.getState().user.id;
     set({ isLoading: true, feedError: null, page: 1 });
 
     const res = await apiFetchFeed({
       tab: activeTab,
       page: 1,
       pageSize: 10,
-      currentUserId,
+      currentUserId: resolvedUserId,
     });
 
     if (res.error) {
       set({
         isLoading: false,
         feedError: res.error,
-        posts: get().posts.length > 0 ? get().posts : mockPosts,
+        posts: get().posts,
       });
       return;
     }
 
     set({
-      posts: res.posts,
+      posts: res.posts || [],
       hasMore: res.hasMore,
       isLoading: false,
       feedError: null,
@@ -166,7 +169,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     }));
 
     // 2. Perform backend API mutation
-    const userId = currentUserId || currentUser.id;
+    const userId = currentUserId || useAuthStore.getState().user.id;
     const res = await apiToggleLike(postId, wasLiked, userId);
 
     // 3. Rollback if error
@@ -210,7 +213,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     }));
 
     // 2. Backend mutation
-    const userId = currentUserId || currentUser.id;
+    const userId = currentUserId || useAuthStore.getState().user.id;
     const res = await apiToggleRepost(postId, wasReposted, userId);
 
     // 3. Rollback on failure
@@ -254,7 +257,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     }));
 
     // 2. Backend mutation
-    const userId = currentUserId || currentUser.id;
+    const userId = currentUserId || useAuthStore.getState().user.id;
     const res = await apiToggleBookmark({ postId }, wasSaved, userId);
 
     // 3. Rollback on failure
@@ -276,16 +279,19 @@ export const usePostStore = create<PostState>((set, get) => ({
   },
 
   createPost: async (params, currentUserId) => {
-    const authorId = currentUserId || params.authorId || currentUser.id;
+    const activeUser = useAuthStore.getState().user;
+    const authorId = currentUserId || params.authorId || activeUser.id;
     const tempId = `post_${Date.now()}`;
 
     // 1. Optimistic new post
     const optimisticPost: Post = {
       id: tempId,
-      author: currentUser,
+      author: activeUser,
       postType: params.postType,
       content: params.content,
       paper: params.paper,
+      images: params.images,
+      poll: params.poll,
       topics: params.topics,
       visibility: params.visibility || 'public',
       likesCount: 0,
@@ -307,6 +313,7 @@ export const usePostStore = create<PostState>((set, get) => ({
       content: params.content,
       postType: params.postType,
       paper: params.paper,
+      mediaUrls: params.images,
       topics: params.topics,
       visibility: params.visibility || 'public',
       authorId,
@@ -336,13 +343,14 @@ export const usePostStore = create<PostState>((set, get) => ({
   getCommentsForPost: (postId) => get().comments[postId] || [],
 
   addComment: async (postId, content, parentId, currentUserId) => {
-    const authorId = currentUserId || currentUser.id;
+    const activeUser = useAuthStore.getState().user;
+    const authorId = currentUserId || activeUser.id;
     const tempCommentId = `c_${Date.now()}`;
 
     const optimisticComment: Comment = {
       id: tempCommentId,
       postId,
-      author: currentUser,
+      author: activeUser,
       content,
       parentId,
       likesCount: 0,

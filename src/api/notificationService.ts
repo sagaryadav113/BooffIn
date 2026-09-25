@@ -1,7 +1,6 @@
 import { supabase } from './client';
 import { mapSupabaseProfile } from './socialService';
 import { AppNotification, NotificationFilter, NotificationType, NotificationEntityType } from '../types/notification';
-import { mockNotifications, mockUsers, mockPosts, mockPapers } from '../data/mockData';
 
 async function getAuthUserId(): Promise<string | null> {
   try {
@@ -12,106 +11,6 @@ async function getAuthUserId(): Promise<string | null> {
     return null;
   }
 }
-
-// Fallback in-memory notification state for offline/mock usage
-let fallbackNotifications: AppNotification[] = [
-  {
-    id: 'notif_1',
-    type: 'like',
-    actor: mockUsers[3], // Dr. Elena Park
-    content: 'liked your research post',
-    entityType: 'post',
-    entityId: mockPosts[2].id,
-    targetPost: mockPosts[2],
-    targetPostId: mockPosts[2].id,
-    createdAt: '2m ago',
-    isRead: false,
-  },
-  {
-    id: 'notif_2',
-    type: 'comment',
-    actor: mockUsers[4], // Prof. Arjun Mehta
-    content: 'commented: "This methodology is remarkably sound."',
-    entityType: 'post',
-    entityId: mockPosts[2].id,
-    targetPost: mockPosts[2],
-    targetPostId: mockPosts[2].id,
-    messageSnippet: 'This methodology is remarkably sound.',
-    createdAt: '10m ago',
-    isRead: false,
-  },
-  {
-    id: 'notif_3',
-    type: 'reply',
-    actor: mockUsers[2], // Dr. Marcus Chen
-    content: 'replied to your comment: "Have you considered the batch effects?"',
-    entityType: 'post',
-    entityId: mockPosts[0].id,
-    targetPost: mockPosts[0],
-    targetPostId: mockPosts[0].id,
-    messageSnippet: 'Have you considered the batch effects?',
-    createdAt: '25m ago',
-    isRead: false,
-  },
-  {
-    id: 'notif_4',
-    type: 'follow',
-    actor: mockUsers[1], // Dr. Aanya Rao
-    content: 'started following you',
-    entityType: 'profile',
-    entityId: mockUsers[1].id,
-    createdAt: '1h ago',
-    isRead: false,
-  },
-  {
-    id: 'notif_5',
-    type: 'paper_discussion',
-    actor: mockUsers[4], // Prof. Arjun Mehta
-    content: 'new discussion activity on paper you interacted with',
-    entityType: 'paper',
-    entityId: mockPapers[0].id,
-    targetPaper: mockPapers[0],
-    targetPaperId: mockPapers[0].id,
-    createdAt: '2h ago',
-    isRead: false,
-  },
-  {
-    id: 'notif_6',
-    type: 'researcher_post',
-    actor: mockUsers[1], // Dr. Aanya Rao
-    content: 'shared new research on Room-temperature Superconductivity',
-    entityType: 'post',
-    entityId: mockPosts[1].id,
-    targetPost: mockPosts[1],
-    targetPostId: mockPosts[1].id,
-    messageSnippet: 'Room-temperature Superconductivity',
-    createdAt: '3h ago',
-    isRead: true,
-  },
-  {
-    id: 'notif_7',
-    type: 'topic_activity',
-    actor: mockUsers[2], // Dr. Marcus Chen
-    content: 'new research activity in #Quantum Computing',
-    entityType: 'topic',
-    entityId: 'topic_quantum',
-    targetTopicName: 'Quantum Computing',
-    createdAt: '5h ago',
-    isRead: true,
-  },
-  {
-    id: 'notif_8',
-    type: 'repost',
-    actor: mockUsers[6], // Maya Singh
-    content: 'reposted your research post',
-    entityType: 'post',
-    entityId: mockPosts[2].id,
-    targetPost: mockPosts[2],
-    targetPostId: mockPosts[2].id,
-    createdAt: '6h ago',
-    isRead: true,
-  },
-];
 
 /**
  * Format relative time string from ISO timestamp
@@ -156,6 +55,8 @@ export function formatNotificationContent(
       return 'reposted your research post';
     case 'paper_discussion':
       return 'new discussion activity on paper you interacted with';
+    case 'collaboration_request':
+      return 'sent you a research collaboration request';
     case 'researcher_post':
       return snippet ? `shared new research: "${snippet}"` : 'shared new research';
     case 'topic_activity':
@@ -176,7 +77,6 @@ export function getNotificationDeepLink(notification: AppNotification): {
   pathname: string;
   params?: Record<string, string>;
 } {
-  // 1. Post target
   if (notification.targetPostId || (notification.entityType === 'post' && notification.entityId)) {
     const postId = notification.targetPostId || notification.entityId || '';
     return {
@@ -185,7 +85,6 @@ export function getNotificationDeepLink(notification: AppNotification): {
     };
   }
 
-  // 2. Paper target
   if (notification.targetPaperId || (notification.entityType === 'paper' && notification.entityId)) {
     const paperId = notification.targetPaperId || notification.entityId || '';
     return {
@@ -194,7 +93,6 @@ export function getNotificationDeepLink(notification: AppNotification): {
     };
   }
 
-  // 3. Topic target
   if (notification.targetTopicName || (notification.entityType === 'topic' && (notification.targetTopicName || notification.entityId))) {
     const slug = (notification.targetTopicName || notification.entityId || 'general')
       .toLowerCase()
@@ -206,15 +104,6 @@ export function getNotificationDeepLink(notification: AppNotification): {
     };
   }
 
-  // 4. User profile target (Follow notification or profile entity)
-  if (notification.type === 'follow' || notification.entityType === 'profile') {
-    return {
-      pathname: '/profile/[id]',
-      params: { id: notification.actor.id },
-    };
-  }
-
-  // Default to actor's profile
   return {
     pathname: '/profile/[id]',
     params: { id: notification.actor.id },
@@ -254,7 +143,7 @@ export function filterNotificationList(
 }
 
 /**
- * Fetch paginated notifications for the current user
+ * Fetch paginated real notifications for the authenticated user from Supabase
  */
 export async function fetchNotifications(
   filter: NotificationFilter = 'All',
@@ -264,15 +153,7 @@ export async function fetchNotifications(
   try {
     const userId = await getAuthUserId();
     if (!userId) {
-      // Return filtered fallback notifications
-      const filtered = filterNotificationList(fallbackNotifications, filter);
-      const start = (page - 1) * pageSize;
-      const paginated = filtered.slice(start, start + pageSize);
-      return {
-        data: paginated,
-        hasMore: start + pageSize < filtered.length,
-        error: null,
-      };
+      return { data: [], hasMore: false, error: null };
     }
 
     let query = supabase
@@ -303,7 +184,6 @@ export async function fetchNotifications(
       )
       .eq('recipient_id', userId);
 
-    // Apply database filter where applicable
     if (filter === 'Mentions') {
       query = query.in('notification_type', ['comment', 'reply', 'mention']);
     } else if (filter === 'Follows') {
@@ -328,13 +208,7 @@ export async function fetchNotifications(
       .range(start, end);
 
     if (error || !data || data.length === 0) {
-      const filtered = filterNotificationList(fallbackNotifications, filter);
-      const paginated = filtered.slice(start, start + pageSize);
-      return {
-        data: paginated,
-        hasMore: start + pageSize < filtered.length,
-        error: null,
-      };
+      return { data: [], hasMore: false, error: error?.message || null };
     }
 
     const notifications: AppNotification[] = data.map((row: any) => {
@@ -369,14 +243,7 @@ export async function fetchNotifications(
       error: null,
     };
   } catch (err: any) {
-    const filtered = filterNotificationList(fallbackNotifications, filter);
-    const start = (page - 1) * pageSize;
-    const paginated = filtered.slice(start, start + pageSize);
-    return {
-      data: paginated,
-      hasMore: start + pageSize < filtered.length,
-      error: null,
-    };
+    return { data: [], hasMore: false, error: err?.message || 'Failed to load notifications' };
   }
 }
 
@@ -387,8 +254,7 @@ export async function fetchUnreadCount(): Promise<{ count: number; error: string
   try {
     const userId = await getAuthUserId();
     if (!userId) {
-      const count = fallbackNotifications.filter((n) => !n.isRead).length;
-      return { count, error: null };
+      return { count: 0, error: null };
     }
 
     const { count, error } = await supabase
@@ -398,14 +264,12 @@ export async function fetchUnreadCount(): Promise<{ count: number; error: string
       .eq('read_status', false);
 
     if (error || count === null) {
-      const fallbackCount = fallbackNotifications.filter((n) => !n.isRead).length;
-      return { count: fallbackCount, error: null };
+      return { count: 0, error: error?.message || null };
     }
 
     return { count, error: null };
   } catch {
-    const count = fallbackNotifications.filter((n) => !n.isRead).length;
-    return { count, error: null };
+    return { count: 0, error: null };
   }
 }
 
@@ -415,11 +279,6 @@ export async function fetchUnreadCount(): Promise<{ count: number; error: string
 export async function markNotificationAsRead(
   notificationId: string
 ): Promise<{ success: boolean; error: string | null }> {
-  // Update local fallback
-  fallbackNotifications = fallbackNotifications.map((n) =>
-    n.id === notificationId ? { ...n, isRead: true } : n
-  );
-
   try {
     const userId = await getAuthUserId();
     if (!userId) {
@@ -433,12 +292,12 @@ export async function markNotificationAsRead(
       .eq('recipient_id', userId);
 
     if (error) {
-      return { success: true, error: null };
+      return { success: false, error: error.message };
     }
 
     return { success: true, error: null };
-  } catch {
-    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to mark as read' };
   }
 }
 
@@ -450,112 +309,24 @@ export async function markAllNotificationsAsRead(): Promise<{
   updatedCount: number;
   error: string | null;
 }> {
-  const unreadBefore = fallbackNotifications.filter((n) => !n.isRead).length;
-  fallbackNotifications = fallbackNotifications.map((n) => ({ ...n, isRead: true }));
-
   try {
     const userId = await getAuthUserId();
     if (!userId) {
-      return { success: true, updatedCount: unreadBefore, error: null };
+      return { success: true, updatedCount: 0, error: null };
     }
 
-    const { error } = await supabase
+    const { error, count } = await supabase
       .from('notifications')
       .update({ read_status: true })
       .eq('recipient_id', userId)
       .eq('read_status', false);
 
     if (error) {
-      return { success: true, updatedCount: unreadBefore, error: null };
+      return { success: false, updatedCount: 0, error: error.message };
     }
 
-    return { success: true, updatedCount: unreadBefore, error: null };
-  } catch {
-    return { success: true, updatedCount: unreadBefore, error: null };
-  }
-}
-
-/**
- * Create a notification (Used by backend services/triggers or testing)
- */
-export async function createNotification(params: {
-  recipientId: string;
-  actorId?: string;
-  type: NotificationType;
-  entityType: NotificationEntityType;
-  entityId: string;
-  messageSnippet?: string;
-  metadata?: Record<string, any>;
-}): Promise<{ data: AppNotification | null; error: string | null }> {
-  // 1. Prevent self-notifications
-  if (params.actorId && params.recipientId === params.actorId) {
-    return { data: null, error: 'Self-notifications are ignored' };
-  }
-
-  // 2. Prevent duplicate unread notifications for like, follow, repost
-  const isDuplicate = fallbackNotifications.some(
-    (n) =>
-      !n.isRead &&
-      n.type === params.type &&
-      n.actor.id === params.actorId &&
-      n.entityId === params.entityId
-  );
-
-  if (isDuplicate && (params.type === 'like' || params.type === 'follow' || params.type === 'repost')) {
-    return { data: null, error: 'Duplicate unread notification prevented' };
-  }
-
-  const actor = mockUsers.find((u) => u.id === params.actorId) || mockUsers[0];
-  const newNotif: AppNotification = {
-    id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    type: params.type,
-    actor,
-    content: formatNotificationContent(params.type, params.messageSnippet, params.metadata?.topic_name),
-    entityType: params.entityType,
-    entityId: params.entityId,
-    targetPostId: params.entityType === 'post' ? params.entityId : params.metadata?.post_id,
-    targetPaperId: params.entityType === 'paper' ? params.entityId : params.metadata?.paper_id,
-    targetTopicName: params.metadata?.topic_name,
-    targetCommentId: params.metadata?.comment_id,
-    messageSnippet: params.messageSnippet,
-    metadata: params.metadata,
-    createdAt: 'Just now',
-    isRead: false,
-  };
-
-  fallbackNotifications = [newNotif, ...fallbackNotifications];
-
-  try {
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        recipient_id: params.recipientId,
-        actor_id: params.actorId || null,
-        notification_type: params.type as any,
-        entity_type: params.entityType as any,
-        entity_id: params.entityId,
-        message_snippet: params.messageSnippet || null,
-        metadata: params.metadata || {},
-        read_status: false,
-      })
-      .select()
-      .single();
-
-    if (!error && data) {
-      newNotif.id = data.id;
-    }
-  } catch {
-    // Ignore offline errors
-  }
-
-  return { data: newNotif, error: null };
-}
-
-/**
- * Reset mock notifications for test suites
- */
-export function resetMockNotifications(initialList?: AppNotification[]) {
-  if (initialList) {
-    fallbackNotifications = [...initialList];
+    return { success: true, updatedCount: count || 0, error: null };
+  } catch (err: any) {
+    return { success: false, updatedCount: 0, error: err?.message || 'Failed to mark all as read' };
   }
 }

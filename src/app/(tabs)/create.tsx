@@ -10,7 +10,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
   X,
@@ -20,6 +23,9 @@ import {
   Tag,
   Globe,
   Users,
+  Plus,
+  Trash2,
+  Check,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -28,7 +34,22 @@ import { PaperCard } from '../../components/cards/PaperCard';
 import { PaperLookupModal } from '../../components/modals/PaperLookupModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
-import { Paper, PostType } from '../../types';
+import { Paper, PostType, Poll } from '../../types';
+
+const POPULAR_TOPICS = [
+  'Neuroscience',
+  'AI & Bio',
+  'Genetics',
+  'Cancer',
+  'Immunology',
+  'Bioinformatics',
+  'Physics',
+  'Quantum Computing',
+  'Chemistry',
+  'Biophysics',
+  'Materials Science',
+  'Ecology',
+];
 
 export default function CreatePostScreen() {
   const user = useAuthStore((s) => s.user);
@@ -38,12 +59,96 @@ export default function CreatePostScreen() {
   const [postType, setPostType] = useState<PostType>('discussion');
   const [attachedPaper, setAttachedPaper] = useState<Paper | null>(null);
   const [paperModalVisible, setPaperModalVisible] = useState(false);
+
+  // Attached Images
+  const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState('');
+
+  // Attached Poll
+  const [attachedPoll, setAttachedPoll] = useState<Poll | null>(null);
+  const [pollModalVisible, setPollModalVisible] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+
+  // Selected Topics
   const [selectedTopics, setSelectedTopics] = useState<string[]>(['Neuroscience']);
+  const [topicModalVisible, setTopicModalVisible] = useState(false);
+  const [customTopicInput, setCustomTopicInput] = useState('');
+
   const [visibility, setVisibility] = useState<'public' | 'followers'>('public');
   const [isPublishing, setIsPublishing] = useState(false);
 
+  const handleAddImage = () => {
+    const trimmed = imageUrlInput.trim();
+    if (trimmed) {
+      setAttachedImages([...attachedImages, trimmed]);
+      setImageUrlInput('');
+      setImageModalVisible(false);
+    }
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setAttachedImages(attachedImages.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleAddPollOption = () => {
+    if (pollOptions.length < 4) {
+      setPollOptions([...pollOptions, '']);
+    }
+  };
+
+  const handlePollOptionChange = (text: string, index: number) => {
+    const updated = [...pollOptions];
+    updated[index] = text;
+    setPollOptions(updated);
+  };
+
+  const handleRemovePollOption = (index: number) => {
+    if (pollOptions.length > 2) {
+      setPollOptions(pollOptions.filter((_, idx) => idx !== index));
+    }
+  };
+
+  const handleSavePoll = () => {
+    const validOptions = pollOptions.filter((o) => o.trim().length > 0);
+    if (!pollQuestion.trim() || validOptions.length < 2) return;
+
+    setAttachedPoll({
+      question: pollQuestion.trim(),
+      options: validOptions.map((text, idx) => ({
+        id: `opt_${idx + 1}`,
+        text: text.trim(),
+        votesCount: 0,
+      })),
+      totalVotes: 0,
+    });
+    setPollModalVisible(false);
+  };
+
+  const handleToggleTopic = (topic: string) => {
+    if (selectedTopics.includes(topic)) {
+      if (selectedTopics.length > 1) {
+        setSelectedTopics(selectedTopics.filter((t) => t !== topic));
+      }
+    } else {
+      setSelectedTopics([...selectedTopics, topic]);
+    }
+  };
+
+  const handleAddCustomTopic = () => {
+    const trimmed = customTopicInput.trim().replace(/^#/, '');
+    if (trimmed && !selectedTopics.includes(trimmed)) {
+      setSelectedTopics([...selectedTopics, trimmed]);
+      setCustomTopicInput('');
+    }
+  };
+
   const handlePublish = async () => {
-    if ((!content.trim() && !attachedPaper) || isPublishing) return;
+    const hasContent = content.trim().length > 0;
+    const hasAttachments = attachedPaper || attachedImages.length > 0 || attachedPoll;
+
+    if ((!hasContent && !hasAttachments) || isPublishing) return;
 
     setIsPublishing(true);
     try {
@@ -52,6 +157,8 @@ export default function CreatePostScreen() {
           content: content.trim(),
           postType: attachedPaper ? 'research_share' : postType,
           paper: attachedPaper || undefined,
+          images: attachedImages.length > 0 ? attachedImages : undefined,
+          poll: attachedPoll || undefined,
           topics: selectedTopics,
           visibility,
         },
@@ -60,6 +167,8 @@ export default function CreatePostScreen() {
 
       setContent('');
       setAttachedPaper(null);
+      setAttachedImages([]);
+      setAttachedPoll(null);
       router.replace('/(tabs)');
     } catch (err) {
       console.error('[CreatePost] Error publishing post:', err);
@@ -75,6 +184,8 @@ export default function CreatePostScreen() {
       router.replace('/(tabs)');
     }
   };
+
+  const canPost = (content.trim().length > 0 || attachedPaper || attachedImages.length > 0 || attachedPoll) && !isPublishing;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -96,7 +207,7 @@ export default function CreatePostScreen() {
             variant="primary"
             size="sm"
             onPress={handlePublish}
-            disabled={isPublishing || (!content.trim() && !attachedPaper)}
+            disabled={!canPost}
             style={styles.postButton}
           />
         </View>
@@ -131,7 +242,7 @@ export default function CreatePostScreen() {
           {/* User Info & Text Input */}
           <View style={styles.inputContainer}>
             <Avatar
-              url={user.avatarUrl}
+              uri={user.avatarUrl}
               name={user.fullName}
               size={40}
               verified={user.orcidVerified}
@@ -149,11 +260,63 @@ export default function CreatePostScreen() {
             />
           </View>
 
+          {/* Attached Images Preview Grid */}
+          {attachedImages.length > 0 && (
+            <View style={styles.imagesGrid}>
+              {attachedImages.map((url, idx) => (
+                <View key={idx} style={styles.imagePreviewWrapper}>
+                  <Image
+                    source={{ uri: url }}
+                    style={styles.imagePreview}
+                    contentFit="cover"
+                  />
+                  <TouchableOpacity
+                    style={styles.removeMediaBtn}
+                    onPress={() => handleRemoveImage(idx)}
+                  >
+                    <X size={14} color={colors.white} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Attached Poll Preview */}
+          {attachedPoll && (
+            <View style={styles.pollPreviewCard}>
+              <View style={styles.pollPreviewHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <BarChart2 size={16} color={colors.textPrimary} />
+                  <Text style={styles.pollPreviewTitle}>Poll Attachment</Text>
+                </View>
+                <TouchableOpacity onPress={() => setAttachedPoll(null)}>
+                  <X size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.pollPreviewQuestion}>{attachedPoll.question}</Text>
+
+              {attachedPoll.options.map((opt) => (
+                <View key={opt.id} style={styles.pollPreviewOption}>
+                  <Text style={styles.pollPreviewOptionText}>{opt.text}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Tagged Topics Chips */}
           <View style={styles.topicTagsWrap}>
             {selectedTopics.map((topic) => (
               <View key={topic} style={styles.topicTagChip}>
                 <Text style={styles.topicTagChipText}>#{topic}</Text>
+                {selectedTopics.length > 1 && (
+                  <TouchableOpacity
+                    onPress={() => handleToggleTopic(topic)}
+                    style={{ marginLeft: 4 }}
+                  >
+                    <X size={12} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
               </View>
             ))}
           </View>
@@ -184,33 +347,54 @@ export default function CreatePostScreen() {
                   attachedPaper && { color: colors.accentLink, fontWeight: '700' },
                 ]}
               >
-                {attachedPaper ? 'Paper attached' : 'Add paper'}
+                {attachedPaper ? 'Paper added' : 'Add paper'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => {}}
+              onPress={() => setImageModalVisible(true)}
               style={styles.toolbarAction}
             >
-              <ImageIcon size={18} color={colors.textPrimary} />
-              <Text style={styles.toolbarActionText}>Image</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {}}
-              style={styles.toolbarAction}
-            >
-              <BarChart2 size={18} color={colors.textPrimary} />
-              <Text style={styles.toolbarActionText}>Poll</Text>
+              <ImageIcon
+                size={18}
+                color={attachedImages.length > 0 ? colors.accentLink : colors.textPrimary}
+              />
+              <Text
+                style={[
+                  styles.toolbarActionText,
+                  attachedImages.length > 0 && { color: colors.accentLink, fontWeight: '700' },
+                ]}
+              >
+                {attachedImages.length > 0 ? `Image (${attachedImages.length})` : 'Image'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => {
-                const nextTopics = ['Neuroscience', 'Genetics', 'AI in Science', 'Cancer', 'Bioinformatics'];
-                const current = selectedTopics[0] || 'Neuroscience';
-                const nextIdx = (nextTopics.indexOf(current) + 1) % nextTopics.length;
-                setSelectedTopics([nextTopics[nextIdx]]);
+                if (attachedPoll) {
+                  setPollQuestion(attachedPoll.question);
+                  setPollOptions(attachedPoll.options.map((o) => o.text));
+                }
+                setPollModalVisible(true);
               }}
+              style={styles.toolbarAction}
+            >
+              <BarChart2
+                size={18}
+                color={attachedPoll ? colors.accentLink : colors.textPrimary}
+              />
+              <Text
+                style={[
+                  styles.toolbarActionText,
+                  attachedPoll && { color: colors.accentLink, fontWeight: '700' },
+                ]}
+              >
+                {attachedPoll ? 'Poll added' : 'Poll'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setTopicModalVisible(true)}
               style={styles.toolbarAction}
             >
               <Tag size={18} color={colors.textPrimary} />
@@ -242,6 +426,208 @@ export default function CreatePostScreen() {
           onClose={() => setPaperModalVisible(false)}
           onSelectPaper={(paper) => setAttachedPaper(paper)}
         />
+
+        {/* Image Attachment Modal */}
+        <Modal
+          visible={imageModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setImageModalVisible(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setImageModalVisible(false)}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.modalCard}>
+                  <Text style={styles.modalTitle}>Attach Figure / Image</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Enter a direct URL for your scientific diagram, chart, or microscope figure.
+                  </Text>
+
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="https://example.com/figure.png"
+                    placeholderTextColor={colors.textMuted}
+                    value={imageUrlInput}
+                    onChangeText={setImageUrlInput}
+                    autoCapitalize="none"
+                    autoFocus
+                  />
+
+                  <View style={styles.modalBtnRow}>
+                    <Button
+                      title="Cancel"
+                      variant="secondary"
+                      size="sm"
+                      onPress={() => setImageModalVisible(false)}
+                      style={{ flex: 1, marginRight: spacing.sm }}
+                    />
+                    <Button
+                      title="Attach Image"
+                      variant="primary"
+                      size="sm"
+                      onPress={handleAddImage}
+                      disabled={!imageUrlInput.trim()}
+                      style={{ flex: 1.5 }}
+                    />
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+
+        {/* Poll Creator Modal */}
+        <Modal
+          visible={pollModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPollModalVisible(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setPollModalVisible(false)}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.modalCard}>
+                  <Text style={styles.modalTitle}>Create Research Poll</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Poll peers on methodologies, hypotheses, or scientific opinions.
+                  </Text>
+
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Ask a question..."
+                    placeholderTextColor={colors.textMuted}
+                    value={pollQuestion}
+                    onChangeText={setPollQuestion}
+                  />
+
+                  <View style={{ gap: 8, marginVertical: spacing.xs }}>
+                    {pollOptions.map((opt, idx) => (
+                      <View key={idx} style={styles.pollOptionInputRow}>
+                        <TextInput
+                          style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                          placeholder={`Option ${idx + 1}`}
+                          placeholderTextColor={colors.textMuted}
+                          value={opt}
+                          onChangeText={(val) => handlePollOptionChange(val, idx)}
+                        />
+                        {pollOptions.length > 2 && (
+                          <TouchableOpacity
+                            onPress={() => handleRemovePollOption(idx)}
+                            style={{ padding: spacing.xs }}
+                          >
+                            <Trash2 size={16} color={colors.textMuted} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+
+                  {pollOptions.length < 4 && (
+                    <TouchableOpacity
+                      onPress={handleAddPollOption}
+                      style={styles.addOptionBtn}
+                    >
+                      <Plus size={14} color={colors.textPrimary} />
+                      <Text style={styles.addOptionBtnText}>Add Option</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <View style={[styles.modalBtnRow, { marginTop: spacing.md }]}>
+                    <Button
+                      title="Cancel"
+                      variant="secondary"
+                      size="sm"
+                      onPress={() => setPollModalVisible(false)}
+                      style={{ flex: 1, marginRight: spacing.sm }}
+                    />
+                    <Button
+                      title="Save Poll"
+                      variant="primary"
+                      size="sm"
+                      onPress={handleSavePoll}
+                      disabled={!pollQuestion.trim() || pollOptions.filter((o) => o.trim()).length < 2}
+                      style={{ flex: 1.5 }}
+                    />
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+
+        {/* Tag Topics Modal */}
+        <Modal
+          visible={topicModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setTopicModalVisible(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setTopicModalVisible(false)}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.modalCard}>
+                  <Text style={styles.modalTitle}>Tag Research Topics</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Select disciplines to ensure your post reaches relevant researchers.
+                  </Text>
+
+                  {/* Custom topic input */}
+                  <View style={styles.customTopicRow}>
+                    <TextInput
+                      style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                      placeholder="Add custom topic (e.g. Epigenetics)"
+                      placeholderTextColor={colors.textMuted}
+                      value={customTopicInput}
+                      onChangeText={setCustomTopicInput}
+                      onSubmitEditing={handleAddCustomTopic}
+                    />
+                    <TouchableOpacity
+                      onPress={handleAddCustomTopic}
+                      style={styles.addCustomTopicBtn}
+                    >
+                      <Plus size={16} color={colors.white} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Popular topics grid */}
+                  <View style={styles.topicSelectionWrap}>
+                    {POPULAR_TOPICS.map((topic) => {
+                      const isSelected = selectedTopics.includes(topic);
+                      return (
+                        <TouchableOpacity
+                          key={topic}
+                          onPress={() => handleToggleTopic(topic)}
+                          style={[
+                            styles.topicSelectPill,
+                            isSelected && styles.topicSelectPillActive,
+                          ]}
+                        >
+                          {isSelected && <Check size={12} color={colors.white} style={{ marginRight: 4 }} />}
+                          <Text
+                            style={[
+                              styles.topicSelectPillText,
+                              isSelected && styles.topicSelectPillTextActive,
+                            ]}
+                          >
+                            {topic}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <Button
+                    title="Done"
+                    variant="primary"
+                    size="sm"
+                    onPress={() => setTopicModalVisible(false)}
+                    style={{ marginTop: spacing.md }}
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -312,9 +698,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   topicTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.backgroundTertiary,
     paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xxs + 1,
+    paddingVertical: spacing.xxs + 2,
     borderRadius: radii.sm,
   },
   topicTagChipText: {
@@ -338,6 +726,75 @@ const styles = StyleSheet.create({
     minHeight: 120,
     textAlignVertical: 'top',
     paddingTop: 0,
+  },
+  imagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  imagePreviewWrapper: {
+    position: 'relative',
+    width: 110,
+    height: 110,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  removeMediaBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pollPreviewCard: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  pollPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  pollPreviewTitle: {
+    ...typography.microBold,
+    color: colors.textPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pollPreviewQuestion: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    fontSize: 14,
+  },
+  pollPreviewOption: {
+    backgroundColor: colors.cardBackground,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.sm,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  pollPreviewOptionText: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   paperWrapper: {
     marginTop: spacing.md,
@@ -385,5 +842,102 @@ const styles = StyleSheet.create({
     ...typography.micro,
     color: colors.textSecondary,
     fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: colors.cardBackground,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+  },
+  modalTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  modalInput: {
+    height: 44,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    fontSize: 14,
+    color: colors.textPrimary,
+    backgroundColor: colors.backgroundSecondary,
+    marginBottom: spacing.sm,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    marginTop: spacing.xs,
+  },
+  pollOptionInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  addOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  addOptionBtnText: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+  },
+  customTopicRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  addCustomTopicBtn: {
+    width: 44,
+    height: 44,
+    backgroundColor: colors.black,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topicSelectionWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginVertical: spacing.xs,
+  },
+  topicSelectPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  topicSelectPillActive: {
+    backgroundColor: colors.black,
+    borderColor: colors.black,
+  },
+  topicSelectPillText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  topicSelectPillTextActive: {
+    color: colors.white,
   },
 });

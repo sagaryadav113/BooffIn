@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -38,21 +38,21 @@ import {
   ParticipatingResearchers,
   PeopleInterestedSection,
 } from '../../components/discussion';
-import { currentUser as fallbackUser } from '../../data/mockData';
-import { DiscussionType } from '../../types';
+import { DiscussionType, Paper } from '../../types';
 
 export default function PaperDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const paperId = id || 'paper_1';
+  const paperId = id || '';
 
   const getPaperById = usePaperStore((s) => s.getPaperById);
+  const fetchPaperById = usePaperStore((s) => s.fetchPaperById);
   const toggleSavePaper = usePaperStore((s) => s.toggleSavePaper);
   const toggleLikePaper = usePaperStore((s) => s.toggleLikePaper);
-  const authUser = useAuthStore((s) => s.user);
-  const currentUser = authUser || fallbackUser;
+  const currentUser = useAuthStore((s) => s.user);
 
   // Discussion store hooks
-  const discussions = useDiscussionStore((s) => s.discussions[paperId] || []);
+  const discussions = useDiscussionStore((s) => (paperId ? s.discussions[paperId] || [] : []));
+  const fetchDiscussionsForPaper = useDiscussionStore((s) => s.fetchDiscussionsForPaper);
   const activeFilter = useDiscussionStore((s) => s.activeFilter);
   const setActiveFilter = useDiscussionStore((s) => s.setActiveFilter);
   const addDiscussion = useDiscussionStore((s) => s.addDiscussion);
@@ -63,8 +63,27 @@ export default function PaperDetailScreen() {
   const getInterestedPeople = useDiscussionStore((s) => s.getInterestedPeople);
 
   const [abstractExpanded, setAbstractExpanded] = useState(false);
+  const [paper, setPaper] = useState<Paper | null>(getPaperById(paperId) || null);
+  const [isLoading, setIsLoading] = useState(!paper);
 
-  const paper = getPaperById(paperId);
+  useEffect(() => {
+    async function loadData() {
+      if (!paperId) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      const fetched = await fetchPaperById(paperId);
+      if (fetched) {
+        setPaper(fetched);
+      }
+      await fetchDiscussionsForPaper(paperId);
+      setIsLoading(false);
+    }
+
+    loadData();
+  }, [paperId]);
 
   // Compute counts for structured discussion types
   const counts = useMemo(() => {
@@ -94,6 +113,17 @@ export default function PaperDetailScreen() {
     return getInterestedPeople(paper, currentUser.id);
   }, [paper, currentUser.id, getInterestedPeople]);
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AppHeader showBack title="Paper Reference" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Typography variant="caption" color={colors.textSecondary}>Loading paper details...</Typography>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!paper) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -101,7 +131,7 @@ export default function PaperDetailScreen() {
         <EmptyState
           icon="FileText"
           title="Paper not found"
-          description="The requested research reference could not be located."
+          description="The requested research reference could not be located in the database."
           actionTitle="Back to Explore"
           onAction={() => router.push('/(tabs)/explore')}
         />

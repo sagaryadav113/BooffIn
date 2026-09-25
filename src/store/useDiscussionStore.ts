@@ -7,15 +7,16 @@ import {
   Paper,
   UserProfile,
 } from '../types';
-import { mockPaperDiscussions } from '../data/mockDiscussions';
-import { mockUsers } from '../data/mockData';
+import { supabase } from '../api/client';
 
 interface DiscussionState {
   discussions: Record<string, DiscussionContribution[]>;
   activeFilter: 'all' | DiscussionType;
+  isLoading: boolean;
 
   // Actions
   setActiveFilter: (filter: 'all' | DiscussionType) => void;
+  fetchDiscussionsForPaper: (paperId: string) => Promise<void>;
   getDiscussionsForPaper: (paperId: string, filter?: 'all' | DiscussionType) => DiscussionContribution[];
   addDiscussion: (params: {
     paperId: string;
@@ -46,10 +47,103 @@ function extractMentions(text: string): string[] {
 }
 
 export const useDiscussionStore = create<DiscussionState>((set, get) => ({
-  discussions: mockPaperDiscussions,
+  discussions: {},
   activeFilter: 'all',
+  isLoading: false,
 
   setActiveFilter: (activeFilter) => set({ activeFilter }),
+
+  fetchDiscussionsForPaper: async (paperId: string) => {
+    set({ isLoading: true });
+    try {
+      // Find posts and comments referencing this paper in Supabase
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          id,
+          content,
+          post_type,
+          created_at,
+          author:profiles(id, username, full_name, avatar_url, academic_title, institution, orcid_id, is_orcid_verified),
+          comments(
+            id,
+            content,
+            created_at,
+            author:profiles(id, username, full_name, avatar_url, academic_title, institution, orcid_id, is_orcid_verified)
+          )
+        `)
+        .eq('paper_id', paperId)
+        .order('created_at', { ascending: false });
+
+      if (error || !data) {
+        set({ isLoading: false });
+        return;
+      }
+
+      const mapped: DiscussionContribution[] = data.map((row: any) => ({
+        id: row.id,
+        paperId,
+        author: {
+          id: row.author?.id || '',
+          handle: row.author?.username || 'researcher',
+          fullName: row.author?.full_name || 'Researcher',
+          avatarUrl: row.author?.avatar_url,
+          academicTitle: row.author?.academic_title || 'Researcher',
+          institution: row.author?.institution || '',
+          bio: '',
+          orcidVerified: Boolean(row.author?.is_orcid_verified),
+          orcidId: row.author?.orcid_id,
+          followersCount: 0,
+          followingCount: 0,
+          postsCount: 0,
+          savedCount: 0,
+          joinedDate: '',
+        },
+        type: (row.post_type as DiscussionType) || 'discussion',
+        content: row.content || '',
+        mentions: extractMentions(row.content || ''),
+        likesCount: 0,
+        isLiked: false,
+        repliesCount: row.comments?.length || 0,
+        createdAt: 'Recently',
+        replies: (row.comments || []).map((c: any) => ({
+          id: c.id,
+          discussionId: row.id,
+          author: {
+            id: c.author?.id || '',
+            handle: c.author?.username || 'researcher',
+            fullName: c.author?.full_name || 'Researcher',
+            avatarUrl: c.author?.avatar_url,
+            academicTitle: c.author?.academic_title || 'Researcher',
+            institution: c.author?.institution || '',
+            bio: '',
+            orcidVerified: Boolean(c.author?.is_orcid_verified),
+            orcidId: c.author?.orcid_id,
+            followersCount: 0,
+            followingCount: 0,
+            postsCount: 0,
+            savedCount: 0,
+            joinedDate: '',
+          },
+          content: c.content || '',
+          mentions: extractMentions(c.content || ''),
+          likesCount: 0,
+          isLiked: false,
+          createdAt: 'Recently',
+        })),
+      }));
+
+      set((state) => ({
+        discussions: {
+          ...state.discussions,
+          [paperId]: mapped,
+        },
+        isLoading: false,
+      }));
+    } catch {
+      set({ isLoading: false });
+    }
+  },
 
   getDiscussionsForPaper: (paperId: string, filter?: 'all' | DiscussionType) => {
     const list = get().discussions[paperId] || [];
@@ -210,44 +304,7 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
   },
 
   getInterestedPeople: (paper: Paper, currentUserId?: string) => {
-    const users = mockUsers.filter((u) => u.id !== currentUserId && u.id !== 'usr_me');
-    const paperTopicsLower = paper.topics.map((t) => t.toLowerCase());
-
-    const results: InterestedPerson[] = [];
-    const seenIds = new Set<string>();
-
-    // 1. Topic followers: match researchInterests with paper.topics
-    for (const user of users) {
-      const interests = user.researchInterests || [];
-      const matched = interests.filter((interest) =>
-        paperTopicsLower.some(
-          (pt) => pt.includes(interest.toLowerCase()) || interest.toLowerCase().includes(pt)
-        )
-      );
-
-      if (matched.length > 0 && !seenIds.has(user.id)) {
-        seenIds.add(user.id);
-        results.push({
-          user,
-          reason: `Follows ${matched[0]}`,
-          matchedTopics: matched,
-        });
-      }
-    }
-
-    // 2. Interacting researchers (e.g. users active in discussion or field)
-    for (const user of users) {
-      if (!seenIds.has(user.id)) {
-        seenIds.add(user.id);
-        const interests = user.researchInterests || [];
-        results.push({
-          user,
-          reason: `Researches ${interests[0] || 'Life Sciences'}`,
-          matchedTopics: interests.slice(0, 2),
-        });
-      }
-    }
-
-    return results.slice(0, 5);
+    // Return empty list if no real active users participate or match
+    return [];
   },
 }));

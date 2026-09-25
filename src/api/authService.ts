@@ -1,6 +1,5 @@
 import { supabase } from './client';
 import { UserProfile } from '../types';
-import { currentUser, mockUsers } from '../data/mockData';
 
 const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
 
@@ -26,7 +25,6 @@ async function openAuthSession(url: string, redirectUrl: string): Promise<any> {
   }
 }
 
-
 export interface AuthResponse {
   user: UserProfile | null;
   error: string | null;
@@ -35,8 +33,8 @@ export interface AuthResponse {
 export interface SignUpParams {
   email: string;
   password: string;
-  fullName: string;
-  handle: string;
+  fullName?: string;
+  handle?: string;
   academicTitle?: string;
   institution?: string;
 }
@@ -67,7 +65,7 @@ export function mapProfileRecord(raw: any, fallbackEmail?: string): UserProfile 
     avatarUrl: raw.avatar_url || undefined,
     academicTitle: raw.academic_title || 'Academic Researcher',
     institution: raw.institution || 'Independent Research',
-    bio: raw.bio || 'Exploring scientific literature and methodology.',
+    bio: raw.bio || '',
     location: raw.location || undefined,
     country: raw.country || undefined,
     orcidId: raw.orcid_id || undefined,
@@ -89,10 +87,6 @@ export function mapProfileRecord(raw: any, fallbackEmail?: string): UserProfile 
  */
 export async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
   try {
-    if (!isLiveSupabaseConfigured()) {
-      return mockUsers.find((u) => u.id === userId) || currentUser;
-    }
-
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -135,34 +129,39 @@ export function setStoredLocalSession(profile: UserProfile | null): void {
 }
 
 /**
- * Retrieves the currently active session and restored user profile
+ * Retrieves the currently active session and restored user profile from Supabase Auth
  */
 export async function getInitialAuthSession(): Promise<UserProfile | null> {
   try {
-    if (isLiveSupabaseConfigured()) {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error || !session?.user) return null;
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session?.user) return null;
 
-      const profile = await fetchUserProfile(session.user.id);
-      if (profile) {
-        setStoredLocalSession(profile);
-        return profile;
-      }
-
-      // If user exists in auth but profile table row is missing, construct profile from metadata
-      const fallbackProfile: UserProfile = {
-        ...currentUser,
-        id: session.user.id,
-        handle: (session.user.user_metadata?.handle || session.user.email?.split('@')[0] || 'researcher').toLowerCase(),
-        fullName: session.user.user_metadata?.full_name || 'Researcher',
-        academicTitle: session.user.user_metadata?.academic_title || 'Research Enthusiast',
-        institution: session.user.user_metadata?.institution || 'Independent',
-      };
-      setStoredLocalSession(fallbackProfile);
-      return fallbackProfile;
+    const profile = await fetchUserProfile(session.user.id);
+    if (profile) {
+      setStoredLocalSession(profile);
+      return profile;
     }
 
-    return getStoredLocalSession();
+    // If profile table row is not yet provisioned, construct profile from metadata
+    const metadata = session.user.user_metadata || {};
+    const fallbackProfile: UserProfile = {
+      id: session.user.id,
+      handle: (metadata.handle || metadata.username || session.user.email?.split('@')[0] || 'researcher').toLowerCase(),
+      fullName: metadata.full_name || metadata.name || 'Researcher',
+      academicTitle: metadata.academic_title || 'Research Enthusiast',
+      institution: metadata.institution || 'Independent',
+      bio: '',
+      orcidVerified: Boolean(metadata.orcid_id),
+      orcidId: metadata.orcid_id,
+      followersCount: 0,
+      followingCount: 0,
+      postsCount: 0,
+      savedCount: 0,
+      joinedDate: 'Recently',
+      researchInterests: [],
+    };
+    setStoredLocalSession(fallbackProfile);
+    return fallbackProfile;
   } catch {
     return null;
   }
@@ -184,52 +183,39 @@ export async function signInWithEmail(
       return { user: null, error: 'Email and password are required.' };
     }
 
-    // 1. Live Supabase Auth
-    if (isLiveSupabaseConfigured()) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    });
 
-      if (error) {
-        return { user: null, error: error.message };
-      }
-
-      if (data.user) {
-        let profile = await fetchUserProfile(data.user.id);
-        if (!profile) {
-          profile = {
-            ...currentUser,
-            id: data.user.id,
-            handle: cleanEmail.split('@')[0],
-          };
-        }
-        return { user: profile, error: null };
-      }
+    if (error) {
+      return { user: null, error: error.message };
     }
 
-    // 2. Mock Fallback (Match by email or handle)
-    const matchedUser = mockUsers.find(
-      (u) =>
-        u.handle.toLowerCase() === cleanEmail.split('@')[0] ||
-        `${u.handle}@university.edu`.toLowerCase() === cleanEmail ||
-        cleanEmail.includes(u.handle.toLowerCase())
-    );
-
-    if (matchedUser) {
-      setStoredLocalSession(matchedUser);
-      return { user: matchedUser, error: null };
+    if (data.user) {
+      let profile = await fetchUserProfile(data.user.id);
+      if (!profile) {
+        profile = {
+          id: data.user.id,
+          handle: cleanEmail.split('@')[0],
+          fullName: data.user.user_metadata?.full_name || 'Researcher',
+          academicTitle: 'Researcher',
+          institution: 'Independent',
+          bio: '',
+          orcidVerified: false,
+          followersCount: 0,
+          followingCount: 0,
+          postsCount: 0,
+          savedCount: 0,
+          joinedDate: 'Recently',
+          researchInterests: [],
+        };
+      }
+      setStoredLocalSession(profile);
+      return { user: profile, error: null };
     }
 
-    const dynamicUser: UserProfile = {
-      ...currentUser,
-      id: `usr_${Date.now()}`,
-      handle: cleanEmail.split('@')[0] || 'researcher',
-      fullName: cleanEmail.split('@')[0].toUpperCase(),
-    };
-
-    setStoredLocalSession(dynamicUser);
-    return { user: dynamicUser, error: null };
+    return { user: null, error: 'No user data returned from authentication.' };
   } catch (err: any) {
     return {
       user: null,
@@ -239,94 +225,74 @@ export async function signInWithEmail(
 }
 
 /**
- * Sign Up with Email, Password & Academic Metadata
+ * Sign Up with Email & Password (Identity creation step)
  */
 export async function signUpWithEmail(
   params: SignUpParams
 ): Promise<AuthResponse> {
   try {
     const cleanEmail = params.email.trim().toLowerCase();
-    const cleanHandle = params.handle.trim().replace(/^@/, '').toLowerCase();
+    const fallbackHandle = cleanEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '') || 'researcher';
+    const cleanHandle = (params.handle || fallbackHandle).trim().replace(/^@/, '').toLowerCase();
+    const cleanFullName = (params.fullName || 'Researcher').trim();
 
     if (!cleanEmail || !params.password) {
       return { user: null, error: 'Email and password are required.' };
     }
-    if (!cleanHandle) {
-      return { user: null, error: 'Username handle is required.' };
-    }
-    if (!params.fullName.trim()) {
-      return { user: null, error: 'Full name is required.' };
-    }
 
-    if (isLiveSupabaseConfigured()) {
-      const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password: params.password,
-        options: {
-          data: {
-            full_name: params.fullName.trim(),
-            username: cleanHandle,
-            handle: cleanHandle,
-            academic_title: params.academicTitle,
-            institution: params.institution,
-          },
+    const { data, error } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password: params.password,
+      options: {
+        data: {
+          full_name: cleanFullName,
+          username: cleanHandle,
+          handle: cleanHandle,
+          academic_title: params.academicTitle || 'Research Enthusiast',
+          institution: params.institution || 'Independent',
         },
-      });
+      },
+    });
 
-      if (error) {
-        return { user: null, error: error.message };
-      }
+    if (error) {
+      return { user: null, error: error.message };
+    }
 
-      if (data.user) {
-        const newProfile: UserProfile = {
+    if (data.user) {
+      let profile = await fetchUserProfile(data.user.id);
+      if (!profile) {
+        profile = {
           id: data.user.id,
           handle: cleanHandle,
-          fullName: params.fullName.trim(),
-          academicTitle: params.academicTitle || 'Student & Research Enthusiast',
-          institution: params.institution || 'Independent Researcher',
-          bio: 'Exploring literature, asking questions, and discussing peer-reviewed science.',
+          fullName: cleanFullName,
+          academicTitle: params.academicTitle || 'Research Enthusiast',
+          institution: params.institution || 'Independent',
+          bio: '',
           orcidVerified: false,
           followingCount: 0,
           followersCount: 0,
           postsCount: 0,
           savedCount: 0,
           joinedDate: 'Just now',
+          researchInterests: [],
         };
 
-        // Explicit profile table upsert as safety fallback
         try {
           await supabase.from('profiles').upsert({
             id: data.user.id,
             username: cleanHandle,
-            full_name: params.fullName.trim(),
-            academic_title: params.academicTitle || 'Research Enthusiast',
-            institution: params.institution || 'Independent',
+            full_name: cleanFullName,
+            academic_title: profile.academicTitle,
+            institution: profile.institution,
           });
         } catch {}
-
-        setStoredLocalSession(newProfile);
-        return { user: newProfile, error: null };
       }
+
+      setStoredLocalSession(profile);
+      return { user: profile, error: null };
     }
 
-    // Mock Fallback
-    const mockNewUser: UserProfile = {
-      id: `usr_${Date.now()}`,
-      handle: cleanHandle || 'newresearcher',
-      fullName: params.fullName.trim() || 'New Researcher',
-      academicTitle: params.academicTitle || 'Research Enthusiast',
-      institution: params.institution || 'Independent',
-      bio: 'Exploring literature and discussing peer-reviewed science on BooffIn.',
-      orcidVerified: false,
-      followingCount: 0,
-      followersCount: 0,
-      postsCount: 0,
-      savedCount: 0,
-      joinedDate: 'Just now',
-    };
-
-    setStoredLocalSession(mockNewUser);
-    return { user: mockNewUser, error: null };
+    return { user: null, error: 'Account created. Please check your email for confirmation if required.' };
   } catch (err: any) {
     return {
       user: null,
@@ -336,82 +302,112 @@ export async function signUpWithEmail(
 }
 
 /**
+ * Persists updated researcher onboarding/profile information directly to Supabase
+ */
+export async function persistUserProfile(
+  userId: string,
+  updates: Partial<UserProfile>
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const dbPayload: any = {};
+    if (updates.fullName !== undefined) dbPayload.full_name = updates.fullName.trim();
+    if (updates.handle !== undefined) dbPayload.username = updates.handle.trim().replace(/^@/, '').toLowerCase();
+    if (updates.academicTitle !== undefined) dbPayload.academic_title = updates.academicTitle.trim();
+    if (updates.institution !== undefined) dbPayload.institution = updates.institution.trim();
+    if (updates.bio !== undefined) dbPayload.bio = updates.bio.trim();
+    if (updates.orcidId !== undefined) {
+      dbPayload.orcid_id = updates.orcidId.trim() || null;
+      dbPayload.orcid_verified = Boolean(updates.orcidId.trim());
+    }
+    if (updates.researchInterests !== undefined) dbPayload.research_interests = updates.researchInterests;
+    if (updates.avatarUrl !== undefined) dbPayload.avatar_url = updates.avatarUrl;
+    if (updates.websiteUrl !== undefined) dbPayload.website_url = updates.websiteUrl;
+    if (updates.location !== undefined) dbPayload.location = updates.location;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(dbPayload)
+      .eq('id', userId);
+
+    if (error) {
+      console.warn('persistUserProfile warning:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to update researcher profile.' };
+  }
+}
+
+/**
+ * Validates if an existing user has already completed onboarding
+ */
+export function isProfileComplete(user: UserProfile | null): boolean {
+  if (!user) return false;
+  const hasInterests = Array.isArray(user.researchInterests) && user.researchInterests.length > 0;
+  const hasValidName = Boolean(
+    user.fullName &&
+    user.fullName.trim().length > 0 &&
+    user.fullName.trim().toLowerCase() !== 'researcher'
+  );
+  return hasInterests && hasValidName;
+}
+
+/**
  * Sign In with Google OAuth
  */
 export async function signInWithGoogle(): Promise<AuthResponse> {
   try {
-    if (isLiveSupabaseConfigured()) {
-      const redirectUrl = createAuthRedirectUrl('auth/callback');
+    const redirectUrl = createAuthRedirectUrl('auth/callback');
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'select_account consent',
-          },
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: true,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account consent',
         },
-      });
+      },
+    });
 
-      if (error) {
-        return { user: null, error: error.message };
-      }
-
-      if (typeof window !== 'undefined' && data?.url) {
-        window.location.href = data.url;
-        return { user: null, error: null };
-      }
-
-      if (data?.url && !isWeb) {
-        const res = await openAuthSession(data.url, redirectUrl);
-        if (res.type === 'success' && res.url) {
-          const urlObj = new URL(res.url);
-          const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
-          const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
-          if (accessToken && refreshToken) {
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            const session = await getInitialAuthSession();
-            if (session) {
-              setStoredLocalSession(session);
-              return { user: session, error: null };
-            }
-          }
-        }
-        return { user: null, error: 'Google sign-in was cancelled.' };
-      }
-
-      return { user: null, error: 'Could not obtain Google authentication URL.' };
+    if (error) {
+      return { user: null, error: error.message };
     }
 
-    // Preview / Demo Fallback when live Supabase credentials are not configured
-    const demoGoogleUser: UserProfile = {
-      id: 'usr_google_demo_' + Date.now().toString().slice(-4),
-      handle: 'elenapark',
-      fullName: 'Dr. Elena Park',
-      academicTitle: 'Postdoctoral Fellow in Computational Neuroscience',
-      institution: 'Stanford University School of Medicine',
-      bio: 'Investigating synaptic plasticity, neural circuits, and hippocampus memory representations.',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-      orcidId: '0000-0002-1825-0097',
-      orcidVerified: true,
-      researchInterests: ['Neuroscience', 'Synaptic Plasticity', 'Bioimaging', 'Electrophysiology'],
-      followersCount: 1240,
-      followingCount: 382,
-      postsCount: 18,
-      savedCount: 42,
-      joinedDate: 'Joined recently',
-    };
-    setStoredLocalSession(demoGoogleUser);
-    return { user: demoGoogleUser, error: null };
+    if (typeof window !== 'undefined' && data?.url) {
+      window.location.href = data.url;
+      return { user: null, error: null };
+    }
+
+    if (data?.url && !isWeb) {
+      const res = await openAuthSession(data.url, redirectUrl);
+      if (res.type === 'success' && res.url) {
+        const urlObj = new URL(res.url);
+        const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
+        const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          const session = await getInitialAuthSession();
+          if (session) {
+            setStoredLocalSession(session);
+            return { user: session, error: null };
+          }
+        }
+      }
+      return { user: null, error: 'Google sign-in was cancelled.' };
+    }
+
+    return { user: null, error: 'Could not obtain Google authentication URL.' };
   } catch (err: any) {
     return {
       user: null,
-      error: err.message || 'Google authentication was cancelled or failed.',
+      error: err.message || 'Google authentication failed.',
     };
   }
 }
@@ -421,74 +417,51 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
  */
 export async function signInWithORCID(): Promise<AuthResponse> {
   try {
-    if (isLiveSupabaseConfigured()) {
-      const redirectUrl = createAuthRedirectUrl('auth/callback');
+    const redirectUrl = createAuthRedirectUrl('auth/callback');
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'orcid' as any,
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
-      });
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'orcid' as any,
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: true,
+      },
+    });
 
-      if (error) {
-        return { user: null, error: error.message };
-      }
-
-      if (typeof window !== 'undefined' && data?.url) {
-        window.location.href = data.url;
-        return { user: null, error: null };
-      }
-
-      if (data?.url && !isWeb) {
-        const res = await openAuthSession(data.url, redirectUrl);
-        if (res.type === 'success' && res.url) {
-          const urlObj = new URL(res.url);
-          const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
-          const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
-          if (accessToken && refreshToken) {
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            const session = await getInitialAuthSession();
-            if (session) {
-              setStoredLocalSession(session);
-              return { user: session, error: null };
-            }
-          }
-        }
-        return { user: null, error: 'ORCID authentication was cancelled.' };
-      }
-
-      return { user: null, error: 'Could not obtain ORCID authentication URL.' };
+    if (error) {
+      return { user: null, error: error.message };
     }
 
-    // Preview / Demo Fallback when live Supabase credentials are not configured
-    const demoOrcidUser: UserProfile = {
-      id: 'usr_orcid_verified_' + Date.now().toString().slice(-4),
-      handle: 'drelena',
-      fullName: 'Dr. Elena Park',
-      academicTitle: 'Associate Professor & Principal Investigator',
-      institution: 'Stanford University School of Medicine',
-      bio: 'Investigating synaptic plasticity, neural circuits, and hippocampus memory representations.',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-      orcidId: '0000-0002-1825-0097',
-      orcidVerified: true,
-      researchInterests: ['Neuroscience', 'Synaptic Plasticity', 'Bioimaging', 'Electrophysiology'],
-      followersCount: 1420,
-      followingCount: 420,
-      postsCount: 24,
-      savedCount: 56,
-      joinedDate: 'Joined recently',
-    };
-    setStoredLocalSession(demoOrcidUser);
-    return { user: demoOrcidUser, error: null };
+    if (typeof window !== 'undefined' && data?.url) {
+      window.location.href = data.url;
+      return { user: null, error: null };
+    }
+
+    if (data?.url && !isWeb) {
+      const res = await openAuthSession(data.url, redirectUrl);
+      if (res.type === 'success' && res.url) {
+        const urlObj = new URL(res.url);
+        const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
+        const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          const session = await getInitialAuthSession();
+          if (session) {
+            setStoredLocalSession(session);
+            return { user: session, error: null };
+          }
+        }
+      }
+      return { user: null, error: 'ORCID authentication was cancelled.' };
+    }
+
+    return { user: null, error: 'Could not obtain ORCID authentication URL.' };
   } catch (err: any) {
     return {
       user: null,
-      error: err.message || 'ORCID Authentication cancelled or unavailable.',
+      error: err.message || 'ORCID Authentication failed.',
     };
   }
 }
@@ -503,15 +476,13 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
       return { success: false, error: 'Please provide a valid email address.' };
     }
 
-    if (isLiveSupabaseConfigured()) {
-      const redirectUrl = createAuthRedirectUrl('auth/reset-password');
-      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: redirectUrl,
-      });
+    const redirectUrl = createAuthRedirectUrl('auth/reset-password');
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: redirectUrl,
+    });
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
+    if (error) {
+      return { success: false, error: error.message };
     }
 
     return { success: true, error: null };
@@ -529,9 +500,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
 export async function signOutUser(): Promise<void> {
   try {
     setStoredLocalSession(null);
-    if (isLiveSupabaseConfigured()) {
-      await supabase.auth.signOut();
-    }
+    await supabase.auth.signOut();
   } catch {
     setStoredLocalSession(null);
   }

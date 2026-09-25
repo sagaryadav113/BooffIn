@@ -1,4 +1,5 @@
 import { ParsedReferenceInput, ReferenceInputType } from './types';
+import { sanitizeExternalUrl } from '../../utils/security';
 
 // Standard DOI Regex pattern (compliant with Crossref / DataCite syntax)
 const DOI_REGEX = /\b(10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+)\b/i;
@@ -224,11 +225,12 @@ export function parseReferenceInput(rawInput: string): ParsedReferenceInput {
 
   // 6. Generic URL
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    const safeUrl = sanitizeExternalUrl(trimmed) || trimmed;
     const detected = detectPublisherFromUrl(trimmed);
     return {
       rawInput: trimmed,
       type: 'generic_url',
-      canonicalUrl: trimmed,
+      canonicalUrl: safeUrl,
       detectedPublisher: detected.publisher,
       detectedJournal: detected.journal,
     };
@@ -238,6 +240,6 @@ export function parseReferenceInput(rawInput: string): ParsedReferenceInput {
   return {
     rawInput: trimmed,
     type: 'generic_url',
-    canonicalUrl: trimmed,
+    canonicalUrl: sanitizeExternalUrl(trimmed) || trimmed,
   };
 }

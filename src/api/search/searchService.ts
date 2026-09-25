@@ -1,6 +1,5 @@
 import { SearchProvider, SearchQueryParams, SearchResults } from '../../types';
 import { PostgresSearchProvider } from './PostgresSearchProvider';
-import { MockSearchProvider } from './MockSearchProvider';
 
 let activeSearchProvider: SearchProvider = new PostgresSearchProvider();
 
@@ -13,8 +12,6 @@ export function getSearchProvider(): SearchProvider {
 
 /**
  * Configure or swap the active search provider.
- * Allows migrating to dedicated search engines (e.g., Elasticsearch, Meilisearch, Typesense)
- * without modifying UI components or store contracts.
  */
 export function setSearchProvider(provider: SearchProvider): void {
   activeSearchProvider = provider;
@@ -29,7 +26,7 @@ export async function searchBoffIn(params: SearchQueryParams): Promise<SearchRes
 }
 
 /**
- * Curated discovery queries for new / empty state exploration
+ * Scientific search discovery queries for initial exploration
  */
 export interface SearchDiscoverySuggestion {
   category: 'researchers' | 'papers' | 'topics' | 'discussions';
@@ -40,27 +37,27 @@ export interface SearchDiscoverySuggestion {
 
 export const POPULAR_DISCOVERIES: SearchDiscoverySuggestion[] = [
   {
-    category: 'researchers',
-    label: 'Dr. Smith',
-    query: 'Dr. Smith',
-    description: 'Find neuroscience and synaptic plasticity faculty',
-  },
-  {
-    category: 'papers',
-    label: 'Experience dependent plasticity',
-    query: 'experience dependent plasticity',
-    description: 'Peer-reviewed structural remodeling in adult cortex',
+    category: 'topics',
+    label: 'Neuroscience',
+    query: 'Neuroscience',
+    description: 'Explore neural circuits, synaptic plasticity, and bioimaging',
   },
   {
     category: 'topics',
-    label: 'Neuroscience',
-    query: 'neuroscience',
-    description: 'Explore brain circuits, synaptic mechanisms, and imaging',
+    label: 'Genetics',
+    query: 'Genetics',
+    description: 'Explore genome sequencing, CRISPR editing, and epigenetics',
   },
   {
-    category: 'discussions',
-    label: 'CRISPR off target effects',
-    query: 'CRISPR off target effects',
-    description: 'Scientific questions and insights on genome editing fidelity',
+    category: 'topics',
+    label: 'Molecular Biology',
+    query: 'Molecular Biology',
+    description: 'Explore cellular biochemistry and macromolecular complexes',
+  },
+  {
+    category: 'topics',
+    label: 'Bioinformatics',
+    query: 'Bioinformatics',
+    description: 'Explore multi-omics pipelines and computational modeling',
   },
 ];

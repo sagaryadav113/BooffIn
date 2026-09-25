@@ -135,10 +135,12 @@ export const PaperCard: React.FC<PaperCardProps> = ({
             </View>
 
             <TouchableOpacity
+              accessibilityRole="link"
+              accessibilityLabel={`Read paper on publisher website: ${paper.journal}`}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={handleOpenPublisher}
               style={styles.linkButton}
               activeOpacity={0.7}
-              accessibilityLabel={`Read paper on publisher website: ${paper.journal}`}
             >
               <Text style={styles.linkText}>Read paper</Text>
               <ExternalLink size={13} color={colors.accentLink} strokeWidth={2.2} />

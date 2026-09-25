@@ -57,6 +57,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <View style={styles.leftSection}>
         {showBack && (
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
             onPress={handleBack}
             style={styles.iconButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -87,6 +89,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <View style={styles.rightSection}>
         {showSearch && (
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Search discussions and papers"
             onPress={searchHandler}
             style={styles.iconButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -97,6 +101,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
         {showCreate && (
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Create research post or discussion"
             onPress={onCreatePress || (() => router.push('/(tabs)/create'))}
             style={[styles.iconButton, styles.createButton]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -107,6 +113,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
         {rightIcon && onRightIconPress && (
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={rightIcon}
             onPress={onRightIconPress}
             style={styles.iconButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

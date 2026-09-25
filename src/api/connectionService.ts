@@ -7,30 +7,8 @@ import {
   UserProfile,
   Post,
 } from '../types';
-import { mockUsers, mockPosts } from '../data/mockData';
 import { isLiveSupabaseConfigured } from './authService';
-
-// In-memory / persistent mock store for collaboration requests
-let memoryCollaborationRequests: CollaborationRequest[] = [
-  {
-    id: 'req_1',
-    senderId: 'usr_3', // Dr. Elena Park
-    recipientId: 'usr_me', // Current User
-    topic: 'Functional Connectomics & Organoids',
-    message: 'Saw your questions on synaptic plasticity in 3D cortical organoids. Would love to share our calcium imaging protocols and discuss potential dataset collaboration.',
-    status: 'pending',
-    createdAt: '1d ago',
-  },
-  {
-    id: 'req_2',
-    senderId: 'usr_me', // Current User
-    recipientId: 'usr_1', // Dr. Aanya Rao
-    topic: 'Two-Photon In Vivo Imaging',
-    message: 'Hi Dr. Rao, I have been analyzing cross-layer dendritic reorganization in visual cortex models and would appreciate exchanging methodologies.',
-    status: 'accepted',
-    createdAt: '3d ago',
-  },
-];
+import { sanitizeTextContent } from '../utils/security';
 
 function mapCollaborationRecord(record: any, senderProfile?: UserProfile, recipientProfile?: UserProfile): CollaborationRequest {
   return {
@@ -71,15 +49,12 @@ export function getSharedResearchInterests(
  */
 export function getResearcherDiscussedTopics(
   researcherId: string,
-  allPosts?: Post[]
+  allPosts: Post[] = []
 ): { topic: string; count: number }[] {
-  const postsPool = allPosts && allPosts.length > 0 ? allPosts : mockPosts;
-  const userPosts = postsPool.filter((p) => p.author.id === researcherId);
-
+  const userPosts = allPosts.filter((p) => p.author.id === researcherId);
   const topicCountMap: Record<string, number> = {};
 
   userPosts.forEach((post) => {
-    // Collect from post tags
     if (Array.isArray(post.topics)) {
       post.topics.forEach((t) => {
         const clean = t.trim();
@@ -88,7 +63,6 @@ export function getResearcherDiscussedTopics(
         }
       });
     }
-    // Collect from referenced paper topics
     if (post.paper && Array.isArray(post.paper.topics)) {
       post.paper.topics.forEach((pt: any) => {
         const clean = typeof pt === 'string' ? pt.trim() : pt?.name?.trim?.() || '';
@@ -98,16 +72,6 @@ export function getResearcherDiscussedTopics(
       });
     }
   });
-
-  // If user has direct research interests, include them as well
-  const researcher = mockUsers.find((u) => u.id === researcherId);
-  if (researcher?.researchInterests) {
-    researcher.researchInterests.forEach((interest) => {
-      if (!topicCountMap[interest]) {
-        topicCountMap[interest] = 1;
-      }
-    });
-  }
 
   return Object.entries(topicCountMap)
     .map(([topic, count]) => ({ topic, count }))
@@ -126,49 +90,31 @@ export async function getConnectionStatus(
   }
 
   try {
-    if (isLiveSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('collaboration_requests')
-        .select('*')
-        .or(
-          `and(sender_id.eq.${currentUserId},recipient_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},recipient_id.eq.${currentUserId})`
-        )
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('collaboration_requests')
+      .select('*')
+      .or(
+        `and(sender_id.eq.${currentUserId},recipient_id.eq.${targetUserId}),and(sender_id.eq.${targetUserId},recipient_id.eq.${currentUserId})`
+      )
+      .order('created_at', { ascending: false });
 
-      if (error || !data || data.length === 0) {
-        return 'none';
-      }
-
-      // Check for accepted connection first
-      const accepted = data.find((r) => r.status === 'accepted');
-      if (accepted) return 'connected';
-
-      // Check for active pending request
-      const pendingSent = data.find(
-        (r) => r.sender_id === currentUserId && r.status === 'pending'
-      );
-      if (pendingSent) return 'pending_sent';
-
-      const pendingReceived = data.find(
-        (r) => r.recipient_id === currentUserId && r.status === 'pending'
-      );
-      if (pendingReceived) return 'pending_received';
-
+    if (error || !data || data.length === 0) {
       return 'none';
     }
 
-    // Mock fallback
-    const match = memoryCollaborationRequests.find(
-      (r) =>
-        (r.senderId === currentUserId && r.recipientId === targetUserId) ||
-        (r.senderId === targetUserId && r.recipientId === currentUserId)
-    );
+    const accepted = data.find((r) => r.status === 'accepted');
+    if (accepted) return 'connected';
 
-    if (!match) return 'none';
-    if (match.status === 'accepted') return 'connected';
-    if (match.status === 'pending') {
-      return match.senderId === currentUserId ? 'pending_sent' : 'pending_received';
-    }
+    const pendingSent = data.find(
+      (r) => r.sender_id === currentUserId && r.status === 'pending'
+    );
+    if (pendingSent) return 'pending_sent';
+
+    const pendingReceived = data.find(
+      (r) => r.recipient_id === currentUserId && r.status === 'pending'
+    );
+    if (pendingReceived) return 'pending_received';
+
     return 'none';
   } catch {
     return 'none';
@@ -179,17 +125,23 @@ export async function getConnectionStatus(
  * Send a new collaboration connection request
  */
 export async function sendCollaborationRequest(
-  senderId: string,
+  _senderId: string,
   params: SendCollaborationRequestParams
 ): Promise<{ success: boolean; request?: CollaborationRequest; error?: string }> {
   try {
-    const cleanTopic = params.topic.trim();
-    const cleanMessage = params.message.trim();
+    const cleanTopic = sanitizeTextContent(params.topic, 200);
+    const cleanMessage = sanitizeTextContent(params.message, 2000);
 
-    if (!senderId || !params.recipientId) {
-      return { success: false, error: 'Sender and recipient are required.' };
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: 'Authentication required to send collaboration request.' };
     }
-    if (senderId === params.recipientId) {
+    const verifiedSenderId = user.id;
+
+    if (!params.recipientId) {
+      return { success: false, error: 'Recipient is required.' };
+    }
+    if (verifiedSenderId === params.recipientId) {
       return { success: false, error: 'Cannot send collaboration request to yourself.' };
     }
     if (!cleanTopic) {
@@ -199,50 +151,27 @@ export async function sendCollaborationRequest(
       return { success: false, error: 'Please write a brief collaboration proposal or note.' };
     }
 
-    if (isLiveSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('collaboration_requests')
-        .insert({
-          sender_id: senderId,
-          recipient_id: params.recipientId,
-          topic: cleanTopic,
-          message: cleanMessage,
-          status: 'pending',
-        })
-        .select('*')
-        .single();
+    const { data, error } = await supabase
+      .from('collaboration_requests')
+      .insert({
+        sender_id: verifiedSenderId,
+        recipient_id: params.recipientId,
+        topic: cleanTopic,
+        message: cleanMessage,
+        status: 'pending',
+      })
+      .select('*')
+      .single();
 
-      if (error) {
-        if (error.code === '23505') {
-          return { success: false, error: 'You already have a pending collaboration request with this researcher for this topic.' };
-        }
-        return { success: false, error: error.message };
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'You already have a pending collaboration request with this researcher for this topic.' };
       }
-
-      const created = mapCollaborationRecord(data);
-      return { success: true, request: created };
+      return { success: false, error: error.message };
     }
 
-    // Mock Fallback
-    const newReq: CollaborationRequest = {
-      id: `req_${Date.now()}`,
-      senderId,
-      recipientId: params.recipientId,
-      topic: cleanTopic,
-      message: cleanMessage,
-      status: 'pending',
-      createdAt: 'Just now',
-    };
-
-    // Remove old matching request if existing
-    memoryCollaborationRequests = [
-      newReq,
-      ...memoryCollaborationRequests.filter(
-        (r) => !(r.senderId === senderId && r.recipientId === params.recipientId)
-      ),
-    ];
-
-    return { success: true, request: newReq };
+    const created = mapCollaborationRecord(data);
+    return { success: true, request: created };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to send collaboration request.' };
   }
@@ -256,23 +185,20 @@ export async function respondToCollaborationRequest(
   status: 'accepted' | 'declined'
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (isLiveSupabaseConfigured()) {
-      const { error } = await supabase
-        .from('collaboration_requests')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', requestId);
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true };
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: 'Authentication required.' };
     }
 
-    // Mock Fallback
-    memoryCollaborationRequests = memoryCollaborationRequests.map((r) =>
-      r.id === requestId ? { ...r, status, updatedAt: 'Just now' } : r
-    );
+    const { error } = await supabase
+      .from('collaboration_requests')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', requestId)
+      .eq('recipient_id', user.id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
 
     return { success: true };
   } catch (err: any) {
@@ -287,21 +213,21 @@ export async function withdrawCollaborationRequest(
   requestId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (isLiveSupabaseConfigured()) {
-      const { error } = await supabase
-        .from('collaboration_requests')
-        .update({ status: 'withdrawn', updated_at: new Date().toISOString() })
-        .eq('id', requestId);
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true };
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: 'Authentication required.' };
     }
 
-    // Mock Fallback
-    memoryCollaborationRequests = memoryCollaborationRequests.filter((r) => r.id !== requestId);
+    const { error } = await supabase
+      .from('collaboration_requests')
+      .update({ status: 'withdrawn', updated_at: new Date().toISOString() })
+      .eq('id', requestId)
+      .eq('sender_id', user.id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to withdraw collaboration request.' };
@@ -314,57 +240,38 @@ export async function withdrawCollaborationRequest(
 export async function getCollaborationRequests(
   userId: string
 ): Promise<{ incoming: CollaborationRequest[]; outgoing: CollaborationRequest[] }> {
+  if (!userId) return { incoming: [], outgoing: [] };
+
   try {
-    if (isLiveSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('collaboration_requests')
-        .select(`
-          *,
-          sender:profiles!collaboration_requests_sender_id_fkey(*),
-          recipient:profiles!collaboration_requests_recipient_id_fkey(*)
-        `)
-        .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('collaboration_requests')
+      .select(`
+        *,
+        sender:profiles!collaboration_requests_sender_id_fkey(*),
+        recipient:profiles!collaboration_requests_recipient_id_fkey(*)
+      `)
+      .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
 
-      if (error || !data) {
-        return { incoming: [], outgoing: [] };
-      }
-
-      const incoming: CollaborationRequest[] = [];
-      const outgoing: CollaborationRequest[] = [];
-
-      data.forEach((row) => {
-        const req = mapCollaborationRecord(
-          row,
-          row.sender ? (row.sender as any) : undefined,
-          row.recipient ? (row.recipient as any) : undefined
-        );
-        if (row.recipient_id === userId) {
-          incoming.push(req);
-        } else {
-          outgoing.push(req);
-        }
-      });
-
-      return { incoming, outgoing };
+    if (error || !data) {
+      return { incoming: [], outgoing: [] };
     }
 
-    // Mock Fallback
-    const incoming = memoryCollaborationRequests
-      .filter((r) => r.recipientId === userId)
-      .map((r) => ({
-        ...r,
-        sender: mockUsers.find((u) => u.id === r.senderId),
-        recipient: mockUsers.find((u) => u.id === r.recipientId),
-      }));
+    const incoming: CollaborationRequest[] = [];
+    const outgoing: CollaborationRequest[] = [];
 
-    const outgoing = memoryCollaborationRequests
-      .filter((r) => r.senderId === userId)
-      .map((r) => ({
-        ...r,
-        sender: mockUsers.find((u) => u.id === r.senderId),
-        recipient: mockUsers.find((u) => u.id === r.recipientId),
-      }));
+    data.forEach((row) => {
+      const req = mapCollaborationRecord(
+        row,
+        row.sender ? (row.sender as any) : undefined,
+        row.recipient ? (row.recipient as any) : undefined
+      );
+      if (row.recipient_id === userId) {
+        incoming.push(req);
+      } else {
+        outgoing.push(req);
+      }
+    });
 
     return { incoming, outgoing };
   } catch {

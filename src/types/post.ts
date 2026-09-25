@@ -15,6 +15,20 @@ export interface Comment {
   replies?: Comment[];
 }
 
+export interface PollOption {
+  id: string;
+  text: string;
+  votesCount: number;
+}
+
+export interface Poll {
+  question: string;
+  options: PollOption[];
+  totalVotes: number;
+  userVotedOptionId?: string;
+  expiresAt?: string;
+}
+
 export interface Post {
   id: string;
   author: UserProfile;
@@ -22,6 +36,7 @@ export interface Post {
   content: string;
   paper?: Paper; // Referenced external paper
   images?: string[];
+  poll?: Poll;
   topics: string[];
   visibility: 'public' | 'followers';
   likesCount: number;

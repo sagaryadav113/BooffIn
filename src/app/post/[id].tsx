@@ -22,10 +22,14 @@ import { CommentCard } from '../../components/cards/CommentCard';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Comment } from '../../types';
+import { Comment, Post } from '../../types';
+import { supabase } from '../../api/client';
+import { mapSupabasePost } from '../../api/socialService';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const postId = id || '';
+
   const getPostById = usePostStore((s) => s.getPostById);
   const getCommentsForPost = usePostStore((s) => s.getCommentsForPost);
   const fetchCommentsForPost = usePostStore((s) => s.fetchCommentsForPost);
@@ -36,15 +40,62 @@ export default function PostDetailScreen() {
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const post = getPostById(id || 'post_1');
-  const comments = post ? getCommentsForPost(post.id) : [];
+  const [post, setPost] = useState<Post | null>(getPostById(postId) || null);
+  const [isLoading, setIsLoading] = useState(!post);
 
   useEffect(() => {
-    if (post) {
-      fetchCommentsForPost(post.id, currentUser.id);
+    async function loadPost() {
+      if (!postId) {
+        setIsLoading(false);
+        return;
+      }
+
+      if (!post) {
+        setIsLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('posts')
+            .select(`
+              *,
+              author:profiles!author_id (*),
+              paper:papers!paper_id (
+                *,
+                paper_authors (*)
+              ),
+              post_topics ( topic:topics!topic_id (*) ),
+              likes!left ( user_id ),
+              reposts!left ( user_id ),
+              bookmarks!left ( user_id )
+            `)
+            .eq('id', postId)
+            .maybeSingle();
+
+          if (data && !error) {
+            const mappedPost = mapSupabasePost(data, currentUser.id);
+            setPost(mappedPost);
+          }
+        } catch {}
+        setIsLoading(false);
+      }
+
+      fetchCommentsForPost(postId, currentUser.id);
     }
-  }, [post?.id, currentUser.id]);
+
+    loadPost();
+  }, [postId, currentUser.id]);
+
+  const comments = post ? getCommentsForPost(post.id) : [];
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AppHeader title="Discussion" showBack />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Typography variant="caption" color={colors.textSecondary}>Loading discussion...</Typography>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!post) {
     return (
@@ -53,7 +104,7 @@ export default function PostDetailScreen() {
         <EmptyState
           icon="FileText"
           title="Post not found"
-          description="This research discussion may have been deleted or moved."
+          description="This research discussion may have been deleted or does not exist."
         />
       </SafeAreaView>
     );

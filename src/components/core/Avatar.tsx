@@ -3,21 +3,35 @@ import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { colors, radii } from '../../theme';
 
+export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
+
+const sizeMap: Record<string, number> = {
+  xs: 24,
+  sm: 32,
+  md: 40,
+  lg: 52,
+  xl: 72,
+};
+
 interface AvatarProps {
   url?: string;
+  uri?: string;
   name?: string;
-  size?: number;
+  size?: AvatarSize;
   style?: ViewStyle;
   verified?: boolean;
 }
 
 export const Avatar: React.FC<AvatarProps> = ({
   url,
+  uri,
   name = 'User',
   size = 40,
   style,
   verified = false,
 }) => {
+  const pixelSize = typeof size === 'number' ? size : sizeMap[size] || 40;
+  const imageSource = uri || url;
   const getInitials = (n: string) => {
     return n
       .split(' ')
@@ -28,11 +42,11 @@ export const Avatar: React.FC<AvatarProps> = ({
   };
 
   return (
-    <View style={[{ width: size, height: size }, styles.container, style]}>
-      {url ? (
+    <View style={[{ width: pixelSize, height: pixelSize }, styles.container, style]}>
+      {imageSource ? (
         <Image
-          source={{ uri: url }}
-          style={{ width: size, height: size, borderRadius: size / 2 }}
+          source={{ uri: imageSource }}
+          style={{ width: pixelSize, height: pixelSize, borderRadius: pixelSize / 2 }}
           contentFit="cover"
           transition={200}
         />
@@ -40,10 +54,10 @@ export const Avatar: React.FC<AvatarProps> = ({
         <View
           style={[
             styles.fallback,
-            { width: size, height: size, borderRadius: size / 2 },
+            { width: pixelSize, height: pixelSize, borderRadius: pixelSize / 2 },
           ]}
         >
-          <Text style={[styles.initials, { fontSize: size * 0.38 }]}>
+          <Text style={[styles.initials, { fontSize: pixelSize * 0.38 }]}>
             {getInitials(name)}
           </Text>
         </View>

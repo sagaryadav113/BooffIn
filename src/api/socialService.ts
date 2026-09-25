@@ -1,16 +1,15 @@
 import { supabase } from './client';
 import { Post, Comment, PostType, Paper, UserProfile } from '../types';
-import { mockPosts, mockComments, mockUsers, mockPapers } from '../data/mockData';
-import { getFollowedTopicsForUser } from './topicService';
 import { getFeedRanker, buildUserRankingContext } from './ranking/feedRanker';
+import { sanitizeExternalUrl, sanitizeTextContent } from '../utils/security';
 
 /**
  * Explainable "For You" Feed Ranking Function
- * Transparent, deterministic scoring:
- * 1. Followed Topic Match (+50 pts per matching topic followed by the user)
- * 2. Peer-Reviewed Paper Reference (+15 pts if referencing an external paper / DOI)
- * 3. Social Interaction Weight (+2 per like, +3 per comment, +4 per repost)
- * 4. Recency Score (up to +30 pts for fresh scientific discussions)
+ * Transparent, deterministic scoring based on actual interactions and topics:
+ * 1. Followed Topic Match (+150 pts per matching topic followed by user)
+ * 2. Peer-Reviewed Paper Reference (+25 pts)
+ * 3. Social Interaction Weight (+1.5 per like, +2.5 per comment, +3 per repost)
+ * 4. Recency Score (up to +40 pts for fresh scientific discussions)
  */
 export function calculateExplainableFeedScore(
   post: Post,
@@ -18,7 +17,6 @@ export function calculateExplainableFeedScore(
 ): number {
   let score = 0;
 
-  // 1. Followed Topic Match (+150 per matching followed topic)
   if (followedTopicNames && followedTopicNames.length > 0) {
     const matchingCount = post.topics.filter((pt) =>
       followedTopicNames.some(
@@ -28,17 +26,14 @@ export function calculateExplainableFeedScore(
     score += matchingCount * 150;
   }
 
-  // 2. Peer-Reviewed Paper Reference Bonus
   if (post.paper) {
     score += 25;
   }
 
-  // 3. Social Interaction Weight
   score += (post.likesCount || 0) * 1.5;
   score += (post.commentsCount || 0) * 2.5;
   score += (post.repostsCount || 0) * 3;
 
-  // 4. Recency Bonus
   if (post.createdAt.includes('m ago') || post.createdAt.includes('Just now')) {
     score += 40;
   } else if (post.createdAt.includes('h ago')) {
@@ -52,7 +47,7 @@ export function calculateExplainableFeedScore(
   return Math.round(score);
 }
 
-// Helper to determine if we're in real Supabase mode vs local mock mode
+// Helper to determine if we're connected to Supabase
 export function isSupabaseConfigured(): boolean {
   const url = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
   const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -65,14 +60,6 @@ export function isSupabaseConfigured(): boolean {
       !key.includes('dummy_anon_key')
   );
 }
-
-// In-Memory Social Graph & Interaction Store (used for local mode / offline resilience)
-const localLikes = new Set<string>();
-const localReposts = new Set<string>();
-const localBookmarks = new Set<string>();
-const localFollows = new Set<string>(['usr_me:usr_1', 'usr_me:usr_2']);
-const localCommentsStore: Record<string, Comment[]> = { ...mockComments };
-const localCreatedPosts: Post[] = [];
 
 // Relative time formatting helper
 export function formatRelativeTime(dateString?: string | null): string {
@@ -150,7 +137,7 @@ export function mapSupabasePaper(row: any, currentUserId?: string): Paper {
 
   const isSaved = Array.isArray(row.bookmarks)
     ? row.bookmarks.some((b: any) => b.user_id === currentUserId)
-    : false;
+    : Boolean(row.is_saved);
 
   return {
     id: row.id,
@@ -158,13 +145,13 @@ export function mapSupabasePaper(row: any, currentUserId?: string): Paper {
     title: row.title || 'Untitled Paper',
     abstract: row.abstract || '',
     authors: authors.length > 0 ? authors : [{ name: 'Anonymous Researcher' }],
-    journal: row.journal || 'Academic Preprint',
+    journal: row.journal || 'Academic Journal',
     publisher: row.publisher || undefined,
     publicationYear: row.publication_year || new Date().getFullYear(),
     publicationDate: row.publication_date || undefined,
-    canonicalUrl: row.canonical_url || '',
+    canonicalUrl: row.canonical_url || (row.doi ? `https://doi.org/${row.doi}` : ''),
     openAccessUrl: row.open_access_pdf_url || undefined,
-    isOpenAccess: row.open_access_status !== 'closed',
+    isOpenAccess: row.open_access_status && row.open_access_status !== 'closed',
     topics: Array.isArray(row.paper_topics)
       ? row.paper_topics.map((pt: any) => pt.topic?.name).filter(Boolean)
       : [],
@@ -234,7 +221,7 @@ export function mapSupabaseComment(row: any, _currentUserId?: string): Comment {
 }
 
 // ============================================================================
-// 1. READ FEED (Paginated, Non-N+1 Single-Query Join)
+// 1. READ FEED (Paginated Supabase Query)
 // ============================================================================
 export interface FetchFeedOptions {
   tab?: string; // 'For You' | 'Following' | Topic Name
@@ -246,15 +233,17 @@ export interface FetchFeedOptions {
 export async function fetchFeed(
   options: FetchFeedOptions = {}
 ): Promise<{ posts: Post[]; hasMore: boolean; error: string | null }> {
-  const { tab = 'For You', page = 1, pageSize = 10, currentUserId } = options;
+  const { tab = 'For You', page = 1, pageSize = 10 } = options;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  if (!isSupabaseConfigured()) {
-    return getFallbackFeed(tab, page, pageSize, currentUserId);
-  }
-
   try {
+    let resolvedUserId = options.currentUserId;
+    if (!resolvedUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      resolvedUserId = user?.id;
+    }
+
     let query = supabase
       .from('posts')
       .select(
@@ -320,11 +309,16 @@ export async function fetchFeed(
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (tab === 'Following' && currentUserId) {
+    // Following tab filter: only posts from followed users
+    if (tab === 'Following') {
+      if (!resolvedUserId) {
+        return { posts: [], hasMore: false, error: null };
+      }
+
       const { data: followRows } = await supabase
         .from('follows')
         .select('following_id')
-        .eq('follower_id', currentUserId);
+        .eq('follower_id', resolvedUserId);
 
       const followingIds = (followRows || []).map((f) => f.following_id);
       if (followingIds.length > 0) {
@@ -336,26 +330,49 @@ export async function fetchFeed(
 
     const { data, error } = await query;
 
-    if (error || !data || data.length === 0) {
-      return getFallbackFeed(tab, page, pageSize, currentUserId);
+    if (error) {
+      console.warn('[socialService.fetchFeed] Supabase error:', error.message);
+      return { posts: [], hasMore: false, error: error.message };
     }
 
-    const mappedPosts = data.map((row: any) => mapSupabasePost(row, currentUserId));
+    if (!data || data.length === 0) {
+      return { posts: [], hasMore: false, error: null };
+    }
+
+    const mappedPosts = data.map((row: any) => mapSupabasePost(row, resolvedUserId));
 
     let filtered = mappedPosts;
     if (tab === 'For You') {
-      const followedUserIds = currentUserId
-        ? Array.from(localFollows).filter((f) => f.startsWith(`${currentUserId}:`)).map((f) => f.split(':')[1])
-        : ['usr_1', 'usr_2'];
-      const context = buildUserRankingContext(currentUserId, followedUserIds);
-      if (currentUserId) {
-        for (const key of localLikes) {
-          if (key.startsWith(`${currentUserId}:`)) context.userLikedPostIds.add(key.split(':')[1]);
+      let followedTopicNames: string[] = [];
+      let followedUserIds: string[] = [];
+
+      if (resolvedUserId) {
+        const { data: topicFollows } = await supabase
+          .from('topic_follows')
+          .select('topic:topics(name, slug)')
+          .eq('user_id', resolvedUserId);
+
+        if (topicFollows) {
+          followedTopicNames = topicFollows
+            .map((tf: any) => tf.topic?.name?.toLowerCase())
+            .filter(Boolean);
         }
-        for (const key of localBookmarks) {
-          if (key.startsWith(`${currentUserId}:post:`)) context.userSavedPostIds.add(key.replace(`${currentUserId}:post:`, ''));
+
+        const { data: userFollows } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', resolvedUserId);
+
+        if (userFollows) {
+          followedUserIds = userFollows.map((f: any) => f.following_id);
         }
       }
+
+      const context = buildUserRankingContext(resolvedUserId, followedUserIds);
+      if (followedTopicNames.length > 0) {
+        followedTopicNames.forEach((name) => context.followedTopicNames.add(name));
+      }
+
       filtered = getFeedRanker().rank(mappedPosts, context);
     } else if (tab !== 'For You' && tab !== 'Following') {
       const targetTopic = tab.toLowerCase();
@@ -369,74 +386,10 @@ export async function fetchFeed(
       hasMore: data.length === pageSize,
       error: null,
     };
-  } catch {
-    return getFallbackFeed(tab, page, pageSize, currentUserId);
+  } catch (err: any) {
+    console.warn('[socialService.fetchFeed] Exception:', err);
+    return { posts: [], hasMore: false, error: err?.message || 'Failed to load feed' };
   }
-}
-
-// Fallback mock feed for offline / initial development resilience
-function getFallbackFeed(
-  tab: string,
-  page: number,
-  pageSize: number,
-  currentUserId?: string
-): { posts: Post[]; hasMore: boolean; error: string | null } {
-  let allPosts = [...localCreatedPosts, ...mockPosts];
-
-  // Overlay user interaction state
-  if (currentUserId) {
-    allPosts = allPosts.map((p) => ({
-      ...p,
-      isLiked: localLikes.has(`${currentUserId}:${p.id}`) || p.isLiked,
-      isReposted: localReposts.has(`${currentUserId}:${p.id}`) || p.isReposted,
-      isSaved: localBookmarks.has(`${currentUserId}:post:${p.id}`) || p.isSaved,
-    }));
-  }
-
-  let filtered = allPosts;
-
-  if (tab === 'For You') {
-    const followedUserIds = currentUserId
-      ? Array.from(localFollows).filter((f) => f.startsWith(`${currentUserId}:`)).map((f) => f.split(':')[1])
-      : ['usr_1', 'usr_2'];
-    const context = buildUserRankingContext(currentUserId, followedUserIds);
-    if (currentUserId) {
-      for (const key of localLikes) {
-        if (key.startsWith(`${currentUserId}:`)) context.userLikedPostIds.add(key.split(':')[1]);
-      }
-      for (const key of localBookmarks) {
-        if (key.startsWith(`${currentUserId}:post:`)) context.userSavedPostIds.add(key.replace(`${currentUserId}:post:`, ''));
-      }
-    }
-    filtered = getFeedRanker().rank(allPosts, context);
-  } else if (tab === 'Following' && currentUserId) {
-    filtered = allPosts.filter((p) => localFollows.has(`${currentUserId}:${p.author.id}`));
-  } else if (tab !== 'For You' && tab !== 'Following') {
-    if (tab === 'AI & Bio') {
-      filtered = allPosts.filter((post) =>
-        post.topics.some(
-          (t) =>
-            t.toLowerCase().includes('ai') ||
-            t.toLowerCase().includes('bioinformatics') ||
-            t.toLowerCase().includes('single cell') ||
-            t.toLowerCase().includes('multi-omics')
-        )
-      );
-    } else {
-      filtered = allPosts.filter((post) =>
-        post.topics.some((t) => t.toLowerCase().includes(tab.toLowerCase()))
-      );
-    }
-  }
-
-  const start = (page - 1) * pageSize;
-  const paginated = filtered.slice(start, start + pageSize);
-
-  return {
-    posts: paginated,
-    hasMore: start + pageSize < filtered.length,
-    error: null,
-  };
 }
 
 // ============================================================================
@@ -448,57 +401,21 @@ export interface CreatePostPayload {
   paper?: Paper;
   topics: string[];
   visibility?: 'public' | 'followers';
-  authorId: string;
+  authorId?: string;
   mediaUrls?: string[];
 }
 
 export async function createPost(
   payload: CreatePostPayload
 ): Promise<{ post: Post | null; error: string | null }> {
-  const { content, postType, paper, topics, visibility = 'public', authorId, mediaUrls = [] } = payload;
+  const { postType, paper, topics, visibility = 'public', mediaUrls = [] } = payload;
+  const content = sanitizeTextContent(payload.content, 5000);
 
-  if (!authorId) {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     return { post: null, error: 'User must be authenticated to create a post.' };
   }
-
-  if (!isSupabaseConfigured()) {
-    const authorUser = mockUsers.find((u) => u.id === authorId) || {
-      id: authorId,
-      handle: 'researcher',
-      fullName: 'Researcher',
-      academicTitle: 'Scientist',
-      institution: 'Independent',
-      bio: '',
-      orcidVerified: false,
-      joinedDate: 'Recently',
-      followingCount: 0,
-      followersCount: 0,
-      postsCount: 1,
-      savedCount: 0,
-    };
-
-    const newPost: Post = {
-      id: `post_${Date.now()}`,
-      author: authorUser,
-      postType,
-      content,
-      paper,
-      topics: topics.length > 0 ? topics : ['General Science'],
-      visibility,
-      images: mediaUrls,
-      likesCount: 0,
-      commentsCount: 0,
-      repostsCount: 0,
-      savesCount: 0,
-      isLiked: false,
-      isReposted: false,
-      isSaved: false,
-      createdAt: 'Just now',
-    };
-
-    localCreatedPosts.unshift(newPost);
-    return { post: newPost, error: null };
-  }
+  const verifiedAuthorId = user.id;
 
   try {
     let paperId: string | null = null;
@@ -516,19 +433,22 @@ export async function createPost(
         if (existingPaper?.id) {
           paperId = existingPaper.id;
         } else {
+          const safeCanonicalUrl = sanitizeExternalUrl(paper.canonicalUrl) || (paper.doi ? `https://doi.org/${paper.doi}` : null);
+          const safePdfUrl = sanitizeExternalUrl(paper.openAccessUrl);
+
           const { data: newPaper, error: paperError } = await supabase
             .from('papers')
             .insert({
               doi: paper.doi || null,
-              canonical_url: paper.canonicalUrl || `https://doi.org/${paper.doi}`,
-              title: paper.title,
-              abstract: paper.abstract || null,
-              journal: paper.journal || 'General Science',
+              canonical_url: safeCanonicalUrl || `https://doi.org/${paper.doi || 'unknown'}`,
+              title: sanitizeTextContent(paper.title, 500),
+              abstract: paper.abstract ? sanitizeTextContent(paper.abstract, 5000) : null,
+              journal: paper.journal || 'Academic Preprint',
               publisher: paper.publisher || null,
               publication_year: paper.publicationYear || new Date().getFullYear(),
               publication_date: paper.publicationDate || null,
               open_access_status: paper.isOpenAccess ? 'gold' : 'closed',
-              open_access_pdf_url: paper.openAccessUrl || null,
+              open_access_pdf_url: safePdfUrl,
             })
             .select('id')
             .single();
@@ -538,9 +458,9 @@ export async function createPost(
             if (paper.authors && paper.authors.length > 0) {
               const authorsToInsert = paper.authors.map((a, idx) => ({
                 paper_id: paperId,
-                author_name: a.name,
+                author_name: sanitizeTextContent(a.name, 200),
                 author_order: idx + 1,
-                affiliation: a.affiliation || null,
+                affiliation: a.affiliation ? sanitizeTextContent(a.affiliation, 300) : null,
                 external_author_id: a.orcid || null,
               }));
               await supabase.from('paper_authors').insert(authorsToInsert);
@@ -553,7 +473,7 @@ export async function createPost(
     const { data: postRow, error: postError } = await supabase
       .from('posts')
       .insert({
-        author_id: authorId,
+        author_id: verifiedAuthorId,
         post_type: postType,
         content,
         paper_id: paperId,
@@ -583,7 +503,8 @@ export async function createPost(
 
     if (topics && topics.length > 0 && postRow?.id) {
       for (const topicName of topics) {
-        const slug = topicName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const cleanName = sanitizeTextContent(topicName, 100);
+        const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
         const { data: topicData } = await supabase
           .from('topics')
           .select('id')
@@ -594,7 +515,7 @@ export async function createPost(
         if (!topicId) {
           const { data: createdTopic } = await supabase
             .from('topics')
-            .insert({ name: topicName, slug })
+            .insert({ name: cleanName, slug })
             .select('id')
             .maybeSingle();
           topicId = createdTopic?.id;
@@ -632,36 +553,55 @@ export async function createPost(
   }
 }
 
+/**
+ * Delete a post with verified author ownership and RLS enforcement
+ */
+export async function deletePost(
+  postId: string,
+  _userId?: string
+): Promise<{ success: boolean; error: string | null }> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { success: false, error: 'Authentication required to delete post.' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId)
+      .eq('author_id', user.id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to delete post' };
+  }
+}
+
 // ============================================================================
-// 3. LIKE & UNLIKE (Duplicate Prevention & Counter Trigger)
+// 3. LIKE & UNLIKE (Database-driven via public.likes)
 // ============================================================================
 export async function toggleLike(
   postId: string,
   isCurrentlyLiked: boolean,
-  userId: string
+  _userId?: string
 ): Promise<{ success: boolean; isLiked: boolean; error: string | null }> {
-  if (!userId) {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     return { success: false, isLiked: isCurrentlyLiked, error: 'User not authenticated' };
   }
-
-  const key = `${userId}:${postId}`;
-
-  if (!isSupabaseConfigured()) {
-    if (isCurrentlyLiked) {
-      localLikes.delete(key);
-      return { success: true, isLiked: false, error: null };
-    } else {
-      localLikes.add(key); // Set inherently prevents duplicate likes
-      return { success: true, isLiked: true, error: null };
-    }
-  }
+  const verifiedUserId = user.id;
 
   try {
     if (isCurrentlyLiked) {
       const { error } = await supabase
         .from('likes')
         .delete()
-        .eq('user_id', userId)
+        .eq('user_id', verifiedUserId)
         .eq('post_id', postId);
 
       if (error && !error.message.includes('not found')) {
@@ -672,7 +612,7 @@ export async function toggleLike(
       const { error } = await supabase
         .from('likes')
         .upsert(
-          { user_id: userId, post_id: postId },
+          { user_id: verifiedUserId, post_id: postId },
           { onConflict: 'user_id,post_id', ignoreDuplicates: true }
         );
 
@@ -687,35 +627,25 @@ export async function toggleLike(
 }
 
 // ============================================================================
-// 4. REPOST & UNDO REPOST (Duplicate Prevention & Counter Trigger)
+// 4. REPOST & UNDO REPOST (Database-driven via public.reposts)
 // ============================================================================
 export async function toggleRepost(
   postId: string,
   isCurrentlyReposted: boolean,
-  userId: string
+  _userId?: string
 ): Promise<{ success: boolean; isReposted: boolean; error: string | null }> {
-  if (!userId) {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     return { success: false, isReposted: isCurrentlyReposted, error: 'User not authenticated' };
   }
-
-  const key = `${userId}:${postId}`;
-
-  if (!isSupabaseConfigured()) {
-    if (isCurrentlyReposted) {
-      localReposts.delete(key);
-      return { success: true, isReposted: false, error: null };
-    } else {
-      localReposts.add(key);
-      return { success: true, isReposted: true, error: null };
-    }
-  }
+  const verifiedUserId = user.id;
 
   try {
     if (isCurrentlyReposted) {
       const { error } = await supabase
         .from('reposts')
         .delete()
-        .eq('user_id', userId)
+        .eq('user_id', verifiedUserId)
         .eq('post_id', postId);
 
       if (error && !error.message.includes('not found')) {
@@ -726,7 +656,7 @@ export async function toggleRepost(
       const { error } = await supabase
         .from('reposts')
         .upsert(
-          { user_id: userId, post_id: postId },
+          { user_id: verifiedUserId, post_id: postId },
           { onConflict: 'user_id,post_id', ignoreDuplicates: true }
         );
 
@@ -741,7 +671,7 @@ export async function toggleRepost(
 }
 
 // ============================================================================
-// 5. BOOKMARK & REMOVE BOOKMARK (For Posts and Papers)
+// 5. BOOKMARK & REMOVE BOOKMARK (Database-driven via public.bookmarks)
 // ============================================================================
 export interface ToggleBookmarkTarget {
   postId?: string;
@@ -751,32 +681,21 @@ export interface ToggleBookmarkTarget {
 export async function toggleBookmark(
   target: ToggleBookmarkTarget,
   isCurrentlySaved: boolean,
-  userId: string
+  _userId?: string
 ): Promise<{ success: boolean; isSaved: boolean; error: string | null }> {
-  if (!userId) {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     return { success: false, isSaved: isCurrentlySaved, error: 'User not authenticated' };
   }
+  const verifiedUserId = user.id;
+
   if (!target.postId && !target.paperId) {
     return { success: false, isSaved: isCurrentlySaved, error: 'Must specify postId or paperId' };
   }
 
-  const key = target.postId
-    ? `${userId}:post:${target.postId}`
-    : `${userId}:paper:${target.paperId}`;
-
-  if (!isSupabaseConfigured()) {
-    if (isCurrentlySaved) {
-      localBookmarks.delete(key);
-      return { success: true, isSaved: false, error: null };
-    } else {
-      localBookmarks.add(key);
-      return { success: true, isSaved: true, error: null };
-    }
-  }
-
   try {
     if (isCurrentlySaved) {
-      let deleteQuery = supabase.from('bookmarks').delete().eq('user_id', userId);
+      let deleteQuery = supabase.from('bookmarks').delete().eq('user_id', verifiedUserId);
       if (target.postId) deleteQuery = deleteQuery.eq('post_id', target.postId);
       if (target.paperId) deleteQuery = deleteQuery.eq('paper_id', target.paperId);
 
@@ -787,7 +706,7 @@ export async function toggleBookmark(
       return { success: true, isSaved: false, error: null };
     } else {
       const { error } = await supabase.from('bookmarks').insert({
-        user_id: userId,
+        user_id: verifiedUserId,
         post_id: target.postId || null,
         paper_id: target.paperId || null,
       });
@@ -806,17 +725,12 @@ export async function toggleBookmark(
 }
 
 // ============================================================================
-// 6. COMMENTS (Fetch, Add & Delete Own Comment with RLS Enforcement)
+// 6. COMMENTS (Fetch, Add & Delete via public.comments)
 // ============================================================================
 export async function fetchComments(
   postId: string,
   currentUserId?: string
 ): Promise<{ comments: Comment[]; error: string | null }> {
-  if (!isSupabaseConfigured()) {
-    const list = localCommentsStore[postId] || [];
-    return { comments: list, error: null };
-  }
-
   try {
     const { data, error } = await supabase
       .from('comments')
@@ -846,8 +760,7 @@ export async function fetchComments(
       .order('created_at', { ascending: true });
 
     if (error || !data) {
-      const mockList = localCommentsStore[postId] || [];
-      return { comments: mockList, error: null };
+      return { comments: [], error: error?.message || null };
     }
 
     const commentMap = new Map<string, Comment>();
@@ -872,8 +785,8 @@ export async function fetchComments(
     });
 
     return { comments: rootComments, error: null };
-  } catch {
-    return { comments: localCommentsStore[postId] || [], error: null };
+  } catch (err: any) {
+    return { comments: [], error: err?.message || 'Failed to load comments' };
   }
 }
 
@@ -881,65 +794,23 @@ export interface AddCommentPayload {
   postId: string;
   content: string;
   parentId?: string;
-  authorId: string;
+  authorId?: string;
 }
 
 export async function addComment(
   payload: AddCommentPayload
 ): Promise<{ comment: Comment | null; error: string | null }> {
-  const { postId, content, parentId, authorId } = payload;
+  const { postId, parentId } = payload;
+  const content = sanitizeTextContent(payload.content, 2000);
 
-  if (!authorId) {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     return { comment: null, error: 'Authentication required to post comment.' };
   }
+  const verifiedAuthorId = user.id;
 
-  if (!isSupabaseConfigured()) {
-    const authorUser = mockUsers.find((u) => u.id === authorId) || {
-      id: authorId,
-      handle: 'researcher',
-      fullName: 'Researcher',
-      academicTitle: 'Scientist',
-      institution: 'Independent',
-      bio: '',
-      orcidVerified: false,
-      joinedDate: 'Recently',
-      followingCount: 0,
-      followersCount: 0,
-      postsCount: 0,
-      savedCount: 0,
-    };
-
-    const newComment: Comment = {
-      id: `c_${Date.now()}`,
-      postId,
-      author: authorUser,
-      content,
-      parentId,
-      likesCount: 0,
-      isLiked: false,
-      createdAt: 'Just now',
-      replies: [],
-    };
-
-    const existing = localCommentsStore[postId] || [];
-    if (parentId) {
-      const attachReply = (list: Comment[]): Comment[] => {
-        return list.map((c) => {
-          if (c.id === parentId) {
-            return { ...c, replies: [...(c.replies || []), newComment] };
-          }
-          if (c.replies && c.replies.length > 0) {
-            return { ...c, replies: attachReply(c.replies) };
-          }
-          return c;
-        });
-      };
-      localCommentsStore[postId] = attachReply(existing);
-    } else {
-      localCommentsStore[postId] = [newComment, ...existing];
-    }
-
-    return { comment: newComment, error: null };
+  if (!content) {
+    return { comment: null, error: 'Comment cannot be empty.' };
   }
 
   try {
@@ -947,7 +818,7 @@ export async function addComment(
       .from('comments')
       .insert({
         post_id: postId,
-        author_id: authorId,
+        author_id: verifiedAuthorId,
         parent_id: parentId || null,
         content,
       })
@@ -968,7 +839,7 @@ export async function addComment(
       return { comment: null, error: error.message };
     }
 
-    return { comment: mapSupabaseComment(data, authorId), error: null };
+    return { comment: mapSupabaseComment(data, verifiedAuthorId), error: null };
   } catch (err: any) {
     return { comment: null, error: err?.message || 'Failed to post comment.' };
   }
@@ -976,31 +847,12 @@ export async function addComment(
 
 export async function deleteComment(
   commentId: string,
-  postId: string,
-  userId: string
+  _postId: string,
+  _userId?: string
 ): Promise<{ success: boolean; error: string | null }> {
-  if (!userId) {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     return { success: false, error: 'Authentication required.' };
-  }
-
-  if (!isSupabaseConfigured()) {
-    const existing = localCommentsStore[postId] || [];
-    const filterOut = (list: Comment[]): Comment[] => {
-      return list
-        .filter((c) => {
-          if (c.id === commentId) {
-            // RLS check: only allow author to delete
-            return c.author.id !== userId;
-          }
-          return true;
-        })
-        .map((c) => ({
-          ...c,
-          replies: c.replies ? filterOut(c.replies) : [],
-        }));
-    };
-    localCommentsStore[postId] = filterOut(existing);
-    return { success: true, error: null };
   }
 
   try {
@@ -1008,7 +860,7 @@ export async function deleteComment(
       .from('comments')
       .delete()
       .eq('id', commentId)
-      .eq('author_id', userId);
+      .eq('author_id', user.id);
 
     if (error) {
       return { success: false, error: error.message };
@@ -1021,33 +873,27 @@ export async function deleteComment(
 }
 
 // ============================================================================
-// 7. FOLLOW & UNFOLLOW (Self-Follow Prevention & Duplicate Prevention)
+// 7. FOLLOW & UNFOLLOW (Database-driven via public.follows)
 // ============================================================================
 export async function followUser(
   targetUserId: string,
-  currentUserId: string
+  _currentUserId?: string
 ): Promise<{ success: boolean; error: string | null }> {
-  if (!currentUserId) {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     return { success: false, error: 'Must be logged in to follow users.' };
   }
+  const verifiedUserId = user.id;
 
-  // Prevent self-follow
-  if (targetUserId === currentUserId) {
+  if (targetUserId === verifiedUserId) {
     return { success: false, error: 'You cannot follow yourself.' };
-  }
-
-  const key = `${currentUserId}:${targetUserId}`;
-
-  if (!isSupabaseConfigured()) {
-    localFollows.add(key); // Set prevents duplicate follow
-    return { success: true, error: null };
   }
 
   try {
     const { error } = await supabase
       .from('follows')
       .upsert(
-        { follower_id: currentUserId, following_id: targetUserId },
+        { follower_id: verifiedUserId, following_id: targetUserId },
         { onConflict: 'follower_id,following_id', ignoreDuplicates: true }
       );
 
@@ -1066,24 +912,19 @@ export async function followUser(
 
 export async function unfollowUser(
   targetUserId: string,
-  currentUserId: string
+  _currentUserId?: string
 ): Promise<{ success: boolean; error: string | null }> {
-  if (!currentUserId) {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     return { success: false, error: 'Must be logged in to unfollow users.' };
   }
-
-  const key = `${currentUserId}:${targetUserId}`;
-
-  if (!isSupabaseConfigured()) {
-    localFollows.delete(key);
-    return { success: true, error: null };
-  }
+  const verifiedUserId = user.id;
 
   try {
     const { error } = await supabase
       .from('follows')
       .delete()
-      .eq('follower_id', currentUserId)
+      .eq('follower_id', verifiedUserId)
       .eq('following_id', targetUserId);
 
     if (error && !error.message.includes('not found')) {
@@ -1100,17 +941,19 @@ export async function checkIsFollowing(
   targetUserId: string,
   currentUserId?: string
 ): Promise<boolean> {
-  if (!currentUserId || targetUserId === currentUserId) return false;
-
-  if (!isSupabaseConfigured()) {
-    return localFollows.has(`${currentUserId}:${targetUserId}`);
+  let verifiedUserId = currentUserId;
+  if (!verifiedUserId) {
+    const { data: { user } } = await supabase.auth.getUser();
+    verifiedUserId = user?.id;
   }
+
+  if (!verifiedUserId || targetUserId === verifiedUserId) return false;
 
   try {
     const { data } = await supabase
       .from('follows')
       .select('follower_id')
-      .eq('follower_id', currentUserId)
+      .eq('follower_id', verifiedUserId)
       .eq('following_id', targetUserId)
       .maybeSingle();
 
@@ -1127,11 +970,6 @@ export async function fetchUserPosts(
   userId: string,
   currentUserId?: string
 ): Promise<{ posts: Post[]; error: string | null }> {
-  if (!isSupabaseConfigured()) {
-    const fallback = [...localCreatedPosts, ...mockPosts].filter((p) => p.author.id === userId);
-    return { posts: fallback, error: null };
-  }
-
   try {
     const { data, error } = await supabase
       .from('posts')
@@ -1178,17 +1016,15 @@ export async function fetchUserPosts(
       .order('created_at', { ascending: false });
 
     if (error || !data || data.length === 0) {
-      const fallback = [...localCreatedPosts, ...mockPosts].filter((p) => p.author.id === userId);
-      return { posts: fallback, error: null };
+      return { posts: [], error: error?.message || null };
     }
 
     return {
       posts: data.map((row: any) => mapSupabasePost(row, currentUserId)),
       error: null,
     };
-  } catch {
-    const fallback = [...localCreatedPosts, ...mockPosts].filter((p) => p.author.id === userId);
-    return { posts: fallback, error: null };
+  } catch (err: any) {
+    return { posts: [], error: err?.message || 'Failed to fetch posts' };
   }
 }
 
@@ -1196,18 +1032,6 @@ export async function fetchSavedPostsAndPapers(
   userId: string
 ): Promise<{ posts: Post[]; papers: Paper[]; error: string | null }> {
   if (!userId) return { posts: [], papers: [], error: 'User not authenticated' };
-
-  if (!isSupabaseConfigured()) {
-    return {
-      posts: [...localCreatedPosts, ...mockPosts].filter(
-        (p) => localBookmarks.has(`${userId}:post:${p.id}`) || p.isSaved
-      ),
-      papers: mockPapers.filter(
-        (p) => localBookmarks.has(`${userId}:paper:${p.id}`) || p.isSaved
-      ),
-      error: null,
-    };
-  }
 
   try {
     const { data, error } = await supabase
@@ -1257,11 +1081,7 @@ export async function fetchSavedPostsAndPapers(
       .order('created_at', { ascending: false });
 
     if (error || !data) {
-      return {
-        posts: mockPosts.filter((p) => p.isSaved),
-        papers: mockPapers.filter((p) => p.isSaved),
-        error: null,
-      };
+      return { posts: [], papers: [], error: error?.message || null };
     }
 
     const posts: Post[] = [];
@@ -1277,11 +1097,7 @@ export async function fetchSavedPostsAndPapers(
     });
 
     return { posts, papers, error: null };
-  } catch {
-    return {
-      posts: mockPosts.filter((p) => p.isSaved),
-      papers: mockPapers.filter((p) => p.isSaved),
-      error: null,
-    };
+  } catch (err: any) {
+    return { posts: [], papers: [], error: err?.message || 'Failed to fetch bookmarks' };
   }
 }

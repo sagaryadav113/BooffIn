@@ -38,10 +38,10 @@ import { TopicChip } from '../../components/core/TopicChip';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { PostCard } from '../../components/cards/PostCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
+import { AppHeader } from '../../components/layout/AppHeader';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 import { usePaperStore } from '../../store/usePaperStore';
-import { currentUser } from '../../data/mockData';
 import {
   getCollaborationRequests,
   respondToCollaborationRequest,
@@ -63,8 +63,7 @@ export default function CurrentUserProfileScreen() {
     outgoing: CollaborationRequest[];
   }>({ incoming: [], outgoing: [] });
 
-  // Active user profile (fall back to currentUser if null for preview)
-  const user = storeUser || currentUser;
+  const user = storeUser;
 
   const loadRequests = React.useCallback(async () => {
     if (!user?.id) return;
@@ -129,9 +128,25 @@ export default function CurrentUserProfileScreen() {
     return `${count}`;
   };
 
-  const cleanWebsiteDomain = user.websiteUrl
+  const cleanWebsiteDomain = user?.websiteUrl
     ? user.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
     : null;
+
+  if (!isAuthenticated || !user?.id) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <AppHeader title="Research Profile" />
+        <EmptyState
+          icon="Users"
+          title="Join the Scientific Community"
+          description="Sign in or register to manage your scientific discussions, track literature, and connect with fellow researchers."
+          actionTitle="Sign In / Register"
+          onAction={() => router.push('/(auth)/welcome')}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

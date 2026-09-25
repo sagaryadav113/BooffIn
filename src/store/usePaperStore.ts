@@ -1,11 +1,15 @@
 import { create } from 'zustand';
 import { Paper } from '../types';
-import { mockPapers, currentUser } from '../data/mockData';
-import { toggleBookmark as apiToggleBookmark } from '../api/socialService';
+import { toggleBookmark as apiToggleBookmark, mapSupabasePaper } from '../api/socialService';
+import { useAuthStore } from './useAuthStore';
+import { supabase } from '../api/client';
 
 interface PaperState {
   papers: Paper[];
   savedPaperIds: Set<string>;
+  isLoading: boolean;
+  fetchPapers: () => Promise<void>;
+  fetchPaperById: (id: string) => Promise<Paper | null>;
   toggleSavePaper: (paperId: string, currentUserId?: string) => Promise<void>;
   toggleLikePaper: (paperId: string) => void;
   getPaperById: (id: string) => Paper | undefined;
@@ -15,8 +19,75 @@ interface PaperState {
 }
 
 export const usePaperStore = create<PaperState>((set, get) => ({
-  papers: mockPapers,
-  savedPaperIds: new Set(['paper_1', 'paper_3']),
+  papers: [],
+  savedPaperIds: new Set<string>(),
+  isLoading: false,
+
+  fetchPapers: async () => {
+    set({ isLoading: true });
+    try {
+      const currentUserId = useAuthStore.getState().user?.id;
+      const { data, error } = await supabase
+        .from('papers')
+        .select(`
+          *,
+          authors:paper_authors(author_name, author_order, affiliation),
+          paper_topics(topic:topics(name)),
+          bookmarks!left(user_id)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.warn('Failed to fetch papers from Supabase:', error.message);
+        set({ isLoading: false });
+        return;
+      }
+
+      if (data) {
+        const mappedPapers: Paper[] = data.map((row: any) => mapSupabasePaper(row, currentUserId));
+        set({ papers: mappedPapers, isLoading: false });
+      } else {
+        set({ isLoading: false });
+      }
+    } catch {
+      set({ isLoading: false });
+    }
+  },
+
+  fetchPaperById: async (id: string) => {
+    // 1. Check local cache
+    const existing = get().papers.find((p) => p.id === id || p.doi === id);
+    if (existing) return existing;
+
+    // 2. Query Supabase
+    try {
+      const currentUserId = useAuthStore.getState().user?.id;
+      const { data, error } = await supabase
+        .from('papers')
+        .select(`
+          *,
+          authors:paper_authors(author_name, author_order, affiliation),
+          paper_topics(topic:topics(name)),
+          bookmarks!left(user_id)
+        `)
+        .or(`id.eq.${id},doi.eq.${id}`)
+        .maybeSingle();
+
+      if (error || !data) return null;
+
+      const paper: Paper = mapSupabasePaper(data, currentUserId);
+
+      set((state) => ({
+        papers: [paper, ...state.papers.filter((p) => p.id !== paper.id)],
+      }));
+
+      return paper;
+    } catch {
+      return null;
+    }
+  },
+
   toggleSavePaper: async (paperId, currentUserId) => {
     const isCurrentlySaved = get().savedPaperIds.has(paperId);
     const nextSaved = new Set(get().savedPaperIds);
@@ -42,7 +113,7 @@ export const usePaperStore = create<PaperState>((set, get) => ({
     }));
 
     // 2. Real API mutation
-    const userId = currentUserId || currentUser.id;
+    const userId = currentUserId || useAuthStore.getState().user.id;
     const res = await apiToggleBookmark({ paperId }, isCurrentlySaved, userId);
 
     // 3. Rollback if error

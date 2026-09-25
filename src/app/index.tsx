@@ -2,12 +2,14 @@ import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '../store/useAuthStore';
+import { isProfileComplete } from '../api/authService';
 import { colors } from '../theme';
 import { BooffinLogo } from '../components/core/BooffinLogo';
 
 export default function Index() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isInitialized = useAuthStore((s) => s.isInitialized);
+  const user = useAuthStore((s) => s.user);
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
 
   useEffect(() => {
@@ -24,7 +26,10 @@ export default function Index() {
   }
 
   if (isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
+    if (user && isProfileComplete(user)) {
+      return <Redirect href="/(tabs)" />;
+    }
+    return <Redirect href="/(auth)/onboarding" />;
   }
 
   return <Redirect href="/(auth)/welcome" />;

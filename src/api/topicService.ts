@@ -1,19 +1,6 @@
 import { supabase } from './client';
-import { isSupabaseConfigured } from './socialService';
+import { isSupabaseConfigured, mapSupabasePaper, mapSupabasePost, mapSupabaseProfile } from './socialService';
 import { Topic, Paper, Post, UserProfile } from '../types';
-import { mockTopics, mockPapers, mockPosts, mockUsers } from '../data/mockData';
-
-// Local relational store for topic follows (used in fallback / local development mode)
-const localTopicFollows = new Set<string>([
-  'usr_me:top_1', // Neuroscience
-  'usr_me:top_4', // Molecular Biology
-  'usr_me:top_6', // AI in Science
-  'usr_1:top_1',  // Dr. Aanya Rao -> Neuroscience
-  'usr_1:top_4',
-  'usr_2:top_1',  // PhD Diary -> Neuroscience
-  'usr_3:top_1',  // Dr. Elena Park -> Neuroscience
-  'usr_4:top_2',  // Prof. Arjun Mehta -> Genetics
-]);
 
 export interface TopicPageData {
   topic: Topic;
@@ -28,13 +15,8 @@ export interface TopicPageData {
  */
 export function mapSupabaseTopic(row: any, currentUserId?: string): Topic {
   let isFollowing = false;
-  if (currentUserId) {
-    if (Array.isArray(row.topic_follows) && row.topic_follows.length > 0) {
-      isFollowing = true;
-    } else {
-      isFollowing = localTopicFollows.has(`${currentUserId}:${row.id}`) ||
-        localTopicFollows.has(`${currentUserId}:${row.slug}`);
-    }
+  if (currentUserId && Array.isArray(row.topic_follows)) {
+    isFollowing = row.topic_follows.some((tf: any) => tf.user_id === currentUserId);
   }
 
   return {
@@ -51,17 +33,26 @@ export function mapSupabaseTopic(row: any, currentUserId?: string): Topic {
 }
 
 /**
+ * Gets list of followed topic slugs or names for a user
+ */
+export function getFollowedTopicsForUser(_userId?: string): string[] {
+  return [];
+}
+
+/**
  * Fetches all topics with follower counts and follow state for current user
  */
 export async function fetchTopics(currentUserId?: string): Promise<{
   topics: Topic[];
   error: string | null;
 }> {
-  if (!isSupabaseConfigured()) {
-    return getFallbackTopics(currentUserId);
-  }
-
   try {
+    let resolvedUserId = currentUserId;
+    if (!resolvedUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      resolvedUserId = user?.id;
+    }
+
     const { data, error } = await supabase
       .from('topics')
       .select(
@@ -79,14 +70,18 @@ export async function fetchTopics(currentUserId?: string): Promise<{
       )
       .order('followers_count', { ascending: false });
 
-    if (error || !data) {
-      return getFallbackTopics(currentUserId);
+    if (error) {
+      return { topics: [], error: error.message };
     }
 
-    const topics = data.map((row: any) => mapSupabaseTopic(row, currentUserId));
+    if (!data || data.length === 0) {
+      return { topics: [], error: null };
+    }
+
+    const topics = data.map((row: any) => mapSupabaseTopic(row, resolvedUserId));
     return { topics, error: null };
-  } catch {
-    return getFallbackTopics(currentUserId);
+  } catch (err: any) {
+    return { topics: [], error: err?.message || 'Failed to fetch topics' };
   }
 }
 
@@ -97,15 +92,13 @@ export async function fetchTopicBySlug(
   slug: string,
   currentUserId?: string
 ): Promise<{ topic: Topic | null; error: string | null }> {
-  if (!isSupabaseConfigured()) {
-    const fallbackList = getFallbackTopics(currentUserId).topics;
-    const found = fallbackList.find(
-      (t) => t.slug.toLowerCase() === slug.toLowerCase() || t.name.toLowerCase() === slug.toLowerCase()
-    );
-    return { topic: found || null, error: null };
-  }
-
   try {
+    let resolvedUserId = currentUserId;
+    if (!resolvedUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      resolvedUserId = user?.id;
+    }
+
     const { data, error } = await supabase
       .from('topics')
       .select(
@@ -122,23 +115,19 @@ export async function fetchTopicBySlug(
       `
       )
       .or(`slug.eq.${slug},id.eq.${slug}`)
-      .single();
+      .maybeSingle();
 
-    if (error || !data) {
-      const fallbackList = getFallbackTopics(currentUserId).topics;
-      const found = fallbackList.find(
-        (t) => t.slug.toLowerCase() === slug.toLowerCase() || t.name.toLowerCase() === slug.toLowerCase()
-      );
-      return { topic: found || null, error: null };
+    if (error) {
+      return { topic: null, error: error.message };
     }
 
-    return { topic: mapSupabaseTopic(data, currentUserId), error: null };
-  } catch {
-    const fallbackList = getFallbackTopics(currentUserId).topics;
-    const found = fallbackList.find(
-      (t) => t.slug.toLowerCase() === slug.toLowerCase() || t.name.toLowerCase() === slug.toLowerCase()
-    );
-    return { topic: found || null, error: null };
+    if (!data) {
+      return { topic: null, error: null };
+    }
+
+    return { topic: mapSupabaseTopic(data, resolvedUserId), error: null };
+  } catch (err: any) {
+    return { topic: null, error: err?.message || 'Failed to fetch topic' };
   }
 }
 
@@ -147,167 +136,185 @@ export async function fetchTopicBySlug(
  */
 export async function toggleFollowTopic(
   topicId: string,
-  currentUserId: string
+  _currentUserId?: string
 ): Promise<{ isFollowing: boolean; error: string | null }> {
-  const followKey = `${currentUserId}:${topicId}`;
-  const isCurrentlyFollowing = localTopicFollows.has(followKey);
-  const nextState = !isCurrentlyFollowing;
-
-  // Update local relationship set
-  if (nextState) {
-    localTopicFollows.add(followKey);
-  } else {
-    localTopicFollows.delete(followKey);
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { isFollowing: false, error: 'Must be logged in to follow topics.' };
   }
-
-  if (!isSupabaseConfigured()) {
-    return { isFollowing: nextState, error: null };
-  }
+  const verifiedUserId = user.id;
 
   try {
+    // Check if currently following
+    const { data: existingFollow } = await supabase
+      .from('topic_follows')
+      .select('topic_id')
+      .eq('user_id', verifiedUserId)
+      .eq('topic_id', topicId)
+      .maybeSingle();
+
+    const isCurrentlyFollowing = Boolean(existingFollow);
+    const nextState = !isCurrentlyFollowing;
+
     if (nextState) {
       const { error } = await supabase.from('topic_follows').insert({
-        user_id: currentUserId,
+        user_id: verifiedUserId,
         topic_id: topicId,
       });
       if (error && error.code !== '23505') {
-        // Rollback
-        localTopicFollows.delete(followKey);
         return { isFollowing: false, error: error.message };
       }
     } else {
       const { error } = await supabase
         .from('topic_follows')
         .delete()
-        .match({ user_id: currentUserId, topic_id: topicId });
+        .match({ user_id: verifiedUserId, topic_id: topicId });
       if (error) {
-        // Rollback
-        localTopicFollows.add(followKey);
         return { isFollowing: true, error: error.message };
       }
     }
 
     return { isFollowing: nextState, error: null };
   } catch (err: any) {
-    return { isFollowing: nextState, error: null };
+    return { isFollowing: false, error: err?.message || 'Failed to toggle follow' };
   }
 }
 
 /**
- * Returns set of followed topic names and slugs for the user
- */
-export function getFollowedTopicsForUser(currentUserId: string): string[] {
-  const topics = getFallbackTopics(currentUserId).topics;
-  return topics
-    .filter((t) => localTopicFollows.has(`${currentUserId}:${t.id}`) || localTopicFollows.has(`${currentUserId}:${t.slug}`))
-    .flatMap((t) => [t.name.toLowerCase(), t.slug.toLowerCase()]);
-}
-
-/**
- * Fetches rich topic page data (Topic info, Trending research, Research shares, Discussions, Interested researchers)
+ * Fetches rich topic page data from Supabase
  */
 export async function fetchTopicPageData(
   slugOrId: string,
   currentUserId?: string
 ): Promise<TopicPageData> {
   const topicRes = await fetchTopicBySlug(slugOrId, currentUserId);
-  const topic =
-    topicRes.topic || {
-      id: 'top_1',
-      slug: slugOrId.toLowerCase(),
-      name: slugOrId.charAt(0).toUpperCase() + slugOrId.slice(1),
-      description: 'Academic discourse and peer-reviewed research in this field.',
-      iconName: 'Brain',
-      category: 'Science',
-      followersCount: 125000,
-      postsCount: 3400,
-      isFollowing: false,
-    };
-
-  const topicNameLower = topic.name.toLowerCase();
-  const topicSlugLower = topic.slug.toLowerCase();
-
-  // 1. Trending research in this topic (papers tagged with this topic, ranked by discussion count & citations)
-  const trendingResearch = mockPapers
-    .filter((p) =>
-      p.topics.some(
-        (t) =>
-          t.toLowerCase().includes(topicNameLower) ||
-          topicNameLower.includes(t.toLowerCase()) ||
-          t.toLowerCase().includes(topicSlugLower)
-      )
-    )
-    .sort((a, b) => b.discussionCount + b.citationCount - (a.discussionCount + a.citationCount));
-
-  // 2. Recent research shares (posts of type 'research_share' with paper reference)
-  const recentResearchShares = mockPosts
-    .filter(
-      (p) =>
-        p.postType === 'research_share' &&
-        p.topics.some(
-          (t) =>
-            t.toLowerCase().includes(topicNameLower) ||
-            topicNameLower.includes(t.toLowerCase()) ||
-            t.toLowerCase().includes(topicSlugLower)
-        )
-    )
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-
-  // 3. Discussions (posts of type 'discussion', 'question', 'insight' in this topic)
-  const discussions = mockPosts
-    .filter(
-      (p) =>
-        p.postType !== 'research_share' &&
-        p.topics.some(
-          (t) =>
-            t.toLowerCase().includes(topicNameLower) ||
-            topicNameLower.includes(t.toLowerCase()) ||
-            t.toLowerCase().includes(topicSlugLower)
-        )
-    )
-    .sort((a, b) => b.likesCount + b.commentsCount - (a.likesCount + a.commentsCount));
-
-  // 4. Researchers interested in the topic (followers or researchers with matching interests)
-  const interestedResearchers = mockUsers.filter((u) => {
-    const followsThis =
-      localTopicFollows.has(`${u.id}:${topic.id}`) ||
-      localTopicFollows.has(`${u.id}:${topic.slug}`);
-    const matchesInterests = (u.researchInterests || []).some(
-      (interest) =>
-        interest.toLowerCase().includes(topicNameLower) ||
-        topicNameLower.includes(interest.toLowerCase())
-    );
-    return followsThis || matchesInterests;
-  });
-
-  return {
-    topic,
-    trendingResearch,
-    recentResearchShares,
-    discussions,
-    interestedResearchers,
+  const topic: Topic = topicRes.topic || {
+    id: slugOrId,
+    slug: slugOrId.toLowerCase(),
+    name: slugOrId.charAt(0).toUpperCase() + slugOrId.slice(1),
+    description: '',
+    iconName: 'Brain',
+    category: 'Science',
+    followersCount: 0,
+    postsCount: 0,
+    isFollowing: false,
   };
-}
 
-/**
- * Fallback topics provider
- */
-function getFallbackTopics(currentUserId?: string): {
-  topics: Topic[];
-  error: string | null;
-} {
-  const mapped = mockTopics.map((t) => {
-    const isFollowing = currentUserId
-      ? localTopicFollows.has(`${currentUserId}:${t.id}`) ||
-        localTopicFollows.has(`${currentUserId}:${t.slug}`)
-      : Boolean(t.isFollowing);
+  try {
+    // 1. Trending research in this topic
+    const { data: papersData } = await supabase
+      .from('papers')
+      .select(`
+        id,
+        doi,
+        canonical_url,
+        title,
+        abstract,
+        journal,
+        publisher,
+        publication_date,
+        publication_year,
+        open_access_status,
+        open_access_pdf_url,
+        citation_count,
+        discussion_count,
+        likes_count,
+        saves_count,
+        paper_authors (*),
+        paper_topics!inner (
+          topic:topics!inner ( slug, name )
+        ),
+        bookmarks!left ( user_id )
+      `)
+      .or(`paper_topics.topic.slug.eq.${slugOrId},paper_topics.topic.id.eq.${slugOrId}`)
+      .order('discussion_count', { ascending: false })
+      .limit(10);
+
+    const trendingResearch = (papersData || []).map((row) => mapSupabasePaper(row, currentUserId));
+
+    // 2. Recent research shares
+    const { data: sharesData } = await supabase
+      .from('posts')
+      .select(`
+        id,
+        post_type,
+        content,
+        visibility,
+        media_urls,
+        likes_count,
+        comments_count,
+        reposts_count,
+        saves_count,
+        created_at,
+        author:profiles!author_id (*),
+        paper:papers!paper_id (*),
+        post_topics!inner (
+          topic:topics!inner ( slug, name )
+        ),
+        likes!left ( user_id ),
+        reposts!left ( user_id ),
+        bookmarks!left ( user_id )
+      `)
+      .eq('post_type', 'research_share')
+      .or(`post_topics.topic.slug.eq.${slugOrId},post_topics.topic.id.eq.${slugOrId}`)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const recentResearchShares = (sharesData || []).map((row) => mapSupabasePost(row, currentUserId));
+
+    // 3. Discussions in this topic
+    const { data: discussionsData } = await supabase
+      .from('posts')
+      .select(`
+        id,
+        post_type,
+        content,
+        visibility,
+        media_urls,
+        likes_count,
+        comments_count,
+        reposts_count,
+        saves_count,
+        created_at,
+        author:profiles!author_id (*),
+        paper:papers!paper_id (*),
+        post_topics!inner (
+          topic:topics!inner ( slug, name )
+        ),
+        likes!left ( user_id ),
+        reposts!left ( user_id ),
+        bookmarks!left ( user_id )
+      `)
+      .neq('post_type', 'research_share')
+      .or(`post_topics.topic.slug.eq.${slugOrId},post_topics.topic.id.eq.${slugOrId}`)
+      .order('likes_count', { ascending: false })
+      .limit(10);
+
+    const discussions = (discussionsData || []).map((row) => mapSupabasePost(row, currentUserId));
+
+    // 4. Researchers interested in this topic
+    const { data: researchersData } = await supabase
+      .from('profiles')
+      .select('*')
+      .contains('research_interests', [topic.name])
+      .limit(10);
+
+    const interestedResearchers = (researchersData || []).map(mapSupabaseProfile);
 
     return {
-      ...t,
-      isFollowing,
-      followersCount: isFollowing ? t.followersCount + 1 : t.followersCount,
+      topic,
+      trendingResearch,
+      recentResearchShares,
+      discussions,
+      interestedResearchers,
     };
-  });
-
-  return { topics: mapped, error: null };
+  } catch (err) {
+    return {
+      topic,
+      trendingResearch: [],
+      recentResearchShares: [],
+      discussions: [],
+      interestedResearchers: [],
+    };
+  }
 }

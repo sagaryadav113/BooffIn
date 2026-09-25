@@ -21,7 +21,6 @@ import {
 import { colors, radii, spacing, typography } from '../../theme';
 import { DiscussionType, UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
-import { mockUsers } from '../../data/mockData';
 
 export interface DiscussionComposerProps {
   currentUser: UserProfile;
@@ -31,20 +30,20 @@ export interface DiscussionComposerProps {
     title?: string;
   }) => void;
   isSubmitting?: boolean;
+  availableMentions?: UserProfile[];
 }
 
 export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
   currentUser,
   onSubmit,
   isSubmitting = false,
+  availableMentions = [],
 }) => {
   const [type, setType] = useState<DiscussionType>('discussion');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMentionBar, setShowMentionBar] = useState(false);
-
-  const availableMentions = mockUsers.filter((u) => u.id !== currentUser.id && u.id !== 'usr_me');
 
   const getPlaceholder = (t: DiscussionType) => {
     switch (t) {

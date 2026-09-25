@@ -1,7 +1,6 @@
 import { Paper } from '../../types';
 import { supabase } from '../client';
 import { isSupabaseConfigured } from '../socialService';
-import { mockPapers } from '../../data/mockData';
 import {
   MetadataProvider,
   NormalizedPaperMetadata,
@@ -34,7 +33,7 @@ export class CompositePaperResolver {
   }
 
   /**
-   * Check if a paper already exists in Supabase or local cache
+   * Check if a paper already exists in Supabase
    */
   public async findExistingPaper(
     doi?: string,
@@ -45,15 +44,7 @@ export class CompositePaperResolver {
 
     if (!cleanDoi && !cleanUrl) return null;
 
-    // 1. Check local mock dataset
-    const localMatch = mockPapers.find(
-      (p) =>
-        (cleanDoi && p.doi?.toLowerCase() === cleanDoi) ||
-        (cleanUrl && p.canonicalUrl === cleanUrl)
-    );
-    if (localMatch) return localMatch;
-
-    // 2. Check Supabase DB if configured
+    // Check Supabase DB
     if (isSupabaseConfigured()) {
       try {
         let query = supabase.from('papers').select(`

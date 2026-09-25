@@ -29,6 +29,9 @@ export const TopicChip: React.FC<TopicChipProps> = ({
 
   return (
     <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`Topic: ${label}`}
+      accessibilityState={{ selected }}
       activeOpacity={0.8}
       onPress={handlePress}
       disabled={!onPress}
@@ -38,6 +41,7 @@ export const TopicChip: React.FC<TopicChipProps> = ({
         selected ? styles.selected : styles.unselected,
         style,
       ]}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
     >
       <Typography
         variant={size === 'sm' ? 'micro' : 'captionMedium'}
@@ -58,10 +62,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   mdSize: {
+    minHeight: 34,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs + 3,
   },
   smSize: {
+    minHeight: 28,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },

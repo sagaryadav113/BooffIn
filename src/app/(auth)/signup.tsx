@@ -1,346 +1,278 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
-import { router } from 'expo-router';
-import { CheckCircle2 } from 'lucide-react-native';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  SafeAreaView,
+  StatusBar,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ActivityIndicator,
+} from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ArrowLeft, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
-import { ScreenContainer } from '../../components/layout/ScreenContainer';
-import { Header } from '../../components/layout/Header';
-import { Typography } from '../../components/core/Typography';
 import { Input } from '../../components/core/Input';
-import { Button } from '../../components/core/Button';
-import { QuickOAuthModal } from '../../components/modals/QuickOAuthModal';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export default function SignupScreen() {
-  const [fullName, setFullName] = useState('');
-  const [handle, setHandle] = useState('');
-  const [academicTitle, setAcademicTitle] = useState('');
-  const [institution, setInstitution] = useState('');
-  const [email, setEmail] = useState('');
+  const params = useLocalSearchParams<{ email?: string }>();
+  const [email, setEmail] = useState(params.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [oauthModalVisible, setOauthModalVisible] = useState(false);
-  const [oauthProvider, setOauthProvider] = useState<'google' | 'orcid'>('google');
 
   const signUp = useAuthStore((s) => s.signUp);
   const isLoading = useAuthStore((s) => s.isLoading);
   const authError = useAuthStore((s) => s.authError);
   const clearError = useAuthStore((s) => s.clearError);
 
-  const handleSignUp = async () => {
+  const cleanEmail = email.trim().toLowerCase();
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail);
+  const isPasswordValid = password.length >= 6;
+
+  const handleBack = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    router.back();
+  };
+
+  const handleCreateAccount = async () => {
     setValidationError(null);
     clearError();
 
-    if (!fullName.trim()) {
-      setValidationError('Please enter your full name.');
-      return;
-    }
-
-    if (!handle.trim()) {
-      setValidationError('Please enter a username or handle.');
-      return;
-    }
-
-    const cleanEmail = email.trim();
-    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+    if (!isEmailValid) {
       setValidationError('Please enter a valid email address.');
       return;
     }
 
-    if (!password || password.length < 6) {
+    if (!isPasswordValid) {
       setValidationError('Password must be at least 6 characters.');
       return;
     }
 
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+
     const success = await signUp({
       email: cleanEmail,
       password,
-      fullName: fullName.trim(),
-      handle: handle.trim().replace(/^@/, ''),
-      academicTitle: academicTitle.trim() || 'Research Enthusiast',
-      institution: institution.trim() || 'Independent Researcher',
     });
 
     if (success) {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
+      // Seamlessly transition to the progressive researcher onboarding flow
       router.replace('/(auth)/onboarding');
     }
-  };
-
-  const handleGoogleSignUp = () => {
-    setOauthProvider('google');
-    setOauthModalVisible(true);
-  };
-
-  const handleORCIDSignUp = () => {
-    setOauthProvider('orcid');
-    setOauthModalVisible(true);
-  };
-
-  const handleAuthSuccess = () => {
-    setOauthModalVisible(false);
-    router.replace('/(auth)/onboarding');
   };
 
   const displayError = validationError || authError;
 
   return (
-    <ScreenContainer scrollable>
-      <Header showBack onBack={() => router.back()} />
-
-      <View style={styles.content}>
-        <Typography variant="h1" style={styles.title}>
-          Create your BooffIn account
-        </Typography>
-
-        <Typography variant="body" color={colors.textSecondary} style={styles.subtitle}>
-          Join a community of scientists, students, and research enthusiasts discussing peer-reviewed literature.
-        </Typography>
-
-        {/* OAuth Buttons Group */}
-        <View style={styles.oauthButtonGroup}>
-          {/* Google Sign-up Option */}
-          <TouchableOpacity
-            style={styles.googleButton}
-            onPress={handleGoogleSignUp}
-            activeOpacity={0.88}
-            disabled={isLoading}
-          >
-            <View style={styles.googleIconBadge}>
-              <Text style={styles.googleIconText}>G</Text>
-            </View>
-            <Text style={styles.googleButtonText}>Sign Up with Google</Text>
-          </TouchableOpacity>
-
-          {/* ORCID Sign-up Option */}
-          <TouchableOpacity
-            style={styles.orcidButton}
-            onPress={handleORCIDSignUp}
-            activeOpacity={0.88}
-            disabled={isLoading}
-          >
-            <View style={styles.orcidLogoCircle}>
-              <Text style={styles.orcidLogoText}>iD</Text>
-            </View>
-            <Text style={styles.orcidButtonText}>Sign Up with ORCID iD</Text>
-            <CheckCircle2 size={16} color={colors.white} style={{ marginLeft: 4 }} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Divider */}
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Typography variant="micro" color={colors.textMuted} style={styles.dividerText}>
-            OR REGISTER WITH EMAIL
-          </Typography>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Error Banner */}
-        {displayError && (
-          <View style={styles.errorBanner}>
-            <Typography variant="caption" color={colors.accentRed}>
-              {displayError}
-            </Typography>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={styles.wrapper}>
+          {/* Header */}
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.backButton}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <ArrowLeft size={22} color={colors.textPrimary} strokeWidth={2.2} />
+            </TouchableOpacity>
           </View>
-        )}
 
-        <View style={styles.form}>
-          <Input
-            label="Full Name *"
-            placeholder="Dr. Elena Park or Maya Singh"
-            value={fullName}
-            onChangeText={(text) => {
-              setFullName(text);
-              if (validationError) setValidationError(null);
-            }}
-            leftIcon="User"
-          />
+          <KeyboardAvoidingView
+            style={styles.keyboardContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+          >
+            <View style={styles.contentContainer}>
+              {/* Form Section */}
+              <View style={styles.topSection}>
+                <Text style={styles.title}>Create your password</Text>
+                <Text style={styles.subtitle}>
+                  Choose a secure password (at least 6 characters) to set up your BooffIn account.
+                </Text>
 
-          <Input
-            label="Researcher Handle *"
-            placeholder="elenapark"
-            value={handle}
-            onChangeText={(text) => {
-              setHandle(text);
-              if (validationError) setValidationError(null);
-            }}
-            autoCapitalize="none"
-            leftIcon="Tag"
-          />
+                {/* Email Display / Input */}
+                <View style={styles.emailBadge}>
+                  <Text style={styles.emailBadgeLabel}>ACCOUNT EMAIL</Text>
+                  <Text style={styles.emailBadgeValue}>{cleanEmail || 'scientist@university.edu'}</Text>
+                </View>
 
-          <Input
-            label="Academic Role / Status (Optional)"
-            placeholder="e.g. Neuroscience Student, Postdoc, PI"
-            value={academicTitle}
-            onChangeText={setAcademicTitle}
-            leftIcon="Shield"
-            hint="Students and independent researchers are first-class participants."
-          />
+                {/* Error Banner */}
+                {displayError && (
+                  <View style={styles.errorBanner}>
+                    <AlertCircle size={15} color={colors.accentRed} style={{ marginRight: 6 }} />
+                    <Text style={styles.errorText}>{displayError}</Text>
+                  </View>
+                )}
 
-          <Input
-            label="Institution / University (Optional)"
-            placeholder="e.g. Stanford University / Independent"
-            value={institution}
-            onChangeText={setInstitution}
-            leftIcon="Inbox"
-          />
+                {/* Password Input */}
+                <Input
+                  label="Password"
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (validationError) setValidationError(null);
+                    if (authError) clearError();
+                  }}
+                  secureTextEntry={!showPassword}
+                  autoFocus
+                  leftIcon="Shield"
+                  rightIcon={showPassword ? 'EyeOff' : 'Eye'}
+                  onRightIconPress={() => setShowPassword(!showPassword)}
+                  hint="At least 6 characters with mixed characters recommended"
+                />
+              </View>
 
-          <Input
-            label="Academic or Work Email *"
-            placeholder="elena@university.edu"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (validationError) setValidationError(null);
-            }}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            leftIcon="Mail"
-          />
+              {/* Bottom Actions */}
+              <View style={styles.bottomSection}>
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    isPasswordValid && !isLoading
+                      ? styles.submitButtonActive
+                      : styles.submitButtonDisabled,
+                  ]}
+                  onPress={handleCreateAccount}
+                  disabled={!isPasswordValid || isLoading}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Create Account & Continue"
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.submitButtonText,
+                        isPasswordValid ? styles.submitButtonTextActive : styles.submitButtonTextDisabled,
+                      ]}
+                    >
+                      Create Account & Continue
+                    </Text>
+                  )}
+                </TouchableOpacity>
 
-          <Input
-            label="Password *"
-            placeholder="Minimum 6 characters"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (validationError) setValidationError(null);
-            }}
-            secureTextEntry={!showPassword}
-            leftIcon="Lock"
-            rightIcon={showPassword ? 'EyeOff' : 'Eye'}
-            onRightIconPress={() => setShowPassword(!showPassword)}
-          />
-
-          <Button
-            title={isLoading ? 'Creating Account...' : 'Create Account with Email'}
-            variant="primary"
-            size="lg"
-            onPress={handleSignUp}
-            disabled={isLoading}
-            style={styles.signUpButton}
-          />
+                {/* Switch to Login if already registered */}
+                <View style={styles.switchRow}>
+                  <Text style={styles.switchText}>Already have a password? </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(auth)/login',
+                        params: { email: cleanEmail },
+                      })
+                    }
+                  >
+                    <Text style={styles.switchLink}>Sign In</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
         </View>
-
-        <View style={styles.footerRow}>
-          <Typography variant="caption" color={colors.textSecondary}>
-            Already have an account?{' '}
-          </Typography>
-          <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-            <Typography variant="captionBold" color={colors.textPrimary}>
-              Sign In
-            </Typography>
-          </TouchableOpacity>
-        </View>
-
-        <QuickOAuthModal
-          visible={oauthModalVisible}
-          provider={oauthProvider}
-          onClose={() => setOauthModalVisible(false)}
-          onSuccess={handleAuthSuccess}
-        />
-      </View>
-    </ScreenContainer>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    padding: spacing.xl,
-    paddingBottom: spacing.xxxl * 2,
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  wrapper: {
+    flex: 1,
+    maxWidth: 440,
+    width: '100%',
+    alignSelf: 'center',
+    backgroundColor: colors.background,
+  },
+  headerRow: {
+    height: 48,
+    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  backButton: {
+    padding: spacing.xs,
+    marginLeft: -spacing.xs,
+    borderRadius: radii.full,
+  },
+  keyboardContainer: {
+    flex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.md,
+    paddingBottom: Platform.OS === 'web' ? spacing.xxxl : spacing.xl,
+    justifyContent: 'space-between',
+  },
+  topSection: {
+    width: '100%',
+    paddingTop: spacing.sm,
   },
   title: {
-    fontSize: 28,
-    marginBottom: spacing.xs,
+    fontFamily: Platform.select({
+      ios: 'Georgia',
+      android: 'serif',
+      default: 'Georgia, Cambria, "Times New Roman", Times, serif',
+    }),
+    fontSize: 32,
+    color: colors.textPrimary,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    marginBottom: 6,
   },
   subtitle: {
-    marginBottom: spacing.xl,
+    ...typography.body,
+    fontSize: 15,
+    color: colors.textSecondary,
     lineHeight: 22,
+    marginBottom: spacing.xl,
   },
-  oauthButtonGroup: {
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.cardBackground,
+  emailBadge: {
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
     borderColor: colors.borderLight,
-    paddingVertical: spacing.md - 1,
-    paddingHorizontal: spacing.lg,
     borderRadius: radii.md,
-    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.lg,
   },
-  googleIconBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#4285F4',
-    alignItems: 'center',
-    justifyContent: 'center',
+  emailBadgeLabel: {
+    ...typography.micro,
+    color: colors.textMuted,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
-  googleIconText: {
-    color: colors.white,
-    fontWeight: '900',
-    fontSize: 12,
-  },
-  googleButtonText: {
+  emailBadgeValue: {
     ...typography.captionBold,
     color: colors.textPrimary,
-    fontSize: 15,
-  },
-  orcidButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#A6CE39', // Official ORCID Green
-    paddingVertical: spacing.md - 1,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.md,
-    gap: spacing.sm,
-  },
-  orcidLogoCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  orcidLogoText: {
-    color: '#A6CE39',
-    fontWeight: '900',
-    fontSize: 11,
-  },
-  orcidButtonText: {
-    ...typography.captionBold,
-    color: colors.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.md,
-    gap: spacing.md,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.borderLight,
-  },
-  dividerText: {
-    letterSpacing: 0.5,
-    fontWeight: '700',
+    fontSize: 14,
   },
   errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.25)',
@@ -348,16 +280,62 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
   },
-  form: {
-    marginBottom: spacing.xl,
+  errorText: {
+    ...typography.caption,
+    color: colors.accentRed,
+    flex: 1,
+    fontSize: 13,
   },
-  signUpButton: {
-    marginTop: spacing.md,
+  bottomSection: {
     width: '100%',
+    gap: spacing.md,
+    paddingTop: spacing.xl,
   },
-  footerRow: {
+  submitButton: {
+    width: '100%',
+    height: 50,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(Platform.OS === 'web'
+      ? {
+          transition: 'all 0.15s ease',
+        }
+      : {}),
+  },
+  submitButtonActive: {
+    backgroundColor: colors.black,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  submitButtonDisabled: {
+    backgroundColor: colors.gray100,
+    ...(Platform.OS === 'web' ? { cursor: 'not-allowed' as any } : {}),
+  },
+  submitButtonText: {
+    ...typography.bodyMedium,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  submitButtonTextActive: {
+    color: colors.white,
+  },
+  submitButtonTextDisabled: {
+    color: colors.gray400,
+  },
+  switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  switchText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+  switchLink: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 13,
+    textDecorationLine: 'underline',
   },
 });
