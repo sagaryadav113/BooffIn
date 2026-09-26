@@ -18,12 +18,14 @@ export function setSearchProvider(provider: SearchProvider): void {
 }
 
 /**
- * Execute unified BoffIn search across researchers, papers, topics, and discussions.
+ * Execute unified BooffIn search across researchers, papers, topics, and discussions.
  */
-export async function searchBoffIn(params: SearchQueryParams): Promise<SearchResults> {
+export async function searchBooffIn(params: SearchQueryParams): Promise<SearchResults> {
   const provider = getSearchProvider();
   return provider.search(params);
 }
+
+export const searchBoffIn = searchBooffIn;
 
 /**
  * Scientific search discovery queries for initial exploration

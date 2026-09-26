@@ -167,10 +167,10 @@ export const PaperLookupModal: React.FC<PaperLookupModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Notice: BoffIn is a social discussion platform, not a host */}
+        {/* Notice: BooffIn is a social discussion platform, not a host */}
         <View style={styles.disclaimerBanner}>
           <Text style={styles.disclaimerText}>
-            BoffIn references research published externally. No full-text files are uploaded or hosted.
+            BooffIn references research published externally. No full-text files are uploaded or hosted.
           </Text>
         </View>
 
@@ -395,7 +395,7 @@ export const PaperLookupModal: React.FC<PaperLookupModalProps> = ({
                   {isDuplicate && (
                     <View style={styles.duplicateTag}>
                       <Layers size={13} color={colors.accentBlue} />
-                      <Text style={styles.duplicateText}>Existing Reference in BoffIn</Text>
+                      <Text style={styles.duplicateText}>Existing Reference in BooffIn</Text>
                     </View>
                   )}
                 </View>

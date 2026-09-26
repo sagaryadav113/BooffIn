@@ -151,7 +151,7 @@ export class CompositePaperResolver {
         paper: existingPaper,
         isDuplicate: true,
         duplicatePaperId: existingPaper.id,
-        providerName: 'BoffIn Repository (Cached)',
+        providerName: 'BooffIn Repository (Cached)',
         error: null,
       };
     }

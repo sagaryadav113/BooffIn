@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { SearchCategory, SearchResults } from '../types';
-import { searchBoffIn } from '../api/search/searchService';
+import { searchBooffIn } from '../api/search/searchService';
 
 interface SearchState {
   query: string;
@@ -85,7 +85,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     set({ isLoading: true, error: null, page: 1 });
 
     try {
-      const results = await searchBoffIn({
+      const results = await searchBooffIn({
         query: q,
         category: cat,
         limit: 15,
@@ -125,7 +125,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     set({ isLoadingMore: true });
 
     try {
-      const newResults = await searchBoffIn({
+      const newResults = await searchBooffIn({
         query: q,
         category: cat,
         limit,

@@ -229,7 +229,7 @@ export default function SearchScreen() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={colors.textPrimary} />
             <Typography variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.sm }}>
-              Searching BoffIn database...
+              Searching BooffIn database...
             </Typography>
           </View>
         )}
@@ -242,7 +242,7 @@ export default function SearchScreen() {
               <View style={styles.sectionHeaderRow}>
                 <Sparkles size={16} color={colors.textPrimary} />
                 <Typography variant="captionBold" color={colors.textPrimary} style={styles.sectionTitle}>
-                  DISCOVER ON BOFFIN
+                  DISCOVER ON BOOFFIN
                 </Typography>
               </View>
 
