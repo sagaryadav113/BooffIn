@@ -27,13 +27,18 @@ export default function NotificationsScreen() {
   const getFilteredNotifications = useNotificationStore((s) => s.getFilteredNotifications);
   const markAllAsRead = useNotificationStore((s) => s.markAllAsRead);
   const loadNotifications = useNotificationStore((s) => s.loadNotifications);
+  const subscribeToRealtimeNotifications = useNotificationStore((s) => s.subscribeToRealtimeNotifications);
   const isLoading = useNotificationStore((s) => s.isLoading);
   const isRefreshing = useNotificationStore((s) => s.isRefreshing);
   const unreadCount = useNotificationStore((s) => s.unreadCount());
 
   useEffect(() => {
     loadNotifications();
-  }, [loadNotifications]);
+    const unsubscribe = subscribeToRealtimeNotifications();
+    return () => {
+      unsubscribe();
+    };
+  }, [loadNotifications, subscribeToRealtimeNotifications]);
 
   const filteredNotifications = getFilteredNotifications();
   const filterOptions: NotificationFilter[] = ['All', 'Mentions', 'Follows', 'Discussions', 'Updates'];

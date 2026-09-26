@@ -2,11 +2,14 @@ import { supabase } from './client';
 import { mapSupabaseProfile } from './socialService';
 import { AppNotification, NotificationFilter, NotificationType, NotificationEntityType } from '../types/notification';
 
-async function getAuthUserId(): Promise<string | null> {
+async function getAuthUserId(fallbackUserId?: string): Promise<string | null> {
+  if (fallbackUserId && fallbackUserId !== 'unknown') return fallbackUserId;
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return null;
-    return user.id;
+    if (!error && user?.id) return user.id;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.id) return session.user.id;
+    return null;
   } catch {
     return null;
   }
@@ -148,10 +151,11 @@ export function filterNotificationList(
 export async function fetchNotifications(
   filter: NotificationFilter = 'All',
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  currentUserId?: string
 ): Promise<{ data: AppNotification[]; hasMore: boolean; error: string | null }> {
   try {
-    const userId = await getAuthUserId();
+    const userId = await getAuthUserId(currentUserId);
     if (!userId) {
       return { data: [], hasMore: false, error: null };
     }
@@ -250,9 +254,9 @@ export async function fetchNotifications(
 /**
  * Fetch total unread notification count
  */
-export async function fetchUnreadCount(): Promise<{ count: number; error: string | null }> {
+export async function fetchUnreadCount(currentUserId?: string): Promise<{ count: number; error: string | null }> {
   try {
-    const userId = await getAuthUserId();
+    const userId = await getAuthUserId(currentUserId);
     if (!userId) {
       return { count: 0, error: null };
     }
@@ -277,10 +281,11 @@ export async function fetchUnreadCount(): Promise<{ count: number; error: string
  * Mark a single notification as read
  */
 export async function markNotificationAsRead(
-  notificationId: string
+  notificationId: string,
+  currentUserId?: string
 ): Promise<{ success: boolean; error: string | null }> {
   try {
-    const userId = await getAuthUserId();
+    const userId = await getAuthUserId(currentUserId);
     if (!userId) {
       return { success: true, error: null };
     }
@@ -304,13 +309,15 @@ export async function markNotificationAsRead(
 /**
  * Mark all notifications as read for current user
  */
-export async function markAllNotificationsAsRead(): Promise<{
+export async function markAllNotificationsAsRead(
+  currentUserId?: string
+): Promise<{
   success: boolean;
   updatedCount: number;
   error: string | null;
 }> {
   try {
-    const userId = await getAuthUserId();
+    const userId = await getAuthUserId(currentUserId);
     if (!userId) {
       return { success: true, updatedCount: 0, error: null };
     }
@@ -330,3 +337,4 @@ export async function markAllNotificationsAsRead(): Promise<{
     return { success: false, updatedCount: 0, error: err?.message || 'Failed to mark all as read' };
   }
 }
+

@@ -7,6 +7,8 @@ import {
   markAllNotificationsAsRead as apiMarkAllAsRead,
   filterNotificationList,
 } from '../api/notificationService';
+import { useAuthStore } from './useAuthStore';
+import { supabase } from '../api/client';
 
 interface NotificationState {
   notifications: AppNotification[];
@@ -23,6 +25,7 @@ interface NotificationState {
   markAllAsRead: () => Promise<void>;
   getFilteredNotifications: () => AppNotification[];
   unreadCount: () => number;
+  subscribeToRealtimeNotifications: (userId?: string) => () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -33,6 +36,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   error: null,
 
   loadNotifications: async (refresh = false) => {
+    const currentUserId = useAuthStore.getState().user?.id;
     if (refresh) {
       set({ isRefreshing: true, error: null });
     } else {
@@ -40,7 +44,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }
 
     try {
-      const { data, error } = await fetchNotifications(get().activeFilter);
+      const { data, error } = await fetchNotifications(get().activeFilter, 1, 30, currentUserId);
       if (error) {
         set({ error, isLoading: false, isRefreshing: false });
       } else {
@@ -56,8 +60,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   loadUnreadCount: async () => {
+    const currentUserId = useAuthStore.getState().user?.id;
     try {
-      await fetchUnreadCount();
+      await fetchUnreadCount(currentUserId);
     } catch {
       // noop
     }
@@ -69,6 +74,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   markAsRead: async (id: string) => {
+    const currentUserId = useAuthStore.getState().user?.id;
     // 1. Optimistic local update
     set((state) => ({
       notifications: state.notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
@@ -76,13 +82,14 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
     // 2. Server sync
     try {
-      await apiMarkAsRead(id);
+      await apiMarkAsRead(id, currentUserId);
     } catch {
       // Ignore background sync errors
     }
   },
 
   markAllAsRead: async () => {
+    const currentUserId = useAuthStore.getState().user?.id;
     // 1. Optimistic local update
     set((state) => ({
       notifications: state.notifications.map((n) => ({ ...n, isRead: true })),
@@ -90,7 +97,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
     // 2. Server sync
     try {
-      await apiMarkAllAsRead();
+      await apiMarkAllAsRead(currentUserId);
     } catch {
       // Ignore background sync errors
     }
@@ -104,4 +111,32 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   unreadCount: () => {
     return get().notifications.filter((n) => !n.isRead).length;
   },
+
+  subscribeToRealtimeNotifications: (userId?: string) => {
+    const targetUserId = userId || useAuthStore.getState().user?.id;
+    if (!targetUserId || targetUserId === 'unknown') {
+      return () => {};
+    }
+
+    const channel = supabase
+      .channel(`notifications-stream-${targetUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `recipient_id=eq.${targetUserId}`,
+        },
+        () => {
+          get().loadNotifications(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
 }));
+
