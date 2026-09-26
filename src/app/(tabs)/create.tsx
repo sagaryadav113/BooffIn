@@ -248,9 +248,7 @@ export default function CreatePostScreen() {
 
   const handleToggleTopic = (topic: string) => {
     if (selectedTopics.includes(topic)) {
-      if (selectedTopics.length > 1) {
-        setSelectedTopics(selectedTopics.filter((t) => t !== topic));
-      }
+      setSelectedTopics(selectedTopics.filter((t) => t !== topic));
     } else {
       setSelectedTopics([...selectedTopics, topic]);
     }
@@ -463,14 +461,13 @@ export default function CreatePostScreen() {
             {selectedTopics.map((topic) => (
               <View key={topic} style={styles.topicTagChip}>
                 <Text style={styles.topicTagChipText}>#{topic}</Text>
-                {selectedTopics.length > 1 && (
-                  <TouchableOpacity
-                    onPress={() => handleToggleTopic(topic)}
-                    style={{ marginLeft: 4 }}
-                  >
-                    <X size={12} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  onPress={() => handleToggleTopic(topic)}
+                  style={styles.removeTopicChipBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <X size={12} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -934,6 +931,12 @@ const styles = StyleSheet.create({
     ...typography.micro,
     color: colors.textSecondary,
     fontWeight: '600',
+  },
+  removeTopicChipBtn: {
+    marginLeft: 6,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputContainer: {
     flexDirection: 'row',
