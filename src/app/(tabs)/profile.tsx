@@ -64,8 +64,8 @@ import {
   removeProfileAvatar,
   removeProfileBanner,
 } from '../../api/storageService';
-import { fetchUserPosts } from '../../api/socialService';
-import { Post, CollaborationRequest } from '../../types';
+import { fetchUserPosts, fetchSavedPostsAndPapers } from '../../api/socialService';
+import { Post, Paper, CollaborationRequest } from '../../types';
 import { FollowListModal } from '../../components/modals/FollowListModal';
 
 export const DEFAULT_PROFILE_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
@@ -152,6 +152,10 @@ export default function CurrentUserProfileScreen() {
 
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+  const [savedPosts, setSavedPosts] = useState<Post[]>([]);
+  const [savedPapersDb, setSavedPapersDb] = useState<Paper[]>([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [savedSubFilter, setSavedSubFilter] = useState<'All' | 'Posts' | 'Papers'>('All');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const loadRequests = React.useCallback(async () => {
@@ -170,14 +174,28 @@ export default function CurrentUserProfileScreen() {
     setIsLoadingPosts(false);
   }, [user?.id]);
 
+  const loadSavedItems = React.useCallback(async () => {
+    if (!user?.id) return;
+    setIsLoadingSaved(true);
+    const res = await fetchSavedPostsAndPapers(user.id);
+    if (res.posts) {
+      setSavedPosts(res.posts);
+    }
+    if (res.papers) {
+      setSavedPapersDb(res.papers);
+    }
+    setIsLoadingSaved(false);
+  }, [user?.id]);
+
   React.useEffect(() => {
     loadRequests();
     loadUserPosts();
-  }, [loadRequests, loadUserPosts]);
+    loadSavedItems();
+  }, [loadRequests, loadUserPosts, loadSavedItems]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([loadUserPosts(), loadRequests()]);
+    await Promise.all([loadUserPosts(), loadRequests(), loadSavedItems()]);
     setIsRefreshing(false);
   };
 
@@ -217,9 +235,51 @@ export default function CurrentUserProfileScreen() {
     return allPosts.filter((p) => p.author.id === user.id || (p.isReposted && p.author.id !== user.id));
   }, [userPosts, allPosts, user?.id]);
 
-  const savedPapers = useMemo(() => {
-    return papers.filter((p) => savedPaperIds.has(p.id) || p.isSaved);
-  }, [papers, savedPaperIds]);
+  // Combine database saved posts with any in-store saved posts
+  const displaySavedPosts = useMemo(() => {
+    if (!user?.id) return [];
+    const storeMap = new Map(allPosts.map((p) => [p.id, p]));
+    const combinedMap = new Map<string, Post>();
+
+    savedPosts.forEach((sp) => {
+      const live = storeMap.get(sp.id);
+      if (live) {
+        if (live.isSaved !== false) {
+          combinedMap.set(sp.id, {
+            ...sp,
+            likesCount: live.likesCount,
+            repostsCount: live.repostsCount,
+            savesCount: live.savesCount,
+            isLiked: live.isLiked,
+            isReposted: live.isReposted,
+            isSaved: true,
+          });
+        }
+      } else {
+        combinedMap.set(sp.id, sp);
+      }
+    });
+
+    allPosts.forEach((p) => {
+      if (p.isSaved && !combinedMap.has(p.id)) {
+        combinedMap.set(p.id, p);
+      }
+    });
+
+    return Array.from(combinedMap.values());
+  }, [savedPosts, allPosts, user?.id]);
+
+  // Combine database saved papers with store saved papers
+  const displaySavedPapers = useMemo(() => {
+    const combinedMap = new Map<string, Paper>();
+    savedPapersDb.forEach((p) => combinedMap.set(p.id, p));
+    papers.forEach((p) => {
+      if (savedPaperIds.has(p.id) || p.isSaved) {
+        combinedMap.set(p.id, p);
+      }
+    });
+    return Array.from(combinedMap.values());
+  }, [savedPapersDb, papers, savedPaperIds]);
 
   const handleOpenOrcid = () => {
     if (user.orcidId) {
@@ -557,6 +617,13 @@ export default function CurrentUserProfileScreen() {
                       <Text style={styles.tabBadgeText}>{pendingIncomingCount}</Text>
                     </View>
                   )}
+                  {tab === 'Saved' && (displaySavedPosts.length + displaySavedPapers.length) > 0 && (
+                    <View style={[styles.tabBadge, { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.borderLight }]}>
+                      <Text style={[styles.tabBadgeText, { color: colors.textSecondary }]}>
+                        {displaySavedPosts.length + displaySavedPapers.length}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -588,19 +655,117 @@ export default function CurrentUserProfileScreen() {
         )}
 
         {activeSubTab === 'Saved' && (
-          <View style={styles.savedList}>
-            {savedPapers.length > 0 ? (
-              savedPapers.map((p) => (
-                <TrendingPaperCard key={p.id} paper={p} style={{ marginBottom: spacing.md }} />
-              ))
-            ) : (
+          <View style={styles.savedSection}>
+            {/* Filter Chips: All | Posts | Papers */}
+            <View style={styles.savedFilterRow}>
+              {(['All', 'Posts', 'Papers'] as const).map((filter) => {
+                const count =
+                  filter === 'All'
+                    ? displaySavedPosts.length + displaySavedPapers.length
+                    : filter === 'Posts'
+                    ? displaySavedPosts.length
+                    : displaySavedPapers.length;
+                return (
+                  <TouchableOpacity
+                    key={filter}
+                    style={[
+                      styles.savedFilterChip,
+                      savedSubFilter === filter && styles.savedFilterChipActive,
+                    ]}
+                    onPress={() => setSavedSubFilter(filter)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.savedFilterChipText,
+                        savedSubFilter === filter && styles.savedFilterChipTextActive,
+                      ]}
+                    >
+                      {filter}
+                    </Text>
+                    <View
+                      style={[
+                        styles.savedFilterCountBadge,
+                        savedSubFilter === filter && styles.savedFilterCountBadgeActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.savedFilterCountText,
+                          savedSubFilter === filter && styles.savedFilterCountTextActive,
+                        ]}
+                      >
+                        {count}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {isLoadingSaved && displaySavedPosts.length === 0 && displaySavedPapers.length === 0 ? (
+              <View style={{ paddingVertical: spacing.xl * 2, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="small" color={colors.accentBlue} />
+                <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm }}>
+                  Loading saved bookmarks...
+                </Text>
+              </View>
+            ) : displaySavedPosts.length === 0 && displaySavedPapers.length === 0 ? (
               <EmptyState
                 icon="Bookmark"
-                title="No saved papers yet"
-                description="Bookmark papers from your feed or explore to read and reference later."
-                actionTitle="Explore Papers"
-                onAction={() => router.push('/(tabs)/explore')}
+                title="No saved items yet"
+                description="Bookmark research discussions or peer-reviewed papers to read and reference later."
+                actionTitle="Explore Feed & Papers"
+                onAction={() => router.push('/(tabs)')}
               />
+            ) : (
+              <View style={styles.savedItemsList}>
+                {/* When Filter is 'All' or 'Posts' and there are saved posts */}
+                {(savedSubFilter === 'All' || savedSubFilter === 'Posts') && displaySavedPosts.length > 0 && (
+                  <View style={styles.savedPostsContainer}>
+                    {savedSubFilter === 'All' && displaySavedPapers.length > 0 && (
+                      <Text style={styles.savedSubSectionHeading}>
+                        Saved Discussions ({displaySavedPosts.length})
+                      </Text>
+                    )}
+                    {displaySavedPosts.map((p) => (
+                      <PostCard key={p.id} post={p} />
+                    ))}
+                  </View>
+                )}
+
+                {/* When Filter is 'All' or 'Papers' and there are saved papers */}
+                {(savedSubFilter === 'All' || savedSubFilter === 'Papers') && displaySavedPapers.length > 0 && (
+                  <View style={styles.savedPapersContainer}>
+                    {savedSubFilter === 'All' && displaySavedPosts.length > 0 && (
+                      <Text style={[styles.savedSubSectionHeading, { marginTop: spacing.lg }]}>
+                        Saved Papers ({displaySavedPapers.length})
+                      </Text>
+                    )}
+                    <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xs }}>
+                      {displaySavedPapers.map((p) => (
+                        <TrendingPaperCard key={p.id} paper={p} style={{ marginBottom: spacing.md }} />
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Filter specific empty states */}
+                {savedSubFilter === 'Posts' && displaySavedPosts.length === 0 && (
+                  <EmptyState
+                    icon="Bookmark"
+                    title="No saved posts"
+                    description="Tap the bookmark icon on any post in your feed to save it here."
+                  />
+                )}
+                {savedSubFilter === 'Papers' && displaySavedPapers.length === 0 && (
+                  <EmptyState
+                    icon="FileText"
+                    title="No saved papers"
+                    description="Bookmark peer-reviewed papers from explore or post attachments."
+                  />
+                )}
+              </View>
             )}
           </View>
         )}
@@ -1280,6 +1445,82 @@ const styles = StyleSheet.create({
   },
   postsList: {
     width: '100%',
+  },
+  savedSection: {
+    width: '100%',
+  },
+  savedFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  savedFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.full,
+    gap: 6,
+  },
+  savedFilterChipActive: {
+    backgroundColor: colors.black,
+    borderColor: colors.black,
+  },
+  savedFilterChipText: {
+    ...typography.captionBold,
+    fontSize: 12.5,
+    color: colors.textSecondary,
+  },
+  savedFilterChipTextActive: {
+    color: colors.white,
+  },
+  savedFilterCountBadge: {
+    backgroundColor: colors.cardBackground,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+  },
+  savedFilterCountBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: 'transparent',
+  },
+  savedFilterCountText: {
+    ...typography.micro,
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  savedFilterCountTextActive: {
+    color: colors.white,
+  },
+  savedItemsList: {
+    width: '100%',
+  },
+  savedPostsContainer: {
+    width: '100%',
+  },
+  savedPapersContainer: {
+    width: '100%',
+  },
+  savedSubSectionHeading: {
+    ...typography.captionBold,
+    color: colors.textSecondary,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
   },
   savedList: {
     padding: spacing.lg,

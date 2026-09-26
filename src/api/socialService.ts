@@ -1383,30 +1383,54 @@ export async function fetchSavedPostsAndPapers(
   if (!userId) return { posts: [], papers: [], error: 'User not authenticated' };
 
   try {
+    const postSelectQuery = `
+      id,
+      post_type,
+      content,
+      visibility,
+      media_urls,
+      likes_count,
+      comments_count,
+      reposts_count,
+      saves_count,
+      created_at,
+      author:profiles!author_id (*),
+      paper:papers!paper_id (
+        id,
+        doi,
+        canonical_url,
+        title,
+        abstract,
+        journal,
+        publisher,
+        publication_date,
+        publication_year,
+        open_access_status,
+        open_access_pdf_url,
+        citation_count,
+        discussion_count,
+        likes_count,
+        saves_count,
+        paper_authors (*)
+      ),
+      post_topics (
+        topic:topics!topic_id (*)
+      ),
+      likes!left ( user_id ),
+      reposts!left ( user_id ),
+      bookmarks!left ( user_id )
+    `;
+
     const { data, error } = await supabase
       .from('bookmarks')
       .select(
         `
         id,
-        post:posts (
-          id,
-          post_type,
-          content,
-          visibility,
-          media_urls,
-          likes_count,
-          comments_count,
-          reposts_count,
-          saves_count,
-          created_at,
-          author:profiles!author_id (*),
-          paper:papers!paper_id (*),
-          post_topics ( topic:topics!topic_id (*) ),
-          likes!left ( user_id ),
-          reposts!left ( user_id ),
-          bookmarks!left ( user_id )
+        created_at,
+        post:posts!post_id (
+          ${postSelectQuery}
         ),
-        paper:papers (
+        paper:papers!paper_id (
           id,
           doi,
           canonical_url,
@@ -1438,10 +1462,14 @@ export async function fetchSavedPostsAndPapers(
 
     data.forEach((row: any) => {
       if (row.post) {
-        posts.push(mapSupabasePost(row.post, userId));
+        const mappedPost = mapSupabasePost(row.post, userId);
+        mappedPost.isSaved = true;
+        posts.push(mappedPost);
       }
       if (row.paper) {
-        papers.push(mapSupabasePaper(row.paper, userId));
+        const mappedPaper = mapSupabasePaper(row.paper, userId);
+        mappedPaper.isSaved = true;
+        papers.push(mappedPaper);
       }
     });
 
