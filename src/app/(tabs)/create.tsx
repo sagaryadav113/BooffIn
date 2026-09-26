@@ -45,6 +45,8 @@ import {
   capturePostImage,
   uploadPostImage,
 } from '../../api/storageService';
+import { MentionSuggestions } from '../../components/composer/MentionSuggestions';
+import { useMentionAutocomplete } from '../../hooks/useMentionAutocomplete';
 
 const POPULAR_TOPICS = [
   'Neuroscience',
@@ -65,7 +67,16 @@ export default function CreatePostScreen() {
   const user = useAuthStore((s) => s.user);
   const createPost = usePostStore((s) => s.createPost);
 
-  const [content, setContent] = useState('');
+  const {
+    text: content,
+    setText: setContent,
+    handleTextChange,
+    handleSelectionChange,
+    isMentionActive,
+    mentionQuery,
+    insertMention,
+  } = useMentionAutocomplete('');
+
   const [postType, setPostType] = useState<PostType>('discussion');
   const [attachedPaper, setAttachedPaper] = useState<Paper | null>(null);
   const [paperModalVisible, setPaperModalVisible] = useState(false);
@@ -354,22 +365,32 @@ export default function CreatePostScreen() {
           {/* User Info & Text Input */}
           <View style={styles.inputContainer}>
             <Avatar
-              uri={user.avatarUrl}
+              url={user.avatarUrl}
               name={user.fullName}
-              size={40}
+              size="md"
               verified={user.orcidVerified}
               style={styles.avatar}
             />
 
-            <TextInput
-              style={styles.textInput}
-              placeholder="What research are you thinking about, critiquing, or sharing?"
-              placeholderTextColor={colors.textMuted}
-              multiline
-              autoFocus
-              value={content}
-              onChangeText={setContent}
-            />
+            <View style={{ flex: 1 }}>
+              {isMentionActive && (
+                <MentionSuggestions
+                  query={mentionQuery}
+                  onSelectUser={(handle) => insertMention(handle)}
+                />
+              )}
+
+              <TextInput
+                style={styles.textInput}
+                placeholder="What research are you thinking about, critiquing, or sharing? Type @ to mention..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                autoFocus
+                value={content}
+                onChangeText={handleTextChange}
+                onSelectionChange={(e) => handleSelectionChange(e.nativeEvent.selection)}
+              />
+            </View>
           </View>
 
           {/* Attached Images Preview Grid */}

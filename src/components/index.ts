@@ -56,4 +56,7 @@ export * from './modals/PostOptionsModal';
 export * from './modals/EditPostModal';
 export * from './modals/SharePostModal';
 
+// Composer Components
+export * from './composer/MentionSuggestions';
+
 

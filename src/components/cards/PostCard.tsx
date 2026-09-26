@@ -167,7 +167,29 @@ export const PostCard: React.FC<PostCardProps> = ({
 
       {/* Post Text Body */}
       {post.content ? (
-        <Text style={styles.postBody}>{post.content}</Text>
+        <Text style={styles.postBody}>
+          {post.content.split(/(@[a-zA-Z0-9_]{2,30})/g).map((part, index) => {
+            if (part.startsWith('@')) {
+              const handle = part.replace('@', '');
+              return (
+                <Text
+                  key={index}
+                  style={styles.mentionText}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    router.push({
+                      pathname: '/profile/[id]',
+                      params: { id: handle },
+                    });
+                  }}
+                >
+                  {part}
+                </Text>
+              );
+            }
+            return <Text key={index}>{part}</Text>;
+          })}
+        </Text>
       ) : null}
 
       {/* Attached Images Cluster with Full-Screen Lightbox */}
@@ -404,6 +426,10 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     marginTop: spacing.xs + 2,
     marginBottom: spacing.xs + 2,
+  },
+  mentionText: {
+    color: colors.accentBlue,
+    fontWeight: '600',
   },
   paperCardSpacing: {
     marginTop: spacing.sm,

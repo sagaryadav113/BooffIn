@@ -547,9 +547,65 @@ export async function createPost(
       createdAt: 'Just now',
     };
 
+    // Asynchronously dispatch mention notifications
+    sendMentionNotifications({
+      content,
+      postId: postRow.id,
+      actorId: user.id,
+      entityType: 'post',
+    }).catch((e) => console.warn('Mention notification error:', e));
+
     return { post: fullPost, error: null };
   } catch (err: any) {
     return { post: null, error: err?.message || 'Failed to publish post.' };
+  }
+}
+
+/**
+ * Scans content for @handle mentions and sends notifications to mentioned users
+ */
+export async function sendMentionNotifications(params: {
+  content: string;
+  postId: string;
+  actorId: string;
+  entityType?: 'post' | 'comment';
+}): Promise<void> {
+  const { content, postId, actorId, entityType = 'post' } = params;
+  if (!content) return;
+
+  const mentionRegex = /@([a-zA-Z0-9_]{2,30})/g;
+  const matches = [...content.matchAll(mentionRegex)];
+  if (matches.length === 0) return;
+
+  const handles = Array.from(new Set(matches.map((m) => m[1].toLowerCase())));
+  if (handles.length === 0) return;
+
+  try {
+    const { data: profiles, error } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .in('username', handles);
+
+    if (error || !profiles || profiles.length === 0) return;
+
+    const targetProfiles = profiles.filter((p) => p.id !== actorId);
+    if (targetProfiles.length === 0) return;
+
+    const snippet = content.length > 80 ? content.slice(0, 80) + '...' : content;
+    const notificationRows = targetProfiles.map((p) => ({
+      recipient_id: p.id,
+      actor_id: actorId,
+      notification_type: 'mention',
+      entity_type: entityType,
+      entity_id: postId,
+      message_snippet: snippet,
+      metadata: { post_id: postId, handle: p.username },
+      read_status: false,
+    }));
+
+    await supabase.from('notifications').insert(notificationRows);
+  } catch (err) {
+    console.warn('[socialService] sendMentionNotifications error:', err);
   }
 }
 
@@ -667,6 +723,14 @@ export async function updatePost(
     if (mapped && topics !== undefined) {
       mapped.topics = topics;
     }
+
+    // Send mention notifications for edited content
+    sendMentionNotifications({
+      content,
+      postId,
+      actorId: user.id,
+      entityType: 'post',
+    }).catch(() => {});
 
     return { post: mapped, error: null };
   } catch (err: any) {
@@ -931,6 +995,13 @@ export async function addComment(
     if (error) {
       return { comment: null, error: error.message };
     }
+
+    sendMentionNotifications({
+      content,
+      postId,
+      actorId: verifiedAuthorId,
+      entityType: 'comment',
+    }).catch(() => {});
 
     return { comment: mapSupabaseComment(data, verifiedAuthorId), error: null };
   } catch (err: any) {

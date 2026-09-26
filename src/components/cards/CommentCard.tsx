@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { router } from 'expo-router';
 import { colors, spacing } from '../../theme';
 import { Comment } from '../../types';
 import { Avatar } from '../core/Avatar';
@@ -66,7 +67,28 @@ export const CommentCard: React.FC<CommentCardProps> = ({
       </View>
 
       <Typography variant="body" color={colors.textPrimary} style={styles.content}>
-        {comment.content}
+        {comment.content.split(/(@[a-zA-Z0-9_]{2,30})/g).map((part, idx) => {
+          if (part.startsWith('@')) {
+            const handle = part.replace('@', '');
+            return (
+              <Typography
+                key={idx}
+                variant="body"
+                color={colors.accentBlue}
+                style={{ fontWeight: '600' }}
+                onPress={() => {
+                  router.push({
+                    pathname: '/profile/[id]',
+                    params: { id: handle },
+                  });
+                }}
+              >
+                {part}
+              </Typography>
+            );
+          }
+          return part;
+        })}
       </Typography>
 
       <View style={styles.actionsRow}>

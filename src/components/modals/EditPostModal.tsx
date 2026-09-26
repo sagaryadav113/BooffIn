@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import * as Haptics from 'expo-haptics';
 import { Post } from '../../types';
 import { colors, radii, spacing, fontSizes, typography, shadows } from '../../theme';
 import { usePostStore } from '../../store/usePostStore';
+import { MentionSuggestions } from '../composer/MentionSuggestions';
+import { useMentionAutocomplete } from '../../hooks/useMentionAutocomplete';
 
 export interface EditPostModalProps {
   visible: boolean;
@@ -45,7 +47,18 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
 }) => {
   const updatePost = usePostStore((s) => s.updatePost);
 
-  const [content, setContent] = useState(post.content || '');
+  // Mention autocomplete hook for post body
+  const {
+    text: content,
+    setText: setContent,
+    handleTextChange,
+    handleSelectionChange,
+    isMentionActive,
+    mentionQuery,
+    insertMention,
+  } = useMentionAutocomplete(post.content || '');
+
+  const [initialTopics, setInitialTopics] = useState<string[]>(post.topics || []);
   const [topics, setTopics] = useState<string[]>(post.topics || []);
   const [newTopicInput, setNewTopicInput] = useState('');
   const [showAddTopic, setShowAddTopic] = useState(false);
@@ -53,16 +66,17 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Sync state if post changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (visible) {
       setContent(post.content || '');
+      setInitialTopics(post.topics || []);
       setTopics(post.topics || []);
       setNewTopicInput('');
       setShowAddTopic(false);
       setErrorMsg(null);
       setIsSaving(false);
     }
-  }, [visible, post]);
+  }, [visible, post, setContent]);
 
   const handleAddTopic = (topicName: string) => {
     const cleaned = topicName.trim().replace(/^#/, '');
@@ -82,7 +96,15 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
     } catch {}
   };
 
-  const handleRemoveTopic = (topicToRemove: string) => {
+  // Only newly added topics in this session can be cancelled before saving; initial topics cannot be deleted
+  const handleRemoveNewlyAddedTopic = (topicToRemove: string) => {
+    if (initialTopics.includes(topicToRemove)) {
+      Alert.alert(
+        'Permanent Tag',
+        'In accordance with academic topic indexing, tags already published on a post cannot be deleted.'
+      );
+      return;
+    }
     setTopics(topics.filter((t) => t !== topicToRemove));
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -181,18 +203,30 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
               {/* Text Content Editor */}
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionLabel}>Written Content</Text>
+                  <Text style={styles.sectionLabel}>Written Content & Mentions</Text>
                   <Text style={styles.charCount}>{content.length} / 5000</Text>
                 </View>
+
+                {/* Mention Autocomplete Suggestions */}
+                {isMentionActive && (
+                  <MentionSuggestions
+                    query={mentionQuery}
+                    onSelectUser={(handle) => {
+                      insertMention(handle);
+                    }}
+                  />
+                )}
+
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Share your research hypothesis, critique, or update..."
+                  placeholder="Share your research hypothesis, critique, or update... Type @ to mention a colleague."
                   placeholderTextColor={colors.textMuted}
                   value={content}
                   onChangeText={(text) => {
-                    setContent(text);
+                    handleTextChange(text);
                     if (errorMsg) setErrorMsg(null);
                   }}
+                  onSelectionChange={(e) => handleSelectionChange(e.nativeEvent.selection)}
                   multiline
                   autoFocus
                   maxLength={5000}
@@ -220,20 +254,43 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
                   )}
                 </View>
 
+                <Text style={styles.tagRuleNotice}>
+                  * Once tags are added to a post, they cannot be deleted. You may add up to 6 topics total.
+                </Text>
+
                 {/* Active Topics Chips */}
                 <View style={styles.tagChipsContainer}>
-                  {topics.map((t) => (
-                    <View key={t} style={styles.topicChip}>
-                      <Text style={styles.topicChipText}>#{t}</Text>
-                      <TouchableOpacity
-                        onPress={() => handleRemoveTopic(t)}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                        style={styles.removeTopicBtn}
+                  {topics.map((t) => {
+                    const isPermanent = initialTopics.includes(t);
+                    return (
+                      <View
+                        key={t}
+                        style={[
+                          styles.topicChip,
+                          isPermanent && styles.topicChipPermanent,
+                        ]}
                       >
-                        <X size={12} color={colors.accentBlue} />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
+                        {isPermanent && <Lock size={10} color={colors.textSecondary} style={{ marginRight: 2 }} />}
+                        <Text
+                          style={[
+                            styles.topicChipText,
+                            isPermanent && styles.topicChipTextPermanent,
+                          ]}
+                        >
+                          #{t}
+                        </Text>
+                        {!isPermanent && (
+                          <TouchableOpacity
+                            onPress={() => handleRemoveNewlyAddedTopic(t)}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                            style={styles.removeTopicBtn}
+                          >
+                            <X size={12} color={colors.accentBlue} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })}
                   {topics.length === 0 && (
                     <Text style={styles.emptyTopicsNotice}>
                       No research tags selected. Add relevant fields to help colleagues discover your post.
@@ -471,6 +528,12 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.micro,
     color: colors.textSecondary,
   },
+  tagRuleNotice: {
+    fontSize: fontSizes.micro,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    fontStyle: 'italic',
+  },
   labelWithIcon: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -518,10 +581,20 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     gap: 6,
   },
+  topicChipPermanent: {
+    backgroundColor: colors.surfaceHover,
+    borderColor: colors.borderDark,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
   topicChipText: {
     fontSize: fontSizes.micro,
     fontWeight: '600',
     color: colors.accentBlue,
+  },
+  topicChipTextPermanent: {
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
   removeTopicBtn: {
     padding: 2,
