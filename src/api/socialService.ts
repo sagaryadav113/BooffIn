@@ -191,7 +191,7 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
     content: row.content || '',
     paper,
     images: Array.isArray(row.media_urls) ? row.media_urls : [],
-    topics: topics.length > 0 ? topics : ['General Science'],
+    topics: topics.length > 0 ? topics : [],
     visibility: row.visibility || 'public',
     likesCount: row.likes_count || 0,
     commentsCount: row.comments_count || 0,

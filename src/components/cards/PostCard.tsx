@@ -172,13 +172,15 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
       {post.paper && <PaperCard paper={post.paper} style={styles.paperCardSpacing} />}
 
       {/* Topic Chips */}
-      {Array.isArray(post.topics) && post.topics.length > 0 ? (
+      {Array.isArray(post.topics) && post.topics.filter((t) => typeof t === 'string' && t.trim().length > 0).length > 0 ? (
         <View style={styles.topicChipsRow}>
-          {post.topics.map((t) => (
-            <View key={t} style={styles.topicChip}>
-              <Text style={styles.topicChipText}>#{t}</Text>
-            </View>
-          ))}
+          {post.topics
+            .filter((t) => typeof t === 'string' && t.trim().length > 0)
+            .map((t) => (
+              <View key={t} style={styles.topicChip}>
+                <Text style={styles.topicChipText}>#{t.trim()}</Text>
+              </View>
+            ))}
         </View>
       ) : null}
 

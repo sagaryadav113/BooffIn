@@ -72,7 +72,7 @@ export default function CreatePostScreen() {
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
 
   // Selected Topics
-  const [selectedTopics, setSelectedTopics] = useState<string[]>(['Neuroscience']);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [topicModalVisible, setTopicModalVisible] = useState(false);
   const [customTopicInput, setCustomTopicInput] = useState('');
 

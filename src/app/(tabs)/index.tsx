@@ -22,16 +22,6 @@ import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Post } from '../../types';
 
-const FEED_TABS = [
-  'For You',
-  'Following',
-  'Neuroscience',
-  'AI & Bio',
-  'Genetics',
-  'Cancer',
-  'Immunology',
-];
-
 export default function HomeScreen() {
   const posts = usePostStore((s) => s.posts);
   const activeTab = usePostStore((s) => s.activeTab);
@@ -45,6 +35,17 @@ export default function HomeScreen() {
   const hasMore = usePostStore((s) => s.hasMore);
   const feedError = usePostStore((s) => s.feedError);
   const currentUser = useAuthStore((s) => s.user);
+
+  // Dynamic feed navigation tabs: For You, Following, plus user's chosen research interests
+  const userInterests = useMemo(() => {
+    return Array.isArray(currentUser?.researchInterests)
+      ? currentUser.researchInterests.filter((t) => typeof t === 'string' && t.trim().length > 0)
+      : [];
+  }, [currentUser?.researchInterests]);
+
+  const feedTabs = useMemo(() => {
+    return ['For You', 'Following', ...userInterests];
+  }, [userInterests]);
 
   useEffect(() => {
     fetchFeed(activeTab, currentUser?.id);
@@ -71,18 +72,11 @@ export default function HomeScreen() {
     return posts.filter((post) => {
       if (activeTab === 'For You') return true;
       if (activeTab === 'Following') return true;
-      if (activeTab === 'AI & Bio') {
-        return post.topics.some(
-          (t) =>
-            t.toLowerCase().includes('ai') ||
-            t.toLowerCase().includes('bioinformatics') ||
-            t.toLowerCase().includes('single cell') ||
-            t.toLowerCase().includes('multi-omics')
-        );
-      }
-      return post.topics.some((t) =>
-        t.toLowerCase().includes(activeTab.toLowerCase())
-      );
+      const tabLower = activeTab.toLowerCase();
+      return Array.isArray(post.topics) && post.topics.some((t) => {
+        const topicLower = t.toLowerCase();
+        return topicLower.includes(tabLower) || tabLower.includes(topicLower);
+      });
     });
   }, [posts, activeTab]);
 
@@ -116,9 +110,9 @@ export default function HomeScreen() {
         onCreatePress={() => router.push('/(tabs)/create')}
       />
 
-      {/* Feed Navigation Tabs (For You, Following, Topics) */}
+      {/* Feed Navigation Tabs (For You, Following, plus User's Research Interests) */}
       <FeedNavigation
-        tabs={FEED_TABS}
+        tabs={feedTabs}
         activeTab={activeTab}
         onTabChange={handleTabChange}
       />
