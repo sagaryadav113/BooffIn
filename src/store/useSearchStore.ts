@@ -22,6 +22,7 @@ interface SearchState {
   addRecentSearch: (term: string) => void;
   removeRecentSearch: (term: string) => void;
   clearRecentSearches: () => void;
+  updateResearcherFollowState: (researcherId: string, isFollowing: boolean) => void;
 }
 
 const emptyResults: SearchResults = {
@@ -213,5 +214,24 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
   clearRecentSearches: () => {
     set({ recentSearches: [] });
+  },
+
+  updateResearcherFollowState: (researcherId: string, isFollowing: boolean) => {
+    set((state) => ({
+      results: {
+        ...state.results,
+        researchers: state.results.researchers.map((r) =>
+          r.id === researcherId
+            ? {
+                ...r,
+                isFollowing,
+                followersCount: isFollowing
+                  ? r.followersCount + 1
+                  : Math.max(0, r.followersCount - 1),
+              }
+            : r
+        ),
+      },
+    }));
   },
 }));

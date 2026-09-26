@@ -6,3 +6,4 @@ export * from './notificationService';
 export * from './paperResolver';
 export * from './settingsService';
 export * from './moderationService';
+export * from './storageService';

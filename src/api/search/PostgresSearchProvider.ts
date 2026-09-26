@@ -48,6 +48,20 @@ export class PostgresSearchProvider implements SearchProvider {
       // 1. Search Researchers (PostgreSQL profiles table)
       if (category === 'all' || category === 'researchers') {
         const fetchLimit = category === 'researchers' ? limit : Math.max(3, Math.floor(limit / 4));
+        
+        let viewerFollowingSet = new Set<string>();
+        const { data: authData } = await supabase.auth.getUser();
+        const viewerId = authData?.user?.id;
+        if (viewerId) {
+          const { data: followRows } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', viewerId);
+          if (followRows) {
+            followRows.forEach((r) => viewerFollowingSet.add(r.following_id));
+          }
+        }
+
         const { data, count, error } = await supabase
           .from('profiles')
           .select('*', { count: 'exact' })
@@ -57,7 +71,10 @@ export class PostgresSearchProvider implements SearchProvider {
           .range(offset, offset + fetchLimit - 1);
 
         if (!error && data) {
-          researchers = data.map((row) => mapProfileRecord(row));
+          researchers = data.map((row) => {
+            const isFollowing = viewerFollowingSet.has(row.id);
+            return mapProfileRecord(row, undefined, isFollowing);
+          });
           countResearchers = count || data.length;
         }
       }

@@ -3,6 +3,9 @@ export interface UserProfile {
   handle: string;
   fullName: string;
   avatarUrl?: string;
+  bannerUrl?: string;
+  hasCustomAvatar?: boolean;
+  hasCustomBanner?: boolean;
   academicTitle: string; // e.g. "Neuroscientist", "PhD Candidate", "Professor of Physics"
   institution: string; // e.g. "MIT", "Stanford University", "Max Planck"
   department?: string; // e.g. "Department of Brain and Cognitive Sciences"

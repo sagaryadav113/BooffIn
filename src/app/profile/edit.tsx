@@ -14,6 +14,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
   Camera,
@@ -27,6 +28,8 @@ import {
   BookOpen,
   ExternalLink,
   X,
+  Upload,
+  Trash2,
   Image as ImageIcon,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -40,14 +43,25 @@ import {
   checkUsernameAvailability,
   normalizeHandle,
 } from '../../api/authService';
+import {
+  pickAvatarImage,
+  pickBannerImage,
+  uploadProfileAvatar,
+  uploadProfileBanner,
+  removeProfileAvatar,
+  removeProfileBanner,
+} from '../../api/storageService';
+
+const DEFAULT_BANNER_FALLBACK = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
 export default function EditProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const updateProfile = useAuthStore((s) => s.updateProfile);
 
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
-  const [photoModalOpen, setPhotoModalOpen] = useState(false);
-  const [tempPhotoUrl, setTempPhotoUrl] = useState(user?.avatarUrl || '');
+  const [bannerUrl, setBannerUrl] = useState(user?.bannerUrl || '');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [handle, setHandle] = useState(user?.handle || '');
@@ -139,6 +153,76 @@ export default function EditProfileScreen() {
     };
   }, [cleanHandle, isCurrentHandle, valResult?.isValid, user?.id]);
 
+  const handlePickAvatar = async () => {
+    if (!user?.id) return;
+    const res = await pickAvatarImage();
+    if (res.cancelled || !res.asset) return;
+
+    setIsUploadingAvatar(true);
+    const uploadRes = await uploadProfileAvatar(user.id, res.asset);
+    setIsUploadingAvatar(false);
+
+    if (uploadRes.success && uploadRes.url) {
+      setAvatarUrl(uploadRes.url);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    } else {
+      Alert.alert('Photo Upload Failed', uploadRes.error || 'Could not upload photo.');
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!user?.id) return;
+    setIsUploadingAvatar(true);
+    const res = await removeProfileAvatar(user.id);
+    setIsUploadingAvatar(false);
+
+    if (res.success) {
+      setAvatarUrl('');
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+    } else {
+      Alert.alert('Remove Failed', res.error || 'Could not remove photo.');
+    }
+  };
+
+  const handlePickBanner = async () => {
+    if (!user?.id) return;
+    const res = await pickBannerImage();
+    if (res.cancelled || !res.asset) return;
+
+    setIsUploadingBanner(true);
+    const uploadRes = await uploadProfileBanner(user.id, res.asset);
+    setIsUploadingBanner(false);
+
+    if (uploadRes.success && uploadRes.url) {
+      setBannerUrl(uploadRes.url);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    } else {
+      Alert.alert('Banner Upload Failed', uploadRes.error || 'Could not upload banner.');
+    }
+  };
+
+  const handleRemoveBanner = async () => {
+    if (!user?.id) return;
+    setIsUploadingBanner(true);
+    const res = await removeProfileBanner(user.id);
+    setIsUploadingBanner(false);
+
+    if (res.success) {
+      setBannerUrl('');
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+    } else {
+      Alert.alert('Remove Failed', res.error || 'Could not remove banner.');
+    }
+  };
+
   const handleSave = async () => {
     if (!fullName.trim()) {
       Alert.alert('Validation Error', 'Full Name cannot be empty.');
@@ -170,6 +254,9 @@ export default function EditProfileScreen() {
 
     const updates = {
       avatarUrl: avatarUrl.trim() || undefined,
+      bannerUrl: bannerUrl.trim() || undefined,
+      hasCustomAvatar: true,
+      hasCustomBanner: true,
       fullName: fullName.trim(),
       handle: cleanHandle,
       academicTitle: academicTitle.trim(),
@@ -199,17 +286,6 @@ export default function EditProfileScreen() {
     router.back();
   };
 
-  const handleSavePhotoUrl = () => {
-    setAvatarUrl(tempPhotoUrl.trim());
-    setPhotoModalOpen(false);
-  };
-
-  const handleRemovePhoto = () => {
-    setAvatarUrl('');
-    setTempPhotoUrl('');
-    setPhotoModalOpen(false);
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
@@ -236,36 +312,106 @@ export default function EditProfileScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Professional Avatar Section */}
-          <View style={styles.avatarSection}>
-            <View style={styles.avatarWrapper}>
-              <Avatar
-                url={avatarUrl || undefined}
-                name={fullName || 'Researcher'}
-                size={88}
-                verified={!!orcidId.trim()}
+          {/* Media Header: Banner and Avatar Customizer */}
+          <View style={styles.mediaSection}>
+            {/* Banner Preview & Controls */}
+            <View style={styles.bannerEditorContainer}>
+              <Image
+                source={{ uri: bannerUrl || DEFAULT_BANNER_FALLBACK }}
+                style={styles.bannerPreviewImage}
+                contentFit="cover"
               />
-              <TouchableOpacity
-                onPress={() => {
-                  setTempPhotoUrl(avatarUrl);
-                  setPhotoModalOpen(true);
-                }}
-                style={styles.avatarBadgeButton}
-                activeOpacity={0.8}
-              >
-                <Camera size={14} color={colors.white} />
-              </TouchableOpacity>
+
+              {isUploadingBanner && (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator size="small" color={colors.white} />
+                  <Text style={styles.uploadingText}>Uploading Banner...</Text>
+                </View>
+              )}
+
+              <View style={styles.bannerControlsRow}>
+                <TouchableOpacity
+                  onPress={handlePickBanner}
+                  disabled={isUploadingBanner}
+                  style={styles.mediaButton}
+                  activeOpacity={0.8}
+                >
+                  <Camera size={13} color={colors.white} />
+                  <Text style={styles.mediaButtonText}>
+                    {bannerUrl ? 'Change Banner' : 'Upload Banner'}
+                  </Text>
+                </TouchableOpacity>
+
+                {bannerUrl ? (
+                  <TouchableOpacity
+                    onPress={handleRemoveBanner}
+                    disabled={isUploadingBanner}
+                    style={[styles.mediaButton, styles.mediaButtonDanger]}
+                    activeOpacity={0.8}
+                  >
+                    <Trash2 size={13} color={colors.accentRed} />
+                    <Text style={[styles.mediaButtonText, { color: colors.accentRed }]}>Remove</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </View>
 
-            <TouchableOpacity
-              onPress={() => {
-                setTempPhotoUrl(avatarUrl);
-                setPhotoModalOpen(true);
-              }}
-              style={styles.changePhotoBtn}
-            >
-              <Text style={styles.changePhotoText}>Change Profile Photo</Text>
-            </TouchableOpacity>
+            {/* Avatar Preview & Controls */}
+            <View style={styles.avatarEditorRow}>
+              <View style={styles.avatarWrapper}>
+                <Avatar
+                  url={avatarUrl || undefined}
+                  name={fullName || 'Researcher'}
+                  size={84}
+                  verified={!!orcidId.trim()}
+                />
+                {isUploadingAvatar && (
+                  <View style={styles.avatarUploadingOverlay}>
+                    <ActivityIndicator size="small" color={colors.white} />
+                  </View>
+                )}
+                <TouchableOpacity
+                  onPress={handlePickAvatar}
+                  disabled={isUploadingAvatar}
+                  style={styles.avatarBadgeButton}
+                  activeOpacity={0.8}
+                >
+                  <Camera size={14} color={colors.white} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.avatarActionsCol}>
+                <Text style={styles.avatarSectionHeading}>Profile Photo</Text>
+                <Text style={styles.avatarSectionHint}>
+                  Visible across posts, citations, and author lists (Max 5MB)
+                </Text>
+                <View style={styles.avatarButtonsRow}>
+                  <TouchableOpacity
+                    onPress={handlePickAvatar}
+                    disabled={isUploadingAvatar}
+                    style={styles.actionPillBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Upload size={13} color={colors.textPrimary} />
+                    <Text style={styles.actionPillBtnText}>
+                      {avatarUrl ? 'Change Photo' : 'Upload Photo'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {avatarUrl ? (
+                    <TouchableOpacity
+                      onPress={handleRemoveAvatar}
+                      disabled={isUploadingAvatar}
+                      style={[styles.actionPillBtn, styles.actionPillBtnDanger]}
+                      activeOpacity={0.8}
+                    >
+                      <Trash2 size={13} color={colors.accentRed} />
+                      <Text style={[styles.actionPillBtnText, { color: colors.accentRed }]}>Remove</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+            </View>
           </View>
 
           {/* Form Fields */}
@@ -448,54 +594,6 @@ export default function EditProfileScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Photo URL Modal */}
-      <Modal
-        visible={photoModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPhotoModalOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Update Profile Photo</Text>
-              <TouchableOpacity onPress={() => setPhotoModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSubtitle}>
-              Enter a direct image URL (JPEG, PNG, or WebP) for your academic portrait.
-            </Text>
-
-            <TextInput
-              style={styles.modalInput}
-              value={tempPhotoUrl}
-              onChangeText={setTempPhotoUrl}
-              placeholder="https://example.com/photo.jpg"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            <View style={styles.modalActions}>
-              {avatarUrl ? (
-                <TouchableOpacity onPress={handleRemovePhoto} style={styles.modalRemoveBtn}>
-                  <Text style={styles.modalRemoveText}>Remove Photo</Text>
-                </TouchableOpacity>
-              ) : null}
-              <Button
-                title="Apply Photo"
-                variant="primary"
-                size="md"
-                onPress={handleSavePhotoUrl}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -519,16 +617,91 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: '700',
   },
-  avatarSection: {
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
+  mediaSection: {
     backgroundColor: colors.backgroundSecondary,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
+    paddingBottom: spacing.lg,
+  },
+  bannerEditorContainer: {
+    width: '100%',
+    height: 130,
+    position: 'relative',
+    backgroundColor: colors.cardBackground,
+  },
+  bannerPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    zIndex: 10,
+  },
+  uploadingText: {
+    ...typography.captionBold,
+    color: colors.white,
+    fontSize: 13,
+  },
+  bannerControlsRow: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    right: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+    zIndex: 5,
+  },
+  mediaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 5,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  mediaButtonDanger: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FED7D7',
+  },
+  mediaButtonText: {
+    ...typography.micro,
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: 11.5,
+  },
+  avatarEditorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    marginTop: -32,
+    gap: spacing.md,
   },
   avatarWrapper: {
     position: 'relative',
-    marginBottom: spacing.xs,
+  },
+  avatarUploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   avatarBadgeButton: {
     position: 'absolute',
@@ -542,17 +715,50 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: colors.white,
+    zIndex: 15,
   },
-  changePhotoBtn: {
-    marginTop: spacing.xs,
-    paddingVertical: spacing.xxs,
-    paddingHorizontal: spacing.sm,
+  avatarActionsCol: {
+    flex: 1,
+    marginTop: 28,
   },
-  changePhotoText: {
+  avatarSectionHeading: {
     ...typography.captionBold,
     color: colors.textPrimary,
-    fontSize: 13,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  avatarSectionHint: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11.5,
+    marginTop: 2,
+    marginBottom: spacing.xs,
+  },
+  avatarButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+  },
+  actionPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.cardBackground,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 5,
+    borderRadius: radii.full,
+  },
+  actionPillBtnDanger: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FED7D7',
+  },
+  actionPillBtnText: {
+    ...typography.micro,
+    color: colors.textPrimary,
     fontWeight: '600',
+    fontSize: 11.5,
   },
   formCard: {
     padding: spacing.xl,
@@ -628,71 +834,6 @@ const styles = StyleSheet.create({
   submitBtn: {
     marginTop: spacing.md,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: colors.background,
-    borderRadius: radii.xl,
-    padding: spacing.xl,
-    gap: spacing.md,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  modalTitle: {
-    ...typography.h3,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  modalCloseBtn: {
-    padding: spacing.xs,
-  },
-  modalSubtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-  modalInput: {
-    ...typography.body,
-    fontSize: 14,
-    color: colors.textPrimary,
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  modalRemoveBtn: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalRemoveText: {
-    ...typography.captionBold,
-    color: colors.accentRed,
-  },
   availabilityRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -716,3 +857,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+

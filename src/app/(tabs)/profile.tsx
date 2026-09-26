@@ -9,6 +9,9 @@ import {
   TouchableOpacity,
   Linking,
   Share,
+  Alert,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -28,6 +31,10 @@ import {
   Clock,
   Check,
   X as XIcon,
+  Camera,
+  Trash2,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -48,7 +55,18 @@ import {
   withdrawCollaborationRequest,
   getResearcherDiscussedTopics,
 } from '../../api/connectionService';
+import {
+  pickAvatarImage,
+  pickBannerImage,
+  uploadProfileAvatar,
+  uploadProfileBanner,
+  removeProfileAvatar,
+  removeProfileBanner,
+} from '../../api/storageService';
 import { CollaborationRequest } from '../../types';
+import { FollowListModal } from '../../components/modals/FollowListModal';
+
+export const DEFAULT_PROFILE_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
 export default function CurrentUserProfileScreen() {
   const storeUser = useAuthStore((s) => s.user);
@@ -63,7 +81,72 @@ export default function CurrentUserProfileScreen() {
     outgoing: CollaborationRequest[];
   }>({ incoming: [], outgoing: [] });
 
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [bannerModalOpen, setBannerModalOpen] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [followModalVisible, setFollowModalVisible] = useState(false);
+  const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
+
   const user = storeUser;
+
+  const handlePickAndUploadAvatar = async () => {
+    setAvatarModalOpen(false);
+    if (!user?.id) return;
+
+    const res = await pickAvatarImage();
+    if (res.cancelled || !res.asset) return;
+
+    setIsUploadingAvatar(true);
+    const uploadRes = await uploadProfileAvatar(user.id, res.asset);
+    setIsUploadingAvatar(false);
+
+    if (!uploadRes.success) {
+      Alert.alert('Upload Failed', uploadRes.error || 'Could not upload profile photo.');
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setAvatarModalOpen(false);
+    if (!user?.id) return;
+
+    setIsUploadingAvatar(true);
+    const res = await removeProfileAvatar(user.id);
+    setIsUploadingAvatar(false);
+
+    if (!res.success) {
+      Alert.alert('Remove Failed', res.error || 'Could not remove profile photo.');
+    }
+  };
+
+  const handlePickAndUploadBanner = async () => {
+    setBannerModalOpen(false);
+    if (!user?.id) return;
+
+    const res = await pickBannerImage();
+    if (res.cancelled || !res.asset) return;
+
+    setIsUploadingBanner(true);
+    const uploadRes = await uploadProfileBanner(user.id, res.asset);
+    setIsUploadingBanner(false);
+
+    if (!uploadRes.success) {
+      Alert.alert('Upload Failed', uploadRes.error || 'Could not upload banner.');
+    }
+  };
+
+  const handleRemoveBanner = async () => {
+    setBannerModalOpen(false);
+    if (!user?.id) return;
+
+    setIsUploadingBanner(true);
+    const res = await removeProfileBanner(user.id);
+    setIsUploadingBanner(false);
+
+    if (!res.success) {
+      Alert.alert('Remove Failed', res.error || 'Could not remove banner.');
+    }
+  };
 
   const loadRequests = React.useCallback(async () => {
     if (!user?.id) return;
@@ -160,13 +243,29 @@ export default function CurrentUserProfileScreen() {
         <View style={styles.bannerContainer}>
           <Image
             source={{
-              uri: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80',
+              uri: user.bannerUrl || DEFAULT_PROFILE_BANNER,
             }}
             style={styles.bannerImage}
             contentFit="cover"
           />
+
+          {isUploadingBanner && (
+            <View style={styles.uploadingOverlay}>
+              <ActivityIndicator size="small" color={colors.white} />
+              <Text style={styles.uploadingText}>Updating Banner...</Text>
+            </View>
+          )}
+
           <View style={styles.bannerNav}>
-            <View />
+            <TouchableOpacity
+              onPress={() => setBannerModalOpen(true)}
+              style={styles.bannerEditBadge}
+              activeOpacity={0.8}
+            >
+              <Camera size={14} color={colors.white} />
+              <Text style={styles.bannerEditText}>Edit Banner</Text>
+            </TouchableOpacity>
+
             <View style={styles.bannerActions}>
               <IconButton
                 icon="Share2"
@@ -192,13 +291,29 @@ export default function CurrentUserProfileScreen() {
         <View style={styles.profileHeader}>
           {/* Avatar & Edit Profile Action */}
           <View style={styles.avatarActionRow}>
-            <Avatar
-              url={user.avatarUrl}
-              name={user.fullName}
-              size={84}
-              verified={user.orcidVerified}
-              style={styles.avatarOverBanner}
-            />
+            <View style={styles.avatarContainerWrapper}>
+              <Avatar
+                url={user.avatarUrl}
+                name={user.fullName}
+                size={84}
+                verified={user.orcidVerified}
+                style={styles.avatarOverBanner}
+              />
+
+              {isUploadingAvatar && (
+                <View style={styles.avatarUploadingOverlay}>
+                  <ActivityIndicator size="small" color={colors.white} />
+                </View>
+              )}
+
+              <TouchableOpacity
+                onPress={() => setAvatarModalOpen(true)}
+                style={styles.avatarCameraBadge}
+                activeOpacity={0.8}
+              >
+                <Camera size={13} color={colors.white} />
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.actionButtonsRow}>
               {!isAuthenticated ? (
@@ -338,14 +453,30 @@ export default function CurrentUserProfileScreen() {
 
           {/* Following / Followers Stats */}
           <View style={styles.statsRow}>
-            <View style={styles.statItem}>
+            <TouchableOpacity
+              onPress={() => {
+                setFollowModalType('following');
+                setFollowModalVisible(true);
+              }}
+              style={styles.statItem}
+              activeOpacity={0.7}
+            >
               <Text style={styles.statNumber}>{user.followingCount || 0}</Text>
               <Text style={styles.statLabel}>Following</Text>
-            </View>
-            <View style={styles.statItem}>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setFollowModalType('followers');
+                setFollowModalVisible(true);
+              }}
+              style={styles.statItem}
+              activeOpacity={0.7}
+            >
               <Text style={styles.statNumber}>{formatCount(user.followersCount)}</Text>
               <Text style={styles.statLabel}>Followers</Text>
-            </View>
+            </TouchableOpacity>
+
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{posts.length}</Text>
               <Text style={styles.statLabel}>Posts & Shares</Text>
@@ -597,6 +728,153 @@ export default function CurrentUserProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Avatar Action Modal */}
+      <Modal
+        visible={avatarModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarModalOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setAvatarModalOpen(false)}
+        >
+          <View style={styles.actionModalSheet}>
+            <View style={styles.actionModalHeader}>
+              <Text style={styles.actionModalTitle}>Profile Photo</Text>
+              <TouchableOpacity onPress={() => setAvatarModalOpen(false)}>
+                <XIcon size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.actionModalSubtitle}>
+              Upload a clear academic headshot or avatar. (JPG, PNG, WebP, max 5MB)
+            </Text>
+
+            <TouchableOpacity
+              style={styles.actionModalOption}
+              onPress={handlePickAndUploadAvatar}
+              activeOpacity={0.7}
+            >
+              <View style={styles.actionModalOptionIcon}>
+                <Upload size={18} color={colors.textPrimary} />
+              </View>
+              <View style={styles.actionModalOptionText}>
+                <Text style={styles.actionOptionTitle}>
+                  {user.avatarUrl ? 'Upload New Photo' : 'Upload Profile Photo'}
+                </Text>
+                <Text style={styles.actionOptionDesc}>Choose from photo gallery / library</Text>
+              </View>
+            </TouchableOpacity>
+
+            {user.avatarUrl ? (
+              <TouchableOpacity
+                style={[styles.actionModalOption, styles.actionModalOptionDanger]}
+                onPress={handleRemoveAvatar}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.actionModalOptionIcon, { backgroundColor: '#FEE2E2' }]}>
+                  <Trash2 size={18} color={colors.accentRed} />
+                </View>
+                <View style={styles.actionModalOptionText}>
+                  <Text style={[styles.actionOptionTitle, { color: colors.accentRed }]}>
+                    Remove Profile Photo
+                  </Text>
+                  <Text style={styles.actionOptionDesc}>Reset to default initials</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity
+              style={styles.actionModalCancelBtn}
+              onPress={() => setAvatarModalOpen(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.actionModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Banner Action Modal */}
+      <Modal
+        visible={bannerModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBannerModalOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setBannerModalOpen(false)}
+        >
+          <View style={styles.actionModalSheet}>
+            <View style={styles.actionModalHeader}>
+              <Text style={styles.actionModalTitle}>Profile Banner Image</Text>
+              <TouchableOpacity onPress={() => setBannerModalOpen(false)}>
+                <XIcon size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.actionModalSubtitle}>
+              Customize your profile header cover image. (Panoramic 3:1 aspect ratio, max 5MB)
+            </Text>
+
+            <TouchableOpacity
+              style={styles.actionModalOption}
+              onPress={handlePickAndUploadBanner}
+              activeOpacity={0.7}
+            >
+              <View style={styles.actionModalOptionIcon}>
+                <ImageIcon size={18} color={colors.textPrimary} />
+              </View>
+              <View style={styles.actionModalOptionText}>
+                <Text style={styles.actionOptionTitle}>
+                  {user.bannerUrl ? 'Upload New Banner' : 'Upload Banner Image'}
+                </Text>
+                <Text style={styles.actionOptionDesc}>Choose panoramic cover image from library</Text>
+              </View>
+            </TouchableOpacity>
+
+            {user.bannerUrl ? (
+              <TouchableOpacity
+                style={[styles.actionModalOption, styles.actionModalOptionDanger]}
+                onPress={handleRemoveBanner}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.actionModalOptionIcon, { backgroundColor: '#FEE2E2' }]}>
+                  <Trash2 size={18} color={colors.accentRed} />
+                </View>
+                <View style={styles.actionModalOptionText}>
+                  <Text style={[styles.actionOptionTitle, { color: colors.accentRed }]}>
+                    Remove Custom Banner
+                  </Text>
+                  <Text style={styles.actionOptionDesc}>Reset to default scientific background</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity
+              style={styles.actionModalCancelBtn}
+              onPress={() => setBannerModalOpen(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.actionModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Followers & Following List Modal */}
+      <FollowListModal
+        visible={followModalVisible}
+        onClose={() => setFollowModalVisible(false)}
+        userId={user.id}
+        type={followModalType}
+        userName={user.fullName}
+      />
     </SafeAreaView>
   );
 }
@@ -613,10 +891,46 @@ const styles = StyleSheet.create({
     height: 140,
     width: '100%',
     position: 'relative',
+    backgroundColor: colors.backgroundSecondary,
   },
   bannerImage: {
     width: '100%',
     height: '100%',
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    zIndex: 10,
+  },
+  uploadingText: {
+    ...typography.captionBold,
+    color: colors.white,
+    fontSize: 13,
+  },
+  bannerEditBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  bannerEditText: {
+    ...typography.micro,
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: 11,
   },
   bannerNav: {
     position: 'absolute',
@@ -626,6 +940,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 5,
   },
   bannerActions: {
     flexDirection: 'row',
@@ -646,9 +961,38 @@ const styles = StyleSheet.create({
     marginTop: -42,
     marginBottom: spacing.sm,
   },
+  avatarContainerWrapper: {
+    position: 'relative',
+  },
   avatarOverBanner: {
     borderWidth: 3,
     borderColor: colors.white,
+  },
+  avatarUploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  avatarCameraBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    backgroundColor: colors.black,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+    zIndex: 15,
   },
   actionButtonsRow: {
     flexDirection: 'row',
@@ -1026,4 +1370,85 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  actionModalSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.md,
+  },
+  actionModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  actionModalTitle: {
+    ...typography.h3,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  actionModalSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  actionModalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  actionModalOptionDanger: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FED7D7',
+  },
+  actionModalOptionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radii.md,
+    backgroundColor: colors.cardBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionModalOptionText: {
+    flex: 1,
+  },
+  actionOptionTitle: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  actionOptionDesc: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  actionModalCancelBtn: {
+    marginTop: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: colors.backgroundSecondary,
+  },
+  actionModalCancelText: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 14,
+  },
 });
+

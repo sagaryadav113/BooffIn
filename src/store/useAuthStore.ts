@@ -13,7 +13,8 @@ import {
   persistUserProfile,
   SignUpParams,
 } from '../api/authService';
-import { followUser, unfollowUser } from '../api/socialService';
+import { followUser, unfollowUser, toggleFollowUserRpc, fetchUserFollowingIds } from '../api/socialService';
+import { useSearchStore } from './useSearchStore';
 import { supabase } from '../api/client';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -41,10 +42,14 @@ interface AuthState {
   isLoading: boolean;
   authError: string | null;
   users: UserProfile[];
+  followingIds: Set<string>;
+  followLoadingIds: Set<string>;
   isInitialized: boolean;
 
   // Actions
   initializeAuth: () => Promise<void>;
+  loadFollowingIds: (userId: string) => Promise<void>;
+  isFollowingUser: (userId: string) => boolean;
   signIn: (email: string, pass: string) => Promise<boolean>;
   signUp: (params: SignUpParams) => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
@@ -64,7 +69,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   authError: null,
   users: [],
+  followingIds: new Set<string>(),
+  followLoadingIds: new Set<string>(),
   isInitialized: false,
+
+  loadFollowingIds: async (userId: string) => {
+    if (!userId) {
+      set({ followingIds: new Set<string>() });
+      return;
+    }
+    try {
+      const ids = await fetchUserFollowingIds(userId);
+      set({ followingIds: new Set<string>(ids) });
+    } catch {
+      // ignore
+    }
+  },
+
+  isFollowingUser: (userId: string) => {
+    return get().followingIds.has(userId);
+  },
 
   initializeAuth: async () => {
     if (get().isInitialized) return;
@@ -73,7 +97,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       // 1. Check existing session
       const user = await getInitialAuthSession();
-      if (user) {
+      if (user?.id) {
         set({
           user,
           authStatus: 'authenticated',
@@ -81,6 +105,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoading: false,
           isInitialized: true,
         });
+        get().loadFollowingIds(user.id);
       } else {
         set({
           user: emptyUserProfile,
@@ -88,6 +113,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isAuthenticated: false,
           isLoading: false,
           isInitialized: true,
+          followingIds: new Set<string>(),
         });
       }
 
@@ -137,6 +163,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isAuthenticated: true,
             isLoading: false,
           });
+          get().loadFollowingIds(session.user.id);
         } else if (event === 'SIGNED_OUT') {
           setStoredLocalSession(null);
           set({
@@ -144,6 +171,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             authStatus: 'unauthenticated',
             isAuthenticated: false,
             isLoading: false,
+            followingIds: new Set<string>(),
+            followLoadingIds: new Set<string>(),
           });
         }
       });
@@ -320,18 +349,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   toggleFollowUser: async (userId: string) => {
     const currentUserId = get().user.id;
-    if (!currentUserId || currentUserId === userId) {
+    if (!currentUserId || !userId || currentUserId === userId) {
       console.warn('[useAuthStore] Cannot follow self or unauthenticated');
       return false;
     }
 
-    const target = get().users.find((u) => u.id === userId);
-    const wasFollowing = Boolean(target?.isFollowing);
+    // Concurrency protection: prevent double-clicks from creating duplicate requests
+    if (get().followLoadingIds.has(userId)) {
+      return false;
+    }
+
+    const currentFollowingSet = new Set(get().followingIds);
+    const wasFollowing = currentFollowingSet.has(userId);
     const isNowFollowing = !wasFollowing;
     const followingDelta = isNowFollowing ? 1 : -1;
 
     // 1. Optimistic update
+    const nextFollowingSet = new Set(currentFollowingSet);
+    if (isNowFollowing) {
+      nextFollowingSet.add(userId);
+    } else {
+      nextFollowingSet.delete(userId);
+    }
+
+    const nextLoadingSet = new Set(get().followLoadingIds);
+    nextLoadingSet.add(userId);
+
     set((state) => ({
+      followingIds: nextFollowingSet,
+      followLoadingIds: nextLoadingSet,
       users: state.users.map((u) => {
         if (u.id === userId) {
           return {
@@ -350,15 +396,67 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       },
     }));
 
-    // 2. Real API mutation
-    const res = isNowFollowing
-      ? await followUser(userId, currentUserId)
-      : await unfollowUser(userId, currentUserId);
+    // Also sync search results in useSearchStore immediately
+    useSearchStore.getState().updateResearcherFollowState(userId, isNowFollowing);
 
-    // 3. Rollback if error
-    if (!res.success) {
-      console.warn('[useAuthStore] toggleFollowUser failed, rolling back:', res.error);
+    // 2. Real API mutation via atomic RPC
+    try {
+      const res = await toggleFollowUserRpc(userId, currentUserId);
+
+      // Remove loading lock
+      const doneLoadingSet = new Set(get().followLoadingIds);
+      doneLoadingSet.delete(userId);
+
+      if (!res.success) {
+        console.warn('[useAuthStore] toggleFollowUser failed, rolling back:', res.error);
+        // Rollback state
+        set((state) => ({
+          followingIds: currentFollowingSet,
+          followLoadingIds: doneLoadingSet,
+          users: state.users.map((u) => {
+            if (u.id === userId) {
+              return {
+                ...u,
+                isFollowing: wasFollowing,
+                followersCount: wasFollowing
+                  ? u.followersCount + 1
+                  : Math.max(0, u.followersCount - 1),
+              };
+            }
+            return u;
+          }),
+          user: {
+            ...state.user,
+            followingCount: Math.max(0, state.user.followingCount - followingDelta),
+          },
+          authError: res.error,
+        }));
+        useSearchStore.getState().updateResearcherFollowState(userId, wasFollowing);
+        return false;
+      }
+
+      // If server returned exact counts, sync them
+      if (res.callerFollowingCount !== undefined) {
+        set((state) => ({
+          followLoadingIds: doneLoadingSet,
+          user: {
+            ...state.user,
+            followingCount: res.callerFollowingCount!,
+          },
+        }));
+      } else {
+        set({ followLoadingIds: doneLoadingSet });
+      }
+
+      return true;
+    } catch (err: any) {
+      const doneLoadingSet = new Set(get().followLoadingIds);
+      doneLoadingSet.delete(userId);
+
+      // Rollback on unexpected exception
       set((state) => ({
+        followingIds: currentFollowingSet,
+        followLoadingIds: doneLoadingSet,
         users: state.users.map((u) => {
           if (u.id === userId) {
             return {
@@ -375,10 +473,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           ...state.user,
           followingCount: Math.max(0, state.user.followingCount - followingDelta),
         },
+        authError: err?.message || 'Failed to toggle follow.',
       }));
+      useSearchStore.getState().updateResearcherFollowState(userId, wasFollowing);
       return false;
     }
-
-    return true;
   },
 }));

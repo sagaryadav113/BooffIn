@@ -45,6 +45,7 @@ import {
 import { fetchUserProfile, fetchUserProfileByUsername } from '../../api/authService';
 import { ConnectionStatus, UserProfile } from '../../types';
 import { AppHeader } from '../../components/layout/AppHeader';
+import { FollowListModal } from '../../components/modals/FollowListModal';
 
 export default function OtherResearcherProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -57,6 +58,11 @@ export default function OtherResearcherProfileScreen() {
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Papers' | 'Activity'>('Posts');
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('none');
+  const [followModalVisible, setFollowModalVisible] = useState(false);
+  const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
+
+  const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false) || Boolean(researcher?.isFollowing);
+  const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -73,16 +79,16 @@ export default function OtherResearcherProfileScreen() {
         return;
       }
 
-      let prof = await fetchUserProfile(id);
+      let prof = await fetchUserProfile(id, currentUser?.id);
       if (!prof) {
-        prof = await fetchUserProfileByUsername(cleanId);
+        prof = await fetchUserProfileByUsername(cleanId, currentUser?.id);
       }
       setResearcher(prof);
       setIsLoading(false);
     }
 
     loadProfile();
-  }, [id, currentUser]);
+  }, [id, currentUser?.id, currentUser?.handle]);
 
   const isOwnProfile = researcher?.id === currentUser?.id;
 
@@ -117,8 +123,8 @@ export default function OtherResearcherProfileScreen() {
     return getResearcherDiscussedTopics(researcher.id, allPosts);
   }, [researcher?.id, allPosts]);
 
-  const handleFollowToggle = () => {
-    if (!researcher?.id) return;
+  const handleFollowToggle = async () => {
+    if (!researcher?.id || isFollowLoading) return;
     if (isOwnProfile) {
       router.push('/profile/edit');
       return;
@@ -126,7 +132,17 @@ export default function OtherResearcherProfileScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleFollowUser(researcher.id);
+    await toggleFollowUser(researcher.id);
+  };
+
+  const handleOpenFollowers = () => {
+    setFollowModalType('followers');
+    setFollowModalVisible(true);
+  };
+
+  const handleOpenFollowing = () => {
+    setFollowModalType('following');
+    setFollowModalVisible(true);
   };
 
   const handleConnectPress = () => {
@@ -211,7 +227,7 @@ export default function OtherResearcherProfileScreen() {
         <View style={styles.bannerContainer}>
           <Image
             source={{
-              uri: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
+              uri: researcher.bannerUrl || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
             }}
             style={styles.bannerImage}
             contentFit="cover"
@@ -252,9 +268,11 @@ export default function OtherResearcherProfileScreen() {
             <View style={styles.actionButtonsGroup}>
               {/* Follow Button */}
               <Button
-                title={isOwnProfile ? 'Edit Profile' : researcher.isFollowing ? 'Following' : 'Follow'}
-                variant={isOwnProfile || researcher.isFollowing ? 'outline' : 'primary'}
+                title={isOwnProfile ? 'Edit Profile' : isFollowing ? 'Following' : 'Follow'}
+                variant={isOwnProfile || isFollowing ? 'outline' : 'primary'}
                 size="sm"
+                loading={isFollowLoading}
+                disabled={isFollowLoading}
                 onPress={handleFollowToggle}
                 style={styles.followButton}
               />
@@ -450,14 +468,30 @@ export default function OtherResearcherProfileScreen() {
 
           {/* Following / Followers Stats */}
           <View style={styles.statsRow}>
-            <View style={styles.statItem}>
+            <TouchableOpacity
+              onPress={handleOpenFollowing}
+              style={styles.statItem}
+              activeOpacity={0.7}
+            >
               <Text style={styles.statNumber}>{researcher.followingCount}</Text>
               <Text style={styles.statLabel}>Following</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{formatCount(researcher.followersCount)}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleOpenFollowers}
+              style={styles.statItem}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.statNumber}>
+                {formatCount(
+                  isOwnProfile
+                    ? currentUser.followersCount
+                    : (researcher.followersCount + (isFollowing && !researcher.isFollowing ? 1 : !isFollowing && researcher.isFollowing ? -1 : 0))
+                )}
+              </Text>
               <Text style={styles.statLabel}>Followers</Text>
-            </View>
+            </TouchableOpacity>
+
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{posts.length}</Text>
               <Text style={styles.statLabel}>Posts</Text>
@@ -543,6 +577,15 @@ export default function OtherResearcherProfileScreen() {
           onSuccess={loadConnectionStatus}
         />
       )}
+
+      {/* Followers & Following List Modal */}
+      <FollowListModal
+        visible={followModalVisible}
+        onClose={() => setFollowModalVisible(false)}
+        userId={researcher.id}
+        type={followModalType}
+        userName={researcher.fullName}
+      />
     </SafeAreaView>
   );
 }

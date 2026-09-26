@@ -57,12 +57,15 @@ export function isLiveSupabaseConfigured(): boolean {
 /**
  * Maps raw public.profiles database record to frontend UserProfile model
  */
-export function mapProfileRecord(raw: any, fallbackEmail?: string): UserProfile {
+export function mapProfileRecord(raw: any, fallbackEmail?: string, isFollowing?: boolean): UserProfile {
   return {
     id: raw.id,
     handle: raw.username || raw.handle || (fallbackEmail ? fallbackEmail.split('@')[0] : 'researcher'),
     fullName: raw.full_name || 'Researcher',
     avatarUrl: raw.avatar_url || undefined,
+    bannerUrl: raw.banner_url || undefined,
+    hasCustomAvatar: Boolean(raw.has_custom_avatar),
+    hasCustomBanner: Boolean(raw.has_custom_banner),
     academicTitle: raw.academic_title || 'Academic Researcher',
     institution: raw.institution || 'Independent Research',
     bio: raw.bio || '',
@@ -79,13 +82,14 @@ export function mapProfileRecord(raw: any, fallbackEmail?: string): UserProfile 
     joinedDate: raw.created_at
       ? new Date(raw.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
       : 'Recently joined',
+    isFollowing: isFollowing !== undefined ? isFollowing : (raw.is_following ?? undefined),
   };
 }
 
 /**
- * Fetch profile for a given user UUID from Supabase public.profiles
+ * Fetch profile for a given user UUID from Supabase public.profiles, checking viewer follow status if provided
  */
-export async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
+export async function fetchUserProfile(userId: string, viewerId?: string): Promise<UserProfile | null> {
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -94,16 +98,28 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile | nu
       .single();
 
     if (error || !data) return null;
-    return mapProfileRecord(data);
+
+    let isFollowing = false;
+    if (viewerId && viewerId !== userId) {
+      const { data: followRow } = await supabase
+        .from('follows')
+        .select('follower_id')
+        .eq('follower_id', viewerId)
+        .eq('following_id', userId)
+        .maybeSingle();
+      isFollowing = Boolean(followRow);
+    }
+
+    return mapProfileRecord(data, undefined, viewerId && viewerId !== userId ? isFollowing : undefined);
   } catch {
     return null;
   }
 }
 
 /**
- * Fetch profile for a given unique handle/username (case-insensitive)
+ * Fetch profile for a given unique handle/username (case-insensitive), checking viewer follow status if provided
  */
-export async function fetchUserProfileByUsername(username: string): Promise<UserProfile | null> {
+export async function fetchUserProfileByUsername(username: string, viewerId?: string): Promise<UserProfile | null> {
   try {
     const normalized = normalizeHandle(username);
     if (!normalized) return null;
@@ -115,7 +131,19 @@ export async function fetchUserProfileByUsername(username: string): Promise<User
       .maybeSingle();
 
     if (error || !data) return null;
-    return mapProfileRecord(data);
+
+    let isFollowing = false;
+    if (viewerId && viewerId !== data.id) {
+      const { data: followRow } = await supabase
+        .from('follows')
+        .select('follower_id')
+        .eq('follower_id', viewerId)
+        .eq('following_id', data.id)
+        .maybeSingle();
+      isFollowing = Boolean(followRow);
+    }
+
+    return mapProfileRecord(data, undefined, viewerId && viewerId !== data.id ? isFollowing : undefined);
   } catch {
     return null;
   }
@@ -503,6 +531,9 @@ export async function persistUserProfile(
     }
     if (updates.researchInterests !== undefined) dbPayload.research_interests = updates.researchInterests;
     if (updates.avatarUrl !== undefined) dbPayload.avatar_url = updates.avatarUrl;
+    if (updates.bannerUrl !== undefined) dbPayload.banner_url = updates.bannerUrl;
+    if (updates.hasCustomAvatar !== undefined) dbPayload.has_custom_avatar = updates.hasCustomAvatar;
+    if (updates.hasCustomBanner !== undefined) dbPayload.has_custom_banner = updates.hasCustomBanner;
     if (updates.websiteUrl !== undefined) dbPayload.website_url = updates.websiteUrl;
     if (updates.location !== undefined) dbPayload.location = updates.location;
 

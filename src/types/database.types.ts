@@ -35,6 +35,9 @@ export interface Database {
           username: string;
           full_name: string;
           avatar_url: string | null;
+          banner_url: string | null;
+          has_custom_avatar: boolean;
+          has_custom_banner: boolean;
           academic_title: string | null;
           institution: string | null;
           bio: string | null;
@@ -56,6 +59,9 @@ export interface Database {
           username: string;
           full_name: string;
           avatar_url?: string | null;
+          banner_url?: string | null;
+          has_custom_avatar?: boolean;
+          has_custom_banner?: boolean;
           academic_title?: string | null;
           institution?: string | null;
           bio?: string | null;
@@ -77,6 +83,9 @@ export interface Database {
           username?: string;
           full_name?: string;
           avatar_url?: string | null;
+          banner_url?: string | null;
+          has_custom_avatar?: boolean;
+          has_custom_banner?: boolean;
           academic_title?: string | null;
           institution?: string | null;
           bio?: string | null;

@@ -873,8 +873,93 @@ export async function deleteComment(
 }
 
 // ============================================================================
-// 7. FOLLOW & UNFOLLOW (Database-driven via public.follows)
+// 7. FOLLOW & UNFOLLOW (Database-driven via public.follows & RPC)
 // ============================================================================
+
+export interface ToggleFollowResult {
+  success: boolean;
+  isFollowing: boolean;
+  targetUserId: string;
+  targetFollowersCount?: number;
+  callerFollowingCount?: number;
+  error: string | null;
+}
+
+/**
+ * Executes an atomic, race-condition-safe toggle follow mutation.
+ * Uses toggle_follow RPC when available, falling back to direct table mutation.
+ */
+export async function toggleFollowUserRpc(
+  targetUserId: string,
+  _currentUserId?: string
+): Promise<ToggleFollowResult> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return {
+      success: false,
+      isFollowing: false,
+      targetUserId,
+      error: 'Must be authenticated to follow researchers.',
+    };
+  }
+  const verifiedUserId = user.id;
+
+  if (targetUserId === verifiedUserId) {
+    return {
+      success: false,
+      isFollowing: false,
+      targetUserId,
+      error: 'You cannot follow yourself.',
+    };
+  }
+
+  try {
+    // 1. Attempt server-side RPC toggle_follow
+    const { data: rpcData, error: rpcError } = await supabase.rpc('toggle_follow', {
+      target_user_id: targetUserId,
+    });
+
+    if (!rpcError && rpcData) {
+      const parsed = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+      return {
+        success: true,
+        isFollowing: Boolean(parsed.is_following),
+        targetUserId,
+        targetFollowersCount: parsed.target_followers_count,
+        callerFollowingCount: parsed.caller_following_count,
+        error: null,
+      };
+    }
+
+    // 2. Fallback to direct table query if RPC is not loaded
+    const isCurrentlyFollowing = await checkIsFollowing(targetUserId, verifiedUserId);
+    if (isCurrentlyFollowing) {
+      const unfollowRes = await unfollowUser(targetUserId, verifiedUserId);
+      return {
+        success: unfollowRes.success,
+        isFollowing: !unfollowRes.success,
+        targetUserId,
+        error: unfollowRes.error,
+      };
+    } else {
+      const followRes = await followUser(targetUserId, verifiedUserId);
+      return {
+        success: followRes.success,
+        isFollowing: followRes.success,
+        targetUserId,
+        error: followRes.error,
+      };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      isFollowing: false,
+      targetUserId,
+      error: err?.message || 'Failed to toggle follow.',
+    };
+  }
+}
+
 export async function followUser(
   targetUserId: string,
   _currentUserId?: string
@@ -906,7 +991,7 @@ export async function followUser(
 
     return { success: true, error: null };
   } catch (err: any) {
-    return { success: false, error: err?.message };
+    return { success: false, error: err?.message || 'Failed to follow user.' };
   }
 }
 
@@ -933,7 +1018,7 @@ export async function unfollowUser(
 
     return { success: true, error: null };
   } catch (err: any) {
-    return { success: false, error: err?.message };
+    return { success: false, error: err?.message || 'Failed to unfollow user.' };
   }
 }
 
@@ -960,6 +1045,150 @@ export async function checkIsFollowing(
     return Boolean(data);
   } catch {
     return false;
+  }
+}
+
+/**
+ * Fetches all user IDs that the specified user is actively following.
+ * Enables instantaneous in-memory reactivity for the frontend follow state.
+ */
+export async function fetchUserFollowingIds(userId: string): Promise<string[]> {
+  if (!userId) return [];
+
+  try {
+    // Attempt RPC
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_user_following_ids', {
+      p_user_id: userId,
+    });
+
+    if (!rpcError && Array.isArray(rpcData)) {
+      return rpcData;
+    }
+
+    // Direct table fallback
+    const { data, error } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', userId);
+
+    if (error || !data) return [];
+    return data.map((row) => row.following_id);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetches list of followers for a given target user with profile details and viewer follow state.
+ */
+export async function fetchFollowers(
+  targetUserId: string,
+  viewerId?: string,
+  limit: number = 30,
+  offset: number = 0
+): Promise<{ researchers: UserProfile[]; error: string | null }> {
+  if (!targetUserId) return { researchers: [], error: 'User ID is required.' };
+
+  try {
+    // Attempt RPC
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_followers', {
+      p_user_id: targetUserId,
+      p_viewer_id: viewerId || null,
+      p_limit: limit,
+      p_offset: offset,
+    });
+
+    if (!rpcError && Array.isArray(rpcData)) {
+      const mapped = rpcData.map((row: any) => mapSupabaseProfile(row));
+      return { researchers: mapped, error: null };
+    }
+
+    // Direct table query fallback
+    const { data, error } = await supabase
+      .from('follows')
+      .select(`
+        created_at,
+        follower:profiles!follower_id (*)
+      `)
+      .eq('following_id', targetUserId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error || !data) {
+      return { researchers: [], error: error?.message || null };
+    }
+
+    const researchers: UserProfile[] = [];
+    for (const row of data) {
+      if (row.follower) {
+        const prof = mapSupabaseProfile(row.follower);
+        if (viewerId) {
+          prof.isFollowing = await checkIsFollowing(prof.id, viewerId);
+        }
+        researchers.push(prof);
+      }
+    }
+
+    return { researchers, error: null };
+  } catch (err: any) {
+    return { researchers: [], error: err?.message || 'Failed to fetch followers.' };
+  }
+}
+
+/**
+ * Fetches list of researchers a given target user is following with profile details and viewer follow state.
+ */
+export async function fetchFollowing(
+  targetUserId: string,
+  viewerId?: string,
+  limit: number = 30,
+  offset: number = 0
+): Promise<{ researchers: UserProfile[]; error: string | null }> {
+  if (!targetUserId) return { researchers: [], error: 'User ID is required.' };
+
+  try {
+    // Attempt RPC
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_following', {
+      p_user_id: targetUserId,
+      p_viewer_id: viewerId || null,
+      p_limit: limit,
+      p_offset: offset,
+    });
+
+    if (!rpcError && Array.isArray(rpcData)) {
+      const mapped = rpcData.map((row: any) => mapSupabaseProfile(row));
+      return { researchers: mapped, error: null };
+    }
+
+    // Direct table query fallback
+    const { data, error } = await supabase
+      .from('follows')
+      .select(`
+        created_at,
+        following:profiles!following_id (*)
+      `)
+      .eq('follower_id', targetUserId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error || !data) {
+      return { researchers: [], error: error?.message || null };
+    }
+
+    const researchers: UserProfile[] = [];
+    for (const row of data) {
+      if (row.following) {
+        const prof = mapSupabaseProfile(row.following);
+        if (viewerId) {
+          prof.isFollowing = await checkIsFollowing(prof.id, viewerId);
+        }
+        researchers.push(prof);
+      }
+    }
+
+    return { researchers, error: null };
+  } catch (err: any) {
+    return { researchers: [], error: err?.message || 'Failed to fetch following.' };
   }
 }
 

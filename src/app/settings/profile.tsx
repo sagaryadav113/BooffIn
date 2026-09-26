@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, Platform, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Alert, Platform, ActivityIndicator, Image as RNImage } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { Camera, Upload } from 'lucide-react-native';
 import { colors, radii, spacing } from '../../theme';
 import { SettingsLayout } from '../../components/settings/SettingsLayout';
 import { SettingsCardGroup } from '../../components/settings/SettingsCardGroup';
@@ -16,6 +18,16 @@ import {
   checkUsernameAvailability,
   normalizeHandle,
 } from '../../api/authService';
+import {
+  pickAvatarImage,
+  pickBannerImage,
+  uploadProfileAvatar,
+  uploadProfileBanner,
+  removeProfileAvatar,
+  removeProfileBanner,
+} from '../../api/storageService';
+
+const DEFAULT_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
 export default function ProfileSettingsScreen() {
   const { user, updateProfile } = useAuthStore();
@@ -29,6 +41,9 @@ export default function ProfileSettingsScreen() {
   const [websiteUrl, setWebsiteUrl] = useState(user?.websiteUrl || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
+  const [bannerUrl, setBannerUrl] = useState(user?.bannerUrl || '');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [interestInput, setInterestInput] = useState('');
   const [interests, setInterests] = useState<string[]>(user?.researchInterests || []);
 
@@ -124,6 +139,72 @@ export default function ProfileSettingsScreen() {
     setInterests(interests.filter((i) => i !== item));
   };
 
+  const handlePickAvatar = async () => {
+    if (!user?.id) return;
+    const res = await pickAvatarImage();
+    if (res.cancelled || !res.asset) return;
+
+    setIsUploadingAvatar(true);
+    const uploadRes = await uploadProfileAvatar(user.id, res.asset);
+    setIsUploadingAvatar(false);
+
+    if (uploadRes.success && uploadRes.url) {
+      setAvatarUrl(uploadRes.url);
+      setSuccessMessage('Profile photo updated successfully.');
+      setTimeout(() => setSuccessMessage(null), 3500);
+    } else {
+      setErrorMessage(uploadRes.error || 'Failed to upload photo.');
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!user?.id) return;
+    setIsUploadingAvatar(true);
+    const res = await removeProfileAvatar(user.id);
+    setIsUploadingAvatar(false);
+
+    if (res.success) {
+      setAvatarUrl('');
+      setSuccessMessage('Profile photo removed.');
+      setTimeout(() => setSuccessMessage(null), 3500);
+    } else {
+      setErrorMessage(res.error || 'Failed to remove photo.');
+    }
+  };
+
+  const handlePickBanner = async () => {
+    if (!user?.id) return;
+    const res = await pickBannerImage();
+    if (res.cancelled || !res.asset) return;
+
+    setIsUploadingBanner(true);
+    const uploadRes = await uploadProfileBanner(user.id, res.asset);
+    setIsUploadingBanner(false);
+
+    if (uploadRes.success && uploadRes.url) {
+      setBannerUrl(uploadRes.url);
+      setSuccessMessage('Banner image updated successfully.');
+      setTimeout(() => setSuccessMessage(null), 3500);
+    } else {
+      setErrorMessage(uploadRes.error || 'Failed to upload banner.');
+    }
+  };
+
+  const handleRemoveBanner = async () => {
+    if (!user?.id) return;
+    setIsUploadingBanner(true);
+    const res = await removeProfileBanner(user.id);
+    setIsUploadingBanner(false);
+
+    if (res.success) {
+      setBannerUrl('');
+      setSuccessMessage('Banner image removed.');
+      setTimeout(() => setSuccessMessage(null), 3500);
+    } else {
+      setErrorMessage(res.error || 'Failed to remove banner.');
+    }
+  };
+
   const handleSave = async () => {
     if (!user?.id) return;
     if (!fullName.trim()) {
@@ -162,6 +243,9 @@ export default function ProfileSettingsScreen() {
       websiteUrl: websiteUrl.trim(),
       bio: bio.trim(),
       avatarUrl: avatarUrl.trim() || undefined,
+      bannerUrl: bannerUrl.trim() || undefined,
+      hasCustomAvatar: true,
+      hasCustomBanner: true,
       researchInterests: interests,
     };
 
@@ -180,26 +264,9 @@ export default function ProfileSettingsScreen() {
   return (
     <SettingsLayout
       title="Edit Profile"
-      subtitle="Manage your public academic identity and biographical information."
+      subtitle="Manage your public academic identity, banner, and photo."
       isSaving={isSaving}
     >
-      {/* Avatar Header */}
-      <View style={styles.avatarSection}>
-        <Avatar
-          uri={avatarUrl || user?.avatarUrl}
-          name={fullName || 'Researcher'}
-          size="xl"
-        />
-        <View style={styles.avatarMeta}>
-          <Typography variant="captionBold" color={colors.textPrimary}>
-            Profile Photo
-          </Typography>
-          <Typography variant="micro" color={colors.textSecondary} style={{ marginTop: 2, marginBottom: 8 }}>
-            Visible across posts, citations, and author lists.
-          </Typography>
-        </View>
-      </View>
-
       {successMessage ? (
         <View style={styles.successBanner}>
           <Icon name="CheckCircle2" size="sm" color="#166534" />
@@ -217,6 +284,99 @@ export default function ProfileSettingsScreen() {
           </Typography>
         </View>
       ) : null}
+
+      {/* Profile Media Header */}
+      <SettingsSectionHeader title="Profile Media & Header" />
+      <SettingsCardGroup style={styles.cardPadding}>
+        {/* Banner Preview & Actions */}
+        <Typography variant="captionBold" color={colors.textPrimary} style={{ marginBottom: 4 }}>
+          Cover Banner Image
+        </Typography>
+        <Typography variant="micro" color={colors.textSecondary} style={{ marginBottom: spacing.xs }}>
+          Panoramic header displayed on your public researcher profile (3:1, max 5MB).
+        </Typography>
+
+        <View style={styles.bannerBox}>
+          <Image
+            source={{ uri: bannerUrl || DEFAULT_BANNER }}
+            style={styles.bannerImg}
+            contentFit="cover"
+          />
+          {isUploadingBanner && (
+            <View style={styles.mediaUploadingOverlay}>
+              <ActivityIndicator size="small" color={colors.white} />
+              <Typography variant="captionBold" color={colors.white} style={{ marginLeft: 8 }}>
+                Uploading Banner...
+              </Typography>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.mediaButtonsRow}>
+          <Button
+            title={bannerUrl ? 'Change Banner' : 'Upload Banner'}
+            variant="secondary"
+            size="sm"
+            onPress={handlePickBanner}
+            disabled={isUploadingBanner}
+            iconLeft={<Camera size={14} color={colors.textPrimary} />}
+          />
+          {bannerUrl ? (
+            <Button
+              title="Remove Banner"
+              variant="outline"
+              size="sm"
+              onPress={handleRemoveBanner}
+              disabled={isUploadingBanner}
+            />
+          ) : null}
+        </View>
+
+        {/* Avatar Preview & Actions */}
+        <View style={{ height: 1, backgroundColor: colors.borderLight, marginVertical: spacing.md }} />
+
+        <Typography variant="captionBold" color={colors.textPrimary} style={{ marginBottom: 4 }}>
+          Profile Avatar / Headshot
+        </Typography>
+        <Typography variant="micro" color={colors.textSecondary} style={{ marginBottom: spacing.xs }}>
+          Square headshot displayed across discussions and citations (1:1, max 5MB).
+        </Typography>
+
+        <View style={styles.avatarRow}>
+          <View style={{ position: 'relative' }}>
+            <Avatar
+              uri={avatarUrl || user?.avatarUrl}
+              name={fullName || 'Researcher'}
+              size="xl"
+            />
+            {isUploadingAvatar && (
+              <View style={styles.avatarUploadingOverlay}>
+                <ActivityIndicator size="small" color={colors.white} />
+              </View>
+            )}
+          </View>
+
+          <View style={styles.avatarBtnsCol}>
+            <Button
+              title={avatarUrl ? 'Change Photo' : 'Upload Photo'}
+              variant="secondary"
+              size="sm"
+              onPress={handlePickAvatar}
+              disabled={isUploadingAvatar}
+              iconLeft={<Upload size={14} color={colors.textPrimary} />}
+            />
+            {avatarUrl ? (
+              <Button
+                title="Remove Photo"
+                variant="outline"
+                size="sm"
+                onPress={handleRemoveAvatar}
+                disabled={isUploadingAvatar}
+              />
+            ) : null}
+          </View>
+        </View>
+      </SettingsCardGroup>
 
       {/* Basic Identity */}
       <SettingsSectionHeader title="Basic Identity" />
@@ -417,6 +577,57 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
     marginBottom: spacing.lg,
+  },
+  bannerBox: {
+    width: '100%',
+    height: 120,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: colors.backgroundSecondary,
+    marginBottom: spacing.sm,
+  },
+  bannerImg: {
+    width: '100%',
+    height: '100%',
+  },
+  mediaUploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  mediaButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  avatarUploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarBtnsCol: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   avatarMeta: {
     flex: 1,

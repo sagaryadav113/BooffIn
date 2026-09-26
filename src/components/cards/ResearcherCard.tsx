@@ -24,6 +24,9 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
   showMutualInterests = true,
 }) => {
   const currentUser = useAuthStore((s) => s.user);
+  const isFollowing = useAuthStore((s) => s.followingIds.has(researcher.id)) || Boolean(researcher.isFollowing);
+  const isLoading = useAuthStore((s) => s.followLoadingIds.has(researcher.id));
+  const isSelf = Boolean(currentUser?.id && currentUser.id === researcher.id);
 
   const mutualInterests = React.useMemo(() => {
     if (!showMutualInterests || !currentUser || currentUser.id === researcher.id) return [];
@@ -74,11 +77,13 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
         )}
       </View>
 
-      {onFollowToggle && (
+      {onFollowToggle && !isSelf && (
         <Button
-          title={researcher.isFollowing ? 'Following' : 'Follow'}
-          variant={researcher.isFollowing ? 'outline' : 'primary'}
+          title={isFollowing ? 'Following' : 'Follow'}
+          variant={isFollowing ? 'outline' : 'primary'}
           size="sm"
+          loading={isLoading}
+          disabled={isLoading}
           onPress={onFollowToggle}
           style={styles.followButton}
         />
