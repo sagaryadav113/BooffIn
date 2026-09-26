@@ -52,5 +52,8 @@ export * from './modals/ConnectModal';
 export * from './modals/QuickOAuthModal';
 export * from './modals/FollowListModal';
 export * from './modals/ImageViewerModal';
+export * from './modals/PostOptionsModal';
+export * from './modals/EditPostModal';
+export * from './modals/SharePostModal';
 
 

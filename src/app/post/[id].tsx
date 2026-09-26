@@ -11,7 +11,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Avatar } from '../../components/core/Avatar';
@@ -84,7 +84,9 @@ export default function PostDetailScreen() {
     loadPost();
   }, [postId, currentUser.id]);
 
-  const comments = post ? getCommentsForPost(post.id) : [];
+  const storePost = usePostStore((s) => s.getPostById(postId));
+  const activePost = storePost || post;
+  const comments = activePost ? getCommentsForPost(activePost.id) : [];
 
   if (isLoading) {
     return (
@@ -97,7 +99,7 @@ export default function PostDetailScreen() {
     );
   }
 
-  if (!post) {
+  if (!activePost) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <AppHeader title="Discussion" showBack />
@@ -119,7 +121,7 @@ export default function PostDetailScreen() {
     setReplyingTo(null);
 
     setIsSubmitting(true);
-    await addComment(post.id, textToSend, targetParentId, currentUser.id);
+    await addComment(activePost.id, textToSend, targetParentId, currentUser.id);
     setIsSubmitting(false);
   };
 
@@ -127,7 +129,7 @@ export default function PostDetailScreen() {
     if (Platform.OS === 'web') {
       const confirmed = window.confirm('Are you sure you want to delete this comment?');
       if (confirmed) {
-        deleteComment(commentId, post.id, currentUser.id);
+        deleteComment(commentId, activePost.id, currentUser.id);
       }
     } else {
       Alert.alert(
@@ -138,7 +140,7 @@ export default function PostDetailScreen() {
           {
             text: 'Delete',
             style: 'destructive',
-            onPress: () => deleteComment(commentId, post.id, currentUser.id),
+            onPress: () => deleteComment(commentId, activePost.id, currentUser.id),
           },
         ]
       );
@@ -161,7 +163,17 @@ export default function PostDetailScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           {/* Main Post Card */}
-          <PostCard post={post} />
+          <PostCard
+            post={activePost}
+            onDeleted={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)');
+              }
+            }}
+            onUpdated={(updated) => setPost(updated)}
+          />
 
           {/* Comments Section Header */}
           <View style={styles.sectionHeader}>

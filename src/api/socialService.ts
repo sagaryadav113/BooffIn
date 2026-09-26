@@ -582,6 +582,99 @@ export async function deletePost(
   }
 }
 
+export interface UpdatePostPayload {
+  postId: string;
+  content: string;
+  topics?: string[];
+}
+
+/**
+ * Updates an existing post's text content and research topics
+ */
+export async function updatePost(
+  payload: UpdatePostPayload
+): Promise<{ post: Post | null; error: string | null }> {
+  const { postId, topics } = payload;
+  const content = sanitizeTextContent(payload.content, 5000);
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { post: null, error: 'User must be authenticated to edit post.' };
+  }
+
+  try {
+    // 1. Update content in posts table
+    const { data: postRow, error: postError } = await supabase
+      .from('posts')
+      .update({ content })
+      .eq('id', postId)
+      .eq('author_id', user.id)
+      .select(
+        `
+        id,
+        post_type,
+        content,
+        visibility,
+        media_urls,
+        likes_count,
+        comments_count,
+        reposts_count,
+        saves_count,
+        created_at,
+        author:profiles!author_id (*)
+      `
+      )
+      .single();
+
+    if (postError) {
+      return { post: null, error: postError.message };
+    }
+
+    // 2. Update topics if provided
+    if (topics !== undefined) {
+      await supabase.from('post_topics').delete().eq('post_id', postId);
+
+      if (topics.length > 0) {
+        for (const topicName of topics) {
+          const cleanName = sanitizeTextContent(topicName, 100);
+          const slug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          const { data: topicData } = await supabase
+            .from('topics')
+            .select('id')
+            .eq('slug', slug)
+            .maybeSingle();
+
+          let topicId = topicData?.id;
+          if (!topicId) {
+            const { data: createdTopic } = await supabase
+              .from('topics')
+              .insert({ name: cleanName, slug })
+              .select('id')
+              .maybeSingle();
+            topicId = createdTopic?.id;
+          }
+
+          if (topicId) {
+            await supabase
+              .from('post_topics')
+              .insert({ post_id: postId, topic_id: topicId });
+          }
+        }
+      }
+    }
+
+    const mapped = postRow ? mapSupabasePost(postRow, user.id) : null;
+    if (mapped && topics !== undefined) {
+      mapped.topics = topics;
+    }
+
+    return { post: mapped, error: null };
+  } catch (err: any) {
+    return { post: null, error: err?.message || 'Failed to update post.' };
+  }
+}
+
+
 // ============================================================================
 // 3. LIKE & UNLIKE (Database-driven via public.likes)
 // ============================================================================

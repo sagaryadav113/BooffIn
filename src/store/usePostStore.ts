@@ -4,6 +4,8 @@ import { useAuthStore } from './useAuthStore';
 import {
   fetchFeed as apiFetchFeed,
   createPost as apiCreatePost,
+  updatePost as apiUpdatePost,
+  deletePost as apiDeletePost,
   toggleLike as apiToggleLike,
   toggleRepost as apiToggleRepost,
   toggleBookmark as apiToggleBookmark,
@@ -43,6 +45,8 @@ interface PostState {
   toggleRepost: (postId: string, currentUserId?: string) => Promise<void>;
   toggleSavePost: (postId: string, currentUserId?: string) => Promise<void>;
   createPost: (params: CreatePostParams, currentUserId?: string) => Promise<Post | null>;
+  updatePost: (postId: string, content: string, topics?: string[]) => Promise<boolean>;
+  deletePost: (postId: string, currentUserId?: string) => Promise<boolean>;
   fetchCommentsForPost: (postId: string, currentUserId?: string) => Promise<void>;
   getCommentsForPost: (postId: string) => Comment[];
   addComment: (postId: string, content: string, parentId?: string, currentUserId?: string) => Promise<Comment | null>;
@@ -328,6 +332,55 @@ export const usePostStore = create<PostState>((set, get) => ({
     }
 
     return optimisticPost;
+  },
+
+  updatePost: async (postId, content, topics) => {
+    // 1. Optimistic update
+    const previousPosts = get().posts;
+    set((state) => ({
+      posts: state.posts.map((p) => {
+        if (p.id === postId) {
+          return {
+            ...p,
+            content,
+            topics: topics !== undefined ? topics : p.topics,
+          };
+        }
+        return p;
+      }),
+    }));
+
+    // 2. API call
+    const res = await apiUpdatePost({ postId, content, topics });
+    if (res.error) {
+      console.warn('[usePostStore] updatePost failed, rolling back:', res.error);
+      set({ posts: previousPosts });
+      return false;
+    }
+
+    if (res.post) {
+      set((state) => ({
+        posts: state.posts.map((p) => (p.id === postId ? { ...p, ...res.post! } : p)),
+      }));
+    }
+    return true;
+  },
+
+  deletePost: async (postId, currentUserId) => {
+    // 1. Optimistic delete
+    const previousPosts = get().posts;
+    set((state) => ({
+      posts: state.posts.filter((p) => p.id !== postId),
+    }));
+
+    // 2. API call
+    const res = await apiDeletePost(postId, currentUserId);
+    if (!res.success) {
+      console.warn('[usePostStore] deletePost failed, rolling back:', res.error);
+      set({ posts: previousPosts });
+      return false;
+    }
+    return true;
   },
 
   fetchCommentsForPost: async (postId, currentUserId) => {

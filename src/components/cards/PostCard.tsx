@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -21,15 +21,29 @@ import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { PaperCard } from './PaperCard';
 import { PostImageCluster } from './PostImageCluster';
+import { PostOptionsModal } from '../modals/PostOptionsModal';
+import { EditPostModal } from '../modals/EditPostModal';
+import { SharePostModal } from '../modals/SharePostModal';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
 interface PostCardProps {
   post: Post;
   style?: ViewStyle;
+  onDeleted?: () => void;
+  onUpdated?: (updated: Post) => void;
 }
 
-export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
+export const PostCard: React.FC<PostCardProps> = ({
+  post,
+  style,
+  onDeleted,
+  onUpdated,
+}) => {
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
   const toggleLike = usePostStore((s) => s.toggleLikePost);
   const toggleRepost = usePostStore((s) => s.toggleRepost);
   const toggleSave = usePostStore((s) => s.toggleSavePost);
@@ -139,7 +153,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
         <TouchableOpacity
           style={styles.moreButton}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          onPress={(e) => e.stopPropagation()}
+          onPress={(e) => {
+            e.stopPropagation();
+            try {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch {}
+            setIsOptionsOpen(true);
+          }}
         >
           <MoreHorizontal size={20} color={colors.textSecondary} />
         </TouchableOpacity>
@@ -281,6 +301,33 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
           />
         </TouchableOpacity>
       </View>
+
+      {/* Post Options Menu Modal */}
+      <PostOptionsModal
+        visible={isOptionsOpen}
+        onClose={() => setIsOptionsOpen(false)}
+        post={post}
+        onEditPress={() => setIsEditOpen(true)}
+        onSharePress={() => setIsShareOpen(true)}
+        onDeleteSuccess={onDeleted}
+      />
+
+      {/* Edit Post Modal */}
+      <EditPostModal
+        visible={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        post={post}
+        onSaveSuccess={() => {
+          onUpdated?.(post);
+        }}
+      />
+
+      {/* Share Post Modal */}
+      <SharePostModal
+        visible={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        post={post}
+      />
     </TouchableOpacity>
   );
 };
