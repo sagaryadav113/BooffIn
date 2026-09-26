@@ -352,39 +352,6 @@ export default function OtherResearcherProfileScreen() {
             <Text style={styles.bio}>{researcher.bio}</Text>
           ) : null}
 
-          {/* MUTUAL RESEARCH INTERESTS SECTION (When shared interests exist) */}
-          {!isOwnProfile && mutualInterests.length > 0 && (
-            <View style={styles.mutualInterestsCard}>
-              <View style={styles.mutualHeader}>
-                <Sparkles size={15} color="#2563EB" style={{ marginRight: 6 }} />
-                <Text style={styles.mutualTitle}>
-                  Mutual Research Interests ({mutualInterests.length})
-                </Text>
-              </View>
-              <Text style={styles.mutualDesc}>
-                You and {researcher.fullName.split(' ')[0]} share research overlap in:
-              </Text>
-              <View style={styles.interestsRow}>
-                {mutualInterests.map((interest) => (
-                  <TouchableOpacity
-                    key={interest}
-                    style={styles.mutualInterestBadge}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/topic/[slug]',
-                        params: { slug: interest.toLowerCase().replace(/\s+/g, '-') },
-                      })
-                    }
-                    activeOpacity={0.7}
-                  >
-                    <Sparkles size={11} color="#1E40AF" style={{ marginRight: 4 }} />
-                    <Text style={styles.mutualInterestBadgeText}>{interest}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
           {/* TOPICS DISCUSSED & SHARED */}
           {discussedTopics.length > 0 && (
             <View style={styles.discussedSection}>
@@ -412,27 +379,24 @@ export default function OtherResearcherProfileScreen() {
             </View>
           )}
 
-          {/* All Research Interests */}
+          {/* Research Interests */}
           {researcher.researchInterests && researcher.researchInterests.length > 0 && (
             <View style={styles.interestsSection}>
-              <Text style={styles.interestsLabel}>All Research Interests:</Text>
+              <Text style={styles.interestsLabel}>Research Interests:</Text>
               <View style={styles.interestsRow}>
-                {researcher.researchInterests.map((interest) => {
-                  const isMutual = mutualInterests.includes(interest);
-                  return (
-                    <TopicChip
-                      key={interest}
-                      label={isMutual ? `${interest} ★` : interest}
-                      size="sm"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/topic/[slug]',
-                          params: { slug: interest.toLowerCase().replace(/\s+/g, '-') },
-                        })
-                      }
-                    />
-                  );
-                })}
+                {researcher.researchInterests.map((interest) => (
+                  <TopicChip
+                    key={interest}
+                    label={interest}
+                    size="sm"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/topic/[slug]',
+                        params: { slug: interest.toLowerCase().replace(/\s+/g, '-') },
+                      })
+                    }
+                  />
+                ))}
               </View>
             </View>
           )}
