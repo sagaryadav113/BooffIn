@@ -61,7 +61,7 @@ export default function OtherResearcherProfileScreen() {
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
 
-  const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false) || Boolean(researcher?.isFollowing);
+  const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
   const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
 
   useEffect(() => {
@@ -82,6 +82,16 @@ export default function OtherResearcherProfileScreen() {
       let prof = await fetchUserProfile(id, currentUser?.id);
       if (!prof) {
         prof = await fetchUserProfileByUsername(cleanId, currentUser?.id);
+      }
+      if (prof && prof.isFollowing) {
+        useAuthStore.setState((state) => {
+          if (!state.followingIds.has(prof.id)) {
+            const next = new Set(state.followingIds);
+            next.add(prof.id);
+            return { followingIds: next };
+          }
+          return state;
+        });
       }
       setResearcher(prof);
       setIsLoading(false);

@@ -24,9 +24,23 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
   showMutualInterests = true,
 }) => {
   const currentUser = useAuthStore((s) => s.user);
-  const isFollowing = useAuthStore((s) => s.followingIds.has(researcher.id)) || Boolean(researcher.isFollowing);
+  const isFollowing = useAuthStore((s) => s.followingIds.has(researcher.id));
   const isLoading = useAuthStore((s) => s.followLoadingIds.has(researcher.id));
   const isSelf = Boolean(currentUser?.id && currentUser.id === researcher.id);
+
+  // Sync initial isFollowing flag into global store set
+  React.useEffect(() => {
+    if (researcher.isFollowing && researcher.id) {
+      useAuthStore.setState((state) => {
+        if (!state.followingIds.has(researcher.id)) {
+          const next = new Set(state.followingIds);
+          next.add(researcher.id);
+          return { followingIds: next };
+        }
+        return state;
+      });
+    }
+  }, [researcher.id, researcher.isFollowing]);
 
   const mutualInterests = React.useMemo(() => {
     if (!showMutualInterests || !currentUser || currentUser.id === researcher.id) return [];

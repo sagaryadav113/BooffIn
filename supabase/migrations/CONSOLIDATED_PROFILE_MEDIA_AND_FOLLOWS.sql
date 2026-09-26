@@ -1,6 +1,5 @@
 -- ============================================================================
 -- BOOFFIN COMPLETE SETUP: PROFILE MEDIA (DP + BANNER) & FOLLOW/CONNECTION SYSTEM
--- Run this script in the Supabase Dashboard -> SQL Editor -> New Query -> Run
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -45,7 +44,7 @@ BEGIN
 END $$;
 
 -- ----------------------------------------------------------------------------
--- 2. CREATE STORAGE BUCKET: profile-media (if storage schema is available)
+-- 2. CREATE STORAGE BUCKET: profile-media
 -- ----------------------------------------------------------------------------
 DO $$
 BEGIN
@@ -63,8 +62,7 @@ BEGIN
     allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg'];
 EXCEPTION
   WHEN OTHERS THEN
-    -- If bucket insert via SQL is restricted in your project, create 'profile-media' in Storage dashboard
-    RAISE NOTICE 'Notice: Storage bucket can also be created via Supabase Storage UI.';
+    RAISE NOTICE 'Notice: profile-media bucket can also be managed via Storage dashboard.';
 END $$;
 
 -- ----------------------------------------------------------------------------
@@ -147,12 +145,13 @@ CREATE TRIGGER trg_follow_count
   FOR EACH ROW EXECUTE FUNCTION public.fn_handle_follow_count();
 
 -- ----------------------------------------------------------------------------
--- 5. ATOMIC TOGGLE FOLLOW RPC FUNCTION
+-- 5. ATOMIC TOGGLE FOLLOW RPC FUNCTION (Accepts UUID or Username/Text)
 -- ----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.toggle_follow(target_user_id UUID)
+CREATE OR REPLACE FUNCTION public.toggle_follow(target_user_id TEXT)
 RETURNS JSONB AS $$
 DECLARE
   v_caller_id UUID;
+  v_target_uuid UUID;
   v_already_following BOOLEAN;
   v_is_following BOOLEAN;
   v_followers_count INT;
@@ -164,37 +163,51 @@ BEGIN
     RAISE EXCEPTION 'Authentication required to follow users.';
   END IF;
 
-  IF v_caller_id = target_user_id THEN
-    RAISE EXCEPTION 'Users cannot follow themselves.';
+  -- Resolve target UUID whether passed as UUID string or username
+  IF target_user_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    v_target_uuid := target_user_id::UUID;
+  ELSE
+    SELECT id INTO v_target_uuid 
+    FROM public.profiles 
+    WHERE lower(username) = lower(replace(target_user_id, '@', ''))
+    LIMIT 1;
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = target_user_id) THEN
+  IF v_target_uuid IS NULL THEN
     RAISE EXCEPTION 'Target researcher not found.';
+  END IF;
+
+  IF v_caller_id = v_target_uuid THEN
+    RAISE EXCEPTION 'Users cannot follow themselves.';
   END IF;
 
   SELECT EXISTS (
     SELECT 1 FROM public.follows 
-    WHERE follower_id = v_caller_id AND following_id = target_user_id
+    WHERE follower_id = v_caller_id AND following_id = v_target_uuid
   ) INTO v_already_following;
 
   IF v_already_following THEN
     DELETE FROM public.follows 
-    WHERE follower_id = v_caller_id AND following_id = target_user_id;
+    WHERE follower_id = v_caller_id AND following_id = v_target_uuid;
     v_is_following := FALSE;
   ELSE
     INSERT INTO public.follows (follower_id, following_id)
-    VALUES (v_caller_id, target_user_id)
+    VALUES (v_caller_id, v_target_uuid)
     ON CONFLICT (follower_id, following_id) DO NOTHING;
     v_is_following := TRUE;
   END IF;
 
-  SELECT count(*) INTO v_followers_count FROM public.follows WHERE following_id = target_user_id;
+  SELECT count(*) INTO v_followers_count FROM public.follows WHERE following_id = v_target_uuid;
   SELECT count(*) INTO v_following_count FROM public.follows WHERE follower_id = v_caller_id;
+
+  -- Direct count update for immediate consistency
+  UPDATE public.profiles SET followers_count = v_followers_count, updated_at = now() WHERE id = v_target_uuid;
+  UPDATE public.profiles SET following_count = v_following_count, updated_at = now() WHERE id = v_caller_id;
 
   RETURN jsonb_build_object(
     'success', true,
     'is_following', v_is_following,
-    'target_user_id', target_user_id,
+    'target_user_id', v_target_uuid,
     'target_followers_count', v_followers_count,
     'caller_following_count', v_following_count
   );
@@ -204,15 +217,26 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ----------------------------------------------------------------------------
 -- 6. GET USER FOLLOWING IDS RPC FUNCTION
 -- ----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.get_user_following_ids(p_user_id UUID)
+CREATE OR REPLACE FUNCTION public.get_user_following_ids(p_user_id TEXT)
 RETURNS UUID[] AS $$
 DECLARE
+  v_target_uuid UUID;
   v_ids UUID[];
 BEGIN
+  IF p_user_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    v_target_uuid := p_user_id::UUID;
+  ELSE
+    SELECT id INTO v_target_uuid FROM public.profiles WHERE lower(username) = lower(replace(p_user_id, '@', '')) LIMIT 1;
+  END IF;
+
+  IF v_target_uuid IS NULL THEN
+    RETURN ARRAY[]::UUID[];
+  END IF;
+
   SELECT COALESCE(array_agg(following_id), ARRAY[]::UUID[])
   INTO v_ids
   FROM public.follows
-  WHERE follower_id = p_user_id;
+  WHERE follower_id = v_target_uuid;
 
   RETURN v_ids;
 END;
@@ -222,15 +246,31 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 -- 7. GET FOLLOWERS WITH VIEWER FOLLOW STATUS RPC FUNCTION
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_followers(
-  p_user_id UUID,
-  p_viewer_id UUID DEFAULT NULL,
+  p_user_id TEXT,
+  p_viewer_id TEXT DEFAULT NULL,
   p_limit INT DEFAULT 30,
   p_offset INT DEFAULT 0
 )
 RETURNS JSONB AS $$
 DECLARE
+  v_target_uuid UUID;
+  v_viewer_uuid UUID;
   v_result JSONB;
 BEGIN
+  IF p_user_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    v_target_uuid := p_user_id::UUID;
+  ELSE
+    SELECT id INTO v_target_uuid FROM public.profiles WHERE lower(username) = lower(replace(p_user_id, '@', '')) LIMIT 1;
+  END IF;
+
+  IF p_viewer_id IS NOT NULL AND p_viewer_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    v_viewer_uuid := p_viewer_id::UUID;
+  END IF;
+
+  IF v_target_uuid IS NULL THEN
+    RETURN '[]'::jsonb;
+  END IF;
+
   SELECT COALESCE(
     jsonb_agg(
       jsonb_build_object(
@@ -249,8 +289,8 @@ BEGIN
         'posts_count', p.posts_count,
         'created_at', p.created_at,
         'is_following', CASE 
-          WHEN p_viewer_id IS NOT NULL THEN
-            EXISTS (SELECT 1 FROM public.follows WHERE follower_id = p_viewer_id AND following_id = p.id)
+          WHEN v_viewer_uuid IS NOT NULL THEN
+            EXISTS (SELECT 1 FROM public.follows WHERE follower_id = v_viewer_uuid AND following_id = p.id)
           ELSE FALSE
         END
       ) ORDER BY f.created_at DESC
@@ -259,7 +299,7 @@ BEGIN
   ) INTO v_result
   FROM public.follows f
   JOIN public.profiles p ON p.id = f.follower_id
-  WHERE f.following_id = p_user_id
+  WHERE f.following_id = v_target_uuid
   LIMIT p_limit OFFSET p_offset;
 
   RETURN v_result;
@@ -270,15 +310,31 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 -- 8. GET FOLLOWING WITH VIEWER FOLLOW STATUS RPC FUNCTION
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_following(
-  p_user_id UUID,
-  p_viewer_id UUID DEFAULT NULL,
+  p_user_id TEXT,
+  p_viewer_id TEXT DEFAULT NULL,
   p_limit INT DEFAULT 30,
   p_offset INT DEFAULT 0
 )
 RETURNS JSONB AS $$
 DECLARE
+  v_target_uuid UUID;
+  v_viewer_uuid UUID;
   v_result JSONB;
 BEGIN
+  IF p_user_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    v_target_uuid := p_user_id::UUID;
+  ELSE
+    SELECT id INTO v_target_uuid FROM public.profiles WHERE lower(username) = lower(replace(p_user_id, '@', '')) LIMIT 1;
+  END IF;
+
+  IF p_viewer_id IS NOT NULL AND p_viewer_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    v_viewer_uuid := p_viewer_id::UUID;
+  END IF;
+
+  IF v_target_uuid IS NULL THEN
+    RETURN '[]'::jsonb;
+  END IF;
+
   SELECT COALESCE(
     jsonb_agg(
       jsonb_build_object(
@@ -297,8 +353,8 @@ BEGIN
         'posts_count', p.posts_count,
         'created_at', p.created_at,
         'is_following', CASE 
-          WHEN p_viewer_id IS NOT NULL THEN
-            EXISTS (SELECT 1 FROM public.follows WHERE follower_id = p_viewer_id AND following_id = p.id)
+          WHEN v_viewer_uuid IS NOT NULL THEN
+            EXISTS (SELECT 1 FROM public.follows WHERE follower_id = v_viewer_uuid AND following_id = p.id)
           ELSE FALSE
         END
       ) ORDER BY f.created_at DESC
@@ -307,7 +363,7 @@ BEGIN
   ) INTO v_result
   FROM public.follows f
   JOIN public.profiles p ON p.id = f.following_id
-  WHERE f.follower_id = p_user_id
+  WHERE f.follower_id = v_target_uuid
   LIMIT p_limit OFFSET p_offset;
 
   RETURN v_result;
