@@ -5,11 +5,13 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  Dimensions,
-  FlatList,
+  ScrollView,
   StatusBar,
   Platform,
   SafeAreaView,
+  useWindowDimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -30,65 +32,65 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   onClose,
   authorName,
 }) => {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
-  const flatListRef = useRef<FlatList>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      setDimensions(window);
-    });
-    return () => subscription?.remove();
-  }, []);
-
+  // Synchronize initial index when modal becomes visible or initialIndex changes
   useEffect(() => {
     if (visible) {
-      setCurrentIndex(initialIndex);
-      // Wait for layout before scrolling to initial index
-      setTimeout(() => {
-        flatListRef.current?.scrollToIndex({
-          index: Math.min(initialIndex, Math.max(0, images.length - 1)),
+      const safeIndex = Math.min(Math.max(0, initialIndex), Math.max(0, images.length - 1));
+      setCurrentIndex(safeIndex);
+      const timer = setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          x: safeIndex * screenWidth,
           animated: false,
         });
       }, 50);
+      return () => clearTimeout(timer);
     }
-  }, [visible, initialIndex, images.length]);
+  }, [visible, initialIndex, images.length, screenWidth]);
 
   if (!visible || !images || images.length === 0) return null;
 
-  const { width: screenWidth, height: screenHeight } = dimensions;
-
-  const handleScroll = (event: any) => {
-    const slideSize = event.nativeEvent.layoutMeasurement.width;
-    const offset = event.nativeEvent.contentOffset.x;
-    const page = Math.round(offset / slideSize);
-    if (page >= 0 && page < images.length && page !== currentIndex) {
-      setCurrentIndex(page);
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    if (screenWidth > 0) {
+      const page = Math.round(offsetX / screenWidth);
+      if (page >= 0 && page < images.length && page !== currentIndex) {
+        setCurrentIndex(page);
+      }
     }
   };
 
-  const handlePrev = (e: any) => {
-    e.stopPropagation();
+  const handleScrollToPage = (pageIndex: number, animated = true) => {
+    if (pageIndex >= 0 && pageIndex < images.length) {
+      setCurrentIndex(pageIndex);
+      scrollViewRef.current?.scrollTo({
+        x: pageIndex * screenWidth,
+        animated,
+      });
+    }
+  };
+
+  const handlePrev = (e?: any) => {
+    if (e?.stopPropagation) e.stopPropagation();
     if (currentIndex > 0) {
-      const nextIndex = currentIndex - 1;
-      setCurrentIndex(nextIndex);
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      handleScrollToPage(currentIndex - 1, true);
     }
   };
 
-  const handleNext = (e: any) => {
-    e.stopPropagation();
+  const handleNext = (e?: any) => {
+    if (e?.stopPropagation) e.stopPropagation();
     if (currentIndex < images.length - 1) {
-      const nextIndex = currentIndex + 1;
-      setCurrentIndex(nextIndex);
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      handleScrollToPage(currentIndex + 1, true);
     }
   };
 
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={false}
       animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
@@ -125,59 +127,65 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Carousel / Swiper */}
+        {/* Carousel / Swiper Area */}
         <View style={styles.carouselContainer}>
-          <FlatList
-            ref={flatListRef}
-            data={images}
-            keyExtractor={(_, index) => `viewer_img_${index}`}
+          <ScrollView
+            ref={scrollViewRef}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={handleScroll}
             onMomentumScrollEnd={handleScroll}
-            getItemLayout={(_, index) => ({
-              length: screenWidth,
-              offset: screenWidth * index,
-              index,
-            })}
-            initialScrollIndex={initialIndex < images.length ? initialIndex : 0}
-            renderItem={({ item }) => (
-              <View style={[styles.imageSlide, { width: screenWidth }]}>
+            nestedScrollEnabled
+            directionalLockEnabled
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {images.map((imgUrl, index) => (
+              <View
+                key={`slide_${index}`}
+                style={[
+                  styles.imageSlide,
+                  { width: screenWidth, height: screenHeight * 0.76 },
+                ]}
+              >
                 <Image
-                  source={{ uri: item }}
+                  source={{ uri: imgUrl }}
                   style={[
                     styles.fullImage,
-                    { width: screenWidth, height: screenHeight * 0.76 },
+                    { width: screenWidth, height: '100%' },
                   ]}
                   contentFit="contain"
-                  transition={200}
+                  priority="high"
+                  transition={150}
                 />
               </View>
-            )}
-          />
+            ))}
+          </ScrollView>
 
-          {/* Web / Desktop navigation arrows */}
-          {Platform.OS === 'web' && images.length > 1 && (
-            <>
-              {currentIndex > 0 && (
-                <TouchableOpacity
-                  style={[styles.navArrow, styles.navArrowLeft]}
-                  onPress={handlePrev}
-                  activeOpacity={0.8}
-                >
-                  <ChevronLeft size={28} color={colors.white} />
-                </TouchableOpacity>
-              )}
-              {currentIndex < images.length - 1 && (
-                <TouchableOpacity
-                  style={[styles.navArrow, styles.navArrowRight]}
-                  onPress={handleNext}
-                  activeOpacity={0.8}
-                >
-                  <ChevronRight size={28} color={colors.white} />
-                </TouchableOpacity>
-              )}
-            </>
+          {/* Left Arrow Button */}
+          {images.length > 1 && currentIndex > 0 && (
+            <TouchableOpacity
+              style={[styles.navArrow, styles.navArrowLeft]}
+              onPress={handlePrev}
+              activeOpacity={0.8}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            >
+              <ChevronLeft size={28} color={colors.white} />
+            </TouchableOpacity>
+          )}
+
+          {/* Right Arrow Button */}
+          {images.length > 1 && currentIndex < images.length - 1 && (
+            <TouchableOpacity
+              style={[styles.navArrow, styles.navArrowRight]}
+              onPress={handleNext}
+              activeOpacity={0.8}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            >
+              <ChevronRight size={28} color={colors.white} />
+            </TouchableOpacity>
           )}
         </View>
 
@@ -188,12 +196,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
               {images.map((_, idx) => (
                 <TouchableOpacity
                   key={idx}
-                  onPress={() => {
-                    setCurrentIndex(idx);
-                    flatListRef.current?.scrollToIndex({ index: idx, animated: true });
-                  }}
+                  onPress={() => handleScrollToPage(idx, true)}
                   activeOpacity={0.7}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                  hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
                 >
                   <View
                     style={[
@@ -230,7 +235,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -239,8 +244,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   counterBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: spacing.sm + 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: spacing.sm + 4,
     paddingVertical: 3,
     borderRadius: radii.full,
     marginBottom: 2,
@@ -248,19 +253,27 @@ const styles = StyleSheet.create({
   counterText: {
     ...typography.microBold,
     color: colors.white,
-    fontSize: 12,
+    fontSize: 12.5,
+    fontWeight: '700',
   },
   authorText: {
     ...typography.caption,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 12,
-    maxWidth: 200,
+    maxWidth: 220,
   },
   carouselContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     position: 'relative',
+    width: '100%',
+  },
+  scrollView: {
+    flex: 1,
+    width: '100%',
+  },
+  scrollContent: {
+    alignItems: 'center',
   },
   imageSlide: {
     justifyContent: 'center',
@@ -273,21 +286,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     marginTop: -24,
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   navArrowLeft: {
-    left: spacing.md,
+    left: spacing.sm,
   },
   navArrowRight: {
-    right: spacing.md,
+    right: spacing.sm,
   },
   footer: {
     paddingVertical: spacing.md,
@@ -297,22 +310,22 @@ const styles = StyleSheet.create({
   dotsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
   dot: {
-    height: 6,
+    height: 7,
     borderRadius: radii.full,
   },
   dotActive: {
-    width: 18,
+    width: 20,
     backgroundColor: colors.white,
   },
   dotInactive: {
-    width: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    width: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
   },
 });
