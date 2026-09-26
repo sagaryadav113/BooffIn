@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 import { supabase } from './client';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -33,13 +34,60 @@ export interface UploadMediaResult {
 }
 
 /**
+ * Infers MIME type from asset URI if mimeType is undefined
+ */
+function inferMimeType(asset: ImagePicker.ImagePickerAsset): string {
+  if (asset.mimeType) return asset.mimeType.toLowerCase();
+  const uri = asset.uri.toLowerCase();
+  if (uri.endsWith('.png')) return 'image/png';
+  if (uri.endsWith('.webp')) return 'image/webp';
+  if (uri.endsWith('.gif')) return 'image/gif';
+  return 'image/jpeg';
+}
+
+/**
+ * Decodes base64 string to Uint8Array for binary upload
+ */
+function decodeBase64ToUint8Array(base64: string): Uint8Array {
+  // If atob is available (Web, Hermes, modern React Native)
+  if (typeof atob === 'function') {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  // Pure JS fallback decoding
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let bufferLength = base64.length * 0.75;
+  if (base64.endsWith('==')) bufferLength -= 2;
+  else if (base64.endsWith('=')) bufferLength -= 1;
+
+  const bytes = new Uint8Array(bufferLength);
+  let p = 0;
+  for (let i = 0; i < base64.length; i += 4) {
+    const encoded1 = chars.indexOf(base64[i]);
+    const encoded2 = chars.indexOf(base64[i + 1]);
+    const encoded3 = chars.indexOf(base64[i + 2]);
+    const encoded4 = chars.indexOf(base64[i + 3]);
+
+    bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+    if (encoded3 !== 64 && encoded3 !== -1) bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+    if (encoded4 !== 64 && encoded4 !== -1) bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+  }
+  return bytes;
+}
+
+/**
  * Validates selected image asset against allowed MIME types and max size limit (5MB)
  */
 export function validateImage(
   asset: ImagePicker.ImagePickerAsset,
-  blobSize?: number
+  calculatedSize?: number
 ): ImageValidationResult {
-  const mimeType = (asset.mimeType || 'image/jpeg').toLowerCase();
+  const mimeType = inferMimeType(asset);
 
   // Check MIME Type
   const isValidMime = ALLOWED_MIME_TYPES.some((allowed) =>
@@ -54,8 +102,8 @@ export function validateImage(
     };
   }
 
-  // Check file size if available from asset or blob
-  const size = blobSize || asset.fileSize;
+  // Check file size if available from asset, calculatedSize, or base64 length
+  const size = calculatedSize || asset.fileSize || (asset.base64 ? asset.base64.length * 0.75 : undefined);
   if (size && size > MAX_FILE_SIZE_BYTES) {
     const sizeMb = (size / (1024 * 1024)).toFixed(1);
     return {
@@ -75,7 +123,7 @@ export function validateImage(
 }
 
 /**
- * Prompts user to pick an image from their gallery/library
+ * Prompts user to pick an image from their gallery/library with base64 enabled for mobile reliability
  */
 export async function pickImageFromLibrary(
   options: PickImageOptions = {}
@@ -96,6 +144,7 @@ export async function pickImageFromLibrary(
       allowsEditing: options.allowsEditing ?? true,
       aspect: options.aspect,
       quality: options.quality ?? 0.85,
+      base64: true, // Crucial for React Native storage uploads
     });
 
     if (result.canceled || !result.assets || result.assets.length === 0) {
@@ -147,14 +196,28 @@ export async function pickBannerImage(): Promise<{
 }
 
 /**
- * Converts image URI to ArrayBuffer for reliable cross-platform upload to Supabase Storage
+ * Converts image asset to binary data (Uint8Array / ArrayBuffer / Blob) cross-platform
  */
-async function uriToArrayBuffer(uri: string): Promise<{ data: ArrayBuffer; size: number }> {
-  const response = await fetch(uri);
+async function getAssetBinaryData(
+  asset: ImagePicker.ImagePickerAsset
+): Promise<{ data: Uint8Array | ArrayBuffer | Blob; size: number }> {
+  // 1. If base64 is available (standard in Expo ImagePicker when base64: true)
+  if (asset.base64) {
+    const bytes = decodeBase64ToUint8Array(asset.base64);
+    return { data: bytes, size: bytes.byteLength };
+  }
+
+  // 2. Web fallback (blob / arrayBuffer)
+  if (Platform.OS === 'web' || typeof window !== 'undefined') {
+    const response = await fetch(asset.uri);
+    const blob = await response.blob();
+    return { data: blob, size: blob.size };
+  }
+
+  // 3. Mobile fallback
+  const response = await fetch(asset.uri);
   const blob = await response.blob();
-  const size = blob.size;
-  const arrayBuffer = await response.arrayBuffer();
-  return { data: arrayBuffer, size };
+  return { data: blob, size: blob.size || asset.fileSize || 0 };
 }
 
 /**
@@ -173,7 +236,7 @@ export async function uploadProfileAvatar(
     if (onProgress) onProgress(0.1);
 
     // 1. Read binary data
-    const { data: fileData, size } = await uriToArrayBuffer(asset.uri);
+    const { data: fileData, size } = await getAssetBinaryData(asset);
 
     // 2. Validate file size and MIME type
     const validation = validateImage(asset, size);
@@ -191,7 +254,7 @@ export async function uploadProfileAvatar(
 
     if (onProgress) onProgress(0.5);
 
-    // 4. Upload to Supabase Storage (RLS enforces user owns folder {userId}/*)
+    // 4. Upload to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from(PROFILE_MEDIA_BUCKET)
       .upload(filePath, fileData, {
@@ -211,12 +274,12 @@ export async function uploadProfileAvatar(
 
     if (onProgress) onProgress(0.8);
 
-    // 5. Get public URL
+    // 5. Get public URL with timestamp cache buster
     const { data: publicData } = supabase.storage
       .from(PROFILE_MEDIA_BUCKET)
       .getPublicUrl(filePath);
 
-    const publicUrl = publicData.publicUrl;
+    const publicUrl = `${publicData.publicUrl}?t=${Date.now()}`;
 
     // 6. Update database record with has_custom_avatar = true
     const { error: dbError } = await supabase
@@ -231,8 +294,8 @@ export async function uploadProfileAvatar(
       console.warn('Database avatar update error:', dbError);
     }
 
-    // 7. Update auth store state
-    useAuthStore.getState().updateProfile({
+    // 7. Update auth store state and cache
+    await useAuthStore.getState().updateProfile({
       avatarUrl: publicUrl,
       hasCustomAvatar: true,
     });
@@ -245,6 +308,7 @@ export async function uploadProfileAvatar(
       error: null,
     };
   } catch (err: any) {
+    console.error('uploadProfileAvatar unexpected error:', err);
     return {
       success: false,
       url: null,
@@ -276,7 +340,7 @@ export async function removeProfileAvatar(
       return { success: false, error: dbError.message };
     }
 
-    useAuthStore.getState().updateProfile({
+    await useAuthStore.getState().updateProfile({
       avatarUrl: undefined,
       hasCustomAvatar: true,
     });
@@ -306,7 +370,7 @@ export async function uploadProfileBanner(
     if (onProgress) onProgress(0.1);
 
     // 1. Read binary data
-    const { data: fileData, size } = await uriToArrayBuffer(asset.uri);
+    const { data: fileData, size } = await getAssetBinaryData(asset);
 
     // 2. Validate file size and MIME type
     const validation = validateImage(asset, size);
@@ -324,7 +388,7 @@ export async function uploadProfileBanner(
 
     if (onProgress) onProgress(0.5);
 
-    // 4. Upload to Supabase Storage (RLS enforces user owns folder {userId}/*)
+    // 4. Upload to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from(PROFILE_MEDIA_BUCKET)
       .upload(filePath, fileData, {
@@ -344,12 +408,12 @@ export async function uploadProfileBanner(
 
     if (onProgress) onProgress(0.8);
 
-    // 5. Get public URL
+    // 5. Get public URL with timestamp cache buster
     const { data: publicData } = supabase.storage
       .from(PROFILE_MEDIA_BUCKET)
       .getPublicUrl(filePath);
 
-    const publicUrl = publicData.publicUrl;
+    const publicUrl = `${publicData.publicUrl}?t=${Date.now()}`;
 
     // 6. Update database record with has_custom_banner = true
     const { error: dbError } = await supabase
@@ -364,8 +428,8 @@ export async function uploadProfileBanner(
       console.warn('Database banner update error:', dbError);
     }
 
-    // 7. Update auth store state
-    useAuthStore.getState().updateProfile({
+    // 7. Update auth store state and cache
+    await useAuthStore.getState().updateProfile({
       bannerUrl: publicUrl,
       hasCustomBanner: true,
     });
@@ -378,6 +442,7 @@ export async function uploadProfileBanner(
       error: null,
     };
   } catch (err: any) {
+    console.error('uploadProfileBanner unexpected error:', err);
     return {
       success: false,
       url: null,
@@ -409,7 +474,7 @@ export async function removeProfileBanner(
       return { success: false, error: dbError.message };
     }
 
-    useAuthStore.getState().updateProfile({
+    await useAuthStore.getState().updateProfile({
       bannerUrl: undefined,
       hasCustomBanner: true,
     });
