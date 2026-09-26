@@ -8,14 +8,17 @@ import {
   StatusBar,
   ActivityIndicator,
   Platform,
+  ImageBackground,
+  ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Mail } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography, layout } from '../../theme';
-import { BooffinLogo } from '../../components/core/BooffinLogo';
 import { GoogleIcon } from '../../components/core/GoogleIcon';
 import { useAuthStore } from '../../store/useAuthStore';
+
+const WELCOME_HERO_BG = require('../../../assets/images/welcome-hero.jpg');
 
 export default function WelcomeScreen() {
   const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
@@ -41,163 +44,122 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-      <View style={styles.container}>
-        {/* Top Spacer for generous vertical breathing room */}
-        <View style={styles.topSpacer} />
+    <View style={styles.outerContainer}>
+      <StatusBar barStyle="dark-content" backgroundColor="#EDEAE4" />
+      <ImageBackground
+        source={WELCOME_HERO_BG}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Top Artwork Spacer - preserves visibility for the illustration & tagline */}
+            <View style={styles.artworkSpacer} />
 
-        {/* Central Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.logoWrapper}>
-            <BooffinLogo size={88} />
-          </View>
+            {/* Bottom Actions Section */}
+            <View style={styles.bottomSection}>
+              {authError && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{authError}</Text>
+                </View>
+              )}
 
-          <Text style={styles.title}>
-            Let's <Text style={styles.titleBold}>BooffIn</Text>
-          </Text>
+              {/* Continue with Google */}
+              <TouchableOpacity
+                style={styles.googleButton}
+                onPress={handleGoogleAuth}
+                disabled={isLoading}
+                activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Google"
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={colors.textPrimary} />
+                ) : (
+                  <>
+                    <GoogleIcon size={20} />
+                    <Text style={styles.googleButtonText}>Continue with Google</Text>
+                  </>
+                )}
+              </TouchableOpacity>
 
-          <Text style={styles.tagline}>Research finds its people.</Text>
+              {/* Continue with Email */}
+              <TouchableOpacity
+                style={styles.emailButton}
+                onPress={handleEmailAuth}
+                disabled={isLoading}
+                activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with email"
+              >
+                <Mail size={19} color={colors.textPrimary} strokeWidth={2} />
+                <Text style={styles.emailButtonText}>Continue with email</Text>
+              </TouchableOpacity>
 
-          <View style={styles.statementBox}>
-            <Text style={styles.statementText}>Ideas · Papers · People · Progress</Text>
-          </View>
-        </View>
-
-        {/* Bottom Actions Section */}
-        <View style={styles.bottomSection}>
-          {authError && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{authError}</Text>
+              {/* Legal Footer */}
+              <View style={styles.legalContainer}>
+                <Text style={styles.legalText}>
+                  By continuing, you agree to BooffIn's{' '}
+                  <Text style={styles.legalLink}>Terms of Use</Text> and{' '}
+                  <Text style={styles.legalLink}>Privacy Policy</Text>.
+                </Text>
+              </View>
             </View>
-          )}
-
-          {/* Continue with Google */}
-          <TouchableOpacity
-            style={styles.googleButton}
-            onPress={handleGoogleAuth}
-            disabled={isLoading}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Continue with Google"
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
-            ) : (
-              <>
-                <GoogleIcon size={20} />
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {/* Continue with Email */}
-          <TouchableOpacity
-            style={styles.emailButton}
-            onPress={handleEmailAuth}
-            disabled={isLoading}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Continue with email"
-          >
-            <Mail size={19} color={colors.textPrimary} strokeWidth={2} />
-            <Text style={styles.emailButtonText}>Continue with email</Text>
-          </TouchableOpacity>
-
-          {/* Legal Footer */}
-          <View style={styles.legalContainer}>
-            <Text style={styles.legalText}>
-              By continuing, you agree to BooffIn's{' '}
-              <Text style={styles.legalLink}>Terms of Use</Text> and{' '}
-              <Text style={styles.legalLink}>Privacy Policy</Text>.
-            </Text>
-          </View>
-        </View>
-      </View>
-    </SafeAreaView>
+          </ScrollView>
+        </SafeAreaView>
+      </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+    backgroundColor: '#EDEAE4',
+  },
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  container: {
-    flex: 1,
-    paddingHorizontal: spacing.xxl,
-    paddingTop: Platform.OS === 'web' ? spacing.xxxl : spacing.lg,
-    paddingBottom: Platform.OS === 'web' ? spacing.xxxl : spacing.xl,
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
+    paddingTop: Platform.OS === 'web' ? spacing.xxl : spacing.md,
+    paddingBottom: Platform.OS === 'web' ? spacing.xxxl : spacing.xl,
     maxWidth: 440,
     width: '100%',
     alignSelf: 'center',
   },
-  topSpacer: {
-    height: Platform.OS === 'web' ? 24 : 16,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  artworkSpacer: {
+    flex: 1,
+    minHeight: Platform.OS === 'web' ? 440 : 400,
     width: '100%',
-    paddingVertical: spacing.xl,
-  },
-  logoWrapper: {
-    marginBottom: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontFamily: Platform.select({
-      ios: 'Georgia',
-      android: 'serif',
-      default: 'Georgia, Cambria, "Times New Roman", Times, serif',
-    }),
-    fontSize: 34,
-    color: colors.textPrimary,
-    fontWeight: '700',
-    letterSpacing: -0.6,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  titleBold: {
-    fontWeight: '800',
-  },
-  tagline: {
-    ...typography.bodyLargeMedium,
-    fontSize: 16.5,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    letterSpacing: 0.1,
-    marginBottom: spacing.lg,
-  },
-  statementBox: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    alignItems: 'center',
-  },
-  statementText: {
-    ...typography.captionMedium,
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    letterSpacing: 0.4,
-    textAlign: 'center',
-    textTransform: 'uppercase',
   },
   bottomSection: {
     width: '100%',
     alignItems: 'center',
     gap: spacing.sm + 2,
+    paddingTop: spacing.xs,
   },
   errorContainer: {
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     marginBottom: spacing.xs,
     width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
   },
   errorText: {
     ...typography.caption,
@@ -213,9 +175,14 @@ const styles = StyleSheet.create({
     height: layout.buttonHeights.lg,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.borderDark,
+    borderColor: 'rgba(0,0,0,0.12)',
     borderRadius: radii.md,
     gap: spacing.sm + 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
     ...(Platform.OS === 'web'
       ? {
           cursor: 'pointer' as any,
@@ -237,9 +204,14 @@ const styles = StyleSheet.create({
     height: layout.buttonHeights.lg,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.borderDark,
+    borderColor: 'rgba(0,0,0,0.12)',
     borderRadius: radii.md,
     gap: spacing.sm + 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
     ...(Platform.OS === 'web'
       ? {
           cursor: 'pointer' as any,
@@ -255,18 +227,18 @@ const styles = StyleSheet.create({
   },
   legalContainer: {
     paddingHorizontal: spacing.sm,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.xs + 2,
     alignItems: 'center',
   },
   legalText: {
     ...typography.metadata,
-    color: colors.textMuted,
+    color: '#6B6862',
     fontSize: 12.5,
     lineHeight: 17,
     textAlign: 'center',
   },
   legalLink: {
-    color: colors.textSecondary,
+    color: '#2A2927',
     textDecorationLine: 'underline',
   },
 });
