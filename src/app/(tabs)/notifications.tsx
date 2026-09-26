@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -18,29 +18,34 @@ import { LoadingState } from '../../components/feedback/LoadingState';
 import { Typography } from '../../components/core/Typography';
 import { Icon } from '../../components/core/Icon';
 import { useNotificationStore } from '../../store/useNotificationStore';
-import { NotificationFilter } from '../../types/notification';
+import { useAuthStore } from '../../store/useAuthStore';
+import { NotificationFilter, AppNotification } from '../../types/notification';
+import { filterNotificationList } from '../../api/notificationService';
 
 export default function NotificationsScreen() {
   const notifications = useNotificationStore((s) => s.notifications);
   const activeFilter = useNotificationStore((s) => s.activeFilter);
   const setActiveFilter = useNotificationStore((s) => s.setActiveFilter);
-  const getFilteredNotifications = useNotificationStore((s) => s.getFilteredNotifications);
   const markAllAsRead = useNotificationStore((s) => s.markAllAsRead);
   const loadNotifications = useNotificationStore((s) => s.loadNotifications);
   const subscribeToRealtimeNotifications = useNotificationStore((s) => s.subscribeToRealtimeNotifications);
   const isLoading = useNotificationStore((s) => s.isLoading);
   const isRefreshing = useNotificationStore((s) => s.isRefreshing);
-  const unreadCount = useNotificationStore((s) => s.unreadCount());
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const currentUser = useAuthStore((s) => s.user);
 
   useEffect(() => {
     loadNotifications();
-    const unsubscribe = subscribeToRealtimeNotifications();
+    const unsubscribe = subscribeToRealtimeNotifications(currentUser?.id);
     return () => {
       unsubscribe();
     };
-  }, [loadNotifications, subscribeToRealtimeNotifications]);
+  }, [loadNotifications, subscribeToRealtimeNotifications, currentUser?.id]);
 
-  const filteredNotifications = getFilteredNotifications();
+  const filteredNotifications = useMemo(() => {
+    return filterNotificationList(notifications, activeFilter);
+  }, [notifications, activeFilter]);
+
   const filterOptions: NotificationFilter[] = ['All', 'Mentions', 'Follows', 'Discussions', 'Updates'];
 
   const getEmptyStateContent = () => {

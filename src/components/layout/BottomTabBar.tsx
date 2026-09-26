@@ -46,7 +46,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   descriptors,
   navigation,
 }) => {
-  const unreadCount = useNotificationStore((s) => s.unreadCount());
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   return (
     <View style={styles.tabBarContainer}>

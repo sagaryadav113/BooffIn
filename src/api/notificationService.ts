@@ -120,6 +120,7 @@ export function filterNotificationList(
   notifications: AppNotification[],
   filter: NotificationFilter
 ): AppNotification[] {
+  if (!Array.isArray(notifications)) return [];
   if (filter === 'All') return notifications;
   if (filter === 'Mentions') {
     return notifications.filter((n) => n.type === 'comment' || n.type === 'reply' || n.type === 'mention');
@@ -129,7 +130,12 @@ export function filterNotificationList(
   }
   if (filter === 'Discussions') {
     return notifications.filter(
-      (n) => n.type === 'comment' || n.type === 'reply' || n.type === 'paper_discussion'
+      (n) =>
+        n.type === 'comment' ||
+        n.type === 'reply' ||
+        n.type === 'like' ||
+        n.type === 'repost' ||
+        n.type === 'paper_discussion'
     );
   }
   if (filter === 'Updates') {
@@ -144,6 +150,7 @@ export function filterNotificationList(
   }
   return notifications;
 }
+
 
 /**
  * Fetch paginated real notifications for the authenticated user from Supabase

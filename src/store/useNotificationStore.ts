@@ -13,6 +13,7 @@ import { supabase } from '../api/client';
 interface NotificationState {
   notifications: AppNotification[];
   activeFilter: NotificationFilter;
+  unreadCount: number;
   isLoading: boolean;
   isRefreshing: boolean;
   error: string | null;
@@ -24,13 +25,13 @@ interface NotificationState {
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   getFilteredNotifications: () => AppNotification[];
-  unreadCount: () => number;
   subscribeToRealtimeNotifications: (userId?: string) => () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   activeFilter: 'All',
+  unreadCount: 0,
   isLoading: false,
   isRefreshing: false,
   error: null,
@@ -48,7 +49,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       if (error) {
         set({ error, isLoading: false, isRefreshing: false });
       } else {
-        set({ notifications: data, isLoading: false, isRefreshing: false });
+        const unread = data.filter((n) => !n.isRead).length;
+        set({ notifications: data, unreadCount: unread, isLoading: false, isRefreshing: false });
       }
     } catch (err: any) {
       set({
@@ -62,7 +64,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   loadUnreadCount: async () => {
     const currentUserId = useAuthStore.getState().user?.id;
     try {
-      await fetchUnreadCount(currentUserId);
+      const { count } = await fetchUnreadCount(currentUserId);
+      set({ unreadCount: count });
     } catch {
       // noop
     }
@@ -76,9 +79,13 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   markAsRead: async (id: string) => {
     const currentUserId = useAuthStore.getState().user?.id;
     // 1. Optimistic local update
-    set((state) => ({
-      notifications: state.notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
-    }));
+    set((state) => {
+      const updated = state.notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+      return {
+        notifications: updated,
+        unreadCount: updated.filter((n) => !n.isRead).length,
+      };
+    });
 
     // 2. Server sync
     try {
@@ -93,6 +100,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     // 1. Optimistic local update
     set((state) => ({
       notifications: state.notifications.map((n) => ({ ...n, isRead: true })),
+      unreadCount: 0,
     }));
 
     // 2. Server sync
@@ -106,10 +114,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   getFilteredNotifications: () => {
     const { notifications, activeFilter } = get();
     return filterNotificationList(notifications, activeFilter);
-  },
-
-  unreadCount: () => {
-    return get().notifications.filter((n) => !n.isRead).length;
   },
 
   subscribeToRealtimeNotifications: (userId?: string) => {
@@ -139,4 +143,5 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     };
   },
 }));
+
 
