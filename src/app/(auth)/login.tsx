@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { CheckCircle2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { ScreenContainer } from '../../components/layout/ScreenContainer';
 import { Header } from '../../components/layout/Header';
 import { Typography } from '../../components/core/Typography';
 import { Input } from '../../components/core/Input';
 import { Button } from '../../components/core/Button';
+import { GoogleIcon } from '../../components/core/GoogleIcon';
 import { useAuthStore } from '../../store/useAuthStore';
 import { isProfileComplete } from '../../api/authService';
 
@@ -21,7 +21,6 @@ export default function LoginScreen() {
 
   const signIn = useAuthStore((s) => s.signIn);
   const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
-  const signInWithORCID = useAuthStore((s) => s.signInWithORCID);
   const isLoading = useAuthStore((s) => s.isLoading);
   const authError = useAuthStore((s) => s.authError);
   const clearError = useAuthStore((s) => s.clearError);
@@ -76,21 +75,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleORCIDSignIn = async () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-    const success = await signInWithORCID();
-    if (success) {
-      const activeUser = useAuthStore.getState().user;
-      if (isProfileComplete(activeUser)) {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/(auth)/onboarding');
-      }
-    }
-  };
-
   const displayError = validationError || authError;
 
   return (
@@ -106,33 +90,18 @@ export default function LoginScreen() {
           Enter your academic credentials or personal account to explore research discussions.
         </Typography>
 
-        {/* OAuth Buttons Group */}
+        {/* Google Single Sign-On Button */}
         <View style={styles.oauthButtonGroup}>
-          {/* Google Single Sign-On Button */}
           <TouchableOpacity
             style={styles.googleButton}
             onPress={handleGoogleSignIn}
             activeOpacity={0.88}
             disabled={isLoading}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
           >
-            <View style={styles.googleIconBadge}>
-              <Text style={styles.googleIconText}>G</Text>
-            </View>
+            <GoogleIcon size={20} />
             <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          {/* ORCID Quick Auth Button */}
-          <TouchableOpacity
-            style={styles.orcidButton}
-            onPress={handleORCIDSignIn}
-            activeOpacity={0.88}
-            disabled={isLoading}
-          >
-            <View style={styles.orcidLogoCircle}>
-              <Text style={styles.orcidLogoText}>iD</Text>
-            </View>
-            <Text style={styles.orcidButtonText}>Continue with ORCID iD</Text>
-            <CheckCircle2 size={16} color={colors.white} style={{ marginLeft: 4 }} />
           </TouchableOpacity>
         </View>
 
@@ -241,57 +210,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cardBackground,
     borderWidth: 1,
     borderColor: colors.borderLight,
-    paddingVertical: spacing.md - 1,
+    height: layout.buttonHeights.md,
     paddingHorizontal: spacing.lg,
     borderRadius: radii.md,
-    gap: spacing.sm,
-  },
-  googleIconBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#4285F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleIconText: {
-    color: colors.white,
-    fontWeight: '900',
-    fontSize: 12,
+    gap: spacing.md,
   },
   googleButtonText: {
     ...typography.captionBold,
     color: colors.textPrimary,
     fontSize: 15,
-  },
-  orcidButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#A6CE39', // Official ORCID Brand Color
-    paddingVertical: spacing.md - 1,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.md,
-    gap: spacing.sm,
-  },
-  orcidLogoCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  orcidLogoText: {
-    color: '#A6CE39',
-    fontWeight: '900',
-    fontSize: 11,
-  },
-  orcidButtonText: {
-    ...typography.captionBold,
-    color: colors.white,
-    fontSize: 15,
-    fontWeight: '700',
   },
   dividerRow: {
     flexDirection: 'row',

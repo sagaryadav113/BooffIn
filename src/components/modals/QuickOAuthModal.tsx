@@ -10,6 +10,7 @@ import { X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Button } from '../core/Button';
+import { GoogleIcon } from '../core/GoogleIcon';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export interface QuickOAuthModalProps {
@@ -76,7 +77,7 @@ export const QuickOAuthModal: React.FC<QuickOAuthModalProps> = ({
                 ]}
               >
                 {isGoogle ? (
-                  <Text style={styles.googleBadgeText}>G</Text>
+                  <GoogleIcon size={30} />
                 ) : (
                   <Text style={styles.orcidBadgeText}>iD</Text>
                 )}
@@ -159,16 +160,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   googleCircle: {
-    backgroundColor: '#EA4335',
+    backgroundColor: colors.background,
+    borderWidth: 1.5,
+    borderColor: colors.borderLight,
   },
   orcidCircle: {
     backgroundColor: '#A6CE39',
-  },
-  googleBadgeText: {
-    color: colors.white,
-    fontWeight: '800',
-    fontSize: 24,
-    fontFamily: 'serif',
   },
   orcidBadgeText: {
     color: colors.white,
