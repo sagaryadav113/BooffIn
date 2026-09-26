@@ -20,6 +20,7 @@ import { Post } from '../../types';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { PaperCard } from './PaperCard';
+import { PostImageCluster } from './PostImageCluster';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -149,20 +150,14 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
         <Text style={styles.postBody}>{post.content}</Text>
       ) : null}
 
-      {/* Attached Images */}
+      {/* Attached Images Cluster with Full-Screen Lightbox */}
       {Array.isArray(post.images) && post.images.length > 0 ? (
-        <View style={styles.imageGrid}>
-          {post.images.map((imgUrl, idx) => (
-            <Image
-              key={idx}
-              source={{ uri: imgUrl }}
-              style={styles.postImage}
-              contentFit="cover"
-              transition={200}
-            />
-          ))}
-        </View>
+        <PostImageCluster
+          images={post.images}
+          authorName={post.author?.fullName}
+        />
       ) : null}
+
 
       {/* Attached Poll */}
       {post.poll ? (

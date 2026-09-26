@@ -21,6 +21,7 @@ export * from './cards/NotificationCard';
 export * from './cards/NotificationRow';
 export * from './cards/PaperCard';
 export * from './cards/PostCard';
+export * from './cards/PostImageCluster';
 export * from './cards/ResearcherCard';
 export * from './cards/TopicCard';
 export * from './cards/TopicCategoryCard';
@@ -50,4 +51,6 @@ export * from './modals/InstallAppModal';
 export * from './modals/ConnectModal';
 export * from './modals/QuickOAuthModal';
 export * from './modals/FollowListModal';
+export * from './modals/ImageViewerModal';
+
 
