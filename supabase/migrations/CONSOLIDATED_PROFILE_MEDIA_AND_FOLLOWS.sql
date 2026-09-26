@@ -4,7 +4,7 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1. ADD PROFILE MEDIA COLUMNS TO public.profiles
+-- 1. ADD PROFILE MEDIA & FOLLOWER COLUMNS TO public.profiles
 -- ----------------------------------------------------------------------------
 DO $$
 BEGIN
@@ -45,67 +45,27 @@ BEGIN
 END $$;
 
 -- ----------------------------------------------------------------------------
--- 2. CREATE STORAGE BUCKET: profile-media
+-- 2. CREATE STORAGE BUCKET: profile-media (if storage schema is available)
 -- ----------------------------------------------------------------------------
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'profile-media',
-  'profile-media',
-  true,
-  5242880, -- 5MB limit
-  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg']
-)
-ON CONFLICT (id) DO UPDATE SET
-  public = true,
-  file_size_limit = 5242880,
-  allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg'];
-
--- Enable RLS on storage.objects
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
--- Storage Read Policy (Public access)
-DROP POLICY IF EXISTS "Public Profile Media View" ON storage.objects;
-CREATE POLICY "Public Profile Media View"
-  ON storage.objects
-  FOR SELECT
-  USING (bucket_id = 'profile-media');
-
--- Storage Insert Policy (Authenticated user own folder {user_id}/*)
-DROP POLICY IF EXISTS "Users can upload their own profile media" ON storage.objects;
-CREATE POLICY "Users can upload their own profile media"
-  ON storage.objects
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    bucket_id = 'profile-media' AND
-    (storage.foldername(name))[1] = (select auth.uid()::text)
-  );
-
--- Storage Update Policy
-DROP POLICY IF EXISTS "Users can update their own profile media" ON storage.objects;
-CREATE POLICY "Users can update their own profile media"
-  ON storage.objects
-  FOR UPDATE
-  TO authenticated
-  USING (
-    bucket_id = 'profile-media' AND
-    (storage.foldername(name))[1] = (select auth.uid()::text)
+DO $$
+BEGIN
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES (
+    'profile-media',
+    'profile-media',
+    true,
+    5242880, -- 5MB limit
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg']
   )
-  WITH CHECK (
-    bucket_id = 'profile-media' AND
-    (storage.foldername(name))[1] = (select auth.uid()::text)
-  );
-
--- Storage Delete Policy
-DROP POLICY IF EXISTS "Users can delete their own profile media" ON storage.objects;
-CREATE POLICY "Users can delete their own profile media"
-  ON storage.objects
-  FOR DELETE
-  TO authenticated
-  USING (
-    bucket_id = 'profile-media' AND
-    (storage.foldername(name))[1] = (select auth.uid()::text)
-  );
+  ON CONFLICT (id) DO UPDATE SET
+    public = true,
+    file_size_limit = 5242880,
+    allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg'];
+EXCEPTION
+  WHEN OTHERS THEN
+    -- If bucket insert via SQL is restricted in your project, create 'profile-media' in Storage dashboard
+    RAISE NOTICE 'Notice: Storage bucket can also be created via Supabase Storage UI.';
+END $$;
 
 -- ----------------------------------------------------------------------------
 -- 3. FOLLOWS TABLE & CONSTRAINTS
@@ -139,8 +99,7 @@ CREATE POLICY "Public Follows Read"
 
 DROP POLICY IF EXISTS "Users Insert Own Follows" ON public.follows;
 CREATE POLICY "Users Insert Own Follows"
-  ON public.follows FOR INSERT
-  TO authenticated
+  ON public.follows FOR INSERT TO authenticated
   WITH CHECK (
     auth.uid() = follower_id AND
     follower_id <> following_id
@@ -148,8 +107,7 @@ CREATE POLICY "Users Insert Own Follows"
 
 DROP POLICY IF EXISTS "Users Delete Own Follows" ON public.follows;
 CREATE POLICY "Users Delete Own Follows"
-  ON public.follows FOR DELETE
-  TO authenticated
+  ON public.follows FOR DELETE TO authenticated
   USING (auth.uid() = follower_id);
 
 -- ----------------------------------------------------------------------------
