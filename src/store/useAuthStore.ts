@@ -348,7 +348,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   toggleFollowUser: async (userId: string) => {
-    const currentUserId = get().user.id;
+    let currentUserId = get().user.id;
+    if (!currentUserId || currentUserId === 'unknown') {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          currentUserId = session.user.id;
+        }
+      } catch {}
+    }
+
     if (!currentUserId || !userId || currentUserId === userId) {
       console.warn('[useAuthStore] Cannot follow self or unauthenticated');
       return false;

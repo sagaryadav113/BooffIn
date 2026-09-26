@@ -943,21 +943,24 @@ export async function toggleFollowUserRpc(
   }
 
   try {
-    // 1. Attempt server-side RPC toggle_follow
+    // 1. Attempt server-side RPC toggle_follow passing both target_user_id and caller_user_id
     const { data: rpcData, error: rpcError } = await supabase.rpc('toggle_follow', {
       target_user_id: targetId,
+      caller_user_id: verifiedUserId,
     });
 
     if (!rpcError && rpcData) {
       const parsed = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
-      return {
-        success: true,
-        isFollowing: Boolean(parsed.is_following),
-        targetUserId: targetId,
-        targetFollowersCount: parsed.target_followers_count,
-        callerFollowingCount: parsed.caller_following_count,
-        error: null,
-      };
+      if (parsed && parsed.success === true && parsed.is_following !== undefined) {
+        return {
+          success: true,
+          isFollowing: Boolean(parsed.is_following),
+          targetUserId: targetId,
+          targetFollowersCount: parsed.target_followers_count,
+          callerFollowingCount: parsed.caller_following_count,
+          error: null,
+        };
+      }
     }
 
     // 2. Direct table insert / delete fallback with direct count sync
