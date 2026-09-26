@@ -12,6 +12,8 @@ import {
   Platform,
   Modal,
   TouchableWithoutFeedback,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -26,6 +28,9 @@ import {
   Plus,
   Trash2,
   Check,
+  Camera,
+  Images,
+  Link2,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -35,6 +40,11 @@ import { PaperLookupModal } from '../../components/modals/PaperLookupModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 import { Paper, PostType, Poll } from '../../types';
+import {
+  pickPostImages,
+  capturePostImage,
+  uploadPostImage,
+} from '../../api/storageService';
 
 const POPULAR_TOPICS = [
   'Neuroscience',
@@ -60,10 +70,13 @@ export default function CreatePostScreen() {
   const [attachedPaper, setAttachedPaper] = useState<Paper | null>(null);
   const [paperModalVisible, setPaperModalVisible] = useState(false);
 
-  // Attached Images
+  // Attached Images & Upload State
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState<string | null>(null);
 
   // Attached Poll
   const [attachedPoll, setAttachedPoll] = useState<Poll | null>(null);
@@ -79,11 +92,107 @@ export default function CreatePostScreen() {
   const [visibility, setVisibility] = useState<'public' | 'followers'>('public');
   const [isPublishing, setIsPublishing] = useState(false);
 
-  const handleAddImage = () => {
+  const handleOpenImageOptions = () => {
+    if (attachedImages.length >= 4) {
+      Alert.alert('Limit Reached', 'You can attach up to 4 images per post.');
+      return;
+    }
+    setShowUrlInput(false);
+    setImageUrlInput('');
+    setImageModalVisible(true);
+  };
+
+  const handlePickFromLibrary = async () => {
+    const remainingSlots = 4 - attachedImages.length;
+    if (remainingSlots <= 0) {
+      Alert.alert('Limit Reached', 'You can attach up to 4 images per post.');
+      return;
+    }
+
+    setImageModalVisible(false);
+    const pickResult = await pickPostImages(remainingSlots);
+
+    if (pickResult.error) {
+      Alert.alert('Photos Access', pickResult.error);
+      return;
+    }
+
+    if (pickResult.cancelled || !pickResult.assets || pickResult.assets.length === 0) {
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const assetsToUpload = pickResult.assets.slice(0, remainingSlots);
+      const newUrls: string[] = [];
+
+      for (let i = 0; i < assetsToUpload.length; i++) {
+        setUploadProgressText(
+          assetsToUpload.length > 1
+            ? `Uploading ${i + 1} of ${assetsToUpload.length}...`
+            : 'Uploading photo...'
+        );
+        const uploadRes = await uploadPostImage(user.id, assetsToUpload[i]);
+        if (uploadRes.success && uploadRes.url) {
+          newUrls.push(uploadRes.url);
+        } else if (uploadRes.error) {
+          Alert.alert('Upload Issue', uploadRes.error || 'Failed to upload photo.');
+        }
+      }
+
+      if (newUrls.length > 0) {
+        setAttachedImages((prev) => [...prev, ...newUrls].slice(0, 4));
+      }
+    } catch (err: any) {
+      Alert.alert('Upload Error', err?.message || 'An error occurred during photo upload.');
+    } finally {
+      setIsUploadingImage(false);
+      setUploadProgressText(null);
+    }
+  };
+
+  const handleCaptureCamera = async () => {
+    const remainingSlots = 4 - attachedImages.length;
+    if (remainingSlots <= 0) {
+      Alert.alert('Limit Reached', 'You can attach up to 4 images per post.');
+      return;
+    }
+
+    setImageModalVisible(false);
+    const captureResult = await capturePostImage();
+
+    if (captureResult.error) {
+      Alert.alert('Camera Access', captureResult.error);
+      return;
+    }
+
+    if (captureResult.cancelled || !captureResult.asset) {
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setUploadProgressText('Uploading photo...');
+    try {
+      const uploadRes = await uploadPostImage(user.id, captureResult.asset);
+      if (uploadRes.success && uploadRes.url) {
+        setAttachedImages((prev) => [...prev, uploadRes.url!].slice(0, 4));
+      } else {
+        Alert.alert('Upload Failed', uploadRes.error || 'Could not upload photo.');
+      }
+    } catch (err: any) {
+      Alert.alert('Upload Error', err?.message || 'An error occurred during photo upload.');
+    } finally {
+      setIsUploadingImage(false);
+      setUploadProgressText(null);
+    }
+  };
+
+  const handleAddUrlImage = () => {
     const trimmed = imageUrlInput.trim();
     if (trimmed) {
-      setAttachedImages([...attachedImages, trimmed]);
+      setAttachedImages((prev) => [...prev, trimmed].slice(0, 4));
       setImageUrlInput('');
+      setShowUrlInput(false);
       setImageModalVisible(false);
     }
   };
@@ -148,7 +257,7 @@ export default function CreatePostScreen() {
     const hasContent = content.trim().length > 0;
     const hasAttachments = attachedPaper || attachedImages.length > 0 || attachedPoll;
 
-    if ((!hasContent && !hasAttachments) || isPublishing) return;
+    if ((!hasContent && !hasAttachments) || isPublishing || isUploadingImage) return;
 
     setIsPublishing(true);
     try {
@@ -185,7 +294,10 @@ export default function CreatePostScreen() {
     }
   };
 
-  const canPost = (content.trim().length > 0 || attachedPaper || attachedImages.length > 0 || attachedPoll) && !isPublishing;
+  const canPost =
+    (content.trim().length > 0 || attachedPaper || attachedImages.length > 0 || attachedPoll) &&
+    !isPublishing &&
+    !isUploadingImage;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -261,7 +373,7 @@ export default function CreatePostScreen() {
           </View>
 
           {/* Attached Images Preview Grid */}
-          {attachedImages.length > 0 && (
+          {(attachedImages.length > 0 || isUploadingImage) && (
             <View style={styles.imagesGrid}>
               {attachedImages.map((url, idx) => (
                 <View key={idx} style={styles.imagePreviewWrapper}>
@@ -278,6 +390,27 @@ export default function CreatePostScreen() {
                   </TouchableOpacity>
                 </View>
               ))}
+
+              {/* Uploading Progress Indicator Card */}
+              {isUploadingImage && (
+                <View style={[styles.imagePreviewWrapper, styles.uploadingImageWrapper]}>
+                  <ActivityIndicator size="small" color={colors.accentLink} />
+                  <Text style={styles.uploadingProgressText}>
+                    {uploadProgressText || 'Uploading...'}
+                  </Text>
+                </View>
+              )}
+
+              {/* Add more button tile if less than 4 */}
+              {!isUploadingImage && attachedImages.length < 4 && (
+                <TouchableOpacity
+                  style={styles.addImageTile}
+                  onPress={handleOpenImageOptions}
+                >
+                  <Plus size={20} color={colors.textSecondary} />
+                  <Text style={styles.addImageTileText}>Add Photo</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -352,8 +485,9 @@ export default function CreatePostScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setImageModalVisible(true)}
+              onPress={handleOpenImageOptions}
               style={styles.toolbarAction}
+              disabled={isUploadingImage}
             >
               <ImageIcon
                 size={18}
@@ -365,7 +499,7 @@ export default function CreatePostScreen() {
                   attachedImages.length > 0 && { color: colors.accentLink, fontWeight: '700' },
                 ]}
               >
-                {attachedImages.length > 0 ? `Image (${attachedImages.length})` : 'Image'}
+                {attachedImages.length > 0 ? `Image (${attachedImages.length}/4)` : 'Image'}
               </Text>
             </TouchableOpacity>
 
@@ -427,7 +561,7 @@ export default function CreatePostScreen() {
           onSelectPaper={(paper) => setAttachedPaper(paper)}
         />
 
-        {/* Image Attachment Modal */}
+        {/* Image Attachment Options Modal */}
         <Modal
           visible={imageModalVisible}
           transparent
@@ -438,43 +572,113 @@ export default function CreatePostScreen() {
             <View style={styles.modalOverlay}>
               <TouchableWithoutFeedback>
                 <View style={styles.modalCard}>
-                  <Text style={styles.modalTitle}>Attach Figure / Image</Text>
-                  <Text style={styles.modalSubtitle}>
-                    Enter a direct URL for your scientific diagram, chart, or microscope figure.
-                  </Text>
+                  {!showUrlInput ? (
+                    <>
+                      <Text style={styles.modalTitle}>Add Figure / Image</Text>
+                      <Text style={styles.modalSubtitle}>
+                        Select a scientific diagram, microscope scan, chart, or photo.
+                      </Text>
 
-                  <TextInput
-                    style={styles.modalInput}
-                    placeholder="https://example.com/figure.png"
-                    placeholderTextColor={colors.textMuted}
-                    value={imageUrlInput}
-                    onChangeText={setImageUrlInput}
-                    autoCapitalize="none"
-                    autoFocus
-                  />
+                      <View style={styles.imageOptionsList}>
+                        {/* Option 1: Choose from Phone Storage / Photo Library */}
+                        <TouchableOpacity
+                          style={styles.imageOptionItem}
+                          onPress={handlePickFromLibrary}
+                        >
+                          <View style={styles.imageOptionIconWrap}>
+                            <Images size={22} color={colors.textPrimary} />
+                          </View>
+                          <View style={styles.imageOptionTextWrap}>
+                            <Text style={styles.imageOptionTitle}>Photo Library</Text>
+                            <Text style={styles.imageOptionDesc}>
+                              Upload directly from your phone storage
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
 
-                  <View style={styles.modalBtnRow}>
-                    <Button
-                      title="Cancel"
-                      variant="secondary"
-                      size="sm"
-                      onPress={() => setImageModalVisible(false)}
-                      style={{ flex: 1, marginRight: spacing.sm }}
-                    />
-                    <Button
-                      title="Attach Image"
-                      variant="primary"
-                      size="sm"
-                      onPress={handleAddImage}
-                      disabled={!imageUrlInput.trim()}
-                      style={{ flex: 1.5 }}
-                    />
-                  </View>
+                        {/* Option 2: Camera */}
+                        <TouchableOpacity
+                          style={styles.imageOptionItem}
+                          onPress={handleCaptureCamera}
+                        >
+                          <View style={styles.imageOptionIconWrap}>
+                            <Camera size={22} color={colors.textPrimary} />
+                          </View>
+                          <View style={styles.imageOptionTextWrap}>
+                            <Text style={styles.imageOptionTitle}>Take Photo</Text>
+                            <Text style={styles.imageOptionDesc}>
+                              Capture diagram or figure with camera
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Option 3: Image URL */}
+                        <TouchableOpacity
+                          style={styles.imageOptionItem}
+                          onPress={() => setShowUrlInput(true)}
+                        >
+                          <View style={styles.imageOptionIconWrap}>
+                            <Link2 size={22} color={colors.textPrimary} />
+                          </View>
+                          <View style={styles.imageOptionTextWrap}>
+                            <Text style={styles.imageOptionTitle}>Image Link (URL)</Text>
+                            <Text style={styles.imageOptionDesc}>
+                              Paste an online image or journal figure URL
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      </View>
+
+                      <Button
+                        title="Cancel"
+                        variant="secondary"
+                        size="sm"
+                        onPress={() => setImageModalVisible(false)}
+                        style={{ marginTop: spacing.md }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.modalTitle}>Paste Image Link</Text>
+                      <Text style={styles.modalSubtitle}>
+                        Enter a direct URL for your diagram, chart, or scientific figure.
+                      </Text>
+
+                      <TextInput
+                        style={styles.modalInput}
+                        placeholder="https://example.com/figure.png"
+                        placeholderTextColor={colors.textMuted}
+                        value={imageUrlInput}
+                        onChangeText={setImageUrlInput}
+                        autoCapitalize="none"
+                        autoFocus
+                      />
+
+                      <View style={styles.modalBtnRow}>
+                        <Button
+                          title="Back"
+                          variant="secondary"
+                          size="sm"
+                          onPress={() => setShowUrlInput(false)}
+                          style={{ flex: 1, marginRight: spacing.sm }}
+                        />
+                        <Button
+                          title="Attach"
+                          variant="primary"
+                          size="sm"
+                          onPress={handleAddUrlImage}
+                          disabled={!imageUrlInput.trim()}
+                          style={{ flex: 1.5 }}
+                        />
+                      </View>
+                    </>
+                  )}
                 </View>
               </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
         </Modal>
+
 
         {/* Poll Creator Modal */}
         <Modal
@@ -940,4 +1144,78 @@ const styles = StyleSheet.create({
   topicSelectPillTextActive: {
     color: colors.white,
   },
+  uploadingImageWrapper: {
+    backgroundColor: colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    padding: spacing.xs,
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    borderColor: colors.accentLink,
+  },
+  uploadingProgressText: {
+    ...typography.micro,
+    fontSize: 10.5,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  addImageTile: {
+    width: 110,
+    height: 110,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.borderLight,
+    borderStyle: 'dashed',
+    backgroundColor: colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  addImageTileText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    fontSize: 11.5,
+  },
+  imageOptionsList: {
+    gap: spacing.sm,
+    marginVertical: spacing.sm,
+  },
+  imageOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: spacing.md,
+  },
+  imageOptionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: colors.cardBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  imageOptionTextWrap: {
+    flex: 1,
+  },
+  imageOptionTitle: {
+    ...typography.captionBold,
+    fontSize: 14.5,
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  imageOptionDesc: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
 });
+

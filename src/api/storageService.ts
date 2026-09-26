@@ -487,3 +487,201 @@ export async function removeProfileBanner(
     };
   }
 }
+
+/**
+ * Prompts user to pick one or more images from their photo library for a post
+ */
+export async function pickPostImages(
+  maxSelection: number = 4
+): Promise<{
+  cancelled: boolean;
+  assets: ImagePicker.ImagePickerAsset[];
+  error: string | null;
+}> {
+  try {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      return {
+        cancelled: true,
+        assets: [],
+        error: 'Permission to access photos was denied. Please allow photo access in your phone settings.',
+      };
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: Math.max(1, maxSelection),
+      quality: 0.85,
+      base64: true,
+    });
+
+    if (result.canceled || !result.assets || result.assets.length === 0) {
+      return { cancelled: true, assets: [], error: null };
+    }
+
+    return {
+      cancelled: false,
+      assets: result.assets,
+      error: null,
+    };
+  } catch (err: any) {
+    return {
+      cancelled: true,
+      assets: [],
+      error: err?.message || 'Failed to open photo library.',
+    };
+  }
+}
+
+/**
+ * Prompts user to capture a new photo with the camera for a post
+ */
+export async function capturePostImage(): Promise<{
+  cancelled: boolean;
+  asset: ImagePicker.ImagePickerAsset | null;
+  error: string | null;
+}> {
+  try {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      return {
+        cancelled: true,
+        asset: null,
+        error: 'Permission to access camera was denied. Please allow camera access in your phone settings.',
+      };
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      base64: true,
+    });
+
+    if (result.canceled || !result.assets || result.assets.length === 0) {
+      return { cancelled: true, asset: null, error: null };
+    }
+
+    return {
+      cancelled: false,
+      asset: result.assets[0],
+      error: null,
+    };
+  } catch (err: any) {
+    return {
+      cancelled: true,
+      asset: null,
+      error: err?.message || 'Failed to open camera.',
+    };
+  }
+}
+
+/**
+ * Uploads a single post image asset directly to Supabase Storage bucket 'profile-media'
+ * and returns the public CDN URL.
+ */
+export async function uploadPostImage(
+  userId: string,
+  asset: ImagePicker.ImagePickerAsset,
+  onProgress?: (progress: number) => void
+): Promise<UploadMediaResult> {
+  try {
+    if (!userId) {
+      return { success: false, url: null, error: 'User must be authenticated.' };
+    }
+
+    if (onProgress) onProgress(0.1);
+
+    // 1. Read binary data
+    const { data: fileData, size } = await getAssetBinaryData(asset);
+
+    // 2. Validate file size and MIME type
+    const validation = validateImage(asset, size);
+    if (!validation.isValid) {
+      return { success: false, url: null, error: validation.error };
+    }
+
+    if (onProgress) onProgress(0.3);
+
+    // 3. Determine file extension and random safe filename
+    const ext = validation.mimeType.split('/')[1] || 'jpg';
+    const cleanExt = ext === 'jpeg' ? 'jpg' : ext;
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const fileName = `post_${Date.now()}_${randomSuffix}.${cleanExt}`;
+    const filePath = `${userId}/posts/${fileName}`;
+
+    if (onProgress) onProgress(0.5);
+
+    // 4. Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from(PROFILE_MEDIA_BUCKET)
+      .upload(filePath, fileData, {
+        contentType: validation.mimeType,
+        cacheControl: '31536000',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.warn('Storage post image upload error:', uploadError);
+      return {
+        success: false,
+        url: null,
+        error: uploadError.message || 'Failed to upload image to storage.',
+      };
+    }
+
+    if (onProgress) onProgress(0.8);
+
+    // 5. Get public URL
+    const { data: publicData } = supabase.storage
+      .from(PROFILE_MEDIA_BUCKET)
+      .getPublicUrl(filePath);
+
+    const publicUrl = publicData.publicUrl;
+
+    if (onProgress) onProgress(1.0);
+
+    return {
+      success: true,
+      url: publicUrl,
+      error: null,
+    };
+  } catch (err: any) {
+    console.error('uploadPostImage unexpected error:', err);
+    return {
+      success: false,
+      url: null,
+      error: err.message || 'An unexpected error occurred during image upload.',
+    };
+  }
+}
+
+/**
+ * Uploads multiple post images in parallel or sequence, returning successful public URLs
+ */
+export async function uploadMultiplePostImages(
+  userId: string,
+  assets: ImagePicker.ImagePickerAsset[],
+  onProgress?: (completed: number, total: number) => void
+): Promise<{ urls: string[]; errors: string[] }> {
+  const urls: string[] = [];
+  const errors: string[] = [];
+  let completed = 0;
+
+  for (const asset of assets) {
+    const result = await uploadPostImage(userId, asset);
+    completed++;
+    if (onProgress) onProgress(completed, assets.length);
+
+    if (result.success && result.url) {
+      urls.push(result.url);
+    } else if (result.error) {
+      errors.push(result.error);
+    }
+  }
+
+  return { urls, errors };
+}
+
