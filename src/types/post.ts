@@ -47,4 +47,6 @@ export interface Post {
   isReposted?: boolean;
   isSaved?: boolean;
   createdAt: string;
+  repostedBy?: UserProfile;
+  repostedAt?: string;
 }

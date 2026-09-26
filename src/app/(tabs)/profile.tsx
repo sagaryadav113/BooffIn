@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -63,7 +64,8 @@ import {
   removeProfileAvatar,
   removeProfileBanner,
 } from '../../api/storageService';
-import { CollaborationRequest } from '../../types';
+import { fetchUserPosts } from '../../api/socialService';
+import { Post, CollaborationRequest } from '../../types';
 import { FollowListModal } from '../../components/modals/FollowListModal';
 
 export const DEFAULT_PROFILE_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
@@ -148,15 +150,36 @@ export default function CurrentUserProfileScreen() {
     }
   };
 
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const loadRequests = React.useCallback(async () => {
     if (!user?.id) return;
     const reqs = await getCollaborationRequests(user.id);
     setCollaborationRequests(reqs);
   }, [user?.id]);
 
+  const loadUserPosts = React.useCallback(async () => {
+    if (!user?.id) return;
+    setIsLoadingPosts(true);
+    const res = await fetchUserPosts(user.id, user.id);
+    if (res.posts) {
+      setUserPosts(res.posts);
+    }
+    setIsLoadingPosts(false);
+  }, [user?.id]);
+
   React.useEffect(() => {
     loadRequests();
-  }, [loadRequests]);
+    loadUserPosts();
+  }, [loadRequests, loadUserPosts]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([loadUserPosts(), loadRequests()]);
+    setIsRefreshing(false);
+  };
 
   const discussedTopics = React.useMemo(() => {
     if (!user?.id) return [];
@@ -173,11 +196,26 @@ export default function CurrentUserProfileScreen() {
     loadRequests();
   };
 
-  // Memoize filtered posts to prevent infinite re-render loops
+  // Combine database userPosts (authored + reshared) with any optimistic live updates in allPosts
   const posts = useMemo(() => {
     if (!user?.id) return [];
-    return allPosts.filter((p) => p.author.id === user.id);
-  }, [allPosts, user?.id]);
+    if (userPosts.length > 0) {
+      const storeMap = new Map(allPosts.map((p) => [p.id, p]));
+      return userPosts.map((up) => {
+        const live = storeMap.get(up.id);
+        if (!live) return up;
+        return {
+          ...up,
+          likesCount: live.likesCount,
+          repostsCount: live.repostsCount,
+          isLiked: live.isLiked,
+          isReposted: live.isReposted,
+          isSaved: live.isSaved,
+        };
+      });
+    }
+    return allPosts.filter((p) => p.author.id === user.id || (p.isReposted && p.author.id !== user.id));
+  }, [userPosts, allPosts, user?.id]);
 
   const savedPapers = useMemo(() => {
     return papers.filter((p) => savedPaperIds.has(p.id) || p.isSaved);
@@ -238,6 +276,13 @@ export default function CurrentUserProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.accentBlue}
+          />
+        }
       >
         {/* Banner Image */}
         <View style={styles.bannerContainer}>
@@ -521,7 +566,14 @@ export default function CurrentUserProfileScreen() {
         {/* Tab Content */}
         {activeSubTab === 'Posts' && (
           <View style={styles.postsList}>
-            {posts.length > 0 ? (
+            {isLoadingPosts && posts.length === 0 ? (
+              <View style={{ paddingVertical: spacing.xl * 2, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="small" color={colors.accentBlue} />
+                <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm }}>
+                  Loading discussions & shares...
+                </Text>
+              </View>
+            ) : posts.length > 0 ? (
               posts.map((p) => <PostCard key={p.id} post={p} />)
             ) : (
               <EmptyState

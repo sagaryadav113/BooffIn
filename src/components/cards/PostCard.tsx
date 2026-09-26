@@ -83,6 +83,30 @@ export const PostCard: React.FC<PostCardProps> = ({ post, style }) => {
       onPress={handlePostPress}
       style={[styles.container, style]}
     >
+      {/* Repost Attribution Header */}
+      {post.repostedBy && (
+        <TouchableOpacity
+          onPress={(e) => {
+            e.stopPropagation();
+            if (post.repostedBy?.id) {
+              router.push({
+                pathname: '/profile/[id]',
+                params: { id: post.repostedBy.id },
+              });
+            }
+          }}
+          activeOpacity={0.8}
+          style={styles.repostBanner}
+        >
+          <Repeat2 size={13} color={colors.textSecondary} />
+          <Text style={styles.repostBannerText}>
+            {currentUser?.id === post.repostedBy.id
+              ? 'You reposted'
+              : `${post.repostedBy.fullName || post.repostedBy.handle || 'Researcher'} reposted`}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Header: Avatar, Name, Handle, Timestamp, Field */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -274,6 +298,18 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md + 2,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
+  },
+  repostBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    paddingLeft: spacing.xs,
+  },
+  repostBannerText: {
+    ...typography.captionBold,
+    fontSize: 12.5,
+    color: colors.textSecondary,
   },
   header: {
     flexDirection: 'row',

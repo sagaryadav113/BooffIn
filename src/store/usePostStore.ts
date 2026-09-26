@@ -476,5 +476,6 @@ export const usePostStore = create<PostState>((set, get) => ({
   getPostById: (id) => get().posts.find((p) => p.id === id),
   getPostsByPaper: (paperId) =>
     get().posts.filter((p) => p.paper?.id === paperId || p.paper?.doi === paperId),
-  getPostsByUser: (userId) => get().posts.filter((p) => p.author.id === userId),
+  getPostsByUser: (userId) =>
+    get().posts.filter((p) => p.author.id === userId || (p.isReposted && p.author.id !== userId)),
 }));

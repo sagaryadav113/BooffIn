@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   Linking,
   Share,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
@@ -43,7 +45,8 @@ import {
   getResearcherDiscussedTopics,
 } from '../../api/connectionService';
 import { fetchUserProfile, fetchUserProfileByUsername } from '../../api/authService';
-import { ConnectionStatus, UserProfile } from '../../types';
+import { fetchUserPosts } from '../../api/socialService';
+import { ConnectionStatus, UserProfile, Post } from '../../types';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { FollowListModal } from '../../components/modals/FollowListModal';
 
@@ -55,6 +58,9 @@ export default function OtherResearcherProfileScreen() {
 
   const [researcher, setResearcher] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [researcherPosts, setResearcherPosts] = useState<Post[]>([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Papers' | 'Activity'>('Posts');
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('none');
@@ -63,6 +69,16 @@ export default function OtherResearcherProfileScreen() {
 
   const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
   const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
+
+  const loadResearcherPosts = useCallback(async (userId: string) => {
+    if (!userId) return;
+    setIsLoadingPosts(true);
+    const res = await fetchUserPosts(userId, currentUser?.id);
+    if (res.posts) {
+      setResearcherPosts(res.posts);
+    }
+    setIsLoadingPosts(false);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     async function loadProfile() {
@@ -75,6 +91,7 @@ export default function OtherResearcherProfileScreen() {
       const cleanId = id.trim().replace(/^@/, '').toLowerCase();
       if (id === currentUser.id || cleanId === currentUser.handle?.toLowerCase()) {
         setResearcher(currentUser);
+        loadResearcherPosts(currentUser.id);
         setIsLoading(false);
         return;
       }
@@ -94,11 +111,14 @@ export default function OtherResearcherProfileScreen() {
         });
       }
       setResearcher(prof);
+      if (prof?.id) {
+        loadResearcherPosts(prof.id);
+      }
       setIsLoading(false);
     }
 
     loadProfile();
-  }, [id, currentUser?.id, currentUser?.handle]);
+  }, [id, currentUser?.id, currentUser?.handle, loadResearcherPosts]);
 
   const isOwnProfile = researcher?.id === currentUser?.id;
 
@@ -112,10 +132,32 @@ export default function OtherResearcherProfileScreen() {
     loadConnectionStatus();
   }, [loadConnectionStatus]);
 
+  const handleRefresh = async () => {
+    if (!researcher?.id) return;
+    setIsRefreshing(true);
+    await Promise.all([loadResearcherPosts(researcher.id), loadConnectionStatus()]);
+    setIsRefreshing(false);
+  };
+
   const posts = React.useMemo(() => {
     if (!researcher?.id) return [];
-    return allPosts.filter((p) => p.author.id === researcher.id);
-  }, [allPosts, researcher?.id]);
+    if (researcherPosts.length > 0) {
+      const storeMap = new Map(allPosts.map((p) => [p.id, p]));
+      return researcherPosts.map((rp) => {
+        const live = storeMap.get(rp.id);
+        if (!live) return rp;
+        return {
+          ...rp,
+          likesCount: live.likesCount,
+          repostsCount: live.repostsCount,
+          isLiked: live.isLiked,
+          isReposted: live.isReposted,
+          isSaved: live.isSaved,
+        };
+      });
+    }
+    return allPosts.filter((p) => p.author.id === researcher.id || (p.isReposted && p.author.id !== researcher.id));
+  }, [researcherPosts, allPosts, researcher?.id]);
 
   const paperPosts = React.useMemo(() => {
     return posts.filter((p) => !!p.paper);
@@ -232,6 +274,13 @@ export default function OtherResearcherProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.accentBlue}
+          />
+        }
       >
         {/* Banner */}
         <View style={styles.bannerContainer}>
@@ -468,7 +517,7 @@ export default function OtherResearcherProfileScreen() {
 
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{posts.length}</Text>
-              <Text style={styles.statLabel}>Posts</Text>
+              <Text style={styles.statLabel}>Posts & Shares</Text>
             </View>
           </View>
         </View>
@@ -500,7 +549,14 @@ export default function OtherResearcherProfileScreen() {
         {/* Tab Content */}
         {activeSubTab === 'Posts' && (
           <View style={styles.postsList}>
-            {posts.length > 0 ? (
+            {isLoadingPosts && posts.length === 0 ? (
+              <View style={{ paddingVertical: spacing.xl * 2, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="small" color={colors.accentBlue} />
+                <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm }}>
+                  Loading posts & shares...
+                </Text>
+              </View>
+            ) : posts.length > 0 ? (
               posts.map((p) => <PostCard key={p.id} post={p} />)
             ) : (
               <EmptyState

@@ -1265,60 +1265,115 @@ export async function fetchUserPosts(
   currentUserId?: string
 ): Promise<{ posts: Post[]; error: string | null }> {
   try {
-    const { data, error } = await supabase
-      .from('posts')
-      .select(
-        `
+    const postSelectQuery = `
+      id,
+      post_type,
+      content,
+      visibility,
+      media_urls,
+      likes_count,
+      comments_count,
+      reposts_count,
+      saves_count,
+      created_at,
+      author:profiles!author_id (*),
+      paper:papers!paper_id (
         id,
-        post_type,
-        content,
-        visibility,
-        media_urls,
+        doi,
+        canonical_url,
+        title,
+        abstract,
+        journal,
+        publisher,
+        publication_date,
+        publication_year,
+        open_access_status,
+        open_access_pdf_url,
+        citation_count,
+        discussion_count,
         likes_count,
-        comments_count,
-        reposts_count,
         saves_count,
-        created_at,
-        author:profiles!author_id (*),
-        paper:papers!paper_id (
-          id,
-          doi,
-          canonical_url,
-          title,
-          abstract,
-          journal,
-          publisher,
-          publication_date,
-          publication_year,
-          open_access_status,
-          open_access_pdf_url,
-          citation_count,
-          discussion_count,
-          likes_count,
-          saves_count,
-          paper_authors (*)
-        ),
-        post_topics (
-          topic:topics!topic_id (*)
-        ),
-        likes!left ( user_id ),
-        reposts!left ( user_id ),
-        bookmarks!left ( user_id )
-      `
-      )
+        paper_authors (*)
+      ),
+      post_topics (
+        topic:topics!topic_id (*)
+      ),
+      likes!left ( user_id ),
+      reposts!left ( user_id ),
+      bookmarks!left ( user_id )
+    `;
+
+    // 1. Fetch posts authored by this user
+    const authoredPromise = supabase
+      .from('posts')
+      .select(postSelectQuery)
       .eq('author_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return { posts: [], error: error?.message || null };
+    // 2. Fetch posts reposted by this user
+    const repostsPromise = supabase
+      .from('reposts')
+      .select(
+        `
+        created_at,
+        user_id,
+        user:profiles!user_id (*),
+        post:posts!post_id (
+          ${postSelectQuery}
+        )
+      `
+      )
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    const [authoredRes, repostsRes] = await Promise.all([authoredPromise, repostsPromise]);
+
+    if (authoredRes.error && repostsRes.error) {
+      return { posts: [], error: authoredRes.error.message || repostsRes.error.message };
+    }
+
+    const authoredPosts: { post: Post; activityDate: string }[] = (authoredRes.data || []).map((row: any) => ({
+      post: mapSupabasePost(row, currentUserId),
+      activityDate: row.created_at,
+    }));
+
+    const repostedPosts: { post: Post; activityDate: string }[] = (repostsRes.data || [])
+      .filter((row: any) => row.post)
+      .map((row: any) => {
+        const basePost = mapSupabasePost(row.post, currentUserId);
+        const reposter = row.user ? mapSupabaseProfile(row.user) : undefined;
+        return {
+          post: {
+            ...basePost,
+            isReposted: true,
+            repostedBy: reposter,
+            repostedAt: formatRelativeTime(row.created_at),
+          },
+          activityDate: row.created_at,
+        };
+      });
+
+    // Merge and sort by activity date descending
+    const combined = [...authoredPosts, ...repostedPosts];
+    combined.sort((a, b) => new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime());
+
+    // Deduplicate posts
+    const seenPostIds = new Set<string>();
+    const finalPosts: Post[] = [];
+
+    for (const item of combined) {
+      if (!seenPostIds.has(item.post.id)) {
+        seenPostIds.add(item.post.id);
+        finalPosts.push(item.post);
+      }
     }
 
     return {
-      posts: data.map((row: any) => mapSupabasePost(row, currentUserId)),
+      posts: finalPosts,
       error: null,
     };
   } catch (err: any) {
-    return { posts: [], error: err?.message || 'Failed to fetch posts' };
+    return { posts: [], error: err?.message || 'Failed to fetch user posts' };
   }
 }
 
