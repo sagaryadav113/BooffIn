@@ -42,7 +42,7 @@ import {
   getSharedResearchInterests,
   getResearcherDiscussedTopics,
 } from '../../api/connectionService';
-import { fetchUserProfile } from '../../api/authService';
+import { fetchUserProfile, fetchUserProfileByUsername } from '../../api/authService';
 import { ConnectionStatus, UserProfile } from '../../types';
 import { AppHeader } from '../../components/layout/AppHeader';
 
@@ -66,13 +66,17 @@ export default function OtherResearcherProfileScreen() {
       }
 
       setIsLoading(true);
-      if (id === currentUser.id) {
+      const cleanId = id.trim().replace(/^@/, '').toLowerCase();
+      if (id === currentUser.id || cleanId === currentUser.handle?.toLowerCase()) {
         setResearcher(currentUser);
         setIsLoading(false);
         return;
       }
 
-      const prof = await fetchUserProfile(id);
+      let prof = await fetchUserProfile(id);
+      if (!prof) {
+        prof = await fetchUserProfileByUsername(cleanId);
+      }
       setResearcher(prof);
       setIsLoading(false);
     }

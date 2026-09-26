@@ -100,6 +100,27 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile | nu
   }
 }
 
+/**
+ * Fetch profile for a given unique handle/username (case-insensitive)
+ */
+export async function fetchUserProfileByUsername(username: string): Promise<UserProfile | null> {
+  try {
+    const normalized = normalizeHandle(username);
+    if (!normalized) return null;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('username', normalized)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapProfileRecord(data);
+  } catch {
+    return null;
+  }
+}
+
 const LOCAL_SESSION_KEY = 'booffin_active_user_session';
 let memoryLocalSession: UserProfile | null = null;
 
@@ -301,6 +322,161 @@ export async function signUpWithEmail(
   }
 }
 
+export const RESERVED_USERNAMES = new Set([
+  'admin',
+  'administrator',
+  'booffin',
+  'boffin',
+  'support',
+  'help',
+  'moderator',
+  'mod',
+  'staff',
+  'security',
+  'system',
+  'root',
+  'api',
+  'auth',
+  'explore',
+  'feed',
+  'profile',
+  'search',
+  'settings',
+  'paper',
+  'papers',
+  'post',
+  'posts',
+  'topic',
+  'topics',
+  'notifications',
+  'login',
+  'signup',
+  'welcome',
+  'terms',
+  'privacy',
+  'about',
+  'contact',
+  'careers',
+  'app',
+  'dev',
+  'developer',
+  'staging',
+  'production',
+  'status',
+  'bot',
+]);
+
+/**
+ * Normalizes username by trimming, removing leading @ symbols, and lowercasing
+ */
+export function normalizeHandle(handle: string): string {
+  if (!handle) return '';
+  return handle.trim().replace(/^@+/, '').toLowerCase();
+}
+
+export interface UsernameValidationResult {
+  isValid: boolean;
+  normalized: string;
+  error: string | null;
+}
+
+/**
+ * Validates handle format, length, and reserved list
+ */
+export function validateUsername(handle: string): UsernameValidationResult {
+  const normalized = normalizeHandle(handle);
+  if (!normalized) {
+    return { isValid: false, normalized: '', error: 'Please enter a handle.' };
+  }
+  if (normalized.length < 3) {
+    return { isValid: false, normalized, error: 'Handle must be at least 3 characters.' };
+  }
+  if (normalized.length > 30) {
+    return { isValid: false, normalized, error: 'Handle cannot exceed 30 characters.' };
+  }
+  if (!/^[a-z0-9_]+$/.test(normalized)) {
+    return {
+      isValid: false,
+      normalized,
+      error: 'Handle can only contain letters, numbers, and underscores.',
+    };
+  }
+  if (RESERVED_USERNAMES.has(normalized)) {
+    return {
+      isValid: false,
+      normalized,
+      error: 'This handle is reserved by BooffIn.',
+    };
+  }
+  return { isValid: true, normalized, error: null };
+}
+
+export interface UsernameAvailabilityResult {
+  isAvailable: boolean;
+  normalized: string;
+  error: string | null;
+}
+
+/**
+ * Checks if a username is available in Supabase (with client-side preflight and RPC)
+ */
+export async function checkUsernameAvailability(
+  handle: string,
+  forUserId?: string
+): Promise<UsernameAvailabilityResult> {
+  const validation = validateUsername(handle);
+  if (!validation.isValid) {
+    return { isAvailable: false, normalized: validation.normalized, error: validation.error };
+  }
+
+  const normalized = validation.normalized;
+
+  try {
+    // 1. Try secure RPC function
+    const { data, error } = await supabase.rpc('check_username_available', {
+      requested_username: normalized,
+      for_user_id: forUserId || null,
+    });
+
+    if (!error && data && typeof data === 'object') {
+      const isAvailable = Boolean((data as any).available);
+      return {
+        isAvailable,
+        normalized,
+        error: isAvailable ? null : ((data as any).message || 'Handle is not available.'),
+      };
+    }
+
+    // 2. Direct query fallback
+    let query = supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', normalized);
+
+    if (forUserId) {
+      query = query.neq('id', forUserId);
+    }
+
+    const { data: existing, error: queryError } = await query.maybeSingle();
+
+    if (queryError) {
+      return { isAvailable: false, normalized, error: 'Could not check availability. Please try again.' };
+    }
+
+    if (existing) {
+      return {
+        isAvailable: false,
+        normalized,
+        error: 'This handle is already taken by another researcher.',
+      };
+    }
+
+    return { isAvailable: true, normalized, error: null };
+  } catch {
+    return { isAvailable: false, normalized, error: 'Network error checking handle availability.' };
+  }
+}
+
 /**
  * Persists updated researcher onboarding/profile information directly to Supabase
  */
@@ -311,7 +487,13 @@ export async function persistUserProfile(
   try {
     const dbPayload: any = {};
     if (updates.fullName !== undefined) dbPayload.full_name = updates.fullName.trim();
-    if (updates.handle !== undefined) dbPayload.username = updates.handle.trim().replace(/^@/, '').toLowerCase();
+    if (updates.handle !== undefined) {
+      const val = validateUsername(updates.handle);
+      if (!val.isValid) {
+        return { success: false, error: val.error };
+      }
+      dbPayload.username = val.normalized;
+    }
     if (updates.academicTitle !== undefined) dbPayload.academic_title = updates.academicTitle.trim();
     if (updates.institution !== undefined) dbPayload.institution = updates.institution.trim();
     if (updates.bio !== undefined) dbPayload.bio = updates.bio.trim();
@@ -331,6 +513,15 @@ export async function persistUserProfile(
 
     if (error) {
       console.warn('persistUserProfile warning:', error.message);
+      if (error.code === '23505' || error.message.includes('unique') || error.message.includes('profiles_username')) {
+        return { success: false, error: 'This handle is already taken by another researcher.' };
+      }
+      if (error.message.includes('chk_username_not_reserved')) {
+        return { success: false, error: 'This handle is reserved by BooffIn.' };
+      }
+      if (error.message.includes('chk_username_format')) {
+        return { success: false, error: 'Handle must be 3-30 characters using lowercase letters, numbers, and underscores.' };
+      }
       return { success: false, error: error.message };
     }
 

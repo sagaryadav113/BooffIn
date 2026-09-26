@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, Alert, Platform, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { colors, radii, spacing } from '../../theme';
 import { SettingsLayout } from '../../components/settings/SettingsLayout';
@@ -11,7 +11,11 @@ import { Button } from '../../components/core/Button';
 import { Avatar } from '../../components/core/Avatar';
 import { Icon } from '../../components/core/Icon';
 import { useAuthStore } from '../../store/useAuthStore';
-import { persistUserProfile } from '../../api/authService';
+import {
+  validateUsername,
+  checkUsernameAvailability,
+  normalizeHandle,
+} from '../../api/authService';
 
 export default function ProfileSettingsScreen() {
   const { user, updateProfile } = useAuthStore();
@@ -32,6 +36,82 @@ export default function ProfileSettingsScreen() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Async verification status
+  const [asyncStatus, setAsyncStatus] = useState<{
+    checking: boolean;
+    available: boolean | null;
+    message: string | null;
+    normalized: string;
+  }>({
+    checking: false,
+    available: null,
+    message: null,
+    normalized: '',
+  });
+
+  const cleanHandle = normalizeHandle(handle);
+  const isCurrentHandle = cleanHandle === normalizeHandle(user?.handle);
+  const valResult = cleanHandle ? validateUsername(cleanHandle) : null;
+
+  // Derived handle status without setState in effect
+  const handleStatus = React.useMemo(() => {
+    if (!cleanHandle) {
+      return { checking: false, available: null, message: null, normalized: '' };
+    }
+    if (isCurrentHandle) {
+      return {
+        checking: false,
+        available: true,
+        message: `@${cleanHandle} is your current handle`,
+        normalized: cleanHandle,
+      };
+    }
+    if (valResult && !valResult.isValid) {
+      return {
+        checking: false,
+        available: false,
+        message: valResult.error,
+        normalized: cleanHandle,
+      };
+    }
+    if (asyncStatus.normalized === cleanHandle) {
+      return asyncStatus;
+    }
+    return {
+      checking: true,
+      available: null,
+      message: null,
+      normalized: cleanHandle,
+    };
+  }, [cleanHandle, isCurrentHandle, valResult, asyncStatus]);
+
+  // Debounced username availability check
+  useEffect(() => {
+    if (!cleanHandle || isCurrentHandle || (valResult && !valResult.isValid)) {
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      const res = await checkUsernameAvailability(cleanHandle, user?.id);
+      if (isMounted) {
+        setAsyncStatus({
+          checking: false,
+          available: res.isAvailable,
+          message: res.isAvailable
+            ? `@${res.normalized} is available`
+            : (res.error || 'This handle is already taken.'),
+          normalized: res.normalized,
+        });
+      }
+    }, 350);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [cleanHandle, isCurrentHandle, valResult?.isValid, user?.id]);
+
   const handleAddInterest = () => {
     const trimmed = interestInput.trim();
     if (trimmed && !interests.includes(trimmed)) {
@@ -50,16 +130,27 @@ export default function ProfileSettingsScreen() {
       setErrorMessage('Full name is required.');
       return;
     }
-    if (!handle.trim()) {
-      setErrorMessage('Username/handle is required.');
+
+    const cleanHandle = normalizeHandle(handle);
+    const val = validateUsername(cleanHandle);
+    if (!val.isValid) {
+      setErrorMessage(val.error || 'Please enter a valid handle.');
+      return;
+    }
+
+    if (handleStatus.checking) {
+      setErrorMessage('Checking handle availability...');
+      return;
+    }
+
+    if (handleStatus.available === false) {
+      setErrorMessage(handleStatus.message || 'This handle is not available.');
       return;
     }
 
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-
-    const cleanHandle = handle.trim().replace(/^@/, '').toLowerCase();
 
     const updates = {
       fullName: fullName.trim(),
@@ -74,12 +165,11 @@ export default function ProfileSettingsScreen() {
       researchInterests: interests,
     };
 
-    const res = await persistUserProfile(user.id, updates);
+    const res = await updateProfile(updates);
 
     setIsSaving(false);
 
     if (res.success) {
-      updateProfile(updates);
       setSuccessMessage('Profile updated successfully.');
       setTimeout(() => setSuccessMessage(null), 4000);
     } else {
@@ -134,19 +224,54 @@ export default function ProfileSettingsScreen() {
         <Input
           label="Full Name *"
           value={fullName}
-          onChangeText={setFullName}
+          onChangeText={(text) => {
+            setFullName(text);
+            if (errorMessage) setErrorMessage(null);
+          }}
           placeholder="e.g. Dr. Aris Thorne"
           leftIcon="User"
         />
 
-        <Input
-          label="Username / Handle *"
-          value={handle}
-          onChangeText={setHandle}
-          placeholder="e.g. aris_thorne"
-          autoCapitalize="none"
-          hint="Your unique @handle for mentions and direct links."
-        />
+        <View>
+          <Input
+            label="Username / Handle *"
+            value={handle}
+            onChangeText={(text) => {
+              setHandle(text);
+              if (errorMessage) setErrorMessage(null);
+            }}
+            placeholder="e.g. aris_thorne"
+            autoCapitalize="none"
+            hint="Your unique @handle for mentions and direct links."
+          />
+
+          {handle.trim().length > 0 && (
+            <View style={styles.availabilityRow}>
+              {handleStatus.checking ? (
+                <>
+                  <ActivityIndicator size="small" color={colors.accentBlue} />
+                  <Typography variant="micro" color={colors.textSecondary}>
+                    Checking @{handleStatus.normalized} availability...
+                  </Typography>
+                </>
+              ) : handleStatus.available === true ? (
+                <>
+                  <Icon name="CheckCircle2" size="xs" color="#16a34a" />
+                  <Typography variant="micro" color="#16a34a" style={{ fontWeight: '600' }}>
+                    ✓ {handleStatus.message}
+                  </Typography>
+                </>
+              ) : handleStatus.available === false ? (
+                <>
+                  <Icon name="AlertCircle" size="xs" color={colors.accentRed} />
+                  <Typography variant="micro" color={colors.accentRed} style={{ fontWeight: '600' }}>
+                    ✕ {handleStatus.message}
+                  </Typography>
+                </>
+              ) : null}
+            </View>
+          )}
+        </View>
 
         <Input
           label="Avatar Image URL"
@@ -358,5 +483,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: spacing.lg,
     marginBottom: spacing.xxxl,
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
 });

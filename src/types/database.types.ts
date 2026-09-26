@@ -452,5 +452,35 @@ export interface Database {
         };
       };
     };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      check_username_available: {
+        Args: {
+          requested_username: string;
+          for_user_id?: string | null;
+        };
+        Returns: {
+          available: boolean;
+          normalized: string;
+          reason: string | null;
+          message: string;
+        };
+      };
+      is_reserved_username: {
+        Args: {
+          un: string;
+        };
+        Returns: boolean;
+      };
+    };
+    Enums: {
+      post_type_enum: PostTypeEnum;
+      visibility_enum: VisibilityEnum;
+      open_access_status_enum: OpenAccessStatusEnum;
+      notification_type_enum: NotificationTypeEnum;
+      entity_type_enum: EntityTypeEnum;
+    };
   };
 }

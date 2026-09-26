@@ -53,7 +53,7 @@ interface AuthState {
   resetPassword: (email: string) => Promise<{ success: boolean; error: string | null }>;
   signOut: () => Promise<void>;
   clearError: () => void;
-  updateProfile: (updated: Partial<UserProfile>) => void;
+  updateProfile: (updated: Partial<UserProfile>) => Promise<{ success: boolean; error: string | null }>;
   toggleFollowUser: (userId: string) => Promise<boolean>;
 }
 
@@ -288,9 +288,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearError: () => set({ authError: null }),
 
-  updateProfile: (updated) => {
-    const currentUserId = get().user?.id;
-    const updatedUser = { ...get().user, ...updated };
+  updateProfile: async (updated) => {
+    const previousUser = get().user;
+    const currentUserId = previousUser?.id;
+    const updatedUser = { ...previousUser, ...updated };
+
+    // 1. Optimistic update
     setStoredLocalSession(updatedUser);
     set((state) => ({
       user: updatedUser,
@@ -298,10 +301,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }));
 
     if (currentUserId) {
-      persistUserProfile(currentUserId, updated).catch((err) => {
-        console.warn('Profile background sync:', err);
-      });
+      const res = await persistUserProfile(currentUserId, updated);
+      if (!res.success) {
+        console.warn('Profile sync failed:', res.error);
+        // Rollback state if persist failed
+        setStoredLocalSession(previousUser);
+        set((state) => ({
+          user: previousUser,
+          users: state.users.map((u) => (u.id === state.user.id ? previousUser : u)),
+          authError: res.error,
+        }));
+        return res;
+      }
+      return { success: true, error: null };
     }
+    return { success: true, error: null };
   },
 
   toggleFollowUser: async (userId: string) => {

@@ -77,11 +77,10 @@ export default function ResearchProfileScreen() {
       scopusId: scopusId.trim() || undefined,
     };
 
-    const res = await persistUserProfile(user.id, updates as any);
+    const res = await updateProfile(updates as any);
     setIsSaving(false);
 
     if (res.success) {
-      updateProfile(updates as any);
       setSuccessMessage('Research profile updated successfully.');
       setTimeout(() => setSuccessMessage(null), 4000);
     } else {

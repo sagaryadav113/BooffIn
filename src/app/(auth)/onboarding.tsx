@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import {
   GraduationCap,
   Building,
   CheckCircle2,
+  AlertCircle,
   Sparkles,
   BookOpen,
 } from 'lucide-react-native';
@@ -27,6 +28,11 @@ import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Input } from '../../components/core/Input';
 import { useAuthStore } from '../../store/useAuthStore';
+import {
+  validateUsername,
+  checkUsernameAvailability,
+  normalizeHandle,
+} from '../../api/authService';
 
 const DISCIPLINE_TOPICS = [
   'Neuroscience',
@@ -61,6 +67,73 @@ export default function OnboardingScreen() {
   const [institution, setInstitution] = useState(user?.institution || '');
   const [step1Error, setStep1Error] = useState<string | null>(null);
 
+  // Async verification status
+  const [asyncStatus, setAsyncStatus] = useState<{
+    checking: boolean;
+    available: boolean | null;
+    message: string | null;
+    normalized: string;
+  }>({
+    checking: false,
+    available: null,
+    message: null,
+    normalized: '',
+  });
+
+  const cleanHandle = normalizeHandle(handle);
+  const valResult = cleanHandle ? validateUsername(cleanHandle) : null;
+
+  // Derived handle status without setState in effect
+  const handleStatus = React.useMemo(() => {
+    if (!cleanHandle) {
+      return { checking: false, available: null, message: null, normalized: '' };
+    }
+    if (valResult && !valResult.isValid) {
+      return {
+        checking: false,
+        available: false,
+        message: valResult.error,
+        normalized: cleanHandle,
+      };
+    }
+    if (asyncStatus.normalized === cleanHandle) {
+      return asyncStatus;
+    }
+    return {
+      checking: true,
+      available: null,
+      message: null,
+      normalized: cleanHandle,
+    };
+  }, [cleanHandle, valResult, asyncStatus]);
+
+  // Debounced availability check
+  useEffect(() => {
+    if (!cleanHandle || (valResult && !valResult.isValid)) {
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      const res = await checkUsernameAvailability(cleanHandle, user?.id);
+      if (isMounted) {
+        setAsyncStatus({
+          checking: false,
+          available: res.isAvailable,
+          message: res.isAvailable
+            ? `@${res.normalized} is available`
+            : (res.error || 'This handle is already taken.'),
+          normalized: res.normalized,
+        });
+      }
+    }, 350);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [cleanHandle, valResult?.isValid, user?.id]);
+
   // Step 2: Research Disciplines & ORCID State
   const [selectedTopics, setSelectedTopics] = useState<string[]>(
     user?.researchInterests && user.researchInterests.length > 0
@@ -84,18 +157,36 @@ export default function OnboardingScreen() {
     if (step2Error) setStep2Error(null);
   };
 
-  const handleNextToStep2 = () => {
+  const handleNextToStep2 = async () => {
     setStep1Error(null);
     const cleanName = fullName.trim();
-    const cleanHandle = handle.trim().replace(/^@/, '').toLowerCase();
+    const cleanHandle = normalizeHandle(handle);
 
     if (!cleanName) {
       setStep1Error('Please provide your name.');
       return;
     }
 
-    if (!cleanHandle || cleanHandle.length < 3) {
-      setStep1Error('Researcher handle must be at least 3 characters.');
+    const val = validateUsername(cleanHandle);
+    if (!val.isValid) {
+      setStep1Error(val.error || 'Please enter a valid researcher handle.');
+      return;
+    }
+
+    if (handleStatus.checking) {
+      setStep1Error('Checking handle availability...');
+      return;
+    }
+
+    if (handleStatus.available === false) {
+      setStep1Error(handleStatus.message || 'This handle is not available.');
+      return;
+    }
+
+    // Final authoritative preflight check
+    const checkRes = await checkUsernameAvailability(cleanHandle, user?.id);
+    if (!checkRes.isAvailable) {
+      setStep1Error(checkRes.error || 'This handle is already taken.');
       return;
     }
 
@@ -115,14 +206,11 @@ export default function OnboardingScreen() {
     }
 
     setIsSaving(true);
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
 
     const cleanOrcid = orcidId.trim();
     const updatedData = {
       fullName: fullName.trim(),
-      handle: handle.trim().replace(/^@/, '').toLowerCase(),
+      handle: normalizeHandle(handle),
       academicTitle: academicTitle.trim() || 'Research Enthusiast',
       institution: institution.trim() || 'Independent Researcher',
       researchInterests: selectedTopics,
@@ -133,13 +221,30 @@ export default function OnboardingScreen() {
         'Exploring scientific literature, asking questions, and discussing peer-reviewed science on BooffIn.',
     };
 
-    updateProfile(updatedData);
+    const res = await updateProfile(updatedData);
+
+    if (!res.success) {
+      setIsSaving(false);
+      setStep(1);
+      setStep1Error(res.error || 'Failed to save profile. Please choose a different handle.');
+      return;
+    }
+
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
 
     setTimeout(() => {
       setIsSaving(false);
       router.replace('/(tabs)');
     }, 200);
   };
+
+  const isStep1Valid =
+    Boolean(fullName.trim()) &&
+    Boolean(handle.trim()) &&
+    handleStatus.available !== false &&
+    !handleStatus.checking;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -198,18 +303,48 @@ export default function OnboardingScreen() {
                     leftIcon="User"
                   />
 
-                  <Input
-                    label="Researcher Handle *"
-                    placeholder="e.g. sagaryadav"
-                    value={handle}
-                    onChangeText={(text) => {
-                      setHandle(text);
-                      if (step1Error) setStep1Error(null);
-                    }}
-                    autoCapitalize="none"
-                    leftIcon="Tag"
-                    hint="Your unique @handle used in mentions and paper discussions"
-                  />
+                  <View>
+                    <Input
+                      label="Researcher Handle *"
+                      placeholder="e.g. sagaryadav"
+                      value={handle}
+                      onChangeText={(text) => {
+                        setHandle(text);
+                        if (step1Error) setStep1Error(null);
+                      }}
+                      autoCapitalize="none"
+                      leftIcon="Tag"
+                      hint="Your unique @handle used in mentions and paper discussions"
+                    />
+
+                    {/* Real-time Availability Badge */}
+                    {handle.trim().length > 0 && (
+                      <View style={styles.availabilityContainer}>
+                        {handleStatus.checking ? (
+                          <View style={styles.availabilityRow}>
+                            <ActivityIndicator size="small" color={colors.accentBlue} />
+                            <Text style={styles.availabilityCheckingText}>
+                              Checking @{handleStatus.normalized} availability...
+                            </Text>
+                          </View>
+                        ) : handleStatus.available === true ? (
+                          <View style={[styles.availabilityRow, styles.availabilitySuccess]}>
+                            <CheckCircle2 size={15} color="#16a34a" />
+                            <Text style={styles.availabilitySuccessText}>
+                              ✓ @{handleStatus.normalized} is available
+                            </Text>
+                          </View>
+                        ) : handleStatus.available === false ? (
+                          <View style={[styles.availabilityRow, styles.availabilityError]}>
+                            <AlertCircle size={15} color={colors.accentRed} />
+                            <Text style={styles.availabilityErrorText}>
+                              ✕ {handleStatus.message}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    )}
+                  </View>
 
                   <Input
                     label="Academic Role / Status (Optional)"
@@ -232,12 +367,12 @@ export default function OnboardingScreen() {
                   <TouchableOpacity
                     style={[
                       styles.primaryButton,
-                      fullName.trim() && handle.trim()
+                      isStep1Valid
                         ? styles.primaryButtonActive
                         : styles.primaryButtonDisabled,
                     ]}
                     onPress={handleNextToStep2}
-                    disabled={!fullName.trim() || !handle.trim()}
+                    disabled={!isStep1Valid}
                     activeOpacity={0.85}
                   >
                     <Text style={styles.primaryButtonText}>Next: Research Disciplines</Text>
@@ -495,5 +630,33 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 15,
     fontWeight: '600',
+  },
+  availabilityContainer: {
+    marginTop: -spacing.md + 2,
+    marginBottom: spacing.md,
+    paddingHorizontal: 2,
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  availabilityCheckingText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  availabilitySuccess: {},
+  availabilitySuccessText: {
+    ...typography.captionBold,
+    color: '#16a34a',
+    fontSize: 12,
+  },
+  availabilityError: {},
+  availabilityErrorText: {
+    ...typography.captionBold,
+    color: colors.accentRed,
+    fontSize: 12,
   },
 });
