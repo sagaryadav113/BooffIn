@@ -175,7 +175,14 @@ export default function LoginScreen() {
           <Typography variant="caption" color={colors.textSecondary}>
             Do not have an account yet?{' '}
           </Typography>
-          <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+          <TouchableOpacity
+            onPress={() =>
+              router.push({
+                pathname: '/(auth)/signup',
+                params: { email: email.trim() || undefined },
+              })
+            }
+          >
             <Typography variant="captionBold" color={colors.textPrimary}>
               Sign Up
             </Typography>

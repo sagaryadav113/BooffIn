@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   StatusBar,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
@@ -100,19 +101,17 @@ export default function SignupScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
           >
-            <View style={styles.contentContainer}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               {/* Form Section */}
               <View style={styles.topSection}>
-                <Text style={styles.title}>Create your password</Text>
+                <Text style={styles.title}>Create your account</Text>
                 <Text style={styles.subtitle}>
-                  Choose a secure password (at least 6 characters) to set up your BooffIn account.
+                  Enter your academic credentials or email to set up your BooffIn account.
                 </Text>
-
-                {/* Email Display / Input */}
-                <View style={styles.emailBadge}>
-                  <Text style={styles.emailBadgeLabel}>ACCOUNT EMAIL</Text>
-                  <Text style={styles.emailBadgeValue}>{cleanEmail || 'scientist@university.edu'}</Text>
-                </View>
 
                 {/* Error Banner */}
                 {displayError && (
@@ -121,6 +120,23 @@ export default function SignupScreen() {
                     <Text style={styles.errorText}>{displayError}</Text>
                   </View>
                 )}
+
+                {/* Email Input */}
+                <Input
+                  label="Email Address"
+                  placeholder="scientist@university.edu"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    if (validationError) setValidationError(null);
+                    if (authError) clearError();
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus={!email}
+                  leftIcon="Inbox"
+                />
 
                 {/* Password Input */}
                 <Input
@@ -133,7 +149,7 @@ export default function SignupScreen() {
                     if (authError) clearError();
                   }}
                   secureTextEntry={!showPassword}
-                  autoFocus
+                  autoFocus={!!email}
                   leftIcon="Shield"
                   rightIcon={showPassword ? 'EyeOff' : 'Eye'}
                   onRightIconPress={() => setShowPassword(!showPassword)}
@@ -146,12 +162,12 @@ export default function SignupScreen() {
                 <TouchableOpacity
                   style={[
                     styles.submitButton,
-                    isPasswordValid && !isLoading
+                    isEmailValid && isPasswordValid && !isLoading
                       ? styles.submitButtonActive
                       : styles.submitButtonDisabled,
                   ]}
                   onPress={handleCreateAccount}
-                  disabled={!isPasswordValid || isLoading}
+                  disabled={!isEmailValid || !isPasswordValid || isLoading}
                   activeOpacity={0.85}
                   accessibilityRole="button"
                   accessibilityLabel="Create Account & Continue"
@@ -162,7 +178,9 @@ export default function SignupScreen() {
                     <Text
                       style={[
                         styles.submitButtonText,
-                        isPasswordValid ? styles.submitButtonTextActive : styles.submitButtonTextDisabled,
+                        isEmailValid && isPasswordValid
+                          ? styles.submitButtonTextActive
+                          : styles.submitButtonTextDisabled,
                       ]}
                     >
                       Create Account & Continue
@@ -172,12 +190,12 @@ export default function SignupScreen() {
 
                 {/* Switch to Login if already registered */}
                 <View style={styles.switchRow}>
-                  <Text style={styles.switchText}>Already have a password? </Text>
+                  <Text style={styles.switchText}>Already have an account? </Text>
                   <TouchableOpacity
                     onPress={() =>
                       router.push({
                         pathname: '/(auth)/login',
-                        params: { email: cleanEmail },
+                        params: { email: cleanEmail || undefined },
                       })
                     }
                   >
@@ -185,7 +203,7 @@ export default function SignupScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </ScrollView>
           </KeyboardAvoidingView>
         </View>
       </TouchableWithoutFeedback>
@@ -219,8 +237,8 @@ const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
   },
-  contentContainer: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: spacing.xxl,
     paddingTop: spacing.md,
     paddingBottom: Platform.OS === 'web' ? spacing.xxxl : spacing.xl,
@@ -248,27 +266,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
     marginBottom: spacing.xl,
-  },
-  emailBadge: {
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  emailBadgeLabel: {
-    ...typography.micro,
-    color: colors.textMuted,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  emailBadgeValue: {
-    ...typography.captionBold,
-    color: colors.textPrimary,
-    fontSize: 14,
   },
   errorBanner: {
     flexDirection: 'row',
