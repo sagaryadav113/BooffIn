@@ -11,14 +11,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  Modal,
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
   Camera,
-  Check,
   CheckCircle2,
   AlertCircle,
   Globe,
@@ -27,16 +25,14 @@ import {
   Building,
   BookOpen,
   ExternalLink,
-  X,
   Upload,
-  Trash2,
-  Image as ImageIcon,
+  Tag,
+  GraduationCap,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Button } from '../../components/core/Button';
-import { Avatar } from '../../components/core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
   validateUsername,
@@ -292,7 +288,7 @@ export default function EditProfileScreen() {
 
       <AppHeader
         showBack
-        title="Edit Researcher Profile"
+        title="Edit Profile"
         rightElement={
           <TouchableOpacity
             onPress={handleSave}
@@ -312,32 +308,46 @@ export default function EditProfileScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Media Header: Banner and Avatar Customizer */}
-          <View style={styles.mediaSection}>
-            {/* Banner Preview & Controls */}
-            <View style={styles.bannerEditorContainer}>
-              <Image
-                source={{ uri: bannerUrl || DEFAULT_BANNER_FALLBACK }}
-                style={styles.bannerPreviewImage}
-                contentFit="cover"
-              />
+          {/* Header Subtitle */}
+          <Text style={styles.pageSubtitle}>
+            Manage your public academic identity, banner, and photo.
+          </Text>
 
-              {isUploadingBanner && (
-                <View style={styles.uploadingOverlay}>
-                  <ActivityIndicator size="small" color={colors.white} />
-                  <Text style={styles.uploadingText}>Uploading Banner...</Text>
-                </View>
-              )}
+          {/* Section 1: PROFILE MEDIA & HEADER */}
+          <Text style={styles.sectionHeaderTitle}>PROFILE MEDIA & HEADER</Text>
+          <View style={styles.cardContainer}>
+            {/* Cover Banner Image */}
+            <View style={styles.mediaItemBlock}>
+              <Text style={styles.mediaItemTitle}>Cover Banner Image</Text>
+              <Text style={styles.mediaItemSubtitle}>
+                Panoramic header displayed on your public researcher profile (3:1, max 5MB).
+              </Text>
 
-              <View style={styles.bannerControlsRow}>
+              {/* Banner Preview Box */}
+              <View style={styles.bannerPreviewWrapper}>
+                <Image
+                  source={{ uri: bannerUrl || DEFAULT_BANNER_FALLBACK }}
+                  style={styles.bannerPreviewImage}
+                  contentFit="cover"
+                />
+                {isUploadingBanner && (
+                  <View style={styles.uploadingOverlay}>
+                    <ActivityIndicator size="small" color={colors.white} />
+                    <Text style={styles.uploadingText}>Uploading Banner...</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Banner Buttons Row */}
+              <View style={styles.mediaActionsRow}>
                 <TouchableOpacity
                   onPress={handlePickBanner}
                   disabled={isUploadingBanner}
-                  style={styles.mediaButton}
-                  activeOpacity={0.8}
+                  style={styles.pillButtonPrimary}
+                  activeOpacity={0.7}
                 >
-                  <Camera size={13} color={colors.white} />
-                  <Text style={styles.mediaButtonText}>
+                  <Camera size={14} color={colors.textPrimary} />
+                  <Text style={styles.pillButtonPrimaryText}>
                     {bannerUrl ? 'Change Banner' : 'Upload Banner'}
                   </Text>
                 </TouchableOpacity>
@@ -346,54 +356,59 @@ export default function EditProfileScreen() {
                   <TouchableOpacity
                     onPress={handleRemoveBanner}
                     disabled={isUploadingBanner}
-                    style={[styles.mediaButton, styles.mediaButtonDanger]}
-                    activeOpacity={0.8}
+                    style={styles.pillButtonSecondary}
+                    activeOpacity={0.7}
                   >
-                    <Trash2 size={13} color={colors.accentRed} />
-                    <Text style={[styles.mediaButtonText, { color: colors.accentRed }]}>Remove</Text>
+                    <Text style={styles.pillButtonSecondaryText}>Remove Banner</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
             </View>
 
-            {/* Avatar Preview & Controls */}
-            <View style={styles.avatarEditorRow}>
-              <View style={styles.avatarWrapper}>
-                <Avatar
-                  url={avatarUrl || undefined}
-                  name={fullName || 'Researcher'}
-                  size={84}
-                  verified={!!orcidId.trim()}
-                />
-                {isUploadingAvatar && (
-                  <View style={styles.avatarUploadingOverlay}>
-                    <ActivityIndicator size="small" color={colors.white} />
-                  </View>
-                )}
-                <TouchableOpacity
-                  onPress={handlePickAvatar}
-                  disabled={isUploadingAvatar}
-                  style={styles.avatarBadgeButton}
-                  activeOpacity={0.8}
-                >
-                  <Camera size={14} color={colors.white} />
-                </TouchableOpacity>
-              </View>
+            {/* Separator Divider */}
+            <View style={styles.cardDivider} />
 
-              <View style={styles.avatarActionsCol}>
-                <Text style={styles.avatarSectionHeading}>Profile Photo</Text>
-                <Text style={styles.avatarSectionHint}>
-                  Visible across posts, citations, and author lists (Max 5MB)
-                </Text>
-                <View style={styles.avatarButtonsRow}>
+            {/* Profile Avatar / Headshot */}
+            <View style={styles.mediaItemBlock}>
+              <Text style={styles.mediaItemTitle}>Profile Avatar / Headshot</Text>
+              <Text style={styles.mediaItemSubtitle}>
+                Square headshot displayed across discussions and citations (1:1, max 5MB).
+              </Text>
+
+              <View style={styles.avatarControlsRow}>
+                {/* Circular Avatar Preview */}
+                <View style={styles.avatarPreviewWrapper}>
+                  {avatarUrl ? (
+                    <Image
+                      source={{ uri: avatarUrl }}
+                      style={styles.avatarPreviewImage}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarPlaceholderText}>
+                        {(fullName || 'U').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+
+                  {isUploadingAvatar && (
+                    <View style={styles.avatarUploadingOverlay}>
+                      <ActivityIndicator size="small" color={colors.white} />
+                    </View>
+                  )}
+                </View>
+
+                {/* Avatar Action Buttons */}
+                <View style={styles.avatarButtonsContainer}>
                   <TouchableOpacity
                     onPress={handlePickAvatar}
                     disabled={isUploadingAvatar}
-                    style={styles.actionPillBtn}
-                    activeOpacity={0.8}
+                    style={styles.pillButtonPrimary}
+                    activeOpacity={0.7}
                   >
-                    <Upload size={13} color={colors.textPrimary} />
-                    <Text style={styles.actionPillBtnText}>
+                    <Upload size={14} color={colors.textPrimary} />
+                    <Text style={styles.pillButtonPrimaryText}>
                       {avatarUrl ? 'Change Photo' : 'Upload Photo'}
                     </Text>
                   </TouchableOpacity>
@@ -402,11 +417,10 @@ export default function EditProfileScreen() {
                     <TouchableOpacity
                       onPress={handleRemoveAvatar}
                       disabled={isUploadingAvatar}
-                      style={[styles.actionPillBtn, styles.actionPillBtnDanger]}
-                      activeOpacity={0.8}
+                      style={styles.pillButtonSecondary}
+                      activeOpacity={0.7}
                     >
-                      <Trash2 size={13} color={colors.accentRed} />
-                      <Text style={[styles.actionPillBtnText, { color: colors.accentRed }]}>Remove</Text>
+                      <Text style={styles.pillButtonSecondaryText}>Remove Photo</Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -414,27 +428,31 @@ export default function EditProfileScreen() {
             </View>
           </View>
 
-          {/* Form Fields */}
-          <View style={styles.formCard}>
+          {/* Section 2: BASIC IDENTITY */}
+          <Text style={styles.sectionHeaderTitle}>BASIC IDENTITY</Text>
+          <View style={styles.cardContainer}>
             {/* Full Name */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name *</Text>
-              <TextInput
-                style={styles.input}
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="e.g. Sidhant S. Mishra or Dr. Jane Doe"
-                placeholderTextColor={colors.textMuted}
-              />
+            <View style={styles.formGroup}>
+              <Text style={styles.fieldLabel}>Full Name *</Text>
+              <View style={styles.inputWithIconContainer}>
+                <User size={16} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <TextInput
+                  style={styles.fieldInputClean}
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder="e.g. Sagar Yadav or Dr. Jane Doe"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
             </View>
 
             {/* Username / Handle */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Researcher Handle *</Text>
-              <View style={styles.inputWithPrefix}>
-                <Text style={styles.inputPrefix}>@</Text>
+            <View style={styles.formGroup}>
+              <Text style={styles.fieldLabel}>Username / Handle *</Text>
+              <View style={styles.inputWithIconContainer}>
+                <Text style={styles.handlePrefixText}>@</Text>
                 <TextInput
-                  style={[styles.input, styles.inputClean]}
+                  style={styles.fieldInputClean}
                   value={handle}
                   onChangeText={setHandle}
                   placeholder="username"
@@ -472,124 +490,156 @@ export default function EditProfileScreen() {
               )}
             </View>
 
-            {/* Academic Role / Identity */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Academic Role / Status</Text>
-              <TextInput
-                style={styles.input}
-                value={academicTitle}
-                onChangeText={setAcademicTitle}
-                placeholder="e.g. Neuroscience Student, PhD Candidate, Professor"
-                placeholderTextColor={colors.textMuted}
-              />
+            {/* Academic Role / Status */}
+            <View style={styles.formGroup}>
+              <Text style={styles.fieldLabel}>Academic Role / Status</Text>
+              <View style={styles.inputWithIconContainer}>
+                <GraduationCap size={16} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <TextInput
+                  style={styles.fieldInputClean}
+                  value={academicTitle}
+                  onChangeText={setAcademicTitle}
+                  placeholder="e.g. Student researcher, PhD Candidate, Professor"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
               <Text style={styles.fieldHint}>
                 Students, independent researchers, and enthusiasts are equally welcome.
               </Text>
             </View>
 
-            {/* Institution / Affiliation */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Institution / Organization</Text>
-              <TextInput
-                style={styles.input}
-                value={institution}
-                onChangeText={setInstitution}
-                placeholder="e.g. Delhi University / Independent / MIT"
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-
-            {/* Bio */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Bio & Research Summary</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={bio}
-                onChangeText={setBio}
-                multiline
-                numberOfLines={3}
-                placeholder="Share your scientific questions, projects, or interests..."
-                placeholderTextColor={colors.textMuted}
-              />
-            </View>
-
-            {/* Country & Location */}
-            <View style={styles.rowInputs}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>Country</Text>
+            {/* Institution / Organization */}
+            <View style={styles.formGroup}>
+              <Text style={styles.fieldLabel}>Institution / Organization</Text>
+              <View style={styles.inputWithIconContainer}>
+                <Building size={16} color={colors.textSecondary} style={styles.fieldLeftIcon} />
                 <TextInput
-                  style={styles.input}
-                  value={country}
-                  onChangeText={setCountry}
-                  placeholder="e.g. India, USA, UK"
+                  style={styles.fieldInputClean}
+                  value={institution}
+                  onChangeText={setInstitution}
+                  placeholder="e.g. Independent Researcher / MIT / Delhi University"
                   placeholderTextColor={colors.textMuted}
                 />
               </View>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>City / Location</Text>
+            </View>
+
+            {/* Bio & Research Summary */}
+            <View style={styles.formGroup}>
+              <Text style={styles.fieldLabel}>Bio & Research Summary</Text>
+              <View style={styles.textAreaContainer}>
                 <TextInput
-                  style={styles.input}
-                  value={location}
-                  onChangeText={setLocation}
-                  placeholder="e.g. New Delhi, Boston"
+                  style={styles.textAreaInput}
+                  value={bio}
+                  onChangeText={setBio}
+                  multiline
+                  numberOfLines={3}
+                  placeholder="I am a neuroscience student interested in AI and biology..."
                   placeholderTextColor={colors.textMuted}
                 />
+              </View>
+            </View>
+          </View>
+
+          {/* Section 3: RESEARCH & ACADEMIC DETAILS */}
+          <Text style={styles.sectionHeaderTitle}>RESEARCH & ACADEMIC DETAILS</Text>
+          <View style={styles.cardContainer}>
+            {/* Country & Location */}
+            <View style={styles.rowInputs}>
+              <View style={[styles.formGroup, { flex: 1 }]}>
+                <Text style={styles.fieldLabel}>Country</Text>
+                <View style={styles.inputWithIconContainer}>
+                  <Globe size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                  <TextInput
+                    style={styles.fieldInputClean}
+                    value={country}
+                    onChangeText={setCountry}
+                    placeholder="e.g. India"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                </View>
+              </View>
+              <View style={[styles.formGroup, { flex: 1 }]}>
+                <Text style={styles.fieldLabel}>City / Location</Text>
+                <View style={styles.inputWithIconContainer}>
+                  <MapPin size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                  <TextInput
+                    style={styles.fieldInputClean}
+                    value={location}
+                    onChangeText={setLocation}
+                    placeholder="e.g. New Delhi"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                </View>
               </View>
             </View>
 
             {/* Research Interests */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Research Interests (Comma separated)</Text>
-              <TextInput
-                style={styles.input}
-                value={researchInterestsInput}
-                onChangeText={setResearchInterestsInput}
-                placeholder="e.g. Neuroscience, Synaptic Plasticity, AI in Science"
-                placeholderTextColor={colors.textMuted}
-              />
+            <View style={styles.formGroup}>
+              <Text style={styles.fieldLabel}>Research Interests (Comma separated)</Text>
+              <View style={styles.inputWithIconContainer}>
+                <Tag size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <TextInput
+                  style={styles.fieldInputClean}
+                  value={researchInterestsInput}
+                  onChangeText={setResearchInterestsInput}
+                  placeholder="e.g. Neuroscience, AI & Bio, Genetics"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+              <Text style={styles.fieldHint}>
+                These topics will also configure your customized top feed tabs on the home screen.
+              </Text>
             </View>
 
             {/* ORCID iD */}
-            <View style={styles.inputGroup}>
+            <View style={styles.formGroup}>
               <View style={styles.labelWithBadge}>
-                <Text style={styles.label}>ORCID iD</Text>
+                <Text style={styles.fieldLabel}>ORCID iD</Text>
                 <Text style={styles.orcidBadge}>Verified Researcher</Text>
               </View>
-              <TextInput
-                style={styles.input}
-                value={orcidId}
-                onChangeText={setOrcidId}
-                placeholder="0000-0002-8140-5231"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-              />
+              <View style={styles.inputWithIconContainer}>
+                <ExternalLink size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <TextInput
+                  style={styles.fieldInputClean}
+                  value={orcidId}
+                  onChangeText={setOrcidId}
+                  placeholder="0000-0002-8140-5231"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                />
+              </View>
               <Text style={styles.fieldHint}>
                 Linking your ORCID grants the green verified badge and connects your published DOI record.
               </Text>
             </View>
 
             {/* Website URL */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Personal Website / Lab Page</Text>
-              <TextInput
-                style={styles.input}
-                value={websiteUrl}
-                onChangeText={setWebsiteUrl}
-                placeholder="https://yourwebsite.edu"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-                keyboardType="url"
-              />
+            <View style={styles.formGroup}>
+              <Text style={styles.fieldLabel}>Personal Website / Lab Page</Text>
+              <View style={styles.inputWithIconContainer}>
+                <Globe size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <TextInput
+                  style={styles.fieldInputClean}
+                  value={websiteUrl}
+                  onChangeText={setWebsiteUrl}
+                  placeholder="https://yourwebsite.edu"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+              </View>
             </View>
+          </View>
 
-            {/* Submit Button */}
+          {/* Bottom Save Changes Button */}
+          <View style={styles.bottomButtonContainer}>
             <Button
               title={isSaving ? 'Saving Changes...' : 'Save Changes'}
               variant="primary"
               size="lg"
               onPress={handleSave}
               disabled={isSaving}
-              style={styles.submitBtn}
+              style={styles.saveSubmitButton}
             />
           </View>
         </ScrollView>
@@ -601,7 +651,7 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F9FAFB',
   },
   scrollContent: {
     paddingBottom: spacing.xxxl * 2,
@@ -609,25 +659,76 @@ const styles = StyleSheet.create({
   saveHeaderButton: {
     backgroundColor: colors.black,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: 6,
     borderRadius: radii.full,
   },
   saveHeaderText: {
     ...typography.captionBold,
     color: colors.white,
     fontWeight: '700',
+    fontSize: 13,
   },
-  mediaSection: {
-    backgroundColor: colors.backgroundSecondary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    paddingBottom: spacing.lg,
+  pageSubtitle: {
+    ...typography.body,
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
   },
-  bannerEditorContainer: {
+  sectionHeaderTitle: {
+    ...typography.captionBold,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: colors.textSecondary,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xs + 2,
+    textTransform: 'uppercase',
+  },
+  cardContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xl,
+    gap: spacing.md,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      },
+      default: {
+        elevation: 1,
+      },
+    }),
+  },
+  mediaItemBlock: {
+    gap: 4,
+  },
+  mediaItemTitle: {
+    ...typography.bodyBold,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  mediaItemSubtitle: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  bannerPreviewWrapper: {
     width: '100%',
-    height: 130,
+    height: 120,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6',
     position: 'relative',
-    backgroundColor: colors.cardBackground,
   },
   bannerPreviewImage: {
     width: '100%',
@@ -651,126 +752,112 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 13,
   },
-  bannerControlsRow: {
-    position: 'absolute',
-    bottom: spacing.sm,
-    right: spacing.md,
+  mediaActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs + 2,
-    zIndex: 5,
+    gap: spacing.sm,
+    marginTop: 10,
   },
-  mediaButton: {
+  pillButtonPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 5,
+    gap: 6,
+    backgroundColor: '#F3F4F6',
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  mediaButtonDanger: {
-    backgroundColor: '#FFF5F5',
-    borderColor: '#FED7D7',
+  pillButtonPrimaryText: {
+    ...typography.captionBold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
-  mediaButtonText: {
-    ...typography.micro,
-    color: colors.white,
-    fontWeight: '700',
-    fontSize: 11.5,
-  },
-  avatarEditorRow: {
+  pillButtonSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    marginTop: -32,
-    gap: spacing.md,
+    gap: 6,
+    backgroundColor: colors.white,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  avatarWrapper: {
+  pillButtonSecondaryText: {
+    ...typography.captionBold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 4,
+  },
+  avatarControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: 4,
+  },
+  avatarPreviewWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
     position: 'relative',
+  },
+  avatarPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPlaceholderText: {
+    ...typography.h3,
+    fontSize: 22,
+    color: colors.textSecondary,
+    fontWeight: '700',
   },
   avatarUploadingOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
-  avatarBadgeButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: colors.black,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.white,
-    zIndex: 15,
-  },
-  avatarActionsCol: {
-    flex: 1,
-    marginTop: 28,
-  },
-  avatarSectionHeading: {
-    ...typography.captionBold,
-    color: colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  avatarSectionHint: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontSize: 11.5,
-    marginTop: 2,
-    marginBottom: spacing.xs,
-  },
-  avatarButtonsRow: {
+  avatarButtonsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs + 2,
+    gap: spacing.sm,
+    flexWrap: 'wrap',
   },
-  actionPillBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.cardBackground,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 5,
-    borderRadius: radii.full,
+  formGroup: {
+    gap: 6,
   },
-  actionPillBtnDanger: {
-    backgroundColor: '#FFF5F5',
-    borderColor: '#FED7D7',
-  },
-  actionPillBtnText: {
-    ...typography.micro,
-    color: colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 11.5,
-  },
-  formCard: {
-    padding: spacing.xl,
-    gap: spacing.lg,
-  },
-  inputGroup: {
-    gap: spacing.xs,
-  },
-  label: {
+  fieldLabel: {
     ...typography.captionBold,
-    color: colors.textPrimary,
+    fontSize: 13,
     fontWeight: '700',
+    color: colors.textPrimary,
   },
   labelWithBadge: {
     flexDirection: 'row',
@@ -779,46 +866,53 @@ const styles = StyleSheet.create({
   },
   orcidBadge: {
     ...typography.micro,
-    color: colors.accentGreen,
+    color: '#16a34a',
     fontWeight: '700',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: 'rgba(22, 163, 74, 0.08)',
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 2,
     borderRadius: radii.sm,
   },
-  input: {
-    ...typography.body,
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  inputWithPrefix: {
+  inputWithIconContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingLeft: spacing.md,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    minHeight: 44,
   },
-  inputPrefix: {
-    ...typography.body,
+  fieldLeftIcon: {
+    marginRight: 8,
+  },
+  handlePrefixText: {
+    ...typography.bodyBold,
     color: colors.textSecondary,
-    fontWeight: '600',
+    marginRight: 4,
+    fontSize: 15,
   },
-  inputClean: {
+  fieldInputClean: {
     flex: 1,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingLeft: 4,
+    ...typography.body,
+    fontSize: 14,
+    color: colors.textPrimary,
+    paddingVertical: 8,
   },
-  textArea: {
-    minHeight: 80,
+  textAreaContainer: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 88,
+  },
+  textAreaInput: {
+    ...typography.body,
+    fontSize: 14,
+    color: colors.textPrimary,
+    minHeight: 70,
     textAlignVertical: 'top',
   },
   rowInputs: {
@@ -831,15 +925,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
-  submitBtn: {
-    marginTop: spacing.md,
-  },
   availabilityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingVertical: 2,
-    marginTop: 4,
+    marginTop: 2,
   },
   availabilityCheckingText: {
     ...typography.caption,
@@ -855,6 +946,15 @@ const styles = StyleSheet.create({
     ...typography.captionBold,
     color: colors.accentRed,
     fontSize: 12,
+  },
+  bottomButtonContainer: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+  },
+  saveSubmitButton: {
+    backgroundColor: colors.black,
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
   },
 });
 
