@@ -885,15 +885,8 @@ export interface ToggleFollowResult {
   error: string | null;
 }
 
-/**
- * Resolves current verified user ID from memory, active session, or Supabase Auth
- */
 async function getVerifiedUserId(providedId?: string): Promise<string | null> {
   if (providedId && providedId !== 'unknown') return providedId;
-  const authStoreUser = useAuthStore.getState().user;
-  if (authStoreUser?.id && authStoreUser.id !== 'unknown') {
-    return authStoreUser.id;
-  }
   const { data: sessData } = await supabase.auth.getSession();
   if (sessData?.session?.user?.id) {
     return sessData.session.user.id;
@@ -1156,12 +1149,13 @@ export async function fetchFollowers(
       .range(offset, offset + limit - 1);
 
     if (!error && Array.isArray(data)) {
-      const currentFollowingSet = useAuthStore.getState().followingIds;
+      const viewerFollowingIds = verifiedViewerId ? await fetchUserFollowingIds(verifiedViewerId) : [];
+      const followingSet = new Set(viewerFollowingIds);
       const researchers: UserProfile[] = [];
       for (const row of data) {
         if (row.follower) {
           const prof = mapSupabaseProfile(row.follower);
-          prof.isFollowing = verifiedViewerId ? currentFollowingSet.has(prof.id) : false;
+          prof.isFollowing = verifiedViewerId ? followingSet.has(prof.id) : false;
           researchers.push(prof);
         }
       }
@@ -1228,12 +1222,13 @@ export async function fetchFollowing(
       .range(offset, offset + limit - 1);
 
     if (!error && Array.isArray(data)) {
-      const currentFollowingSet = useAuthStore.getState().followingIds;
+      const viewerFollowingIds = verifiedViewerId ? await fetchUserFollowingIds(verifiedViewerId) : [];
+      const followingSet = new Set(viewerFollowingIds);
       const researchers: UserProfile[] = [];
       for (const row of data) {
         if (row.following) {
           const prof = mapSupabaseProfile(row.following);
-          prof.isFollowing = verifiedViewerId ? currentFollowingSet.has(prof.id) : false;
+          prof.isFollowing = verifiedViewerId ? followingSet.has(prof.id) : false;
           researchers.push(prof);
         }
       }
