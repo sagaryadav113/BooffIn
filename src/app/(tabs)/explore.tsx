@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,23 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Compass, Sparkles, ArrowRight, SlidersHorizontal } from 'lucide-react-native';
+import { Compass, Sparkles, ArrowRight, Search, FileText, Users, Award, ExternalLink } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { SearchBar } from '../../components/core/SearchBar';
-import { FilterPills } from '../../components/core/FilterPills';
-import { TopicCategoryCard } from '../../components/cards/TopicCategoryCard';
+import { PaperCard } from '../../components/cards/PaperCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
 import { TrendingDiscussionCard } from '../../components/cards/TrendingDiscussionCard';
-import { ResearcherCard } from '../../components/cards/ResearcherCard';
-import { TopicCard } from '../../components/cards/TopicCard';
 import { EmptyState } from '../../components/feedback/EmptyState';
+import { ExploreFilterTabs } from '../../components/explore/ExploreFilterTabs';
+import { RecentSearchesList } from '../../components/explore/RecentSearchesList';
+import { TrendingTopicsGrid } from '../../components/explore/TrendingTopicsGrid';
+import { ResearcherResultCard } from '../../components/explore/ResearcherResultCard';
+import { useExploreSearchStore } from '../../store/useExploreSearchStore';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useTopicStore } from '../../store/useTopicStore';
 import { usePostStore } from '../../store/usePostStore';
@@ -29,31 +32,20 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { supabase } from '../../api/client';
 import { UserProfile } from '../../types';
 
-const QUICK_QUERIES = [
-  'AlphaFold',
-  'CRISPR-Cas9',
-  'Brain Mapping',
-  'Single-cell RNA',
-  'Organoids',
-  'Synaptic Plasticity',
-  'Immunotherapy',
-  'Quantum Optics',
-];
-
-const EXPLORE_FILTERS = [
-  'All',
-  'Research Papers',
-  'Discussions',
-  'Topic Fields',
-  'Researchers',
-];
-
 export default function ExploreScreen() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [researchersList, setResearchersList] = useState<UserProfile[]>([]);
-  const [isLoadingResearchers, setIsLoadingResearchers] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const {
+    searchQuery,
+    activeCategory,
+    isSearching,
+    results,
+    recentSearches,
+    setSearchQuery,
+    setActiveCategory,
+    executeSearch,
+    clearSearch,
+    removeRecentSearch,
+    clearRecentSearches,
+  } = useExploreSearchStore();
 
   const papers = usePaperStore((s) => s.papers);
   const fetchPapers = usePaperStore((s) => s.fetchPapers);
@@ -62,18 +54,25 @@ export default function ExploreScreen() {
   const posts = usePostStore((s) => s.posts);
   const fetchFeed = usePostStore((s) => s.fetchFeed);
   const currentUser = useAuthStore((s) => s.user);
-  const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
 
-  const loadResearchers = useCallback(async () => {
-    setIsLoadingResearchers(true);
+  const [researchersList, setResearchersList] = React.useState<UserProfile[]>([]);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  const loadInitialData = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      await Promise.all([
+        fetchPapers(),
+        fetchTopics(currentUser?.id),
+        fetchFeed('For You', currentUser?.id),
+      ]);
+
+      const { data } = await supabase
         .from('profiles')
         .select('id, username, full_name, avatar_url, academic_title, institution, bio, orcid_id, is_orcid_verified, followers_count, following_count')
         .order('followers_count', { ascending: false })
         .limit(10);
 
-      if (data && !error) {
+      if (data) {
         const mapped: UserProfile[] = data.map((row: any) => ({
           id: row.id,
           handle: row.username || 'researcher',
@@ -93,46 +92,34 @@ export default function ExploreScreen() {
         setResearchersList(mapped);
       }
     } catch {}
-    setIsLoadingResearchers(false);
-  }, []);
+  }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed]);
 
   useEffect(() => {
-    fetchPapers();
-    fetchTopics(currentUser?.id);
-    fetchFeed('For You', currentUser?.id);
-    loadResearchers();
-  }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed, loadResearchers]);
+    loadInitialData();
+  }, [loadInitialData]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    await Promise.all([
-      fetchPapers(),
-      fetchTopics(currentUser?.id),
-      fetchFeed('For You', currentUser?.id),
-      loadResearchers(),
-    ]);
+    await loadInitialData();
     setIsRefreshing(false);
   };
 
-  const handleSearchSubmit = (query?: string) => {
-    const term = (query || searchQuery).trim();
-    if (term) {
-      router.push({
-        pathname: '/search',
-        params: { q: term },
-      });
+  const handleSearchSubmit = (term?: string) => {
+    const q = term !== undefined ? term : searchQuery;
+    if (q.trim()) {
+      try {
+        Haptics.selectionAsync();
+      } catch {}
+      executeSearch(q);
     }
   };
 
-  const handleQuickQuery = (term: string) => {
-    try {
-      Haptics.selectionAsync();
-    } catch {}
+  const handleSelectRecentOrTopic = (term: string) => {
     setSearchQuery(term);
-    handleSearchSubmit(term);
+    executeSearch(term);
   };
 
   const trendingPapers = useMemo(() => {
@@ -145,13 +132,26 @@ export default function ExploreScreen() {
     return [...posts].filter((p) => p.commentsCount > 0);
   }, [posts]);
 
-  const recommendedResearchers = useMemo(() => {
-    return researchersList.filter((u) => u.id !== currentUser?.id);
-  }, [researchersList, currentUser?.id]);
+  const hasQuery = Boolean(searchQuery.trim());
+  const hasResults = Boolean(results && (results.papers.length > 0 || results.researchers.length > 0));
 
-  const recommendedTopics = useMemo(() => {
-    return topics.slice(0, 5);
-  }, [topics]);
+  const detectedBadgeText = useMemo(() => {
+    if (!results?.detectedInputType || results.detectedInputType === 'keyword') return null;
+    switch (results.detectedInputType) {
+      case 'doi':
+        return 'DOI Reference Detected';
+      case 'arxiv':
+        return 'arXiv Preprint Detected';
+      case 'orcid':
+        return '16-Digit ORCID ID Detected';
+      case 'url':
+        return 'Publisher Article URL Detected';
+      case 'user':
+        return 'Scholar Handle Detected';
+      default:
+        return null;
+    }
+  }, [results?.detectedInputType]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -160,20 +160,40 @@ export default function ExploreScreen() {
       {/* Header */}
       <AppHeader
         title="Explore"
-        rightElement={
-          <TouchableOpacity
-            onPress={() => router.push('/topic')}
-            style={styles.headerIconButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <SlidersHorizontal size={19} color={colors.textPrimary} />
-          </TouchableOpacity>
+        subtitle="Discover scientific papers & verified scholars"
+      />
+
+      {/* Universal Search Bar */}
+      <View style={styles.searchBarContainer}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={(text) => setSearchQuery(text)}
+          placeholder="Search by DOI, arXiv, ORCID, author, title..."
+          onSubmitEditing={() => handleSearchSubmit()}
+          onClear={clearSearch}
+        />
+      </View>
+
+      {/* Filter Tabs */}
+      <ExploreFilterTabs
+        activeCategory={activeCategory}
+        onSelectCategory={setActiveCategory}
+        counts={
+          results
+            ? {
+                papers: results.papers.length,
+                researchers: results.researchers.length,
+              }
+            : undefined
         }
       />
 
+      {/* Main Content Area */}
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -183,215 +203,139 @@ export default function ExploreScreen() {
           />
         }
       >
-        {/* Search Bar */}
-        <View style={styles.searchSection}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={() => handleSearchSubmit()}
-            placeholder="Search papers, DOI, researchers, fields..."
-          />
+        {/* State A: Active Search Loading */}
+        {isSearching && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.black} />
+            <Text style={styles.loadingText}>Searching global academic literature & registries...</Text>
+          </View>
+        )}
 
-          {/* Quick Discovery Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickQueriesScroll}
-          >
-            <View style={styles.promptLabelRow}>
-              <Sparkles size={13} color={colors.textSecondary} />
-              <Text style={styles.promptLabel}>Popular:</Text>
-            </View>
-            {QUICK_QUERIES.map((query) => (
-              <TouchableOpacity
-                key={query}
-                activeOpacity={0.75}
-                onPress={() => handleQuickQuery(query)}
-                style={styles.queryChip}
-              >
-                <Text style={styles.queryChipText}>{query}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Discovery Filter Tabs */}
-        <View style={styles.filterPillsWrapper}>
-          <FilterPills
-            options={EXPLORE_FILTERS}
-            selected={activeFilter}
-            onSelect={setActiveFilter}
-          />
-        </View>
-
-        {/* SECTION 1: Research Topic Categories */}
-        {(activeFilter === 'All' || activeFilter === 'Topic Fields') && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Research Fields</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Explore literature across {topics.length} scientific disciplines
-                </Text>
+        {/* State B: Active Search Results */}
+        {!isSearching && hasQuery && results && (
+          <View style={styles.resultsContainer}>
+            {/* Detected Intent Badge */}
+            {detectedBadgeText && (
+              <View style={styles.detectedPill}>
+                <Sparkles size={12} color={colors.accentLink} />
+                <Text style={styles.detectedPillText}>{detectedBadgeText}</Text>
               </View>
-              {topics.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => router.push('/topic')}
-                  style={styles.seeAllRow}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.seeAllText}>All fields</Text>
-                  <ArrowRight size={13} color={colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-            </View>
+            )}
 
-            {topics.length > 0 ? (
-              <View style={styles.topicGrid}>
-                {topics.map((topic) => (
-                  <View key={topic.id} style={styles.topicGridItem}>
-                    <TopicCategoryCard topic={topic} />
+            {/* Papers Section */}
+            {(activeCategory === 'all' || activeCategory === 'papers') && results.papers.length > 0 && (
+              <View style={styles.sectionWrap}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionHeaderTitle}>
+                    RESEARCH ARTICLES ({results.papers.length})
+                  </Text>
+                </View>
+                {results.papers.map((paper) => (
+                  <View key={paper.id} style={styles.paperCardWrap}>
+                    <PaperCard paper={paper} />
                   </View>
                 ))}
               </View>
-            ) : (
-              <EmptyState
-                icon="Tag"
-                title="No topics found"
-                description="Follow or explore scientific fields to see them featured here."
-              />
             )}
-          </View>
-        )}
 
-        {/* SECTION 2: Trending Research (Papers) */}
-        {(activeFilter === 'All' || activeFilter === 'Research Papers') && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Trending Research</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Peer-reviewed papers with high discussion velocity
-                </Text>
-              </View>
-              {trendingPapers.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => router.push('/search')}
-                  style={styles.seeAllRow}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.seeAllText}>See all</Text>
-                  <ArrowRight size={13} color={colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {trendingPapers.length > 0 ? (
-              <View style={styles.cardList}>
-                {trendingPapers.map((paper) => (
-                  <TrendingPaperCard key={paper.id} paper={paper} />
+            {/* Researchers Section */}
+            {(activeCategory === 'all' || activeCategory === 'researchers') && results.researchers.length > 0 && (
+              <View style={styles.sectionWrap}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionHeaderTitle}>
+                    SCHOLARS & RESEARCHERS ({results.researchers.length})
+                  </Text>
+                </View>
+                {results.researchers.map((researcher) => (
+                  <ResearcherResultCard key={researcher.id} researcher={researcher} />
                 ))}
               </View>
-            ) : (
+            )}
+
+            {/* Empty State when no results found */}
+            {!hasResults && (
               <EmptyState
-                icon="FileText"
-                title="No papers have been published yet"
-                description="Search for DOI references or be the first to reference a paper in discussion."
-                actionTitle="Search Papers"
-                onAction={() => router.push('/search')}
+                icon="Search"
+                title="No direct matches found"
+                description={`Could not find publications or scholars matching "${searchQuery}". Try searching by exact DOI, arXiv ID, 16-digit ORCID, or topic keywords.`}
+                actionTitle="Clear Search"
+                onAction={clearSearch}
               />
             )}
           </View>
         )}
 
-        {/* SECTION 3: Trending Discussions */}
-        {(activeFilter === 'All' || activeFilter === 'Discussions') && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Trending Discussions</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Methodology questions and active debates in the community
-                </Text>
-              </View>
-            </View>
+        {/* State C: Default Discovery Feed (When not searching) */}
+        {!hasQuery && (
+          <>
+            {/* Recent Searches */}
+            <RecentSearchesList
+              searches={recentSearches}
+              onSelectSearch={handleSelectRecentOrTopic}
+              onRemoveSearch={removeRecentSearch}
+              onClearAll={clearRecentSearches}
+            />
 
-            {trendingDiscussions.length > 0 ? (
-              <View style={styles.cardList}>
-                {trendingDiscussions.map((post) => (
-                  <TrendingDiscussionCard key={post.id} post={post} />
+            {/* Trending Topics & Disciplines Grid */}
+            <TrendingTopicsGrid onSelectTopic={handleSelectRecentOrTopic} />
+
+            {/* Featured Trending Papers */}
+            {trendingPapers.length > 0 && (
+              <View style={styles.discoverySection}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={styles.sectionTitleLeft}>
+                    <FileText size={16} color={colors.textPrimary} />
+                    <Text style={styles.discoverySectionTitle}>FEATURED RESEARCH PAPERS</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setActiveCategory('papers')}
+                    style={styles.seeAllBtn}
+                  >
+                    <Text style={styles.seeAllText}>Explore all</Text>
+                    <ArrowRight size={13} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                {trendingPapers.slice(0, 4).map((paper) => (
+                  <View key={paper.id} style={styles.paperCardWrap}>
+                    <PaperCard paper={paper} />
+                  </View>
                 ))}
               </View>
-            ) : (
-              <EmptyState
-                icon="MessageSquare"
-                title="No discussions yet"
-                description="Start a discussion or pose a research question on a paper."
-                actionTitle="Create Discussion"
-                onAction={() => router.push('/(tabs)/create')}
-              />
             )}
-          </View>
-        )}
 
-        {/* SECTION 4: Recommended Researchers */}
-        {(activeFilter === 'All' || activeFilter === 'Researchers') && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Researchers to Follow</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Connect with active investigators in your scientific domains
-                </Text>
-              </View>
-            </View>
+            {/* Recommended Scholars */}
+            {researchersList.length > 0 && (
+              <View style={styles.discoverySection}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={styles.sectionTitleLeft}>
+                    <Users size={16} color={colors.textPrimary} />
+                    <Text style={styles.discoverySectionTitle}>ACTIVE SCHOLARS & PEERS</Text>
+                  </View>
+                </View>
 
-            {recommendedResearchers.length > 0 ? (
-              <View style={styles.researchersCard}>
-                {recommendedResearchers.map((researcher) => (
-                  <ResearcherCard
+                {researchersList.slice(0, 5).map((researcher) => (
+                  <ResearcherResultCard
                     key={researcher.id}
-                    researcher={researcher}
-                    onFollowToggle={() => toggleFollowUser(researcher.id)}
+                    researcher={{
+                      id: researcher.id,
+                      fullName: researcher.fullName,
+                      handle: researcher.handle,
+                      avatarUrl: researcher.avatarUrl,
+                      academicTitle: researcher.academicTitle,
+                      institution: researcher.institution,
+                      bio: researcher.bio,
+                      orcidId: researcher.orcidId,
+                      orcidVerified: researcher.orcidVerified,
+                      followersCount: researcher.followersCount,
+                      followingCount: researcher.followingCount,
+                      isRegisteredUser: true,
+                    }}
                   />
                 ))}
               </View>
-            ) : (
-              <EmptyState
-                icon="Users"
-                title="Be one of the first researchers to join BooffIn"
-                description="Invite colleagues and peers to share literature and collaborate."
-              />
             )}
-          </View>
-        )}
-
-        {/* SECTION 5: Recommended Topics */}
-        {(activeFilter === 'All' || activeFilter === 'Topic Fields') && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Recommended Topics</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Stay updated with emerging preprints and publications
-                </Text>
-              </View>
-            </View>
-
-            {recommendedTopics.length > 0 ? (
-              <View style={styles.topicsCard}>
-                {recommendedTopics.map((topic) => (
-                  <TopicCard key={topic.id} topic={topic} />
-                ))}
-              </View>
-            ) : (
-              <EmptyState
-                icon="Tag"
-                title="No topics found"
-                description="Discover and follow scientific disciplines to customize your feed."
-              />
-            )}
-          </View>
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -403,111 +347,90 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  scrollContent: {
-    paddingBottom: spacing.xxxl * 2,
+  searchBarContainer: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background,
   },
-  headerIconButton: {
-    padding: spacing.xs,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxl + 20,
+  },
+  loadingContainer: {
+    paddingVertical: spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.md,
   },
-  searchSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  quickQueriesScroll: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm + 2,
-    gap: spacing.xs + 2,
-  },
-  promptLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginRight: 4,
-  },
-  promptLabel: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  queryChip: {
-    backgroundColor: colors.backgroundSecondary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  queryChipText: {
-    ...typography.micro,
-    color: colors.textPrimary,
-    fontWeight: '500',
-  },
-  filterPillsWrapper: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    paddingBottom: spacing.xs,
-  },
-  section: {
-    marginTop: spacing.xxl,
-    paddingHorizontal: spacing.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md + 2,
-  },
-  sectionTitle: {
-    ...typography.sectionTitle,
-    fontSize: 20,
-    color: colors.textPrimary,
-    fontWeight: '700',
-    letterSpacing: -0.4,
-  },
-  sectionSubtitle: {
+  loadingText: {
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 13.5,
-    marginTop: 2,
   },
-  seeAllRow: {
+  resultsContainer: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  detectedPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingTop: 2,
-    minHeight: layout.touchTargetMin - 12,
+    gap: 6,
+    backgroundColor: '#EFF6FF',
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginBottom: spacing.md,
+  },
+  detectedPillText: {
+    ...typography.microBold,
+    color: '#1D4ED8',
+    fontSize: 11.5,
+  },
+  sectionWrap: {
+    marginBottom: spacing.lg,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  sectionHeaderTitle: {
+    ...typography.microBold,
+    color: colors.textSecondary,
+    letterSpacing: 0.5,
+  },
+  paperCardWrap: {
+    marginBottom: spacing.md,
+  },
+  discoverySection: {
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+  },
+  sectionTitleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+  },
+  discoverySectionTitle: {
+    ...typography.microBold,
+    color: colors.textPrimary,
+    letterSpacing: 0.5,
+  },
+  seeAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   seeAllText: {
-    ...typography.captionBold,
+    ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 13.5,
-  },
-  topicGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  topicGridItem: {
-    width: '48.5%',
-  },
-  cardList: {
-    gap: spacing.sm,
-  },
-  researchersCard: {
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    overflow: 'hidden',
-    backgroundColor: colors.cardBackground,
-  },
-  topicsCard: {
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    overflow: 'hidden',
-    backgroundColor: colors.cardBackground,
+    fontSize: 12,
   },
 });
