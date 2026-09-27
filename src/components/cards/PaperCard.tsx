@@ -14,6 +14,8 @@ import { Paper } from '../../types';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Badge } from '../core/Badge';
 
+import { usePaperFigures } from '../../hooks/usePaperFigures';
+
 interface PaperCardProps {
   paper: Paper;
   onRemove?: () => void; // for composer view
@@ -54,9 +56,12 @@ export const PaperCard: React.FC<PaperCardProps> = ({
     }
   };
 
-  const figures = paper.figures || [];
+  // Resolve figures automatically from paper object or live academic APIs
+  const figures = usePaperFigures(paper);
   const primaryFigure = figures[0]?.url;
   const secondaryFigure = figures[1]?.url;
+  const primaryCaption = figures[0]?.caption;
+  const secondaryCaption = figures[1]?.caption;
 
   return (
     <TouchableOpacity
@@ -75,7 +80,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Scientific Figure Preview Collage */}
+      {/* Scientific Figure Preview Collage (1 or 2 Figures) */}
       {!compact && primaryFigure && (
         <View style={styles.imageContainer}>
           {secondaryFigure ? (
@@ -85,8 +90,11 @@ export const PaperCard: React.FC<PaperCardProps> = ({
                   source={{ uri: primaryFigure }}
                   style={styles.figureImage}
                   contentFit="cover"
-                  transition={200}
+                  transition={250}
                 />
+                <View style={styles.figBadge}>
+                  <Text style={styles.figBadgeText}>Fig. 1</Text>
+                </View>
               </View>
               <View style={styles.multiFigureDivider} />
               <View style={styles.multiFigureCol}>
@@ -94,17 +102,25 @@ export const PaperCard: React.FC<PaperCardProps> = ({
                   source={{ uri: secondaryFigure }}
                   style={styles.figureImage}
                   contentFit="cover"
-                  transition={200}
+                  transition={250}
                 />
+                <View style={styles.figBadge}>
+                  <Text style={styles.figBadgeText}>Fig. 2</Text>
+                </View>
               </View>
             </View>
           ) : (
-            <Image
-              source={{ uri: primaryFigure }}
-              style={styles.figureImage}
-              contentFit="cover"
-              transition={200}
-            />
+            <View style={{ flex: 1, width: '100%', height: '100%' }}>
+              <Image
+                source={{ uri: primaryFigure }}
+                style={styles.figureImage}
+                contentFit="cover"
+                transition={250}
+              />
+              <View style={styles.figBadge}>
+                <Text style={styles.figBadgeText}>Figure 1</Text>
+              </View>
+            </View>
           )}
         </View>
       )}
@@ -184,11 +200,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   imageContainer: {
-    height: 140,
+    height: 165,
     width: '100%',
     backgroundColor: colors.backgroundTertiary,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
+    position: 'relative',
   },
   multiFigureRow: {
     flexDirection: 'row',
@@ -198,15 +215,31 @@ const styles = StyleSheet.create({
   multiFigureCol: {
     flex: 1,
     height: '100%',
+    position: 'relative',
   },
   multiFigureDivider: {
-    width: 1,
+    width: 1.5,
     height: '100%',
     backgroundColor: colors.borderLight,
   },
   figureImage: {
     width: '100%',
     height: '100%',
+  },
+  figBadge: {
+    position: 'absolute',
+    bottom: spacing.xs + 2,
+    left: spacing.xs + 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 2,
+    borderRadius: radii.sm - 2,
+  },
+  figBadgeText: {
+    ...typography.microBold,
+    color: colors.white,
+    fontSize: 11,
+    letterSpacing: 0.2,
   },
   compactImage: {
     width: 64,

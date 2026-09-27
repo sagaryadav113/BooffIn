@@ -60,6 +60,8 @@ import {
 } from '../../components/discussion';
 import { Comment, DiscussionType, Paper } from '../../types';
 
+import { usePaperFigures } from '../../hooks/usePaperFigures';
+
 export default function PaperDetailScreen() {
   const { id, fromPostId } = useLocalSearchParams<{ id: string; fromPostId?: string }>();
   const paperId = id || '';
@@ -107,6 +109,7 @@ export default function PaperDetailScreen() {
   }, [paperId, activePostId, getPaperById]);
 
   const [paper, setPaper] = useState<Paper | null>(initialPaper);
+  const resolvedFigures = usePaperFigures(paper);
   const [isLoading, setIsLoading] = useState(!initialPaper);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -701,7 +704,7 @@ export default function PaperDetailScreen() {
               )}
 
               {/* High-Resolution Scientific Figures Gallery (if available) */}
-              {paper.figures && paper.figures.length > 0 && (
+              {((paper.figures && paper.figures.length > 0) || (resolvedFigures && resolvedFigures.length > 0)) && (
                 <View style={styles.figuresSection}>
                   <Text style={styles.sectionHeaderTitle}>FIGURES & SCHEMATICS</Text>
                   <ScrollView
@@ -710,7 +713,7 @@ export default function PaperDetailScreen() {
                     showsHorizontalScrollIndicator={false}
                     style={styles.figuresScroll}
                   >
-                    {paper.figures.map((fig) => (
+                    {(paper.figures && paper.figures.length > 0 ? paper.figures : resolvedFigures).map((fig) => (
                       <View key={fig.id} style={styles.figureSlide}>
                         <Image
                           source={{ uri: fig.url }}

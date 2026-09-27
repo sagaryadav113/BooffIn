@@ -12,6 +12,7 @@ import { OpenAlexProvider } from './providers/openAlexProvider';
 import { CrossrefProvider } from './providers/crossrefProvider';
 import { ArXivProvider } from './providers/arxivProvider';
 import { PubMedProvider } from './providers/pubmedProvider';
+import { resolvePaperFigures } from './figureResolver';
 
 export class CompositePaperResolver {
   private providers: MetadataProvider[];
@@ -185,6 +186,24 @@ export class CompositePaperResolver {
       };
     }
 
+    let figures: Paper['figures'] = undefined;
+    try {
+      const resolvedFigs = await resolvePaperFigures({
+        doi: normalized.doi || parsedInput.doi,
+        pmid: parsedInput.pmid,
+        pmcid: parsedInput.pmcid,
+        arxivId: parsedInput.arxivId,
+        canonicalUrl: normalized.canonicalUrl || parsedInput.canonicalUrl,
+        title: normalized.title,
+        journal: normalized.journal,
+      });
+      if (resolvedFigs && resolvedFigs.length > 0) {
+        figures = resolvedFigs;
+      }
+    } catch (figErr) {
+      console.warn('[CompositePaperResolver] Figure extraction non-blocking error:', figErr);
+    }
+
     const newPaper: Paper = {
       id: `paper_${Date.now()}`,
       doi: normalized.doi,
@@ -199,6 +218,7 @@ export class CompositePaperResolver {
       openAccessUrl: normalized.openAccessUrl,
       isOpenAccess: normalized.isOpenAccess,
       topics: normalized.topics,
+      figures,
       citationCount: normalized.citationCount,
       discussionCount: 1,
       likesCount: 0,
