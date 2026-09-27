@@ -489,15 +489,41 @@ export const usePostStore = create<PostState>((set, get) => ({
       let updated: Comment[];
 
       if (parentId) {
-        updated = existing.map((c) => {
-          if (c.id === parentId) {
-            return {
-              ...c,
-              replies: [...(c.replies || []), optimisticComment],
-            };
-          }
-          return c;
-        });
+        const insertNestedReply = (
+          list: Comment[],
+          targetId: string,
+          replyToAdd: Comment
+        ): { updated: Comment[]; found: boolean } => {
+          let found = false;
+          const resList = list.map((item) => {
+            if (item.id === targetId) {
+              found = true;
+              return {
+                ...item,
+                replies: [...(item.replies || []), replyToAdd],
+              };
+            }
+            if (item.replies && item.replies.length > 0) {
+              const nested = insertNestedReply(item.replies, targetId, replyToAdd);
+              if (nested.found) {
+                found = true;
+                return {
+                  ...item,
+                  replies: nested.updated,
+                };
+              }
+            }
+            return item;
+          });
+          return { updated: resList, found };
+        };
+
+        const result = insertNestedReply(existing, parentId, optimisticComment);
+        if (result.found) {
+          updated = result.updated;
+        } else {
+          updated = [optimisticComment, ...existing];
+        }
       } else {
         updated = [optimisticComment, ...existing];
       }

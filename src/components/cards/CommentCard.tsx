@@ -36,6 +36,7 @@ export interface CommentCardProps {
   currentUserId?: string;
   currentUser?: UserProfile;
   isReply?: boolean;
+  depth?: number;
   style?: ViewStyle;
 }
 
@@ -49,6 +50,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
   currentUserId,
   currentUser,
   isReply = false,
+  depth = 0,
   style,
 }) => {
   const [isInlineReplying, setIsInlineReplying] = useState(false);
@@ -77,14 +79,13 @@ export const CommentCard: React.FC<CommentCardProps> = ({
     }
   };
 
-  const handleLikeReplyItem = (replyId: string) => {
+  const handleTriggerReply = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    if (onLikeReply) {
-      onLikeReply(comment.id, replyId);
-    } else if (onLike) {
-      onLike(replyId);
+    setIsInlineReplying(!isInlineReplying);
+    if (!isInlineReplying) {
+      setReplyText(`@${comment.author?.handle || 'scholar'} `);
     }
   };
 
@@ -94,14 +95,15 @@ export const CommentCard: React.FC<CommentCardProps> = ({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
-    if (onAddReply) {
-      onAddReply(comment.id, replyText.trim());
-    } else if (onReply) {
-      onReply({ ...comment, content: replyText.trim() });
-    }
-
+    const textToSend = replyText.trim();
     setReplyText('');
     setIsInlineReplying(false);
+
+    if (onAddReply) {
+      onAddReply(comment.id, textToSend);
+    } else if (onReply) {
+      onReply({ ...comment, content: textToSend });
+    }
   };
 
   const handleShare = async () => {
@@ -161,10 +163,17 @@ export const CommentCard: React.FC<CommentCardProps> = ({
     );
   };
 
+  const isRoot = depth === 0 && !isReply;
   const repliesCount = comment.replies?.length || 0;
 
   return (
-    <View style={[styles.cardContainer, isReply && styles.nestedReplyContainer, style]}>
+    <View
+      style={[
+        isRoot ? styles.rootCardContainer : styles.replyCardContainer,
+        depth > 1 && { marginLeft: Math.min(depth - 1, 3) * 10 },
+        style,
+      ]}
+    >
       {/* Top Header: Author info + Green tick + Type badge */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -175,29 +184,59 @@ export const CommentCard: React.FC<CommentCardProps> = ({
           <Avatar
             url={comment.author?.avatarUrl}
             name={comment.author?.fullName || 'Researcher'}
-            size={38}
+            size={isRoot ? 38 : 28}
             verified={comment.author?.orcidVerified ?? true}
           />
           <View style={styles.authorMeta}>
             <View style={styles.authorNameRow}>
-              <Text style={styles.authorName}>{comment.author?.fullName || 'Researcher'}</Text>
-              <Text style={styles.authorHandle}>@{comment.author?.handle || 'scholar'}</Text>
+              <Text style={isRoot ? styles.authorName : styles.replyAuthorName}>
+                {comment.author?.fullName || 'Researcher'}
+              </Text>
+              <Text style={isRoot ? styles.authorHandle : styles.replyAuthorHandle}>
+                @{comment.author?.handle || 'scholar'}
+              </Text>
             </View>
-            <Text style={styles.authorTitle} numberOfLines={1}>
-              {comment.author?.academicTitle || 'Student researcher'}
-              {comment.author?.institution ? ` · ${comment.author.institution}` : ''}
-            </Text>
+            {isRoot ? (
+              <Text style={styles.authorTitle} numberOfLines={1}>
+                {comment.author?.academicTitle || 'Student researcher'}
+                {comment.author?.institution ? ` · ${comment.author.institution}` : ''}
+              </Text>
+            ) : (
+              <Text style={styles.replyTimestamp}>{comment.createdAt}</Text>
+            )}
           </View>
         </TouchableOpacity>
 
-        {/* Structured Discussion Type Badge */}
-        {!isReply && (
+        {/* Structured Discussion Type Badge on root or like button on sub-reply */}
+        {isRoot ? (
           <View style={[styles.typeBadge, { backgroundColor: badgeInfo.bg }]}>
             <IconComp size={12} color={badgeInfo.color} />
             <Text style={[styles.typeBadgeLabel, { color: badgeInfo.color }]}>
               {badgeInfo.label}
             </Text>
           </View>
+        ) : (
+          <TouchableOpacity
+            onPress={handleLike}
+            style={styles.replyLikeButton}
+            activeOpacity={0.7}
+          >
+            <Heart
+              size={13}
+              color={comment.isLiked ? colors.accentRed : colors.textMuted}
+              fill={comment.isLiked ? colors.accentRed : 'transparent'}
+            />
+            {comment.likesCount > 0 && (
+              <Text
+                style={[
+                  styles.replyLikeCount,
+                  comment.isLiked && { color: colors.accentRed },
+                ]}
+              >
+                {comment.likesCount}
+              </Text>
+            )}
+          </TouchableOpacity>
         )}
       </View>
 
@@ -207,56 +246,50 @@ export const CommentCard: React.FC<CommentCardProps> = ({
       </View>
 
       {/* Bottom Action Row */}
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          onPress={handleLike}
-          style={[styles.actionButton, comment.isLiked && styles.actionButtonActive]}
-          activeOpacity={0.7}
-        >
-          <Heart
-            size={15}
-            color={comment.isLiked ? colors.accentRed : colors.textSecondary}
-            fill={comment.isLiked ? colors.accentRed : 'transparent'}
-          />
-          <Text
-            style={[
-              styles.actionLabel,
-              comment.isLiked && { color: colors.accentRed, fontWeight: '700' },
-            ]}
+      <View style={isRoot ? styles.actionRow : styles.replyActionRow}>
+        {isRoot && (
+          <TouchableOpacity
+            onPress={handleLike}
+            style={[styles.actionButton, comment.isLiked && styles.actionButtonActive]}
+            activeOpacity={0.7}
           >
-            {comment.likesCount > 0 ? comment.likesCount : 'Helpful'}
-          </Text>
-        </TouchableOpacity>
+            <Heart
+              size={15}
+              color={comment.isLiked ? colors.accentRed : colors.textSecondary}
+              fill={comment.isLiked ? colors.accentRed : 'transparent'}
+            />
+            <Text
+              style={[
+                styles.actionLabel,
+                comment.isLiked && { color: colors.accentRed, fontWeight: '700' },
+              ]}
+            >
+              {comment.likesCount > 0 ? comment.likesCount : 'Helpful'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
+        {/* Reply button on every comment and every nested reply */}
         <TouchableOpacity
-          onPress={() => {
-            if (onReply) {
-              onReply(comment);
-            } else {
-              setIsInlineReplying(!isInlineReplying);
-              if (!isInlineReplying) {
-                setReplyText(`@${comment.author?.handle || 'researcher'} `);
-              }
-            }
-          }}
+          onPress={handleTriggerReply}
           style={styles.actionButton}
           activeOpacity={0.7}
         >
-          <CornerDownRight size={15} color={colors.textSecondary} />
-          <Text style={styles.actionLabel}>
-            {repliesCount > 0
-              ? `${repliesCount} ${repliesCount === 1 ? 'Reply' : 'Replies'}`
-              : 'Reply'}
+          <CornerDownRight size={isRoot ? 15 : 13} color={colors.textSecondary} />
+          <Text style={[styles.actionLabel, !isRoot && { fontSize: 11 }]}>
+            Reply
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleShare}
-          style={styles.actionButton}
-          activeOpacity={0.7}
-        >
-          <Share2 size={15} color={colors.textSecondary} />
-        </TouchableOpacity>
+        {isRoot && (
+          <TouchableOpacity
+            onPress={handleShare}
+            style={styles.actionButton}
+            activeOpacity={0.7}
+          >
+            <Share2 size={15} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
 
         {isOwnComment && onDelete && (
           <TouchableOpacity
@@ -264,20 +297,20 @@ export const CommentCard: React.FC<CommentCardProps> = ({
             style={styles.actionButton}
             activeOpacity={0.7}
           >
-            <Trash2 size={14} color={colors.textMuted} />
+            <Trash2 size={isRoot ? 14 : 12} color={colors.textMuted} />
           </TouchableOpacity>
         )}
 
-        <Text style={styles.timestamp}>{comment.createdAt}</Text>
+        {isRoot && <Text style={styles.timestamp}>{comment.createdAt}</Text>}
       </View>
 
-      {/* Inline Reply Composer */}
+      {/* Inline Reply Composer for this specific comment / reply */}
       {isInlineReplying && (
         <View style={styles.replyComposerContainer}>
           <Avatar
             url={currentUser?.avatarUrl}
             name={currentUser?.fullName || 'Me'}
-            size={28}
+            size={26}
           />
           <TextInput
             placeholder={`Reply to @${comment.author?.handle || 'scholar'}...`}
@@ -296,68 +329,28 @@ export const CommentCard: React.FC<CommentCardProps> = ({
               !replyText.trim() && styles.replySendButtonDisabled,
             ]}
           >
-            <Send size={13} color={colors.white} />
+            <Send size={12} color={colors.white} />
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Nested Threaded Replies List (Subcards) */}
+      {/* Recursive Continuous Nested Replies Chain */}
       {comment.replies && comment.replies.length > 0 && (
         <View style={styles.repliesList}>
           {comment.replies.map((reply) => (
-            <View key={reply.id} style={styles.replyCard}>
-              <View style={styles.replyHeader}>
-                <TouchableOpacity
-                  onPress={() => handleAuthorPress(reply.author?.id)}
-                  style={styles.replyAuthorRow}
-                  activeOpacity={0.8}
-                >
-                  <Avatar
-                    url={reply.author?.avatarUrl}
-                    name={reply.author?.fullName || 'Researcher'}
-                    size={26}
-                    verified={reply.author?.orcidVerified ?? true}
-                  />
-                  <View>
-                    <View style={styles.replyNameRow}>
-                      <Text style={styles.replyAuthorName}>
-                        {reply.author?.fullName || 'Researcher'}
-                      </Text>
-                      <Text style={styles.replyAuthorHandle}>
-                        @{reply.author?.handle || 'scholar'}
-                      </Text>
-                    </View>
-                    <Text style={styles.replyTimestamp}>{reply.createdAt}</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => handleLikeReplyItem(reply.id)}
-                  style={styles.replyLikeButton}
-                  activeOpacity={0.7}
-                >
-                  <Heart
-                    size={13}
-                    color={reply.isLiked ? colors.accentRed : colors.textMuted}
-                    fill={reply.isLiked ? colors.accentRed : 'transparent'}
-                  />
-                  {reply.likesCount > 0 && (
-                    <Text
-                      style={[
-                        styles.replyLikeCount,
-                        reply.isLiked && { color: colors.accentRed },
-                      ]}
-                    >
-                      {reply.likesCount}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.replyContent}>
-                {renderFormattedContent(reply.content)}
-              </View>
-            </View>
+            <CommentCard
+              key={reply.id}
+              comment={reply}
+              onReply={onReply}
+              onAddReply={onAddReply}
+              onLike={onLike}
+              onLikeReply={onLikeReply}
+              onDelete={onDelete}
+              currentUserId={currentUserId}
+              currentUser={currentUser}
+              isReply
+              depth={depth + 1}
+            />
           ))}
         </View>
       )}
@@ -366,7 +359,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
 };
 
 const styles = StyleSheet.create({
-  cardContainer: {
+  rootCardContainer: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -380,13 +373,13 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  nestedReplyContainer: {
-    marginHorizontal: 0,
-    borderWidth: 0,
-    shadowOpacity: 0,
-    elevation: 0,
-    padding: 0,
-    backgroundColor: 'transparent',
+  replyCardContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: '#EEF2F6',
+    marginTop: spacing.xs + 2,
   },
   header: {
     flexDirection: 'row',
@@ -420,11 +413,26 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
   },
+  replyAuthorName: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 12,
+  },
+  replyAuthorHandle: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11,
+  },
   authorTitle: {
     ...typography.micro,
     color: colors.textSecondary,
     fontSize: 11,
     marginTop: 1,
+  },
+  replyTimestamp: {
+    ...typography.micro,
+    color: colors.textMuted,
+    fontSize: 10,
   },
   typeBadge: {
     flexDirection: 'row',
@@ -461,11 +469,18 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     gap: spacing.md,
   },
+  replyActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 4,
+    marginTop: 2,
+    gap: spacing.sm,
+  },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 4,
+    gap: 4,
+    paddingVertical: 2,
   },
   actionButtonActive: {
     opacity: 0.9,
@@ -482,10 +497,24 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
     fontSize: 11,
   },
+  replyLikeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    padding: 4,
+  },
+  replyLikeCount: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
   replyComposerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     borderRadius: radii.md,
     padding: spacing.xs + 2,
     marginTop: spacing.sm,
@@ -510,60 +539,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   repliesList: {
-    marginTop: spacing.sm,
-    gap: spacing.sm,
-  },
-  replyCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: spacing.sm + 2,
-    borderWidth: 1,
-    borderColor: '#EEF2F6',
-  },
-  replyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  replyAuthorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: spacing.xs,
     gap: spacing.xs,
-  },
-  replyNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  replyAuthorName: {
-    ...typography.captionBold,
-    color: colors.textPrimary,
-    fontSize: 12,
-  },
-  replyAuthorHandle: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontSize: 11,
-  },
-  replyTimestamp: {
-    ...typography.micro,
-    color: colors.textMuted,
-    fontSize: 10,
-  },
-  replyLikeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    padding: 4,
-  },
-  replyLikeCount: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  replyContent: {
-    marginTop: 2,
   },
 });

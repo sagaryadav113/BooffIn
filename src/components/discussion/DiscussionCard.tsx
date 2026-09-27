@@ -299,6 +299,21 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
               <View style={styles.replyContent}>
                 {renderFormattedContent(reply.content)}
               </View>
+
+              {/* Action row for sub-reply */}
+              <View style={styles.replyActionRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsReplying(true);
+                    setReplyText(`@${reply.author.handle} `);
+                  }}
+                  style={styles.replyActionButton}
+                  activeOpacity={0.7}
+                >
+                  <CornerDownRight size={13} color={colors.textSecondary} />
+                  <Text style={styles.replyActionText}>Reply</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
         </View>
@@ -506,5 +521,24 @@ const styles = StyleSheet.create({
   },
   replyContent: {
     marginTop: 2,
+  },
+  replyActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 4,
+    marginTop: 2,
+    gap: spacing.sm,
+  },
+  replyActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+  },
+  replyActionText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    fontSize: 11,
   },
 });
