@@ -528,6 +528,25 @@ export async function syncScholarPublications(
       };
     }
 
+    // Uniqueness Check: Ensure no other user has verified this ORCID
+    const { data: existingProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, username')
+      .eq('orcid_id', cleanOrcid)
+      .eq('orcid_verified', true)
+      .neq('id', userId);
+
+    if (existingProfiles && existingProfiles.length > 0) {
+      const otherUser = existingProfiles[0];
+      const otherName = otherUser.full_name || otherUser.username || 'another author';
+      return {
+        success: false,
+        publications: [],
+        stats: { totalPublications: 0, totalCitations: 0, openAccessCount: 0, isVerified: false },
+        error: `This ORCID iD is already verified and linked to another BooffIn account (${otherName}). Each ORCID iD can only belong to a single verified profile.`,
+      };
+    }
+
     // 1. Fetch works from ORCID Public API
     let works: ScholarPublication[] = [];
     try {

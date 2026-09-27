@@ -54,7 +54,11 @@ import {
   fetchOrcidPersonDetails,
   OrcidPersonDetails,
 } from '../../api/orcidService';
-import { verifyPasswordAndDisconnectOrcid } from '../../api/authService';
+import {
+  verifyPasswordAndDisconnectOrcid,
+  verifyPasswordAndLinkOrcid,
+  checkOrcidAvailability,
+} from '../../api/authService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 
@@ -103,6 +107,9 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   const [connectInputOrcid, setConnectInputOrcid] = useState('');
   const [isVerifyingRecord, setIsVerifyingRecord] = useState(false);
   const [verifiedPersonPreview, setVerifiedPersonPreview] = useState<OrcidPersonDetails | null>(null);
+  const [connectPassword, setConnectPassword] = useState('');
+  const [showConnectPassword, setShowConnectPassword] = useState(false);
+  const [isConnectingWithPassword, setIsConnectingWithPassword] = useState(false);
   const [connectStepError, setConnectStepError] = useState<string | null>(null);
 
   // Password verification modal for disconnecting ORCID
@@ -169,6 +176,8 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   const handleOpenConnectModal = () => {
     setConnectInputOrcid('');
     setVerifiedPersonPreview(null);
+    setConnectPassword('');
+    setShowConnectPassword(false);
     setConnectStepError(null);
     setConnectError(null);
     setConnectModalVisible(true);
@@ -178,7 +187,8 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   };
 
   /**
-   * Live Query to ORCID Public Registry to verify the researcher record
+   * Live Query to ORCID Public Registry to verify the researcher record.
+   * Also checks uniqueness so no duplicate accounts can claim the same ORCID iD.
    */
   const handleVerifyOrcidRecord = async () => {
     const clean = normalizeOrcidId(connectInputOrcid);
@@ -188,11 +198,27 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
     }
 
     setConnectStepError(null);
+    setConnectPassword('');
     setIsVerifyingRecord(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
 
+    // 1. Strict Uniqueness Check: Ensure no other user has verified this ORCID iD
+    const availability = await checkOrcidAvailability(clean, userId);
+    if (!availability.available) {
+      setIsVerifyingRecord(false);
+      setConnectStepError(
+        availability.error ||
+          'This ORCID iD is already verified and linked to another BooffIn account. Each ORCID iD can only be associated with a single verified author account.'
+      );
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch {}
+      return;
+    }
+
+    // 2. Fetch live official researcher details from ORCID Registry
     const res = await fetchOrcidPersonDetails(clean);
     setIsVerifyingRecord(false);
 
@@ -207,37 +233,58 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   };
 
   /**
-   * Confirms binding the verified ORCID and syncs publications
+   * Confirms binding the verified ORCID by requiring password verification.
+   * Only after valid password authentication is the verified badge granted.
    */
   const handleConfirmAndSyncOrcid = async () => {
     if (!verifiedPersonPreview) return;
+    if (!connectPassword.trim()) {
+      setConnectStepError('Please enter your account password to verify ownership and claim your author badge.');
+      return;
+    }
     const cleanOrcid = verifiedPersonPreview.orcidId;
 
-    setIsSyncing(true);
+    setIsConnectingWithPassword(true);
     setConnectStepError(null);
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
-    // 1. Update user profile with verified status
-    await updateProfile({
-      orcidId: cleanOrcid,
-      orcidVerified: true,
-    });
+    // 1. Re-authenticate with Supabase password and link ORCID
+    const authRes = await verifyPasswordAndLinkOrcid(
+      userId,
+      cleanOrcid,
+      connectPassword
+    );
 
-    // 2. Sync all publications
+    if (!authRes.success) {
+      setIsConnectingWithPassword(false);
+      setConnectStepError(
+        authRes.error ||
+          'Password verification failed. Only the authenticated account owner can verify this identity.'
+      );
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch {}
+      return;
+    }
+
+    // 2. Sync all publications from ORCID & OpenAlex
+    setIsSyncing(true);
     const syncRes = await syncScholarPublications(
       userId,
       cleanOrcid,
       userFullName || verifiedPersonPreview.name
     );
 
+    setIsConnectingWithPassword(false);
     setIsSyncing(false);
 
     if (syncRes.success) {
       setConnectModalVisible(false);
       setVerifiedPersonPreview(null);
       setConnectInputOrcid('');
+      setConnectPassword('');
       setPublications(syncRes.publications);
       setStats({
         ...syncRes.stats,
@@ -245,13 +292,19 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
         orcidId: cleanOrcid,
       });
 
+      // Update auth store with verified status
+      await updateProfile({
+        orcidId: cleanOrcid,
+        orcidVerified: true,
+      });
+
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
 
       Alert.alert(
-        'ORCID Record Verified & Connected',
-        `Successfully linked ${verifiedPersonPreview.name}'s ORCID record! Synced ${syncRes.publications.length} verified publications for your BooffIn Scholar profile.`
+        'Verified Author Badge Granted',
+        `Successfully verified your identity as ${verifiedPersonPreview.name}! Your verified author badge is active and ${syncRes.publications.length} publications are synced to your BooffIn Scholar profile.`
       );
     } else {
       setConnectStepError(syncRes.error || 'Failed to sync publications from ORCID.');
@@ -1046,7 +1099,9 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.connectModalTitle}>Connect & Verify ORCID</Text>
                   <Text style={styles.connectModalSubtitle}>
-                    Enter your 16-digit ORCID iD. We will verify your official record with the ORCID registry.
+                    {verifiedPersonPreview
+                      ? 'Verify your account password to confirm ownership and seal your verified author badge.'
+                      : 'Enter your 16-digit ORCID iD. We will query the public registry to verify your official works.'}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -1063,15 +1118,31 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 </View>
               )}
 
-              {/* Input Form */}
+              {/* Step 1: Input ORCID Form */}
               <View style={styles.orcidInputWrap}>
-                <Text style={styles.passwordInputLabel}>ORCID iD or Profile URL</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.passwordInputLabel}>ORCID iD or Profile URL</Text>
+                  {verifiedPersonPreview && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setVerifiedPersonPreview(null);
+                        setConnectPassword('');
+                        setConnectStepError(null);
+                      }}
+                    >
+                      <Text style={{ ...typography.micro, color: colors.accentBlue, fontWeight: '600' }}>
+                        Change ID
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <View style={styles.orcidInputFieldRow}>
                   <TextInput
                     style={styles.orcidTextInput}
                     placeholder="0000-0002-1825-0097"
                     placeholderTextColor={colors.textMuted}
                     value={connectInputOrcid}
+                    editable={!verifiedPersonPreview}
                     onChangeText={(val) => {
                       setConnectInputOrcid(val);
                       if (connectStepError) setConnectStepError(null);
@@ -1079,25 +1150,34 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
-                  <TouchableOpacity
-                    onPress={handleVerifyOrcidRecord}
-                    disabled={isVerifyingRecord || !connectInputOrcid.trim()}
-                    style={[
-                      styles.verifyPillBtn,
-                      (!connectInputOrcid.trim() || isVerifyingRecord) && { opacity: 0.6 },
-                    ]}
-                    activeOpacity={0.75}
-                  >
-                    {isVerifyingRecord ? (
-                      <ActivityIndicator size="small" color={colors.white} />
-                    ) : (
-                      <Text style={styles.verifyPillBtnText}>Verify Record</Text>
-                    )}
-                  </TouchableOpacity>
+                  {!verifiedPersonPreview ? (
+                    <TouchableOpacity
+                      onPress={handleVerifyOrcidRecord}
+                      disabled={isVerifyingRecord || !connectInputOrcid.trim()}
+                      style={[
+                        styles.verifyPillBtn,
+                        (!connectInputOrcid.trim() || isVerifyingRecord) && { opacity: 0.6 },
+                      ]}
+                      activeOpacity={0.75}
+                    >
+                      {isVerifyingRecord ? (
+                        <ActivityIndicator size="small" color={colors.white} />
+                      ) : (
+                        <Text style={styles.verifyPillBtnText}>Verify Record</Text>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 }}>
+                      <CheckCircle2 size={16} color="#16A34A" />
+                      <Text style={{ ...typography.captionBold, color: '#16A34A', fontSize: 11.5 }}>
+                        Found
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
 
-              {/* Live Verified Record Preview Card */}
+              {/* Step 2: Live Verified Record Preview Card */}
               {verifiedPersonPreview && (
                 <View style={styles.verifiedPreviewCard}>
                   <View style={styles.verifiedPreviewHeader}>
@@ -1117,6 +1197,12 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                         {verifiedPersonPreview.worksCount} Works Found on ORCID
                       </Text>
                     </View>
+                    <View style={[styles.verifiedStatBadge, { borderColor: '#BBF7D0' }]}>
+                      <ShieldCheck size={12} color="#16A34A" />
+                      <Text style={[styles.verifiedStatText, { color: '#166534' }]}>
+                        Verified Registry
+                      </Text>
+                    </View>
                   </View>
 
                   {verifiedPersonPreview.biography ? (
@@ -1124,6 +1210,55 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                       {verifiedPersonPreview.biography}
                     </Text>
                   ) : null}
+                </View>
+              )}
+
+              {/* Step 3: Password Confirmation Input */}
+              {verifiedPersonPreview && (
+                <View style={styles.passwordInputWrap}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ShieldCheck size={14} color={colors.accentBlue} />
+                    <Text style={styles.passwordInputLabel}>Confirm BooffIn Account Password</Text>
+                  </View>
+                  <Text style={[styles.passwordModalSubtitle, { marginBottom: 6 }]}>
+                    To prevent identity theft, please enter your password. Only authenticated account owners can claim this author badge.
+                  </Text>
+                  <View style={styles.passwordInputFieldRow}>
+                    <KeyRound size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={styles.passwordTextInput}
+                      placeholder="Enter your account password..."
+                      placeholderTextColor={colors.textMuted}
+                      secureTextEntry={!showConnectPassword}
+                      value={connectPassword}
+                      onChangeText={(val) => {
+                        setConnectPassword(val);
+                        if (connectStepError) setConnectStepError(null);
+                      }}
+                      autoCapitalize="none"
+                      autoFocus
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowConnectPassword(!showConnectPassword)}
+                      style={{ padding: 4 }}
+                    >
+                      {showConnectPassword ? (
+                        <EyeOff size={16} color={colors.textSecondary} />
+                      ) : (
+                        <Eye size={16} color={colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Anti-impersonation notice */}
+              {!verifiedPersonPreview && (
+                <View style={styles.antiImpersonationBox}>
+                  <ShieldCheck size={15} color={colors.accentBlue} />
+                  <Text style={styles.antiImpersonationText}>
+                    Academic Integrity Guarantee: Each ORCID iD can only be bound to a single BooffIn account. Password authentication is required before issuing the verified badge.
+                  </Text>
                 </View>
               )}
 
@@ -1136,15 +1271,33 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                   onPress={() => setConnectModalVisible(false)}
                   style={{ flex: 1 }}
                 />
-                <Button
-                  title={isSyncing ? 'Syncing Works...' : 'Confirm & Sync Works'}
-                  variant="primary"
-                  size="sm"
-                  loading={isSyncing}
-                  disabled={!verifiedPersonPreview || isSyncing}
-                  onPress={handleConfirmAndSyncOrcid}
-                  style={{ flex: 1.6 }}
-                />
+                {verifiedPersonPreview ? (
+                  <Button
+                    title={
+                      isConnectingWithPassword || isSyncing
+                        ? 'Verifying...'
+                        : 'Verify Password & Claim Badge'
+                    }
+                    variant="primary"
+                    size="sm"
+                    loading={isConnectingWithPassword || isSyncing}
+                    disabled={
+                      !connectPassword.trim() || isConnectingWithPassword || isSyncing
+                    }
+                    onPress={handleConfirmAndSyncOrcid}
+                    style={{ flex: 1.8 }}
+                  />
+                ) : (
+                  <Button
+                    title={isVerifyingRecord ? 'Searching...' : 'Continue'}
+                    variant="primary"
+                    size="sm"
+                    loading={isVerifyingRecord}
+                    disabled={!connectInputOrcid.trim() || isVerifyingRecord}
+                    onPress={handleVerifyOrcidRecord}
+                    style={{ flex: 1.2 }}
+                  />
+                )}
               </View>
             </View>
           </KeyboardAvoidingView>
@@ -1937,4 +2090,22 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 2,
   },
+  antiImpersonationBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    backgroundColor: 'rgba(37, 99, 235, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.15)',
+    borderRadius: radii.md,
+    padding: spacing.md,
+  },
+  antiImpersonationText: {
+    ...typography.micro,
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
 });
+

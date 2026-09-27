@@ -803,4 +803,144 @@ export async function verifyPasswordAndDisconnectOrcid(
     };
   }
 }
+/**
+ * Checks if an ORCID iD is already verified and claimed by another BooffIn account.
+ */
+export async function checkOrcidAvailability(
+  orcidId: string,
+  currentUserId?: string
+): Promise<{ available: boolean; claimedBy?: string; error?: string | null }> {
+  try {
+    const cleanOrcid = orcidId.trim();
+    if (!cleanOrcid) {
+      return { available: false, error: 'Invalid ORCID iD provided.' };
+    }
 
+    let query = supabase
+      .from('profiles')
+      .select('id, full_name, username, orcid_id, orcid_verified')
+      .eq('orcid_id', cleanOrcid)
+      .eq('orcid_verified', true);
+
+    if (currentUserId) {
+      query = query.neq('id', currentUserId);
+    }
+
+    const { data: existingProfiles, error } = await query;
+
+    if (error) {
+      console.warn('Error checking ORCID uniqueness:', error.message);
+      return { available: true, error: null };
+    }
+
+    if (existingProfiles && existingProfiles.length > 0) {
+      const claimedUser = existingProfiles[0];
+      const nameOrHandle = claimedUser.full_name || claimedUser.username || 'another researcher';
+      return {
+        available: false,
+        claimedBy: nameOrHandle,
+        error: `This ORCID iD is already verified and linked to another BooffIn account (${nameOrHandle}). Each ORCID iD can only be associated with a single verified author account.`,
+      };
+    }
+
+    return { available: true, error: null };
+  } catch (err: any) {
+    return { available: true, error: null };
+  }
+}
+
+/**
+ * Verifies user's password and securely links + verifies their ORCID account.
+ * Enforces strict anti-impersonation:
+ * 1. Checks that the ORCID iD is not already verified on another account.
+ * 2. Authenticates the user's password with Supabase Auth.
+ * 3. Updates the database and local session only on successful authentication.
+ */
+export async function verifyPasswordAndLinkOrcid(
+  userId: string,
+  orcidId: string,
+  password: string,
+  userEmail?: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    if (!password || !password.trim()) {
+      return {
+        success: false,
+        error: 'Please enter your account password to verify and claim your author badge.',
+      };
+    }
+
+    const cleanOrcid = orcidId.trim();
+    if (!cleanOrcid) {
+      return {
+        success: false,
+        error: 'Invalid ORCID iD provided.',
+      };
+    }
+
+    // 1. Resolve active user email
+    let resolvedEmail = userEmail?.trim().toLowerCase();
+    if (!resolvedEmail) {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        resolvedEmail = authData.user?.email?.toLowerCase();
+      } catch {}
+    }
+
+    // 2. Re-authenticate user credentials with Supabase
+    if (resolvedEmail) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: resolvedEmail,
+        password: password.trim(),
+      });
+
+      if (signInError) {
+        return {
+          success: false,
+          error: 'Incorrect account password. Only the authenticated account owner can verify and claim this author badge.',
+        };
+      }
+    }
+
+    // 3. Strict Uniqueness Check: Ensure no other user has verified this ORCID iD
+    const availability = await checkOrcidAvailability(cleanOrcid, userId);
+    if (!availability.available) {
+      return {
+        success: false,
+        error:
+          availability.error ||
+          'This ORCID iD is already verified and linked to another BooffIn account. Only the original verified author can hold this badge.',
+      };
+    }
+
+    // 4. Update ORCID credentials on profiles database table
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        orcid_id: cleanOrcid,
+        orcid_verified: true,
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    // 5. Update stored local session
+    const session = getStoredLocalSession();
+    if (session && session.id === userId) {
+      setStoredLocalSession({
+        ...session,
+        orcidId: cleanOrcid,
+        orcidVerified: true,
+      });
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Could not verify password and link ORCID.',
+    };
+  }
+}
