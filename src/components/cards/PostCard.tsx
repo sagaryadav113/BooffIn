@@ -272,7 +272,13 @@ export const PostCard: React.FC<PostCardProps> = ({
       ) : null}
 
       {/* Attached External Paper Card Preview */}
-      {post.paper && <PaperCard paper={post.paper} style={styles.paperCardSpacing} />}
+      {post.paper && (
+        <PaperCard
+          paper={post.paper}
+          fromPostId={post.id}
+          style={styles.paperCardSpacing}
+        />
+      )}
 
       {/* Topic Chips */}
       {Array.isArray(post.topics) && post.topics.filter((t) => typeof t === 'string' && t.trim().length > 0).length > 0 ? (

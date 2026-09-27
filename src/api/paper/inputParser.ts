@@ -243,3 +243,63 @@ export function parseReferenceInput(rawInput: string): ParsedReferenceInput {
     canonicalUrl: sanitizeExternalUrl(trimmed) || trimmed,
   };
 }
+
+/**
+ * Scans arbitrary text (post body, caption, poll question) and extracts the first DOI or academic paper link found.
+ */
+export function extractPaperLinkOrDoi(text: string): string | null {
+  if (!text || typeof text !== 'string') return null;
+
+  // 1. Look for explicit URLs in text
+  const urlRegex = /(https?:\/\/[^\s<>"'{}|\\^`]+)/gi;
+  const urlMatches = text.match(urlRegex);
+  if (urlMatches) {
+    for (const rawUrl of urlMatches) {
+      const cleanUrl = rawUrl.replace(/[.,;)]+$/, '');
+      const lower = cleanUrl.toLowerCase();
+      // Check if it's an academic source or has a DOI
+      if (
+        lower.includes('doi.org/') ||
+        lower.includes('arxiv.org') ||
+        lower.includes('biorxiv.org') ||
+        lower.includes('medrxiv.org') ||
+        lower.includes('nature.com') ||
+        lower.includes('science.org') ||
+        lower.includes('cell.com') ||
+        lower.includes('sciencedirect.com') ||
+        lower.includes('pubmed.ncbi.nlm.nih.gov') ||
+        lower.includes('ncbi.nlm.nih.gov/pmc') ||
+        lower.includes('pnas.org') ||
+        lower.includes('thelancet.com') ||
+        lower.includes('frontiersin.org') ||
+        lower.includes('journals.plos.org') ||
+        lower.includes('springer.com') ||
+        lower.includes('onlinelibrary.wiley.com') ||
+        lower.includes('ieeexplore.ieee.org') ||
+        extractDoiFromUrl(cleanUrl)
+      ) {
+        return cleanUrl;
+      }
+    }
+  }
+
+  // 2. Look for standalone DOI in text (e.g., "10.1038/s41586-023-06747-5")
+  const doiMatch = text.match(DOI_REGEX);
+  if (doiMatch) {
+    return cleanDoi(doiMatch[1]);
+  }
+
+  // 3. Look for arXiv identifier (e.g., "arXiv:2303.08774" or "arxiv: 2101.00123")
+  const arxivMatch = text.match(ARXIV_ID_REGEX);
+  if (arxivMatch) {
+    return arxivMatch[0].trim();
+  }
+
+  // 4. Look for PMID (e.g., "PMID: 35000123")
+  const pmidMatch = text.match(PMID_REGEX);
+  if (pmidMatch) {
+    return pmidMatch[0].trim();
+  }
+
+  return null;
+}

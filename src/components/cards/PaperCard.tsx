@@ -19,6 +19,7 @@ interface PaperCardProps {
   onRemove?: () => void; // for composer view
   style?: ViewStyle;
   compact?: boolean;
+  fromPostId?: string;
 }
 
 export const PaperCard: React.FC<PaperCardProps> = ({
@@ -26,6 +27,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({
   onRemove,
   style,
   compact = false,
+  fromPostId,
 }) => {
   const getJournalVariant = (journal: string) => {
     const j = journal.toLowerCase();
@@ -38,7 +40,10 @@ export const PaperCard: React.FC<PaperCardProps> = ({
   const handleCardPress = () => {
     router.push({
       pathname: '/paper/[id]',
-      params: { id: paper.id },
+      params: {
+        id: paper.id,
+        ...(fromPostId ? { fromPostId } : {}),
+      },
     });
   };
 

@@ -1,6 +1,6 @@
 import { Paper } from '../types';
 import { defaultPaperResolver, CompositePaperResolver } from './paper/metadataResolver';
-import { parseReferenceInput, cleanDoi, detectPublisherFromUrl } from './paper/inputParser';
+import { parseReferenceInput, cleanDoi, detectPublisherFromUrl, extractPaperLinkOrDoi } from './paper/inputParser';
 import { ResolvePaperResult, NormalizedPaperMetadata, MetadataProvider } from './paper/types';
 
 export {
@@ -9,6 +9,7 @@ export {
   parseReferenceInput,
   cleanDoi,
   detectPublisherFromUrl,
+  extractPaperLinkOrDoi,
 };
 export type { ResolvePaperResult, NormalizedPaperMetadata, MetadataProvider };
 

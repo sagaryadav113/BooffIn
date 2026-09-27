@@ -31,6 +31,7 @@ import {
   Camera,
   Images,
   Link2,
+  Sparkles,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -45,6 +46,8 @@ import {
   capturePostImage,
   uploadPostImage,
 } from '../../api/storageService';
+import { extractPaperLinkOrDoi, resolvePaperWithDetails } from '../../api/paperResolver';
+import * as Haptics from 'expo-haptics';
 import { MentionSuggestions } from '../../components/composer/MentionSuggestions';
 import { useMentionAutocomplete } from '../../hooks/useMentionAutocomplete';
 
@@ -80,6 +83,10 @@ export default function CreatePostScreen() {
   const [postType, setPostType] = useState<PostType>('discussion');
   const [attachedPaper, setAttachedPaper] = useState<Paper | null>(null);
   const [paperModalVisible, setPaperModalVisible] = useState(false);
+
+  // Instant Auto-Detection State for pasted DOIs & Research Links
+  const [isAutoFetchingPaper, setIsAutoFetchingPaper] = useState(false);
+  const [dismissedPaperKey, setDismissedPaperKey] = useState<string | null>(null);
 
   // Attached Images & Upload State
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
@@ -122,6 +129,40 @@ export default function CreatePostScreen() {
       } catch (e) {}
     }
   }, [searchParams.initialContent, searchParams.paperData]);
+
+  // Instant DOI / URL Auto-Detection Effect
+  useEffect(() => {
+    const textToScan = `${content} ${pollQuestion}`;
+    const detectedKey = extractPaperLinkOrDoi(textToScan);
+
+    if (!detectedKey || attachedPaper || detectedKey === dismissedPaperKey) {
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      setIsAutoFetchingPaper(true);
+      try {
+        const result = await resolvePaperWithDetails(detectedKey);
+        if (isMounted && result && result.paper) {
+          setAttachedPaper(result.paper);
+          setPostType('research_share');
+          try {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch {}
+        }
+      } catch (err) {
+        console.warn('[CreatePost] Auto-fetch error:', err);
+      } finally {
+        if (isMounted) setIsAutoFetchingPaper(false);
+      }
+    }, 400);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [content, pollQuestion, attachedPaper, dismissedPaperKey]);
 
   const handleOpenImageOptions = () => {
     if (attachedImages.length >= 4) {
@@ -411,6 +452,17 @@ export default function CreatePostScreen() {
             </View>
           </View>
 
+          {/* Instant DOI / Paper Link Auto-Fetch Banner */}
+          {isAutoFetchingPaper && (
+            <View style={styles.autoFetchBanner}>
+              <ActivityIndicator size="small" color={colors.accentLink} />
+              <View style={styles.autoFetchContent}>
+                <Text style={styles.autoFetchTitle}>Detected research link</Text>
+                <Text style={styles.autoFetchSubtitle}>Fetching bibliographic metadata & open access details...</Text>
+              </View>
+            </View>
+          )}
+
           {/* Attached Images Preview Grid */}
           {(attachedImages.length > 0 || isUploadingImage) && (
             <View style={styles.imagesGrid}>
@@ -497,7 +549,13 @@ export default function CreatePostScreen() {
             <View style={styles.paperWrapper}>
               <PaperCard
                 paper={attachedPaper}
-                onRemove={() => setAttachedPaper(null)}
+                onRemove={() => {
+                  setAttachedPaper(null);
+                  const currentDetected = extractPaperLinkOrDoi(`${content} ${pollQuestion}`);
+                  if (currentDetected) {
+                    setDismissedPaperKey(currentDetected);
+                  }
+                }}
               />
             </View>
           )}
@@ -1260,6 +1318,32 @@ const styles = StyleSheet.create({
     ...typography.micro,
     color: colors.textSecondary,
     fontSize: 12,
+  },
+  autoFetchBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#F0F7FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  autoFetchContent: {
+    flex: 1,
+  },
+  autoFetchTitle: {
+    ...typography.captionBold,
+    color: colors.accentLink,
+    fontSize: 12.5,
+  },
+  autoFetchSubtitle: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11,
   },
 });
 
