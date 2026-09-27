@@ -24,7 +24,7 @@ import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Comment, Post } from '../../types';
 import { supabase } from '../../api/client';
-import { mapSupabasePost } from '../../api/socialService';
+import { mapSupabasePost, populatePollVotes } from '../../api/socialService';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -72,7 +72,8 @@ export default function PostDetailScreen() {
 
           if (data && !error) {
             const mappedPost = mapSupabasePost(data, currentUser.id);
-            setPost(mappedPost);
+            const [postWithVotes] = await populatePollVotes([mappedPost], currentUser.id);
+            setPost(postWithVotes || mappedPost);
           }
         } catch {}
         setIsLoading(false);

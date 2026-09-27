@@ -163,6 +163,153 @@ export function mapSupabasePaper(row: any, currentUserId?: string): Paper {
   };
 }
 
+export interface RawPollData {
+  question: string;
+  options: { id: string; text: string; votesCount?: number }[];
+  expiresAt?: string;
+}
+
+export function encodePollIntoContent(
+  content: string,
+  poll?: import('../types').Poll
+): string {
+  if (!poll || !poll.options || poll.options.length < 2) {
+    return content;
+  }
+  const pollPayload: RawPollData = {
+    question: poll.question,
+    options: poll.options.map((opt, idx) => ({
+      id: opt.id || `opt_${idx + 1}`,
+      text: opt.text,
+    })),
+    expiresAt: poll.expiresAt,
+  };
+  const pollMarker = `\n\n<!--POLL_DATA:${JSON.stringify(pollPayload)}-->`;
+  return `${content.trim()}${pollMarker}`;
+}
+
+export function extractPollAndCleanContent(rawContent?: string | null): {
+  cleanContent: string;
+  poll?: import('../types').Poll;
+} {
+  if (!rawContent) {
+    return { cleanContent: '' };
+  }
+
+  const pollRegex = /(?:\n\n)?<!--POLL_DATA:(.*?)-->|(?:(?:\n\n)?__POLL__:(.*?)(?:\n|$))/s;
+  const match = rawContent.match(pollRegex);
+
+  if (match) {
+    try {
+      const jsonStr = match[1] || match[2];
+      const parsed: RawPollData = JSON.parse(jsonStr);
+      const cleanContent = rawContent.replace(match[0], '').trim();
+      const options = (parsed.options || []).map((opt, idx) => ({
+        id: opt.id || `opt_${idx + 1}`,
+        text: opt.text || String(opt),
+        votesCount: opt.votesCount || 0,
+      }));
+
+      return {
+        cleanContent,
+        poll: {
+          question: parsed.question || '',
+          options,
+          totalVotes: 0,
+          expiresAt: parsed.expiresAt,
+        },
+      };
+    } catch (e) {
+      console.warn('[socialService] Failed to parse poll metadata from content:', e);
+    }
+  }
+
+  return { cleanContent: rawContent };
+}
+
+// Helper to query and populate poll vote totals and current user's voted option
+export async function populatePollVotes(
+  posts: Post[],
+  currentUserId?: string
+): Promise<Post[]> {
+  if (!posts || posts.length === 0) return posts;
+
+  const pollPosts = posts.filter((p) => Boolean(p.poll && p.poll.options && p.poll.options.length > 0));
+  if (pollPosts.length === 0) return posts;
+
+  const pollPostIds = pollPosts.map((p) => p.id);
+
+  try {
+    const { data: voteRows, error } = await supabase
+      .from('comments')
+      .select('post_id, author_id, content')
+      .in('post_id', pollPostIds)
+      .like('content', '[POLL_VOTE:%');
+
+    if (error) {
+      console.warn('[socialService.populatePollVotes] Error fetching votes:', error.message);
+      return posts;
+    }
+
+    const postVotesMap = new Map<
+      string,
+      {
+        optionVotes: Record<string, number>;
+        totalVotes: number;
+        userVotedOptionId?: string;
+      }
+    >();
+
+    for (const post of pollPosts) {
+      postVotesMap.set(post.id, {
+        optionVotes: {},
+        totalVotes: 0,
+      });
+    }
+
+    if (voteRows && voteRows.length > 0) {
+      for (const row of voteRows) {
+        const entry = postVotesMap.get(row.post_id);
+        if (!entry) continue;
+
+        try {
+          const match = row.content.match(/^\[POLL_VOTE:(.*)\]$/);
+          if (match) {
+            const parsed = JSON.parse(match[1]);
+            const optionId = parsed.optionId;
+            if (optionId) {
+              entry.optionVotes[optionId] = (entry.optionVotes[optionId] || 0) + 1;
+              entry.totalVotes += 1;
+              if (currentUserId && row.author_id === currentUserId) {
+                entry.userVotedOptionId = optionId;
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+
+    for (const post of posts) {
+      if (post.poll && postVotesMap.has(post.id)) {
+        const stats = postVotesMap.get(post.id)!;
+        post.poll = {
+          ...post.poll,
+          options: post.poll.options.map((opt) => ({
+            ...opt,
+            votesCount: stats.optionVotes[opt.id] || 0,
+          })),
+          totalVotes: stats.totalVotes,
+          userVotedOptionId: stats.userVotedOptionId || post.poll.userVotedOptionId,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[socialService.populatePollVotes] Unexpected error:', err);
+  }
+
+  return posts;
+}
+
 // Single-query mapping helper to convert nested Supabase post query to Post
 export function mapSupabasePost(row: any, currentUserId?: string): Post {
   const author = mapSupabaseProfile(row.author);
@@ -184,13 +331,16 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
     ? row.bookmarks.some((b: any) => b.user_id === currentUserId)
     : Boolean(row.is_saved);
 
+  const { cleanContent, poll } = extractPollAndCleanContent(row.content || '');
+
   return {
     id: row.id,
     author,
     postType: (row.post_type as PostType) || 'discussion',
-    content: row.content || '',
+    content: cleanContent,
     paper,
     images: Array.isArray(row.media_urls) ? row.media_urls : [],
+    poll,
     topics: topics.length > 0 ? topics : [],
     visibility: row.visibility || 'public',
     likesCount: row.likes_count || 0,
@@ -381,8 +531,10 @@ export async function fetchFeed(
       );
     }
 
+    const postsWithPolls = await populatePollVotes(filtered, resolvedUserId);
+
     return {
-      posts: filtered,
+      posts: postsWithPolls,
       hasMore: data.length === pageSize,
       error: null,
     };
@@ -399,6 +551,7 @@ export interface CreatePostPayload {
   content: string;
   postType: PostType;
   paper?: Paper;
+  poll?: import('../types').Poll;
   topics: string[];
   visibility?: 'public' | 'followers';
   authorId?: string;
@@ -408,7 +561,7 @@ export interface CreatePostPayload {
 export async function createPost(
   payload: CreatePostPayload
 ): Promise<{ post: Post | null; error: string | null }> {
-  const { postType, paper, topics, visibility = 'public', mediaUrls = [] } = payload;
+  const { postType, paper, poll, topics, visibility = 'public', mediaUrls = [] } = payload;
   const content = sanitizeTextContent(payload.content, 5000);
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -470,12 +623,14 @@ export async function createPost(
       }
     }
 
+    const rawContentWithPoll = encodePollIntoContent(content, poll);
+
     const { data: postRow, error: postError } = await supabase
       .from('posts')
       .insert({
         author_id: verifiedAuthorId,
         post_type: postType,
-        content,
+        content: rawContentWithPoll,
         paper_id: paperId,
         visibility,
         media_urls: mediaUrls,
@@ -535,6 +690,8 @@ export async function createPost(
       postType,
       content,
       paper,
+      images: mediaUrls,
+      poll,
       topics,
       visibility,
       likesCount: 0,
@@ -659,10 +816,25 @@ export async function updatePost(
   }
 
   try {
-    // 1. Update content in posts table
+    // 1. Fetch existing post to preserve any attached poll marker
+    const { data: existingPost } = await supabase
+      .from('posts')
+      .select('content')
+      .eq('id', postId)
+      .maybeSingle();
+
+    let finalContent = content;
+    if (existingPost?.content) {
+      const match = existingPost.content.match(/(?:\n\n)?<!--POLL_DATA:(.*?)-->|(?:(?:\n\n)?__POLL__:(.*?)(?:\n|$))/s);
+      if (match) {
+        finalContent = `${content.trim()}\n\n${match[0].trim()}`;
+      }
+    }
+
+    // 2. Update content in posts table
     const { data: postRow, error: postError } = await supabase
       .from('posts')
-      .update({ content })
+      .update({ content: finalContent })
       .eq('id', postId)
       .eq('author_id', user.id)
       .select(
@@ -686,7 +858,7 @@ export async function updatePost(
       return { post: null, error: postError.message };
     }
 
-    // 2. Update topics if provided
+    // 3. Update topics if provided
     if (topics !== undefined) {
       await supabase.from('post_topics').delete().eq('post_id', postId);
 
@@ -724,6 +896,15 @@ export async function updatePost(
       mapped.topics = topics;
     }
 
+    // Populate poll votes if post contains poll
+    let finalMappedPost = mapped;
+    if (mapped) {
+      const [postWithVotes] = await populatePollVotes([mapped], user.id);
+      if (postWithVotes) {
+        finalMappedPost = postWithVotes;
+      }
+    }
+
     // Send mention notifications for edited content
     sendMentionNotifications({
       content,
@@ -732,7 +913,7 @@ export async function updatePost(
       entityType: 'post',
     }).catch(() => {});
 
-    return { post: mapped, error: null };
+    return { post: finalMappedPost, error: null };
   } catch (err: any) {
     return { post: null, error: err?.message || 'Failed to update post.' };
   }
@@ -920,15 +1101,20 @@ export async function fetchComments(
       return { comments: [], error: error?.message || null };
     }
 
+    // Exclude poll vote records so they never show up in comment threads
+    const commentRows = data.filter(
+      (row: any) => !row.content || !row.content.startsWith('[POLL_VOTE:')
+    );
+
     const commentMap = new Map<string, Comment>();
     const rootComments: Comment[] = [];
 
-    data.forEach((row: any) => {
+    commentRows.forEach((row: any) => {
       const comment = mapSupabaseComment(row, currentUserId);
       commentMap.set(comment.id, comment);
     });
 
-    data.forEach((row: any) => {
+    commentRows.forEach((row: any) => {
       const comment = commentMap.get(row.id);
       if (!comment) return;
 
@@ -1033,6 +1219,71 @@ export async function deleteComment(
     return { success: true, error: null };
   } catch (err: any) {
     return { success: false, error: err?.message };
+  }
+}
+
+// ============================================================================
+// 7. POLL VOTING (Persisted via public.comments with [POLL_VOTE:] identifier)
+// ============================================================================
+export async function votePoll(
+  postId: string,
+  optionId: string,
+  userId?: string
+): Promise<{ success: boolean; error: string | null; userVotedOptionId?: string }> {
+  try {
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      resolvedUserId = user?.id;
+    }
+
+    if (!resolvedUserId) {
+      return { success: false, error: 'User must be authenticated to vote.' };
+    }
+
+    // Check if user already voted on this post's poll
+    const { data: existingRows } = await supabase
+      .from('comments')
+      .select('id, content')
+      .eq('post_id', postId)
+      .eq('author_id', resolvedUserId)
+      .like('content', '[POLL_VOTE:%');
+
+    const voteContent = `[POLL_VOTE:${JSON.stringify({ optionId })}]`;
+
+    if (existingRows && existingRows.length > 0) {
+      const existingId = existingRows[0].id;
+      const { error: updateError } = await supabase
+        .from('comments')
+        .update({ content: voteContent })
+        .eq('id', existingId);
+
+      if (updateError) {
+        return { success: false, error: updateError.message };
+      }
+
+      // If duplicate vote rows exist, clean them up
+      if (existingRows.length > 1) {
+        const extraIds = existingRows.slice(1).map((r) => r.id);
+        await supabase.from('comments').delete().in('id', extraIds);
+      }
+    } else {
+      const { error: insertError } = await supabase
+        .from('comments')
+        .insert({
+          post_id: postId,
+          author_id: resolvedUserId,
+          content: voteContent,
+        });
+
+      if (insertError) {
+        return { success: false, error: insertError.message };
+      }
+    }
+
+    return { success: true, error: null, userVotedOptionId: optionId };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to submit vote' };
   }
 }
 
@@ -1532,8 +1783,10 @@ export async function fetchUserPosts(
       }
     }
 
+    const postsWithPolls = await populatePollVotes(finalPosts, currentUserId);
+
     return {
-      posts: finalPosts,
+      posts: postsWithPolls,
       error: null,
     };
   } catch (err: any) {
@@ -1637,7 +1890,9 @@ export async function fetchSavedPostsAndPapers(
       }
     });
 
-    return { posts, papers, error: null };
+    const postsWithPolls = await populatePollVotes(posts, userId);
+
+    return { posts: postsWithPolls, papers, error: null };
   } catch (err: any) {
     return { posts: [], papers: [], error: err?.message || 'Failed to fetch bookmarks' };
   }

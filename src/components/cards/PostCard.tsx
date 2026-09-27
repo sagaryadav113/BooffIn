@@ -14,6 +14,7 @@ import {
   Repeat2,
   Bookmark,
   MoreHorizontal,
+  Check,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Post } from '../../types';
@@ -47,6 +48,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const toggleLike = usePostStore((s) => s.toggleLikePost);
   const toggleRepost = usePostStore((s) => s.toggleRepost);
   const toggleSave = usePostStore((s) => s.toggleSavePost);
+  const votePoll = usePostStore((s) => s.votePoll);
   const currentUser = useAuthStore((s) => s.user);
 
   const handlePostPress = () => {
@@ -209,23 +211,62 @@ export const PostCard: React.FC<PostCardProps> = ({
             {post.poll.options.map((opt) => {
               const total = post.poll?.totalVotes || 0;
               const percent = total > 0 ? Math.round((opt.votesCount / total) * 100) : 0;
+              const isSelected = post.poll?.userVotedOptionId === opt.id;
+
               return (
                 <TouchableOpacity
                   key={opt.id}
                   activeOpacity={0.7}
-                  onPress={(e) => e.stopPropagation()}
-                  style={styles.pollOptionRow}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    try {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    } catch {}
+                    votePoll(post.id, opt.id, currentUser?.id);
+                  }}
+                  style={[
+                    styles.pollOptionRow,
+                    isSelected && styles.pollOptionRowSelected,
+                  ]}
                 >
-                  <View style={[styles.pollProgressFill, { width: `${percent}%` }]} />
-                  <Text style={styles.pollOptionText}>{opt.text}</Text>
-                  <Text style={styles.pollOptionPercent}>{percent}%</Text>
+                  <View
+                    style={[
+                      styles.pollProgressFill,
+                      { width: `${percent}%` },
+                      isSelected && styles.pollProgressFillSelected,
+                    ]}
+                  />
+                  <View style={styles.pollOptionLeft}>
+                    {isSelected && (
+                      <Check size={16} color={colors.textPrimary} style={styles.pollCheckIcon} />
+                    )}
+                    <Text
+                      style={[
+                        styles.pollOptionText,
+                        isSelected && styles.pollOptionTextSelected,
+                      ]}
+                    >
+                      {opt.text}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.pollOptionPercent,
+                      isSelected && styles.pollOptionPercentSelected,
+                    ]}
+                  >
+                    {percent}%
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-          <Text style={styles.pollVotesFooter}>
-            {post.poll.totalVotes} {post.poll.totalVotes === 1 ? 'vote' : 'votes'}
-          </Text>
+          <View style={styles.pollFooterRow}>
+            <Text style={styles.pollVotesFooter}>
+              {post.poll.totalVotes} {post.poll.totalVotes === 1 ? 'vote' : 'votes'}
+              {post.poll.userVotedOptionId ? ' · Voted' : ''}
+            </Text>
+          </View>
         </View>
       ) : null}
 
@@ -497,7 +538,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     backgroundColor: colors.white,
     borderRadius: radii.sm + 2,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
@@ -507,6 +548,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     minHeight: layout.touchTargetMin - 4,
   },
+  pollOptionRowSelected: {
+    borderColor: colors.textPrimary,
+    backgroundColor: 'rgba(17, 24, 39, 0.02)',
+  },
   pollProgressFill: {
     position: 'absolute',
     left: 0,
@@ -514,11 +559,27 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(17, 24, 39, 0.08)',
   },
+  pollProgressFillSelected: {
+    backgroundColor: 'rgba(17, 24, 39, 0.16)',
+  },
+  pollOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: spacing.sm,
+    zIndex: 1,
+  },
+  pollCheckIcon: {
+    marginRight: spacing.xs,
+  },
   pollOptionText: {
     ...typography.captionBold,
     color: colors.textPrimary,
     fontSize: 14,
-    zIndex: 1,
+  },
+  pollOptionTextSelected: {
+    color: colors.textPrimary,
+    fontWeight: '700',
   },
   pollOptionPercent: {
     ...typography.captionBold,
@@ -526,10 +587,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     zIndex: 1,
   },
+  pollOptionPercentSelected: {
+    color: colors.textPrimary,
+    fontWeight: '700',
+  },
+  pollFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+  },
   pollVotesFooter: {
     ...typography.metadata,
     color: colors.textSecondary,
-    marginTop: spacing.sm,
   },
   topicChipsRow: {
     flexDirection: 'row',

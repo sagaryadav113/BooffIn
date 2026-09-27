@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Post, Comment, PostType, Paper } from '../types';
+import { Post, Comment, PostType, Paper, Poll } from '../types';
 import { useAuthStore } from './useAuthStore';
 import {
   fetchFeed as apiFetchFeed,
@@ -12,6 +12,7 @@ import {
   fetchComments as apiFetchComments,
   addComment as apiAddComment,
   deleteComment as apiDeleteComment,
+  votePoll as apiVotePoll,
 } from '../api/socialService';
 
 export interface CreatePostParams {
@@ -44,6 +45,7 @@ interface PostState {
   toggleLikePost: (postId: string, currentUserId?: string) => Promise<void>;
   toggleRepost: (postId: string, currentUserId?: string) => Promise<void>;
   toggleSavePost: (postId: string, currentUserId?: string) => Promise<void>;
+  votePoll: (postId: string, optionId: string, currentUserId?: string) => Promise<boolean>;
   createPost: (params: CreatePostParams, currentUserId?: string) => Promise<Post | null>;
   updatePost: (postId: string, content: string, topics?: string[]) => Promise<boolean>;
   deletePost: (postId: string, currentUserId?: string) => Promise<boolean>;
@@ -282,6 +284,63 @@ export const usePostStore = create<PostState>((set, get) => ({
     }
   },
 
+  votePoll: async (postId, optionId, currentUserId) => {
+    const post = get().posts.find((p) => p.id === postId);
+    if (!post || !post.poll) return false;
+
+    const previousPost = {
+      ...post,
+      poll: post.poll ? { ...post.poll, options: [...post.poll.options] } : undefined,
+    };
+    const prevVotedOptionId = post.poll.userVotedOptionId;
+    const isChangingVote = Boolean(prevVotedOptionId && prevVotedOptionId !== optionId);
+    const isSameVote = prevVotedOptionId === optionId;
+
+    if (isSameVote) return true;
+
+    // 1. Optimistic update
+    const updatedOptions = post.poll.options.map((opt) => {
+      let count = opt.votesCount;
+      if (opt.id === optionId) {
+        count += 1;
+      } else if (opt.id === prevVotedOptionId) {
+        count = Math.max(0, count - 1);
+      }
+      return { ...opt, votesCount: count };
+    });
+
+    const updatedTotalVotes = isChangingVote
+      ? post.poll.totalVotes
+      : post.poll.totalVotes + 1;
+
+    const updatedPoll: Poll = {
+      ...post.poll,
+      options: updatedOptions,
+      totalVotes: updatedTotalVotes,
+      userVotedOptionId: optionId,
+    };
+
+    set((state) => ({
+      posts: state.posts.map((p) =>
+        p.id === postId ? { ...p, poll: updatedPoll } : p
+      ),
+    }));
+
+    // 2. Backend mutation
+    const userId = currentUserId || useAuthStore.getState().user.id;
+    const res = await apiVotePoll(postId, optionId, userId);
+
+    if (!res.success) {
+      console.warn('[usePostStore] Poll vote failed, rolling back:', res.error);
+      set((state) => ({
+        posts: state.posts.map((p) => (p.id === postId ? previousPost : p)),
+      }));
+      return false;
+    }
+
+    return true;
+  },
+
   createPost: async (params, currentUserId) => {
     const activeUser = useAuthStore.getState().user;
     const authorId = currentUserId || params.authorId || activeUser.id;
@@ -318,6 +377,7 @@ export const usePostStore = create<PostState>((set, get) => ({
       postType: params.postType,
       paper: params.paper,
       mediaUrls: params.images,
+      poll: params.poll,
       topics: params.topics,
       visibility: params.visibility || 'public',
       authorId,
