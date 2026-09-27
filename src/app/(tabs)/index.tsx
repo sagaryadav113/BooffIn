@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { colors, spacing, typography, radii } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { FeedNavigation } from '../../components/layout/FeedNavigation';
@@ -58,8 +59,11 @@ export default function HomeScreen() {
     [currentUser?.id, setActiveTab]
   );
 
-  const handleRefresh = useCallback(() => {
-    refreshFeed(currentUser?.id);
+  const handleRefresh = useCallback(async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    await refreshFeed(currentUser?.id);
   }, [currentUser?.id, refreshFeed]);
 
   const handleEndReached = useCallback(() => {
@@ -128,35 +132,34 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Initial Loading Spinner if empty */}
-      {isLoading && filteredPosts.length === 0 ? (
-        <View style={styles.centerLoader}>
-          <ActivityIndicator size="large" color={colors.black} />
-        </View>
-      ) : (
-        /* Virtualized Feed with Smooth Scrolling & Infinite Pagination */
-        <FlatList
-          data={filteredPosts}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          initialNumToRender={5}
-          maxToRenderPerBatch={8}
-          windowSize={7}
-          removeClippedSubviews={Platform.OS !== 'web'}
-          showsVerticalScrollIndicator={false}
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.4}
-          ListFooterComponent={renderFooter}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.black}
-              colors={[colors.black]}
-            />
-          }
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
+      {/* Virtualized Feed with Smooth Scrolling & Infinite Pagination */}
+      <FlatList
+        data={filteredPosts}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        initialNumToRender={5}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS !== 'web'}
+        showsVerticalScrollIndicator={false}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={renderFooter}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.black}
+            colors={[colors.black]}
+          />
+        }
+        contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
+        ListEmptyComponent={
+          isLoading && filteredPosts.length === 0 ? (
+            <View style={styles.centerLoader}>
+              <ActivityIndicator size="large" color={colors.black} />
+            </View>
+          ) : (
             <EmptyState
               icon={activeTab === 'Following' ? 'Users' : 'FileText'}
               title={
@@ -176,9 +179,9 @@ export default function HomeScreen() {
                   : router.push('/(tabs)/create')
               }
             />
-          }
-        />
-      )}
+          )
+        }
+      />
     </SafeAreaView>
   );
 }

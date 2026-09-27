@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StatusBar,
   ScrollView,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Compass, Sparkles, ArrowRight, SlidersHorizontal } from 'lucide-react-native';
@@ -52,6 +53,7 @@ export default function ExploreScreen() {
   const [activeFilter, setActiveFilter] = useState('All');
   const [researchersList, setResearchersList] = useState<UserProfile[]>([]);
   const [isLoadingResearchers, setIsLoadingResearchers] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const papers = usePaperStore((s) => s.papers);
   const fetchPapers = usePaperStore((s) => s.fetchPapers);
@@ -62,44 +64,58 @@ export default function ExploreScreen() {
   const currentUser = useAuthStore((s) => s.user);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
 
+  const loadResearchers = useCallback(async () => {
+    setIsLoadingResearchers(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url, academic_title, institution, bio, orcid_id, is_orcid_verified, followers_count, following_count')
+        .order('followers_count', { ascending: false })
+        .limit(10);
+
+      if (data && !error) {
+        const mapped: UserProfile[] = data.map((row: any) => ({
+          id: row.id,
+          handle: row.username || 'researcher',
+          fullName: row.full_name || 'Researcher',
+          avatarUrl: row.avatar_url,
+          academicTitle: row.academic_title || 'Researcher',
+          institution: row.institution || '',
+          bio: row.bio || '',
+          orcidVerified: Boolean(row.is_orcid_verified),
+          orcidId: row.orcid_id,
+          followersCount: row.followers_count || 0,
+          followingCount: row.following_count || 0,
+          postsCount: 0,
+          savedCount: 0,
+          joinedDate: '',
+        }));
+        setResearchersList(mapped);
+      }
+    } catch {}
+    setIsLoadingResearchers(false);
+  }, []);
+
   useEffect(() => {
     fetchPapers();
     fetchTopics(currentUser?.id);
     fetchFeed('For You', currentUser?.id);
-
-    async function loadResearchers() {
-      setIsLoadingResearchers(true);
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, username, full_name, avatar_url, academic_title, institution, bio, orcid_id, is_orcid_verified, followers_count, following_count')
-          .order('followers_count', { ascending: false })
-          .limit(10);
-
-        if (data && !error) {
-          const mapped: UserProfile[] = data.map((row: any) => ({
-            id: row.id,
-            handle: row.username || 'researcher',
-            fullName: row.full_name || 'Researcher',
-            avatarUrl: row.avatar_url,
-            academicTitle: row.academic_title || 'Researcher',
-            institution: row.institution || '',
-            bio: row.bio || '',
-            orcidVerified: Boolean(row.is_orcid_verified),
-            orcidId: row.orcid_id,
-            followersCount: row.followers_count || 0,
-            followingCount: row.following_count || 0,
-            postsCount: 0,
-            savedCount: 0,
-            joinedDate: '',
-          }));
-          setResearchersList(mapped);
-        }
-      } catch {}
-      setIsLoadingResearchers(false);
-    }
     loadResearchers();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed, loadResearchers]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    await Promise.all([
+      fetchPapers(),
+      fetchTopics(currentUser?.id),
+      fetchFeed('For You', currentUser?.id),
+      loadResearchers(),
+    ]);
+    setIsRefreshing(false);
+  };
 
   const handleSearchSubmit = (query?: string) => {
     const term = (query || searchQuery).trim();
@@ -158,6 +174,14 @@ export default function ExploreScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.black}
+            colors={[colors.black]}
+          />
+        }
       >
         {/* Search Bar */}
         <View style={styles.searchSection}>

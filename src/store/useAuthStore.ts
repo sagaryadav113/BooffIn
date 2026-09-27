@@ -60,6 +60,7 @@ interface AuthState {
   clearError: () => void;
   updateProfile: (updated: Partial<UserProfile>) => Promise<{ success: boolean; error: string | null }>;
   toggleFollowUser: (userId: string) => Promise<boolean>;
+  refreshCurrentUserProfile: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -72,6 +73,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   followingIds: new Set<string>(),
   followLoadingIds: new Set<string>(),
   isInitialized: false,
+
+  refreshCurrentUserProfile: async () => {
+    const currentId = get().user?.id;
+    if (!currentId) return;
+    try {
+      const profile = await fetchUserProfile(currentId);
+      if (profile) {
+        set({ user: profile });
+      }
+      await get().loadFollowingIds(currentId);
+    } catch {
+      // ignore
+    }
+  },
 
   loadFollowingIds: async (userId: string) => {
     if (!userId) {

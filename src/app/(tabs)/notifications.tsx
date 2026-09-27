@@ -9,6 +9,7 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { colors, spacing } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { TopicChip } from '../../components/core/TopicChip';
@@ -41,6 +42,13 @@ export default function NotificationsScreen() {
       unsubscribe();
     };
   }, [loadNotifications, subscribeToRealtimeNotifications, currentUser?.id]);
+
+  const handleRefresh = useCallback(async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    await loadNotifications(true);
+  }, [loadNotifications]);
 
   const filteredNotifications = useMemo(() => {
     return filterNotificationList(notifications, activeFilter);
@@ -122,30 +130,31 @@ export default function NotificationsScreen() {
       </View>
 
       {/* Notifications List */}
-      {isLoading && notifications.length === 0 ? (
-        <LoadingState message="Loading notifications..." />
-      ) : (
-        <FlatList
-          data={filteredNotifications}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <NotificationRow notification={item} />}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => loadNotifications(true)}
-              tintColor={colors.black}
-            />
-          }
-          ListEmptyComponent={
+      <FlatList
+        data={filteredNotifications}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <NotificationRow notification={item} />}
+        contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.black}
+            colors={[colors.black]}
+          />
+        }
+        ListEmptyComponent={
+          isLoading && notifications.length === 0 ? (
+            <LoadingState message="Loading notifications..." />
+          ) : (
             <EmptyState
               icon="Bell"
               title={emptyInfo.title}
               description={emptyInfo.description}
             />
-          }
-        />
-      )}
+          )
+        }
+      />
     </SafeAreaView>
   );
 }

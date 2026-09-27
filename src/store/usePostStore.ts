@@ -100,26 +100,36 @@ export const usePostStore = create<PostState>((set, get) => ({
   },
 
   refreshFeed: async (currentUserId) => {
+    const resolvedUserId = currentUserId || useAuthStore.getState().user?.id;
     set({ isRefreshing: true, feedError: null });
     const res = await apiFetchFeed({
       tab: get().activeTab,
       page: 1,
       pageSize: 10,
-      currentUserId,
+      currentUserId: resolvedUserId,
     });
 
+    if (res.error) {
+      set({
+        isRefreshing: false,
+        feedError: res.error,
+      });
+      return;
+    }
+
     set({
-      posts: res.posts.length > 0 ? res.posts : get().posts,
+      posts: res.posts || [],
       hasMore: res.hasMore,
       isRefreshing: false,
-      feedError: res.error,
+      feedError: null,
       page: 1,
     });
   },
 
   loadMoreFeed: async (currentUserId) => {
-    if (get().isLoadingMore || !get().hasMore || get().isLoading) return;
+    if (get().isLoadingMore || !get().hasMore || get().isLoading || get().isRefreshing) return;
 
+    const resolvedUserId = currentUserId || useAuthStore.getState().user?.id;
     const nextPage = get().page + 1;
     set({ isLoadingMore: true });
 
@@ -127,7 +137,7 @@ export const usePostStore = create<PostState>((set, get) => ({
       tab: get().activeTab,
       page: nextPage,
       pageSize: 10,
-      currentUserId,
+      currentUserId: resolvedUserId,
     });
 
     if (res.error || res.posts.length === 0) {

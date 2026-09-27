@@ -37,6 +37,7 @@ import {
   Upload,
   Image as ImageIcon,
 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
 import { Button } from '../../components/core/Button';
@@ -73,6 +74,7 @@ export const DEFAULT_PROFILE_BANNER = 'https://images.unsplash.com/photo-1506744
 export default function CurrentUserProfileScreen() {
   const storeUser = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const refreshCurrentUserProfile = useAuthStore((s) => s.refreshCurrentUserProfile);
   const allPosts = usePostStore((s) => s.posts);
   const papers = usePaperStore((s) => s.papers);
   const savedPaperIds = usePaperStore((s) => s.savedPaperIds);
@@ -195,7 +197,15 @@ export default function CurrentUserProfileScreen() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([loadUserPosts(), loadRequests(), loadSavedItems()]);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    await Promise.all([
+      refreshCurrentUserProfile(),
+      loadUserPosts(),
+      loadRequests(),
+      loadSavedItems(),
+    ]);
     setIsRefreshing(false);
   };
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Linking,
   Share,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
@@ -65,25 +66,37 @@ export default function PaperDetailScreen() {
   const [abstractExpanded, setAbstractExpanded] = useState(false);
   const [paper, setPaper] = useState<Paper | null>(getPaperById(paperId) || null);
   const [isLoading, setIsLoading] = useState(!paper);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    async function loadData() {
-      if (!paperId) {
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      const fetched = await fetchPaperById(paperId);
-      if (fetched) {
-        setPaper(fetched);
-      }
-      await fetchDiscussionsForPaper(paperId);
+  const loadData = useCallback(async (isRefresh = false) => {
+    if (!paperId) {
       setIsLoading(false);
+      return;
     }
 
+    if (!isRefresh && !paper) {
+      setIsLoading(true);
+    }
+    const fetched = await fetchPaperById(paperId);
+    if (fetched) {
+      setPaper(fetched);
+    }
+    await fetchDiscussionsForPaper(paperId);
+    setIsLoading(false);
+    if (isRefresh) setIsRefreshing(false);
+  }, [paperId, fetchPaperById, fetchDiscussionsForPaper]);
+
+  useEffect(() => {
     loadData();
-  }, [paperId]);
+  }, [loadData]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    await loadData(true);
+  };
 
   // Compute counts for structured discussion types
   const counts = useMemo(() => {
@@ -232,7 +245,18 @@ export default function PaperDetailScreen() {
         }
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.black}
+            colors={[colors.black]}
+          />
+        }
+      >
         {/* Figures Gallery Carousel (if available) */}
         {paper.figures && paper.figures.length > 0 && (
           <View style={styles.figuresContainer}>

@@ -135,7 +135,22 @@ export default function OtherResearcherProfileScreen() {
   const handleRefresh = async () => {
     if (!researcher?.id) return;
     setIsRefreshing(true);
-    await Promise.all([loadResearcherPosts(researcher.id), loadConnectionStatus()]);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    const cleanId = (id || '').replace(/^@/, '');
+    const refreshProfile = async () => {
+      let prof = await fetchUserProfile(cleanId, currentUser?.id);
+      if (!prof) {
+        prof = await fetchUserProfileByUsername(cleanId, currentUser?.id);
+      }
+      if (prof) setResearcher(prof);
+    };
+    await Promise.all([
+      refreshProfile(),
+      loadResearcherPosts(researcher.id),
+      loadConnectionStatus(),
+    ]);
     setIsRefreshing(false);
   };
 

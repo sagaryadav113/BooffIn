@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,8 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Avatar } from '../../components/core/Avatar';
@@ -42,48 +44,57 @@ export default function PostDetailScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [post, setPost] = useState<Post | null>(getPostById(postId) || null);
   const [isLoading, setIsLoading] = useState(!post);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    async function loadPost() {
-      if (!postId) {
-        setIsLoading(false);
-        return;
-      }
-
-      if (!post) {
-        setIsLoading(true);
-        try {
-          const { data, error } = await supabase
-            .from('posts')
-            .select(`
-              *,
-              author:profiles!author_id (*),
-              paper:papers!paper_id (
-                *,
-                paper_authors (*)
-              ),
-              post_topics ( topic:topics!topic_id (*) ),
-              likes!left ( user_id ),
-              reposts!left ( user_id ),
-              bookmarks!left ( user_id )
-            `)
-            .eq('id', postId)
-            .maybeSingle();
-
-          if (data && !error) {
-            const mappedPost = mapSupabasePost(data, currentUser.id);
-            const [postWithVotes] = await populatePollVotes([mappedPost], currentUser.id);
-            setPost(postWithVotes || mappedPost);
-          }
-        } catch {}
-        setIsLoading(false);
-      }
-
-      fetchCommentsForPost(postId, currentUser.id);
+  const loadPostData = useCallback(async (isRefresh = false) => {
+    if (!postId) {
+      setIsLoading(false);
+      return;
     }
 
-    loadPost();
-  }, [postId, currentUser.id]);
+    if (!isRefresh && !post) {
+      setIsLoading(true);
+    }
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          author:profiles!author_id (*),
+          paper:papers!paper_id (
+            *,
+            paper_authors (*)
+          ),
+          post_topics ( topic:topics!topic_id (*) ),
+          likes!left ( user_id ),
+          reposts!left ( user_id ),
+          bookmarks!left ( user_id )
+        `)
+        .eq('id', postId)
+        .maybeSingle();
+
+      if (data && !error) {
+        const mappedPost = mapSupabasePost(data, currentUser.id);
+        const [postWithVotes] = await populatePollVotes([mappedPost], currentUser.id);
+        setPost(postWithVotes || mappedPost);
+      }
+    } catch {}
+    await fetchCommentsForPost(postId, currentUser.id);
+    setIsLoading(false);
+    if (isRefresh) setIsRefreshing(false);
+  }, [postId, currentUser.id, fetchCommentsForPost]);
+
+  useEffect(() => {
+    loadPostData();
+  }, [loadPostData]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    await loadPostData(true);
+  };
 
   const storePost = usePostStore((s) => s.getPostById(postId));
   const activePost = storePost || post;
@@ -162,6 +173,14 @@ export default function PostDetailScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.black}
+              colors={[colors.black]}
+            />
+          }
         >
           {/* Main Post Card */}
           <PostCard
