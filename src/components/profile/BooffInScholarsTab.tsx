@@ -10,6 +10,7 @@ import {
   Share,
   Platform,
   Modal,
+  TextInput,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -25,17 +26,21 @@ import {
   Lock,
   Unlock,
   Award,
-  Link2,
   ArrowUpRight,
   MoreVertical,
   Edit3,
   Copy,
   X as XIcon,
   ShieldCheck,
+  Trash2,
+  KeyRound,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { colors, radii, spacing, typography } from '../../theme';
+import { Button } from '../core/Button';
 import { ScholarPublication, ScholarProfileStats } from '../../types/scholar';
 import { Paper } from '../../types/paper';
 import {
@@ -44,6 +49,7 @@ import {
   normalizeOrcidId,
   connectOrcidOAuth,
 } from '../../api/orcidService';
+import { verifyPasswordAndDisconnectOrcid } from '../../api/authService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 
@@ -88,8 +94,43 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   const [selectedMenuPublication, setSelectedMenuPublication] = useState<ScholarPublication | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
 
+  // Password verification modal for disconnecting ORCID
+  const [disconnectModalVisible, setDisconnectModalVisible] = useState(false);
+  const [disconnectPassword, setDisconnectPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
+
   const activeOrcid = stats.orcidId || propOrcidId;
   const isVerifiedScholar = Boolean(stats.isVerified || propOrcidVerified);
+
+  /**
+   * Syncs existing verified ORCID works
+   */
+  const handleSync = async (orcidToSync?: string) => {
+    const targetOrcid = orcidToSync || activeOrcid;
+    if (!targetOrcid) return;
+    const cleanOrcid = normalizeOrcidId(targetOrcid);
+
+    setConnectError(null);
+    setIsSyncing(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+
+    const res = await syncScholarPublications(userId, cleanOrcid, userFullName);
+    setIsSyncing(false);
+
+    if (res.success) {
+      setPublications(res.publications);
+      setStats(res.stats);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    } else {
+      setConnectError(res.error || 'Failed to synchronize ORCID publications.');
+    }
+  };
 
   // Load publications on mount or when user changes
   const loadPublications = async () => {
@@ -164,30 +205,52 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   };
 
   /**
-   * Syncs existing verified ORCID works
+   * Disconnects ORCID with password verification
    */
-  const handleSync = async (orcidToSync?: string) => {
-    const targetOrcid = orcidToSync || activeOrcid;
-    if (!targetOrcid) return;
-    const cleanOrcid = normalizeOrcidId(targetOrcid);
+  const handleConfirmDisconnect = async () => {
+    if (!disconnectPassword.trim() || isDisconnecting) return;
 
-    setConnectError(null);
-    setIsSyncing(true);
+    setIsDisconnecting(true);
+    setDisconnectError(null);
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
-    const res = await syncScholarPublications(userId, cleanOrcid, userFullName);
-    setIsSyncing(false);
+    const res = await verifyPasswordAndDisconnectOrcid(
+      userId,
+      disconnectPassword,
+      undefined
+    );
+    setIsDisconnecting(false);
 
     if (res.success) {
-      setPublications(res.publications);
-      setStats(res.stats);
+      setDisconnectModalVisible(false);
+      setDisconnectPassword('');
+      setPublications([]);
+      setStats({
+        totalPublications: 0,
+        totalCitations: 0,
+        openAccessCount: 0,
+        isVerified: false,
+        orcidId: undefined,
+      });
+
+      // Update store user profile
+      await updateProfile({
+        orcidId: undefined,
+        orcidVerified: false,
+      });
+
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
+
+      Alert.alert(
+        'ORCID Account Disconnected',
+        'Your ORCID iD and verified publications have been safely removed from your profile.'
+      );
     } else {
-      setConnectError(res.error || 'Failed to synchronize ORCID publications.');
+      setDisconnectError(res.error || 'Password verification failed. Please try again.');
     }
   };
 
@@ -398,21 +461,36 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
           </View>
 
           {isCurrentUser && isVerifiedScholar && (
-            <TouchableOpacity
-              onPress={() => handleSync()}
-              disabled={isSyncing}
-              style={[styles.syncButton, isSyncing && { opacity: 0.6 }]}
-              activeOpacity={0.75}
-            >
-              <RefreshCw
-                size={13}
-                color={colors.textPrimary}
-                style={[isSyncing && { transform: [{ rotate: '45deg' }] }]}
-              />
-              <Text style={styles.syncButtonText}>
-                {isSyncing ? 'Syncing...' : 'Sync ORCID'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.bannerActionsCol}>
+              <TouchableOpacity
+                onPress={() => handleSync()}
+                disabled={isSyncing}
+                style={[styles.syncButton, isSyncing && { opacity: 0.6 }]}
+                activeOpacity={0.75}
+              >
+                <RefreshCw
+                  size={12}
+                  color={colors.textPrimary}
+                  style={[isSyncing && { transform: [{ rotate: '45deg' }] }]}
+                />
+                <Text style={styles.syncButtonText}>
+                  {isSyncing ? 'Syncing...' : 'Sync'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setDisconnectPassword('');
+                  setDisconnectError(null);
+                  setDisconnectModalVisible(true);
+                }}
+                style={styles.disconnectLink}
+                activeOpacity={0.7}
+              >
+                <Trash2 size={11} color={colors.accentRed} />
+                <Text style={styles.disconnectLinkText}>Disconnect</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -795,6 +873,95 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* 5. Password Confirmation Modal for Disconnecting ORCID */}
+      <Modal
+        visible={disconnectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDisconnectModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setDisconnectModalVisible(false)}
+        >
+          <View style={styles.passwordModalCard}>
+            <View style={styles.passwordModalHeader}>
+              <View style={styles.lockIconCircle}>
+                <Lock size={20} color={colors.accentRed} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.passwordModalTitle}>Disconnect ORCID Account</Text>
+                <Text style={styles.passwordModalSubtitle}>
+                  For your security, enter your BooffIn password to confirm disconnecting ORCID ({activeOrcid}).
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setDisconnectModalVisible(false)}
+                style={styles.closeModalBtn}
+              >
+                <XIcon size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {disconnectError && (
+              <View style={styles.passwordErrorBox}>
+                <Text style={styles.passwordErrorText}>{disconnectError}</Text>
+              </View>
+            )}
+
+            <View style={styles.passwordInputWrap}>
+              <Text style={styles.passwordInputLabel}>BooffIn Account Password</Text>
+              <View style={styles.passwordInputFieldRow}>
+                <KeyRound size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={styles.passwordTextInput}
+                  placeholder="Enter your account password..."
+                  placeholderTextColor={colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  value={disconnectPassword}
+                  onChangeText={(val) => {
+                    setDisconnectPassword(val);
+                    if (disconnectError) setDisconnectError(null);
+                  }}
+                  autoCapitalize="none"
+                  autoFocus
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={{ padding: 4 }}
+                >
+                  {showPassword ? (
+                    <EyeOff size={16} color={colors.textSecondary} />
+                  ) : (
+                    <Eye size={16} color={colors.textSecondary} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.passwordModalButtonsRow}>
+              <Button
+                title="Cancel"
+                variant="secondary"
+                size="sm"
+                onPress={() => setDisconnectModalVisible(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title={isDisconnecting ? 'Verifying...' : 'Disconnect ORCID'}
+                variant="danger"
+                size="sm"
+                loading={isDisconnecting}
+                disabled={!disconnectPassword.trim() || isDisconnecting}
+                onPress={handleConfirmDisconnect}
+                style={{ flex: 1.3 }}
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -922,22 +1089,39 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
   },
+  bannerActionsCol: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
   syncButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
     borderColor: colors.borderLight,
-    paddingHorizontal: spacing.sm + 4,
-    paddingVertical: 6,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 5,
     borderRadius: radii.full,
   },
   syncButtonText: {
     ...typography.micro,
     fontWeight: '600',
     color: colors.textPrimary,
-    fontSize: 11.5,
+    fontSize: 11,
+  },
+  disconnectLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  disconnectLinkText: {
+    ...typography.micro,
+    color: colors.accentRed,
+    fontWeight: '600',
+    fontSize: 10.5,
   },
 
   /* Metrics Strip */
@@ -1337,5 +1521,87 @@ const styles = StyleSheet.create({
     ...typography.captionBold,
     fontSize: 13.5,
     color: colors.textPrimary,
+  },
+
+  /* Password Confirmation Disconnect Modal */
+  passwordModalCard: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+  },
+  passwordModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    paddingBottom: spacing.sm + 2,
+  },
+  lockIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passwordModalTitle: {
+    ...typography.bodyBold,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  passwordModalSubtitle: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  passwordErrorBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    padding: spacing.sm,
+    borderRadius: radii.sm,
+  },
+  passwordErrorText: {
+    ...typography.caption,
+    color: colors.accentRed,
+    fontSize: 12,
+  },
+  passwordInputWrap: {
+    gap: 6,
+  },
+  passwordInputLabel: {
+    ...typography.captionBold,
+    fontSize: 12.5,
+    color: colors.textPrimary,
+  },
+  passwordInputFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: Platform.OS === 'ios' ? spacing.sm : 2,
+  },
+  passwordTextInput: {
+    flex: 1,
+    ...typography.body,
+    fontSize: 14,
+    color: colors.textPrimary,
+    minHeight: 38,
+  },
+  passwordModalButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
 });

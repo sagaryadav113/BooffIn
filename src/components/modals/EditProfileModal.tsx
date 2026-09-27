@@ -163,7 +163,7 @@ const EditProfileForm: React.FC<{
       location: location.trim(),
       researchInterests: parsedInterests.length > 0 ? parsedInterests : ['Scientific Research'],
       orcidId: orcidId.trim() || undefined,
-      orcidVerified: !!orcidId.trim(),
+      orcidVerified: Boolean(user?.orcidVerified && user?.orcidId === orcidId.trim()),
       websiteUrl: websiteUrl.trim() || undefined,
     };
 

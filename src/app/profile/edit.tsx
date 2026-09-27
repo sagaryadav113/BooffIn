@@ -287,7 +287,7 @@ export default function EditProfileScreen() {
       location: location.trim(),
       researchInterests: researchInterests.length > 0 ? researchInterests : ['Scientific Research'],
       orcidId: orcidId.trim() || undefined,
-      orcidVerified: !!orcidId.trim(),
+      orcidVerified: Boolean(user?.orcidVerified && user?.orcidId === orcidId.trim()),
       websiteUrl: websiteUrl.trim() || undefined,
     };
 

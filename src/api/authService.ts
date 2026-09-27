@@ -729,3 +729,78 @@ export async function signOutUser(): Promise<void> {
     setStoredLocalSession(null);
   }
 }
+
+/**
+ * Verifies user's password and safely disconnects their ORCID account
+ */
+export async function verifyPasswordAndDisconnectOrcid(
+  userId: string,
+  password: string,
+  userEmail?: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    if (!password || !password.trim()) {
+      return { success: false, error: 'Please enter your password to confirm disconnecting ORCID.' };
+    }
+
+    // 1. Resolve active user email
+    let resolvedEmail = userEmail?.trim().toLowerCase();
+    if (!resolvedEmail) {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        resolvedEmail = authData.user?.email?.toLowerCase();
+      } catch {}
+    }
+
+    // 2. If email is available, verify password with Supabase
+    if (resolvedEmail) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: resolvedEmail,
+        password: password.trim(),
+      });
+
+      if (signInError) {
+        return {
+          success: false,
+          error: 'Incorrect password. Please verify your password and try again.',
+        };
+      }
+    }
+
+    // 3. Clear ORCID credentials on profiles database table
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        orcid_id: null,
+        orcid_verified: false,
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    // 4. Remove cached publications for this user
+    try {
+      await supabase.from('scholar_publications').delete().eq('user_id', userId);
+    } catch {}
+
+    // 5. Update stored local session
+    const session = getStoredLocalSession();
+    if (session && session.id === userId) {
+      setStoredLocalSession({
+        ...session,
+        orcidId: undefined,
+        orcidVerified: false,
+      });
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Could not verify password and disconnect ORCID.',
+    };
+  }
+}
+
