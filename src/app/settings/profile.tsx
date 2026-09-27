@@ -26,6 +26,7 @@ import {
   removeProfileAvatar,
   removeProfileBanner,
 } from '../../api/storageService';
+import { ImageCropperModal, CroppedImageResult } from '../../components/modals/ImageCropperModal';
 
 const DEFAULT_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
@@ -44,6 +45,15 @@ export default function ProfileSettingsScreen() {
   const [bannerUrl, setBannerUrl] = useState(user?.bannerUrl || '');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [cropperState, setCropperState] = useState<{
+    visible: boolean;
+    imageUri: string | null;
+    cropType: 'avatar' | 'banner';
+  }>({
+    visible: false,
+    imageUri: null,
+    cropType: 'avatar',
+  });
   const [interestInput, setInterestInput] = useState('');
   const [interests, setInterests] = useState<string[]>(user?.researchInterests || []);
 
@@ -144,16 +154,53 @@ export default function ProfileSettingsScreen() {
     const res = await pickAvatarImage();
     if (res.cancelled || !res.asset) return;
 
-    setIsUploadingAvatar(true);
-    const uploadRes = await uploadProfileAvatar(user.id, res.asset);
-    setIsUploadingAvatar(false);
+    setCropperState({
+      visible: true,
+      imageUri: res.asset.uri,
+      cropType: 'avatar',
+    });
+  };
 
-    if (uploadRes.success && uploadRes.url) {
-      setAvatarUrl(uploadRes.url);
-      setSuccessMessage('Profile photo updated successfully.');
-      setTimeout(() => setSuccessMessage(null), 3500);
+  const handlePickBanner = async () => {
+    if (!user?.id) return;
+    const res = await pickBannerImage();
+    if (res.cancelled || !res.asset) return;
+
+    setCropperState({
+      visible: true,
+      imageUri: res.asset.uri,
+      cropType: 'banner',
+    });
+  };
+
+  const handleCropperSave = async (cropped: CroppedImageResult) => {
+    setCropperState((prev) => ({ ...prev, visible: false }));
+    if (!user?.id) return;
+
+    if (cropperState.cropType === 'avatar') {
+      setIsUploadingAvatar(true);
+      const uploadRes = await uploadProfileAvatar(user.id, cropped as any);
+      setIsUploadingAvatar(false);
+
+      if (uploadRes.success && uploadRes.url) {
+        setAvatarUrl(uploadRes.url);
+        setSuccessMessage('Profile photo updated successfully.');
+        setTimeout(() => setSuccessMessage(null), 3500);
+      } else {
+        setErrorMessage(uploadRes.error || 'Failed to upload photo.');
+      }
     } else {
-      setErrorMessage(uploadRes.error || 'Failed to upload photo.');
+      setIsUploadingBanner(true);
+      const uploadRes = await uploadProfileBanner(user.id, cropped as any);
+      setIsUploadingBanner(false);
+
+      if (uploadRes.success && uploadRes.url) {
+        setBannerUrl(uploadRes.url);
+        setSuccessMessage('Banner image updated successfully.');
+        setTimeout(() => setSuccessMessage(null), 3500);
+      } else {
+        setErrorMessage(uploadRes.error || 'Failed to upload banner.');
+      }
     }
   };
 
@@ -169,24 +216,6 @@ export default function ProfileSettingsScreen() {
       setTimeout(() => setSuccessMessage(null), 3500);
     } else {
       setErrorMessage(res.error || 'Failed to remove photo.');
-    }
-  };
-
-  const handlePickBanner = async () => {
-    if (!user?.id) return;
-    const res = await pickBannerImage();
-    if (res.cancelled || !res.asset) return;
-
-    setIsUploadingBanner(true);
-    const uploadRes = await uploadProfileBanner(user.id, res.asset);
-    setIsUploadingBanner(false);
-
-    if (uploadRes.success && uploadRes.url) {
-      setBannerUrl(uploadRes.url);
-      setSuccessMessage('Banner image updated successfully.');
-      setTimeout(() => setSuccessMessage(null), 3500);
-    } else {
-      setErrorMessage(uploadRes.error || 'Failed to upload banner.');
     }
   };
 
@@ -563,6 +592,15 @@ export default function ProfileSettingsScreen() {
           style={{ flex: 2 }}
         />
       </View>
+
+      {/* Interactive Image Cropper Modal */}
+      <ImageCropperModal
+        visible={cropperState.visible}
+        imageUri={cropperState.imageUri}
+        cropType={cropperState.cropType}
+        onSave={handleCropperSave}
+        onCancel={() => setCropperState((prev) => ({ ...prev, visible: false }))}
+      />
     </SettingsLayout>
   );
 }

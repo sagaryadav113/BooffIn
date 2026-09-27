@@ -68,6 +68,7 @@ import {
 import { fetchUserPosts, fetchSavedPostsAndPapers } from '../../api/socialService';
 import { Post, Paper, CollaborationRequest } from '../../types';
 import { FollowListModal } from '../../components/modals/FollowListModal';
+import { ImageCropperModal, CroppedImageResult } from '../../components/modals/ImageCropperModal';
 
 export const DEFAULT_PROFILE_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
@@ -92,6 +93,16 @@ export default function CurrentUserProfileScreen() {
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
 
+  const [cropperState, setCropperState] = useState<{
+    visible: boolean;
+    imageUri: string | null;
+    cropType: 'avatar' | 'banner';
+  }>({
+    visible: false,
+    imageUri: null,
+    cropType: 'avatar',
+  });
+
   const user = storeUser;
 
   const handlePickAndUploadAvatar = async () => {
@@ -101,13 +112,11 @@ export default function CurrentUserProfileScreen() {
     const res = await pickAvatarImage();
     if (res.cancelled || !res.asset) return;
 
-    setIsUploadingAvatar(true);
-    const uploadRes = await uploadProfileAvatar(user.id, res.asset);
-    setIsUploadingAvatar(false);
-
-    if (!uploadRes.success) {
-      Alert.alert('Upload Failed', uploadRes.error || 'Could not upload profile photo.');
-    }
+    setCropperState({
+      visible: true,
+      imageUri: res.asset.uri,
+      cropType: 'avatar',
+    });
   };
 
   const handleRemoveAvatar = async () => {
@@ -130,12 +139,33 @@ export default function CurrentUserProfileScreen() {
     const res = await pickBannerImage();
     if (res.cancelled || !res.asset) return;
 
-    setIsUploadingBanner(true);
-    const uploadRes = await uploadProfileBanner(user.id, res.asset);
-    setIsUploadingBanner(false);
+    setCropperState({
+      visible: true,
+      imageUri: res.asset.uri,
+      cropType: 'banner',
+    });
+  };
 
-    if (!uploadRes.success) {
-      Alert.alert('Upload Failed', uploadRes.error || 'Could not upload banner.');
+  const handleCropperSave = async (cropped: CroppedImageResult) => {
+    setCropperState((prev) => ({ ...prev, visible: false }));
+    if (!user?.id) return;
+
+    if (cropperState.cropType === 'avatar') {
+      setIsUploadingAvatar(true);
+      const uploadRes = await uploadProfileAvatar(user.id, cropped as any);
+      setIsUploadingAvatar(false);
+
+      if (!uploadRes.success) {
+        Alert.alert('Upload Failed', uploadRes.error || 'Could not upload profile photo.');
+      }
+    } else {
+      setIsUploadingBanner(true);
+      const uploadRes = await uploadProfileBanner(user.id, cropped as any);
+      setIsUploadingBanner(false);
+
+      if (!uploadRes.success) {
+        Alert.alert('Upload Failed', uploadRes.error || 'Could not upload banner.');
+      }
     }
   };
 
@@ -1101,6 +1131,15 @@ export default function CurrentUserProfileScreen() {
         userId={user.id}
         type={followModalType}
         userName={user.fullName}
+      />
+
+      {/* Interactive Image Cropper Modal */}
+      <ImageCropperModal
+        visible={cropperState.visible}
+        imageUri={cropperState.imageUri}
+        cropType={cropperState.cropType}
+        onSave={handleCropperSave}
+        onCancel={() => setCropperState((prev) => ({ ...prev, visible: false }))}
       />
     </SafeAreaView>
   );

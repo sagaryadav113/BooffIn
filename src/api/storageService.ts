@@ -33,10 +33,19 @@ export interface UploadMediaResult {
   error: string | null;
 }
 
+export type UploadableImageAsset = ImagePicker.ImagePickerAsset | {
+  uri: string;
+  mimeType?: string;
+  base64?: string;
+  fileSize?: number;
+  width?: number;
+  height?: number;
+};
+
 /**
  * Infers MIME type from asset URI if mimeType is undefined
  */
-function inferMimeType(asset: ImagePicker.ImagePickerAsset): string {
+function inferMimeType(asset: UploadableImageAsset): string {
   if (asset.mimeType) return asset.mimeType.toLowerCase();
   const uri = asset.uri.toLowerCase();
   if (uri.endsWith('.png')) return 'image/png';
@@ -84,7 +93,7 @@ function decodeBase64ToUint8Array(base64: string): Uint8Array {
  * Validates selected image asset against allowed MIME types and max size limit (5MB)
  */
 export function validateImage(
-  asset: ImagePicker.ImagePickerAsset,
+  asset: UploadableImageAsset,
   calculatedSize?: number
 ): ImageValidationResult {
   const mimeType = inferMimeType(asset);
@@ -166,7 +175,7 @@ export async function pickImageFromLibrary(
 }
 
 /**
- * Prompts user to pick an avatar image (1:1 square crop)
+ * Prompts user to pick an avatar image
  */
 export async function pickAvatarImage(): Promise<{
   cancelled: boolean;
@@ -174,14 +183,13 @@ export async function pickAvatarImage(): Promise<{
   error: string | null;
 }> {
   return pickImageFromLibrary({
-    aspect: [1, 1],
-    quality: 0.85,
-    allowsEditing: true,
+    quality: 0.95,
+    allowsEditing: false,
   });
 }
 
 /**
- * Prompts user to pick a banner/cover image (3:1 panoramic aspect)
+ * Prompts user to pick a banner/cover image
  */
 export async function pickBannerImage(): Promise<{
   cancelled: boolean;
@@ -189,9 +197,8 @@ export async function pickBannerImage(): Promise<{
   error: string | null;
 }> {
   return pickImageFromLibrary({
-    aspect: [3, 1],
-    quality: 0.85,
-    allowsEditing: true,
+    quality: 0.95,
+    allowsEditing: false,
   });
 }
 
@@ -199,7 +206,7 @@ export async function pickBannerImage(): Promise<{
  * Converts image asset to binary data (Uint8Array / ArrayBuffer / Blob) cross-platform
  */
 async function getAssetBinaryData(
-  asset: ImagePicker.ImagePickerAsset
+  asset: UploadableImageAsset
 ): Promise<{ data: Uint8Array | ArrayBuffer | Blob; size: number }> {
   // 1. If base64 is available (standard in Expo ImagePicker when base64: true)
   if (asset.base64) {
@@ -225,7 +232,7 @@ async function getAssetBinaryData(
  */
 export async function uploadProfileAvatar(
   userId: string,
-  asset: ImagePicker.ImagePickerAsset,
+  asset: UploadableImageAsset,
   onProgress?: (progress: number) => void
 ): Promise<UploadMediaResult> {
   try {
@@ -359,7 +366,7 @@ export async function removeProfileAvatar(
  */
 export async function uploadProfileBanner(
   userId: string,
-  asset: ImagePicker.ImagePickerAsset,
+  asset: UploadableImageAsset,
   onProgress?: (progress: number) => void
 ): Promise<UploadMediaResult> {
   try {
