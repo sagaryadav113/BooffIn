@@ -48,6 +48,7 @@ import {
   removeProfileBanner,
 } from '../../api/storageService';
 import { ImageCropperModal, CroppedImageResult } from '../../components/modals/ImageCropperModal';
+import { ResearchDisciplinePicker } from '../../components/taxonomy/ResearchDisciplinePicker';
 
 const DEFAULT_BANNER_FALLBACK = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
@@ -76,8 +77,8 @@ export default function EditProfileScreen() {
   const [bio, setBio] = useState(user?.bio || '');
   const [country, setCountry] = useState(user?.country || 'India');
   const [location, setLocation] = useState(user?.location || '');
-  const [researchInterestsInput, setResearchInterestsInput] = useState(
-    (user?.researchInterests || []).join(', ')
+  const [researchInterests, setResearchInterests] = useState<string[]>(
+    user?.researchInterests || []
   );
   const [orcidId, setOrcidId] = useState(user?.orcidId || '');
   const [websiteUrl, setWebsiteUrl] = useState(user?.websiteUrl || '');
@@ -272,11 +273,6 @@ export default function EditProfileScreen() {
     }
 
     setIsSaving(true);
-    const parsedInterests = researchInterestsInput
-      .split(',')
-      .map((i) => i.trim())
-      .filter((i) => i.length > 0);
-
     const updates = {
       avatarUrl: avatarUrl.trim() || undefined,
       bannerUrl: bannerUrl.trim() || undefined,
@@ -289,7 +285,7 @@ export default function EditProfileScreen() {
       bio: bio.trim(),
       country: country.trim(),
       location: location.trim(),
-      researchInterests: parsedInterests.length > 0 ? parsedInterests : ['Scientific Research'],
+      researchInterests: researchInterests.length > 0 ? researchInterests : ['Scientific Research'],
       orcidId: orcidId.trim() || undefined,
       orcidVerified: !!orcidId.trim(),
       websiteUrl: websiteUrl.trim() || undefined,
@@ -602,22 +598,25 @@ export default function EditProfileScreen() {
               </View>
             </View>
 
-            {/* Research Interests */}
+            {/* Research Disciplines & Fields (1,000+ Taxonomy Search & Selection) */}
             <View style={styles.formGroup}>
-              <Text style={styles.fieldLabel}>Research Interests (Comma separated)</Text>
-              <View style={styles.inputWithIconContainer}>
-                <Tag size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
-                <TextInput
-                  style={styles.fieldInputClean}
-                  value={researchInterestsInput}
-                  onChangeText={setResearchInterestsInput}
-                  placeholder="e.g. Neuroscience, AI & Bio, Genetics"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-              <Text style={styles.fieldHint}>
-                These topics will also configure your customized top feed tabs on the home screen.
-              </Text>
+              <Text style={styles.fieldLabel}>Research Disciplines & Fields</Text>
+              <ResearchDisciplinePicker
+                selectedTopics={researchInterests}
+                onToggleTopic={(topic) => {
+                  if (researchInterests.some((t) => t.toLowerCase() === topic.toLowerCase())) {
+                    setResearchInterests(researchInterests.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
+                  } else {
+                    setResearchInterests([...researchInterests, topic]);
+                  }
+                }}
+                onRemoveTopic={(topic) => {
+                  setResearchInterests(researchInterests.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
+                }}
+                onClearAll={() => setResearchInterests([])}
+                searchPlaceholder="Search 1,000+ fields, subfields, or topics..."
+                hint="These topics will also configure your customized top feed tabs on the home screen."
+              />
             </View>
 
             {/* ORCID iD */}

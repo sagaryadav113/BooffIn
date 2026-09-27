@@ -27,6 +27,7 @@ import {
   removeProfileBanner,
 } from '../../api/storageService';
 import { ImageCropperModal, CroppedImageResult } from '../../components/modals/ImageCropperModal';
+import { ResearchDisciplinePicker } from '../../components/taxonomy/ResearchDisciplinePicker';
 
 const DEFAULT_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
@@ -530,50 +531,25 @@ export default function ProfileSettingsScreen() {
         />
       </SettingsCardGroup>
 
-      {/* Research Interests Tags */}
-      <SettingsSectionHeader title="Research Topics & Keywords" />
+      {/* Research Disciplines & Fields (1,000+ Taxonomy Search & Picker) */}
+      <SettingsSectionHeader title="Research Disciplines & Fields" />
       <SettingsCardGroup style={styles.cardPadding}>
-        <View style={styles.tagInputRow}>
-          <View style={{ flex: 1 }}>
-            <Input
-              label="Add Research Topic"
-              value={interestInput}
-              onChangeText={setInterestInput}
-              placeholder="e.g. Neural Dynamics, CRISPR"
-              onSubmitEditing={handleAddInterest}
-            />
-          </View>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.addTagBtn}
-            onPress={handleAddInterest}
-          >
-            <Typography variant="captionBold" color={colors.white}>
-              Add
-            </Typography>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.tagsContainer}>
-          {interests.map((interest) => (
-            <View key={interest} style={styles.tagPill}>
-              <Typography variant="caption" color={colors.textPrimary}>
-                {interest}
-              </Typography>
-              <TouchableOpacity
-                onPress={() => handleRemoveInterest(interest)}
-                style={styles.removeTagBtn}
-              >
-                <Icon name="X" size="xs" color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          ))}
-          {interests.length === 0 && (
-            <Typography variant="micro" color={colors.textMuted}>
-              No topics added yet. Add research topics to improve recommendations.
-            </Typography>
-          )}
-        </View>
+        <ResearchDisciplinePicker
+          selectedTopics={interests}
+          onToggleTopic={(topic) => {
+            if (interests.some((t) => t.toLowerCase() === topic.toLowerCase())) {
+              setInterests(interests.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
+            } else {
+              setInterests([...interests, topic]);
+            }
+          }}
+          onRemoveTopic={(topic) => {
+            setInterests(interests.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
+          }}
+          onClearAll={() => setInterests([])}
+          searchPlaceholder="Search 1,000+ fields, subfields, or topics..."
+          hint="Your selected disciplines configure your home feed top tabs and preprint recommendations."
+        />
       </SettingsCardGroup>
 
       {/* Action Buttons */}
