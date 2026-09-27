@@ -52,7 +52,8 @@ interface PostState {
   fetchCommentsForPost: (postId: string, currentUserId?: string) => Promise<void>;
   getCommentsForPost: (postId: string) => Comment[];
   addComment: (postId: string, content: string, parentId?: string, currentUserId?: string) => Promise<Comment | null>;
-  deleteComment: (commentId: string, postId: string, currentUserId: string) => Promise<boolean>;
+  deleteComment: (commentId: string, postId: string, currentUserId?: string) => Promise<boolean>;
+  toggleLikeComment: (commentId: string, postId: string, currentUserId?: string) => void;
   getPostById: (id: string) => Post | undefined;
   getPostsByPaper: (paperId: string) => Post[];
   getPostsByUser: (userId: string) => Post[];
@@ -594,6 +595,38 @@ export const usePostStore = create<PostState>((set, get) => ({
     }
 
     return true;
+  },
+
+  toggleLikeComment: (commentId, postId) => {
+    set((state) => {
+      const currentList = state.comments[postId] || [];
+      const updateInList = (list: Comment[]): Comment[] => {
+        return list.map((c) => {
+          if (c.id === commentId) {
+            const wasLiked = Boolean(c.isLiked);
+            return {
+              ...c,
+              isLiked: !wasLiked,
+              likesCount: wasLiked ? Math.max(0, c.likesCount - 1) : c.likesCount + 1,
+            };
+          }
+          if (c.replies && c.replies.length > 0) {
+            return {
+              ...c,
+              replies: updateInList(c.replies),
+            };
+          }
+          return c;
+        });
+      };
+
+      return {
+        comments: {
+          ...state.comments,
+          [postId]: updateInList(currentList),
+        },
+      };
+    });
   },
 
   getPostById: (id) => get().posts.find((p) => p.id === id),

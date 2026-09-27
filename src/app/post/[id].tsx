@@ -1,30 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
   SafeAreaView,
   StatusBar,
   ScrollView,
-  TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   Alert,
   RefreshControl,
+  Text,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { MessageSquare } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
-import { Avatar } from '../../components/core/Avatar';
-import { Typography } from '../../components/core/Typography';
-import { Icon } from '../../components/core/Icon';
 import { PostCard } from '../../components/cards/PostCard';
 import { CommentCard } from '../../components/cards/CommentCard';
+import { DiscussionComposer, DiscussionTypePills } from '../../components/discussion';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Comment, Post } from '../../types';
+import { Comment, DiscussionType, Post } from '../../types';
 import { supabase } from '../../api/client';
 import { mapSupabasePost, populatePollVotes } from '../../api/socialService';
 
@@ -34,17 +32,22 @@ export default function PostDetailScreen() {
 
   const getPostById = usePostStore((s) => s.getPostById);
   const getCommentsForPost = usePostStore((s) => s.getCommentsForPost);
+  const commentsMap = usePostStore((s) => s.comments);
   const fetchCommentsForPost = usePostStore((s) => s.fetchCommentsForPost);
   const addComment = usePostStore((s) => s.addComment);
   const deleteComment = usePostStore((s) => s.deleteComment);
+  const toggleLikeComment = usePostStore((s) => s.toggleLikeComment);
   const currentUser = useAuthStore((s) => s.user);
 
-  const [commentText, setCommentText] = useState('');
-  const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | DiscussionType>('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [post, setPost] = useState<Post | null>(getPostById(postId) || null);
   const [isLoading, setIsLoading] = useState(!post);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const comments = useMemo(() => {
+    return postId ? getCommentsForPost(postId) : [];
+  }, [postId, commentsMap, getCommentsForPost]);
 
   const loadPostData = useCallback(async (isRefresh = false) => {
     if (!postId) {
@@ -98,55 +101,104 @@ export default function PostDetailScreen() {
 
   const storePost = usePostStore((s) => s.getPostById(postId));
   const activePost = storePost || post;
-  const comments = activePost ? getCommentsForPost(activePost.id) : [];
 
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <AppHeader title="Discussion" showBack />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Typography variant="caption" color={colors.textSecondary}>Loading discussion...</Typography>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Filter counts
+  const filterCounts = useMemo(() => {
+    const counts = {
+      all: comments.length,
+      discussion: 0,
+      question: 0,
+      insight: 0,
+      methodology: 0,
+    };
+    comments.forEach((c) => {
+      const textLower = c.content.toLowerCase();
+      if (textLower.startsWith('[question]') || textLower.includes('?')) {
+        counts.question += 1;
+      } else if (textLower.startsWith('[insight]') || textLower.includes('hypothesis') || textLower.includes('insight')) {
+        counts.insight += 1;
+      } else if (textLower.startsWith('[methodology]') || textLower.includes('protocol') || textLower.includes('method')) {
+        counts.methodology += 1;
+      } else {
+        counts.discussion += 1;
+      }
+    });
+    return counts;
+  }, [comments]);
 
-  if (!activePost) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <AppHeader title="Discussion" showBack />
-        <EmptyState
-          icon="FileText"
-          title="Post not found"
-          description="This research discussion may have been deleted or does not exist."
-        />
-      </SafeAreaView>
-    );
-  }
+  // Filtered comments
+  const filteredComments = useMemo(() => {
+    if (activeFilter === 'all') return comments;
+    return comments.filter((c) => {
+      const textLower = c.content.toLowerCase();
+      if (activeFilter === 'question') {
+        return textLower.startsWith('[question]') || textLower.includes('?');
+      }
+      if (activeFilter === 'insight') {
+        return textLower.startsWith('[insight]') || textLower.includes('hypothesis') || textLower.includes('insight');
+      }
+      if (activeFilter === 'methodology') {
+        return textLower.startsWith('[methodology]') || textLower.includes('protocol') || textLower.includes('method');
+      }
+      return !textLower.startsWith('[question]') && !textLower.startsWith('[insight]') && !textLower.startsWith('[methodology]') && !textLower.includes('?');
+    });
+  }, [comments, activeFilter]);
 
-  const handleSendComment = async () => {
-    if (!commentText.trim() || isSubmitting) return;
+  const handleCreateDiscussion = async ({
+    type,
+    title,
+    content,
+  }: {
+    type: DiscussionType;
+    title?: string;
+    content: string;
+  }) => {
+    if (!content.trim() || isSubmitting || !activePost) return;
 
-    const textToSend = commentText.trim();
-    setCommentText('');
-    const targetParentId = replyingTo?.id;
-    setReplyingTo(null);
+    let finalContent = content.trim();
+    if (title && title.trim()) {
+      finalContent = `${title.trim()}\n\n${finalContent}`;
+    }
+    if (type !== 'discussion') {
+      finalContent = `[${type}] ${finalContent}`;
+    }
 
     setIsSubmitting(true);
-    await addComment(activePost.id, textToSend, targetParentId, currentUser.id);
-    setIsSubmitting(false);
+    try {
+      await addComment(activePost.id, finalContent, undefined, currentUser.id);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    } catch (err) {
+      console.warn('[PostDetailScreen] Error creating discussion:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddReply = async (parentId: string, replyText: string) => {
+    if (!replyText.trim() || !activePost) return;
+    try {
+      await addComment(activePost.id, replyText.trim(), parentId, currentUser.id);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    } catch (err) {
+      console.warn('[PostDetailScreen] Error adding reply:', err);
+    }
   };
 
   const handleDeleteComment = (commentId: string) => {
+    if (!activePost) return;
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Are you sure you want to delete this comment?');
+      const confirmed = window.confirm('Are you sure you want to delete this discussion?');
       if (confirmed) {
         deleteComment(commentId, activePost.id, currentUser.id);
       }
     } else {
       Alert.alert(
-        'Delete Comment',
-        'Are you sure you want to delete this critique?',
+        'Delete Discussion',
+        'Are you sure you want to delete this contribution?',
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -158,6 +210,30 @@ export default function PostDetailScreen() {
       );
     }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AppHeader title="Discussion" showBack />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={styles.loadingText}>Loading discussion...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!activePost) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AppHeader title="Discussion" showBack />
+        <EmptyState
+          icon="FileText"
+          title="Discussion not found"
+          description="This scientific discussion may have been removed or does not exist."
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -173,6 +249,7 @@ export default function PostDetailScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -195,80 +272,64 @@ export default function PostDetailScreen() {
             onUpdated={(updated) => setPost(updated)}
           />
 
-          {/* Comments Section Header */}
-          <View style={styles.sectionHeader}>
-            <Typography variant="captionBold" color={colors.textPrimary}>
-              Critiques & Discussion ({comments.length})
-            </Typography>
+          {/* Section Header */}
+          <View style={styles.discussionHeader}>
+            <View style={styles.discussionTitleRow}>
+              <MessageSquare size={20} color={colors.textPrimary} />
+              <Text style={styles.discussionTitleText}>Discussion</Text>
+              <View style={styles.discussionCountBadge}>
+                <Text style={styles.discussionCountBadgeText}>
+                  {comments.length}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.discussionSubtitleText}>
+              Constructive scientific inquiry & insights
+            </Text>
           </View>
 
-          {/* Comments List */}
-          <View style={styles.commentsList}>
-            {comments.length > 0 ? (
-              comments.map((c) => (
+          {/* Discussion Type Filter Pills */}
+          <DiscussionTypePills
+            activeType={activeFilter}
+            counts={filterCounts}
+            onSelectType={setActiveFilter}
+          />
+
+          {/* Discussion Composer Card */}
+          <View style={styles.composerWrapper}>
+            <DiscussionComposer
+              currentUser={currentUser}
+              onSubmit={handleCreateDiscussion}
+              isSubmitting={isSubmitting}
+            />
+          </View>
+
+          {/* Discussion List */}
+          <View style={styles.discussionsList}>
+            {filteredComments.length > 0 ? (
+              filteredComments.map((c) => (
                 <CommentCard
                   key={c.id}
                   comment={c}
-                  onReply={(target) => setReplyingTo(target)}
+                  onAddReply={handleAddReply}
+                  onLike={(cId) => toggleLikeComment(cId, activePost.id, currentUser.id)}
+                  onLikeReply={(_, replyId) => toggleLikeComment(replyId, activePost.id, currentUser.id)}
                   onDelete={handleDeleteComment}
                   currentUserId={currentUser.id}
+                  currentUser={currentUser}
                 />
               ))
             ) : (
-              <EmptyState
-                icon="MessageCircle"
-                title="No comments yet"
-                description="Share your constructive critique, question, or replication note."
-              />
+              <View style={styles.emptyWrap}>
+                <EmptyState
+                  icon="MessageSquare"
+                  title="No discussions yet"
+                  description="Start a constructive scientific discussion on this research post."
+                />
+              </View>
             )}
           </View>
         </ScrollView>
-
-        {/* Reply Bar */}
-        <View style={styles.bottomBar}>
-          {replyingTo && (
-            <View style={styles.replyingToBar}>
-              <Typography variant="micro" color={colors.textSecondary}>
-                Replying to <Typography variant="microBold" color={colors.textPrimary}>@{replyingTo.author.handle}</Typography>
-              </Typography>
-              <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                <Typography variant="micro" color={colors.accentRed} style={{ fontWeight: '600' }}>
-                  Cancel
-                </Typography>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={styles.inputRow}>
-            <Avatar
-              url={currentUser.avatarUrl}
-              name={currentUser.fullName}
-              size={32}
-              style={{ marginRight: spacing.sm }}
-            />
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Post a constructive critique or reply..."
-              placeholderTextColor={colors.textMuted}
-              value={commentText}
-              onChangeText={setCommentText}
-              multiline
-              editable={!isSubmitting}
-            />
-            <TouchableOpacity
-              onPress={handleSendComment}
-              disabled={!commentText.trim() || isSubmitting}
-              style={[
-                styles.sendButton,
-                commentText.trim() && !isSubmitting
-                  ? styles.sendButtonActive
-                  : styles.sendButtonDisabled,
-              ]}
-            >
-              <Icon name="Send" size="xs" color={colors.white} />
-            </TouchableOpacity>
-          </View>
-        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -282,57 +343,55 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: spacing.xxxl,
   },
-  sectionHeader: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.backgroundSecondary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+  loadingText: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
-  commentsList: {
+  discussionHeader: {
     paddingHorizontal: spacing.lg,
-  },
-  bottomBar: {
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
     backgroundColor: colors.background,
   },
-  replyingToBar: {
+  discussionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: spacing.xs,
+    gap: spacing.xs + 2,
+    marginBottom: 2,
   },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  commentInput: {
-    flex: 1,
-    ...typography.body,
-    fontSize: 14,
+  discussionTitleText: {
+    fontSize: 20,
+    fontWeight: '700',
     color: colors.textPrimary,
+  },
+  discussionCountBadge: {
     backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: radii.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    maxHeight: 80,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
-  sendButton: {
-    width: 34,
-    height: 34,
-    borderRadius: radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.sm,
+  discussionCountBadgeText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 11,
   },
-  sendButtonActive: {
-    backgroundColor: colors.black,
+  discussionSubtitleText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginBottom: spacing.xs,
   },
-  sendButtonDisabled: {
-    backgroundColor: colors.borderDark,
-    opacity: 0.5,
+  composerWrapper: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  discussionsList: {
+    marginTop: spacing.xs,
+  },
+  emptyWrap: {
+    paddingVertical: spacing.xl,
   },
 });

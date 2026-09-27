@@ -370,7 +370,7 @@ export default function CurrentUserProfileScreen() {
       pathname: '/(tabs)/create',
       params: {
         paperData: JSON.stringify(paperAttachment),
-        initialContent: `Sharing my paper: "${pub.title}". Welcoming peer feedback, questions, and critique from fellow researchers!`,
+        initialContent: `Sharing my paper: "${pub.title}". Welcoming peer feedback, questions, and discussions from fellow researchers!`,
       },
     });
   };
@@ -870,7 +870,7 @@ export default function CurrentUserProfileScreen() {
             <EmptyState
               icon="TrendingUp"
               title="Recent Activity"
-              description="Your recent discussions, methodology critiques, and replies will appear here in chronological order."
+              description="Your recent discussions, questions, and replies will appear here in chronological order."
             />
           </View>
         )}

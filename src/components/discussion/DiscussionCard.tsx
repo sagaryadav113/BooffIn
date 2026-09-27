@@ -452,15 +452,14 @@ const styles = StyleSheet.create({
   },
   repliesList: {
     marginTop: spacing.sm,
-    paddingLeft: spacing.md,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.borderLight,
     gap: spacing.sm,
   },
   replyCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: radii.md,
-    padding: spacing.sm,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: '#EEF2F6',
   },
   replyHeader: {
     flexDirection: 'row',

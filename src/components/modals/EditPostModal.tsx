@@ -219,7 +219,7 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
 
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Share your research hypothesis, critique, or update... Type @ to mention a colleague."
+                  placeholder="Share your research hypothesis, discussion, or update... Type @ to mention a colleague."
                   placeholderTextColor={colors.textMuted}
                   value={content}
                   onChangeText={(text) => {

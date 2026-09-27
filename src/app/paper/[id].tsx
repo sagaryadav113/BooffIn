@@ -77,6 +77,7 @@ export default function PaperDetailScreen() {
   const fetchCommentsForPost = usePostStore((s) => s.fetchCommentsForPost);
   const addPostComment = usePostStore((s) => s.addComment);
   const deletePostComment = usePostStore((s) => s.deleteComment);
+  const toggleLikeComment = usePostStore((s) => s.toggleLikeComment);
 
   // Stable Discussion Store Selectors
   const discussionsMap = useDiscussionStore((s) => s.discussions);
@@ -249,48 +250,78 @@ export default function PaperDetailScreen() {
     }
   };
 
-  // Unified Comment Submission Handler
-  const handleSendComment = async () => {
-    if (!commentText.trim() || isSubmittingComment || !paper) return;
-
-    const textToSend = commentText.trim();
-    setCommentText('');
-    const targetParentId = replyingTo?.id;
-    setReplyingTo(null);
+  // Unified Discussion Creation Handler
+  const handleCreateDiscussion = async ({
+    type,
+    title,
+    content,
+  }: {
+    type: DiscussionType;
+    title?: string;
+    content: string;
+  }) => {
+    if (!content.trim() || isSubmittingComment || !paper) return;
 
     setIsSubmittingComment(true);
     try {
       if (activePostId) {
-        // Direct synchronization with the post feed comment thread
-        await addPostComment(activePostId, textToSend, targetParentId, currentUser?.id);
+        let finalContent = content.trim();
+        if (title && title.trim()) {
+          finalContent = `${title.trim()}\n\n${finalContent}`;
+        }
+        if (type !== 'discussion') {
+          finalContent = `[${type}] ${finalContent}`;
+        }
+        await addPostComment(activePostId, finalContent, undefined, currentUser?.id);
       } else {
-        // Fallback to paper discussion store
         addDiscussion({
           paperId: paper.id,
           author: currentUser,
-          type: 'discussion',
-          content: textToSend,
+          type,
+          title: title?.trim() || undefined,
+          content: content.trim(),
         });
       }
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
     } catch (err) {
-      console.warn('[PaperDetail] Error adding comment:', err);
+      console.warn('[PaperDetail] Error adding discussion:', err);
     } finally {
       setIsSubmittingComment(false);
+    }
+  };
+
+  const handleAddReplyToDiscussion = async (parentId: string, replyText: string) => {
+    if (!replyText.trim() || !paper) return;
+    try {
+      if (activePostId) {
+        await addPostComment(activePostId, replyText.trim(), parentId, currentUser?.id);
+      } else {
+        addReply({
+          paperId: paper.id,
+          discussionId: parentId,
+          author: currentUser,
+          content: replyText.trim(),
+        });
+      }
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    } catch (err) {
+      console.warn('[PaperDetail] Error adding reply:', err);
     }
   };
 
   const handleDeleteComment = (commentId: string) => {
     if (!activePostId) return;
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Are you sure you want to delete this comment?');
+      const confirmed = window.confirm('Are you sure you want to delete this discussion?');
       if (confirmed) {
         deletePostComment(commentId, activePostId, currentUser?.id);
       }
     } else {
-      Alert.alert('Delete Comment', 'Are you sure you want to delete this critique?', [
+      Alert.alert('Delete Discussion', 'Are you sure you want to delete this contribution?', [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -300,6 +331,64 @@ export default function PaperDetailScreen() {
       ]);
     }
   };
+
+  // Filter counts calculation
+  const filterCounts = useMemo(() => {
+    const counts = {
+      all: activePostId ? postComments.length : discussions.length,
+      discussion: 0,
+      question: 0,
+      insight: 0,
+      methodology: 0,
+    };
+
+    if (activePostId) {
+      postComments.forEach((c) => {
+        const textLower = c.content.toLowerCase();
+        if (textLower.startsWith('[question]') || textLower.includes('?')) {
+          counts.question += 1;
+        } else if (textLower.startsWith('[insight]') || textLower.includes('hypothesis') || textLower.includes('insight')) {
+          counts.insight += 1;
+        } else if (textLower.startsWith('[methodology]') || textLower.includes('protocol') || textLower.includes('method')) {
+          counts.methodology += 1;
+        } else {
+          counts.discussion += 1;
+        }
+      });
+    } else {
+      discussions.forEach((d) => {
+        if (counts[d.type] !== undefined) {
+          counts[d.type] += 1;
+        } else {
+          counts.discussion += 1;
+        }
+      });
+    }
+    return counts;
+  }, [activePostId, postComments, discussions]);
+
+  // Filtered discussions/comments
+  const filteredPostComments = useMemo(() => {
+    if (activeFilter === 'all') return postComments;
+    return postComments.filter((c) => {
+      const textLower = c.content.toLowerCase();
+      if (activeFilter === 'question') {
+        return textLower.startsWith('[question]') || textLower.includes('?');
+      }
+      if (activeFilter === 'insight') {
+        return textLower.startsWith('[insight]') || textLower.includes('hypothesis') || textLower.includes('insight');
+      }
+      if (activeFilter === 'methodology') {
+        return textLower.startsWith('[methodology]') || textLower.includes('protocol') || textLower.includes('method');
+      }
+      return !textLower.startsWith('[question]') && !textLower.startsWith('[insight]') && !textLower.startsWith('[methodology]') && !textLower.includes('?');
+    });
+  }, [postComments, activeFilter]);
+
+  const filteredDiscussions = useMemo(() => {
+    if (activeFilter === 'all') return discussions;
+    return discussions.filter((d) => d.type === activeFilter);
+  }, [discussions, activeFilter]);
 
   const getJournalVariant = (journal: string): 'nature' | 'science' | 'cell' | 'generic' => {
     const j = journal.toLowerCase();
@@ -742,98 +831,58 @@ export default function PaperDetailScreen() {
           <View style={styles.discussionSectionWrapper}>
             <View style={styles.discussionHeader}>
               <View style={styles.discussionTitleRow}>
-                <MessageSquare size={18} color={colors.textPrimary} />
-                <Typography variant="h4" style={styles.discussionTitle}>
-                  Discussion & Critiques
-                </Typography>
+                <MessageSquare size={20} color={colors.textPrimary} />
+                <Text style={styles.discussionTitle}>Discussion</Text>
                 <View style={styles.discussionCountBadge}>
-                  <Typography
-                    variant="micro"
-                    color={colors.textSecondary}
-                    style={{ fontWeight: '700' }}
-                  >
+                  <Text style={styles.discussionCountBadgeText}>
                     {totalCommentsCount}
-                  </Typography>
+                  </Text>
                 </View>
               </View>
-              <Typography variant="micro" color={colors.textSecondary}>
-                Synchronized with the community feed post
-              </Typography>
+              <Text style={styles.discussionSubtitleText}>
+                Constructive scientific inquiry & insights
+              </Text>
             </View>
 
-            {/* Replying Banner (if user is replying to a specific critique) */}
-            {replyingTo && (
-              <View style={styles.replyingToBar}>
-                <Typography variant="micro" color={colors.textSecondary}>
-                  Replying to{' '}
-                  <Typography variant="microBold" color={colors.textPrimary}>
-                    @{replyingTo.author.handle}
-                  </Typography>
-                </Typography>
-                <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                  <Typography
-                    variant="micro"
-                    color={colors.accentRed}
-                    style={{ fontWeight: '600' }}
-                  >
-                    Cancel
-                  </Typography>
-                </TouchableOpacity>
-              </View>
-            )}
+            {/* Discussion Type Filter Pills */}
+            <DiscussionTypePills
+              activeType={activeFilter}
+              counts={filterCounts}
+              onSelectType={setActiveFilter}
+            />
 
-            {/* Comment Composer Input Box */}
-            <View style={styles.commentComposerBox}>
-              <Avatar
-                url={currentUser?.avatarUrl}
-                name={currentUser?.fullName}
-                size={32}
-                style={{ marginRight: spacing.sm }}
+            {/* Discussion Composer Card */}
+            <View style={styles.composerWrapper}>
+              <DiscussionComposer
+                currentUser={currentUser}
+                onSubmit={handleCreateDiscussion}
+                isSubmitting={isSubmittingComment}
               />
-              <TextInput
-                style={styles.commentInput}
-                placeholder="Join the research discussion or ask a question..."
-                placeholderTextColor={colors.textMuted}
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-                editable={!isSubmittingComment}
-              />
-              <TouchableOpacity
-                onPress={handleSendComment}
-                disabled={!commentText.trim() || isSubmittingComment}
-                style={[
-                  styles.sendCommentBtn,
-                  commentText.trim() && styles.sendCommentBtnActive,
-                ]}
-              >
-                <Send
-                  size={16}
-                  color={commentText.trim() ? colors.white : colors.textMuted}
-                />
-              </TouchableOpacity>
             </View>
 
-            {/* Threaded Comments List */}
+            {/* Threaded Discussions List */}
             {activePostId ? (
               /* Synchronized with Post Feed Comments */
               <View style={styles.commentsList}>
-                {postComments.length > 0 ? (
-                  postComments.map((c) => (
+                {filteredPostComments.length > 0 ? (
+                  filteredPostComments.map((c) => (
                     <CommentCard
                       key={c.id}
                       comment={c}
-                      onReply={(target) => setReplyingTo(target)}
+                      onAddReply={handleAddReplyToDiscussion}
+                      onLike={(cId) => toggleLikeComment(cId, activePostId, currentUser?.id)}
+                      onLikeReply={(_, replyId) => toggleLikeComment(replyId, activePostId, currentUser?.id)}
                       onDelete={handleDeleteComment}
                       currentUserId={currentUser?.id}
+                      currentUser={currentUser}
                     />
                   ))
                 ) : (
                   <View style={styles.emptyDiscussionWrap}>
                     <EmptyState
-                      icon="MessageCircle"
-                      title="No critiques yet"
-                      description="Be the first to share your constructive analysis, critique, or inquiry on this research paper."
+                      icon="MessageSquare"
+                      title="No discussions yet"
+                      description="Start a constructive scientific discussion on this paper reference."
                     />
                   </View>
                 )}
@@ -841,8 +890,8 @@ export default function PaperDetailScreen() {
             ) : (
               /* Paper-Level Discussions Fallback */
               <View style={styles.commentsList}>
-                {discussions.length > 0 ? (
-                  discussions.map((disc) => (
+                {filteredDiscussions.length > 0 ? (
+                  filteredDiscussions.map((disc) => (
                     <DiscussionCard
                       key={disc.id}
                       discussion={disc}
@@ -866,7 +915,7 @@ export default function PaperDetailScreen() {
                     <EmptyState
                       icon="MessageSquare"
                       title="No discussions yet"
-                      description="Start the first scientific inquiry or insight about this paper!"
+                      description="Start a constructive scientific discussion on this paper reference."
                     />
                   </View>
                 )}
@@ -1246,7 +1295,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   discussionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: colors.textPrimary,
   },
@@ -1258,54 +1307,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
-  replyingToBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.backgroundSecondary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    marginHorizontal: spacing.lg,
+  discussionCountBadgeText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  discussionSubtitleText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginBottom: spacing.xs,
+  },
+  composerWrapper: {
     marginTop: spacing.sm,
-    borderRadius: radii.sm,
-  },
-  commentComposerBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: radii.lg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  commentInput: {
-    flex: 1,
-    ...typography.body,
-    fontSize: 14,
-    color: colors.textPrimary,
-    maxHeight: 100,
-    paddingVertical: Platform.OS === 'ios' ? spacing.xs : 2,
-  },
-  sendCommentBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.full,
-    backgroundColor: colors.borderLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.xs,
-  },
-  sendCommentBtnActive: {
-    backgroundColor: colors.black,
+    marginBottom: spacing.xs,
   },
   commentsList: {
     marginTop: spacing.xs,
   },
   emptyDiscussionWrap: {
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.xl,
   },
 });
