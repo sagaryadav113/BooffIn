@@ -91,6 +91,8 @@ export const PaperCard: React.FC<PaperCardProps> = ({
                   style={styles.figureImage}
                   contentFit="cover"
                   transition={250}
+                  cachePolicy="disk"
+                  priority="high"
                 />
                 <View style={styles.figBadge}>
                   <Text style={styles.figBadgeText}>Fig. 1</Text>
@@ -103,6 +105,8 @@ export const PaperCard: React.FC<PaperCardProps> = ({
                   style={styles.figureImage}
                   contentFit="cover"
                   transition={250}
+                  cachePolicy="disk"
+                  priority="high"
                 />
                 <View style={styles.figBadge}>
                   <Text style={styles.figBadgeText}>Fig. 2</Text>
@@ -116,6 +120,8 @@ export const PaperCard: React.FC<PaperCardProps> = ({
                 style={styles.figureImage}
                 contentFit="cover"
                 transition={250}
+                cachePolicy="disk"
+                priority="high"
               />
               <View style={styles.figBadge}>
                 <Text style={styles.figBadgeText}>Figure 1</Text>
@@ -131,6 +137,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({
             source={{ uri: primaryFigure }}
             style={styles.compactImage}
             contentFit="cover"
+            cachePolicy="disk"
           />
         )}
 

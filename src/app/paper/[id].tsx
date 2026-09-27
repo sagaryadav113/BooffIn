@@ -720,6 +720,8 @@ export default function PaperDetailScreen() {
                           style={styles.figureImage}
                           contentFit="cover"
                           transition={200}
+                          cachePolicy="disk"
+                          priority="high"
                         />
                         {fig.caption && (
                           <Typography

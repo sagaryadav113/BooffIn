@@ -28,7 +28,10 @@ export async function resolvePaperFigures(
     params.title?.slice(0, 50);
 
   if (cacheKey && figureCache.has(cacheKey)) {
-    return figureCache.get(cacheKey)!;
+    const cached = figureCache.get(cacheKey)!;
+    if (cached.length > 0) {
+      return cached;
+    }
   }
 
   let figures: PaperFigure[] = [];
@@ -52,6 +55,7 @@ export async function resolvePaperFigures(
         pmid: params.pmid,
         pmcid: params.pmcid,
         journal: params.journal,
+        canonicalUrl: params.canonicalUrl,
       });
     }
 
@@ -63,8 +67,8 @@ export async function resolvePaperFigures(
     console.warn('[figureResolver] Error resolving figures:', err);
   }
 
-  // Cache result (even if empty to prevent repeated failed fetches)
-  if (cacheKey) {
+  // Cache result if valid figures were found
+  if (cacheKey && figures.length > 0) {
     figureCache.set(cacheKey, figures);
   }
 
@@ -79,6 +83,7 @@ async function resolvePmcFigures(params: {
   pmid?: string;
   pmcid?: string;
   journal?: string;
+  canonicalUrl?: string;
 }): Promise<PaperFigure[]> {
   try {
     let resolvedPmcId = params.pmcid;
@@ -125,6 +130,20 @@ async function resolvePmcFigures(params: {
     if (figMatches.length === 0) return [];
 
     const figures: PaperFigure[] = [];
+    const doiLower = (params.doi || '').toLowerCase();
+    const journalLower = (params.journal || '').toLowerCase();
+    const urlLower = (params.canonicalUrl || '').toLowerCase();
+
+    const isSpringerNature =
+      doiLower.startsWith('10.1038/') ||
+      doiLower.startsWith('10.1007/') ||
+      doiLower.startsWith('10.1186/') ||
+      journalLower.includes('nature') ||
+      journalLower.includes('springer') ||
+      journalLower.includes('scientific reports') ||
+      journalLower.includes('bmc') ||
+      urlLower.includes('nature.com') ||
+      urlLower.includes('springer.com');
 
     for (let i = 0; i < Math.min(figMatches.length, 2); i++) {
       const figXml = figMatches[i];
@@ -153,26 +172,27 @@ async function resolvePmcFigures(params: {
         figXml.match(/href="([^"]+)"/i);
 
       if (graphicMatch) {
-        let graphicName = graphicMatch[1];
-        if (!graphicName.toLowerCase().endsWith('.jpg') && !graphicName.toLowerCase().endsWith('.png')) {
-          graphicName += '.jpg';
-        }
+        const rawGraphic = graphicMatch[1].trim();
+        const baseGraphic = rawGraphic.replace(/\.(jpg|jpeg|png|tif|tiff)$/i, '');
 
-        const doiLower = (params.doi || '').toLowerCase();
         let imageUrl = '';
 
-        // Nature / Springer CDN pattern
-        if (
-          doiLower.startsWith('10.1038/') ||
-          doiLower.startsWith('10.1007/') ||
-          (params.journal && /nature|springer|scientific reports/i.test(params.journal))
-        ) {
+        if (isSpringerNature) {
+          // Springer Nature / Scientific Reports / Nature CDN uses .png MediaObjects
           imageUrl = `https://media.springernature.com/lw685/springer-static/image/art%3A${encodeURIComponent(
             params.doi || ''
-          )}/MediaObjects/${graphicName}`;
+          )}/MediaObjects/${baseGraphic}.png`;
+        } else if (doiLower.startsWith('10.1371/')) {
+          // PLOS image API
+          imageUrl = `https://journals.plos.org/plosone/article/figure/image?size=medium&id=${encodeURIComponent(
+            params.doi || ''
+          )}.${baseGraphic}`;
         } else {
-          // Standard PMC binary CDN
-          imageUrl = `https://pmc.ncbi.nlm.nih.gov/articles/PMC${cleanPmcId}/bin/${graphicName}`;
+          // Standard NCBI PMC binary CDN
+          const finalGraphicName = rawGraphic.toLowerCase().endsWith('.jpg') || rawGraphic.toLowerCase().endsWith('.png')
+            ? rawGraphic
+            : `${rawGraphic}.jpg`;
+          imageUrl = `https://pmc.ncbi.nlm.nih.gov/articles/PMC${cleanPmcId}/bin/${finalGraphicName}`;
         }
 
         figures.push({
@@ -217,9 +237,18 @@ async function resolveArxivFigures(arxivId: string): Promise<PaperFigure[]> {
         const captionMatch = block.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i);
 
         if (imgMatch) {
-          let src = imgMatch[1];
+          let src = imgMatch[1].trim();
+          if (src.startsWith('/static/') || src.startsWith('data:image')) {
+            continue;
+          }
+
+          let fullSrc = src;
           if (!src.startsWith('http')) {
-            src = `https://arxiv.org/html/${cleanId}/${src.replace(/^\.?\//, '')}`;
+            if (src.includes(cleanId)) {
+              fullSrc = `https://arxiv.org/html/${src.replace(/^\.?\//, '')}`;
+            } else {
+              fullSrc = `https://arxiv.org/html/${cleanId}/${src.replace(/^\.?\//, '')}`;
+            }
           }
 
           let caption = captionMatch
@@ -231,7 +260,7 @@ async function resolveArxivFigures(arxivId: string): Promise<PaperFigure[]> {
 
           figures.push({
             id: `arxiv_${cleanId}_${i + 1}`,
-            url: src,
+            url: fullSrc,
             caption,
             isPrimary: i === 0,
           });
@@ -243,24 +272,32 @@ async function resolveArxivFigures(arxivId: string): Promise<PaperFigure[]> {
     if (figures.length === 0) {
       const imgMatches = [...html.matchAll(/<img[^>]+src="([^">]+)"[^>]*>/gi)];
       const filtered = imgMatches
-        .map((m) => m[1])
+        .map((m) => m[1].trim())
         .filter(
           (src) =>
+            !src.startsWith('/static/') &&
+            !src.startsWith('data:image') &&
             !src.includes('logo') &&
             !src.includes('icon') &&
             !src.includes('avatar') &&
             !src.includes('orcid') &&
-            !src.includes('badge')
+            !src.includes('badge') &&
+            !src.includes('funder')
         );
 
       for (let i = 0; i < Math.min(filtered.length, 2); i++) {
         let src = filtered[i];
+        let fullSrc = src;
         if (!src.startsWith('http')) {
-          src = `https://arxiv.org/html/${cleanId}/${src.replace(/^\.?\//, '')}`;
+          if (src.includes(cleanId)) {
+            fullSrc = `https://arxiv.org/html/${src.replace(/^\.?\//, '')}`;
+          } else {
+            fullSrc = `https://arxiv.org/html/${cleanId}/${src.replace(/^\.?\//, '')}`;
+          }
         }
         figures.push({
           id: `arxiv_${cleanId}_${i + 1}`,
-          url: src,
+          url: fullSrc,
           caption: `Figure ${i + 1}`,
           isPrimary: i === 0,
         });
