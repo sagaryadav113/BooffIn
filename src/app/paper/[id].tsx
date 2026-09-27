@@ -611,44 +611,18 @@ export default function PaperDetailScreen() {
 
               {Platform.OS === 'web' ? (
                 <View style={styles.webPdfContainer}>
-                  {/* Direct Native PDF / Web Reader Object */}
-                  {/* @ts-ignore */}
-                  <object
-                    data={`${paper.openAccessUrl || paper.canonicalUrl}#toolbar=1&navpanes=0`}
-                    type="application/pdf"
+                  {/* @ts-ignore Direct Native PDF Iframe */}
+                  <iframe
+                    src={`${paper.openAccessUrl || paper.canonicalUrl}`}
                     style={{
                       width: '100%',
-                      height: 760,
+                      height: 780,
                       border: 'none',
-                      borderRadius: radii.md,
                       backgroundColor: '#FFFFFF',
                     }}
-                  >
-                    {/* Fallback for browsers or publishers with restrictive framing */}
-                    <View style={styles.mobilePdfCard}>
-                      <View style={styles.mobilePdfIconWrap}>
-                        <FileCheck size={36} color={colors.accentLink} />
-                      </View>
-                      <Typography variant="h4" style={styles.mobilePdfTitle}>
-                        Open Access Document Ready
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color={colors.textSecondary}
-                        style={styles.mobilePdfSubtitle}
-                      >
-                        Read the full verified original publication in full resolution.
-                      </Typography>
-                      <TouchableOpacity
-                        onPress={handleOpenPdfBrowser}
-                        style={styles.openPdfPrimaryBtn}
-                        activeOpacity={0.85}
-                      >
-                        <BookOpen size={18} color={colors.white} />
-                        <Text style={styles.openPdfBtnText}>Open Full High-Res PDF</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </object>
+                    title={paper.title}
+                    allow="fullscreen"
+                  />
                 </View>
               ) : (
                 <View style={styles.mobilePdfCard}>
