@@ -11,6 +11,8 @@ import {
   Platform,
   Modal,
   TextInput,
+  Pressable,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -790,11 +792,11 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
         animationType="fade"
         onRequestClose={() => setSelectedMenuPublication(null)}
       >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setSelectedMenuPublication(null)}
-        >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSelectedMenuPublication(null)}
+          />
           <View style={styles.actionSheetCard}>
             <View style={styles.actionSheetHeader}>
               <View style={{ flex: 1, gap: 2 }}>
@@ -923,7 +925,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
               <Text style={styles.actionSheetCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* 5. Password Confirmation Modal for Disconnecting ORCID */}
@@ -933,86 +935,91 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
         animationType="fade"
         onRequestClose={() => setDisconnectModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setDisconnectModalVisible(false)}
-        >
-          <View style={styles.passwordModalCard}>
-            <View style={styles.passwordModalHeader}>
-              <View style={styles.lockIconCircle}>
-                <Lock size={20} color={colors.accentRed} />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.passwordModalTitle}>Disconnect ORCID Account</Text>
-                <Text style={styles.passwordModalSubtitle}>
-                  For your security, enter your BooffIn password to confirm disconnecting ORCID ({activeOrcid}).
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setDisconnectModalVisible(false)}
-                style={styles.closeModalBtn}
-              >
-                <XIcon size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {disconnectError && (
-              <View style={styles.passwordErrorBox}>
-                <Text style={styles.passwordErrorText}>{disconnectError}</Text>
-              </View>
-            )}
-
-            <View style={styles.passwordInputWrap}>
-              <Text style={styles.passwordInputLabel}>BooffIn Account Password</Text>
-              <View style={styles.passwordInputFieldRow}>
-                <KeyRound size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.passwordTextInput}
-                  placeholder="Enter your account password..."
-                  placeholderTextColor={colors.textMuted}
-                  secureTextEntry={!showPassword}
-                  value={disconnectPassword}
-                  onChangeText={(val) => {
-                    setDisconnectPassword(val);
-                    if (disconnectError) setDisconnectError(null);
-                  }}
-                  autoCapitalize="none"
-                  autoFocus
-                />
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setDisconnectModalVisible(false)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.keyboardAvoidWrapper}
+          >
+            <View style={styles.passwordModalCard}>
+              <View style={styles.passwordModalHeader}>
+                <View style={styles.lockIconCircle}>
+                  <Lock size={20} color={colors.accentRed} />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.passwordModalTitle}>Disconnect ORCID Account</Text>
+                  <Text style={styles.passwordModalSubtitle}>
+                    For your security, enter your BooffIn password to confirm disconnecting ORCID ({activeOrcid}).
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={{ padding: 4 }}
+                  onPress={() => setDisconnectModalVisible(false)}
+                  style={styles.closeModalBtn}
                 >
-                  {showPassword ? (
-                    <EyeOff size={16} color={colors.textSecondary} />
-                  ) : (
-                    <Eye size={16} color={colors.textSecondary} />
-                  )}
+                  <XIcon size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
-            </View>
 
-            <View style={styles.passwordModalButtonsRow}>
-              <Button
-                title="Cancel"
-                variant="secondary"
-                size="sm"
-                onPress={() => setDisconnectModalVisible(false)}
-                style={{ flex: 1 }}
-              />
-              <Button
-                title={isDisconnecting ? 'Verifying...' : 'Disconnect ORCID'}
-                variant="danger"
-                size="sm"
-                loading={isDisconnecting}
-                disabled={!disconnectPassword.trim() || isDisconnecting}
-                onPress={handleConfirmDisconnect}
-                style={{ flex: 1.3 }}
-              />
+              {disconnectError && (
+                <View style={styles.passwordErrorBox}>
+                  <Text style={styles.passwordErrorText}>{disconnectError}</Text>
+                </View>
+              )}
+
+              <View style={styles.passwordInputWrap}>
+                <Text style={styles.passwordInputLabel}>BooffIn Account Password</Text>
+                <View style={styles.passwordInputFieldRow}>
+                  <KeyRound size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={styles.passwordTextInput}
+                    placeholder="Enter your account password..."
+                    placeholderTextColor={colors.textMuted}
+                    secureTextEntry={!showPassword}
+                    value={disconnectPassword}
+                    onChangeText={(val) => {
+                      setDisconnectPassword(val);
+                      if (disconnectError) setDisconnectError(null);
+                    }}
+                    autoCapitalize="none"
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={{ padding: 4 }}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={16} color={colors.textSecondary} />
+                    ) : (
+                      <Eye size={16} color={colors.textSecondary} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.passwordModalButtonsRow}>
+                <Button
+                  title="Cancel"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() => setDisconnectModalVisible(false)}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  title={isDisconnecting ? 'Verifying...' : 'Disconnect ORCID'}
+                  variant="danger"
+                  size="sm"
+                  loading={isDisconnecting}
+                  disabled={!disconnectPassword.trim() || isDisconnecting}
+                  onPress={handleConfirmDisconnect}
+                  style={{ flex: 1.3 }}
+                />
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* 6. Connect & Verify ORCID Modal */}
@@ -1022,121 +1029,126 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
         animationType="fade"
         onRequestClose={() => setConnectModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setConnectModalVisible(false)}
-        >
-          <View style={styles.connectModalCard}>
-            <View style={styles.connectModalHeader}>
-              <View style={styles.orcidModalIconWrap}>
-                <Text style={styles.orcidModalIconText}>iD</Text>
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.connectModalTitle}>Connect & Verify ORCID</Text>
-                <Text style={styles.connectModalSubtitle}>
-                  Enter your 16-digit ORCID iD. We will verify your official record with the ORCID registry.
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setConnectModalVisible(false)}
-                style={styles.closeModalBtn}
-              >
-                <XIcon size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {connectStepError && (
-              <View style={styles.passwordErrorBox}>
-                <Text style={styles.passwordErrorText}>{connectStepError}</Text>
-              </View>
-            )}
-
-            {/* Input Form */}
-            <View style={styles.orcidInputWrap}>
-              <Text style={styles.passwordInputLabel}>ORCID iD or Profile URL</Text>
-              <View style={styles.orcidInputFieldRow}>
-                <TextInput
-                  style={styles.orcidTextInput}
-                  placeholder="0000-0002-1825-0097"
-                  placeholderTextColor={colors.textMuted}
-                  value={connectInputOrcid}
-                  onChangeText={(val) => {
-                    setConnectInputOrcid(val);
-                    if (connectStepError) setConnectStepError(null);
-                  }}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setConnectModalVisible(false)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.keyboardAvoidWrapper}
+          >
+            <View style={styles.connectModalCard}>
+              <View style={styles.connectModalHeader}>
+                <View style={styles.orcidModalIconWrap}>
+                  <Text style={styles.orcidModalIconText}>iD</Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.connectModalTitle}>Connect & Verify ORCID</Text>
+                  <Text style={styles.connectModalSubtitle}>
+                    Enter your 16-digit ORCID iD. We will verify your official record with the ORCID registry.
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  onPress={handleVerifyOrcidRecord}
-                  disabled={isVerifyingRecord || !connectInputOrcid.trim()}
-                  style={[
-                    styles.verifyPillBtn,
-                    (!connectInputOrcid.trim() || isVerifyingRecord) && { opacity: 0.6 },
-                  ]}
-                  activeOpacity={0.75}
+                  onPress={() => setConnectModalVisible(false)}
+                  style={styles.closeModalBtn}
                 >
-                  {isVerifyingRecord ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <Text style={styles.verifyPillBtnText}>Verify Record</Text>
-                  )}
+                  <XIcon size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
-            </View>
 
-            {/* Live Verified Record Preview Card */}
-            {verifiedPersonPreview && (
-              <View style={styles.verifiedPreviewCard}>
-                <View style={styles.verifiedPreviewHeader}>
-                  <View style={styles.verifiedGreenCircle}>
-                    <CheckCircle2 size={16} color="#16A34A" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.verifiedAuthorName}>{verifiedPersonPreview.name}</Text>
-                    <Text style={styles.verifiedOrcidId}>ORCID: {verifiedPersonPreview.orcidId}</Text>
-                  </View>
+              {connectStepError && (
+                <View style={styles.passwordErrorBox}>
+                  <Text style={styles.passwordErrorText}>{connectStepError}</Text>
                 </View>
+              )}
 
-                <View style={styles.verifiedStatsRow}>
-                  <View style={styles.verifiedStatBadge}>
-                    <BookOpen size={12} color={colors.accentBlue} />
-                    <Text style={styles.verifiedStatText}>
-                      {verifiedPersonPreview.worksCount} Works Found on ORCID
-                    </Text>
-                  </View>
+              {/* Input Form */}
+              <View style={styles.orcidInputWrap}>
+                <Text style={styles.passwordInputLabel}>ORCID iD or Profile URL</Text>
+                <View style={styles.orcidInputFieldRow}>
+                  <TextInput
+                    style={styles.orcidTextInput}
+                    placeholder="0000-0002-1825-0097"
+                    placeholderTextColor={colors.textMuted}
+                    value={connectInputOrcid}
+                    onChangeText={(val) => {
+                      setConnectInputOrcid(val);
+                      if (connectStepError) setConnectStepError(null);
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    onPress={handleVerifyOrcidRecord}
+                    disabled={isVerifyingRecord || !connectInputOrcid.trim()}
+                    style={[
+                      styles.verifyPillBtn,
+                      (!connectInputOrcid.trim() || isVerifyingRecord) && { opacity: 0.6 },
+                    ]}
+                    activeOpacity={0.75}
+                  >
+                    {isVerifyingRecord ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.verifyPillBtnText}>Verify Record</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
-
-                {verifiedPersonPreview.biography ? (
-                  <Text style={styles.verifiedBioSnippet} numberOfLines={2}>
-                    {verifiedPersonPreview.biography}
-                  </Text>
-                ) : null}
               </View>
-            )}
 
-            {/* Actions */}
-            <View style={styles.passwordModalButtonsRow}>
-              <Button
-                title="Cancel"
-                variant="secondary"
-                size="sm"
-                onPress={() => setConnectModalVisible(false)}
-                style={{ flex: 1 }}
-              />
-              <Button
-                title={isSyncing ? 'Syncing Works...' : 'Confirm & Sync Works'}
-                variant="primary"
-                size="sm"
-                loading={isSyncing}
-                disabled={!verifiedPersonPreview || isSyncing}
-                onPress={handleConfirmAndSyncOrcid}
-                style={{ flex: 1.6 }}
-              />
+              {/* Live Verified Record Preview Card */}
+              {verifiedPersonPreview && (
+                <View style={styles.verifiedPreviewCard}>
+                  <View style={styles.verifiedPreviewHeader}>
+                    <View style={styles.verifiedGreenCircle}>
+                      <CheckCircle2 size={16} color="#16A34A" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.verifiedAuthorName}>{verifiedPersonPreview.name}</Text>
+                      <Text style={styles.verifiedOrcidId}>ORCID: {verifiedPersonPreview.orcidId}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.verifiedStatsRow}>
+                    <View style={styles.verifiedStatBadge}>
+                      <BookOpen size={12} color={colors.accentBlue} />
+                      <Text style={styles.verifiedStatText}>
+                        {verifiedPersonPreview.worksCount} Works Found on ORCID
+                      </Text>
+                    </View>
+                  </View>
+
+                  {verifiedPersonPreview.biography ? (
+                    <Text style={styles.verifiedBioSnippet} numberOfLines={2}>
+                      {verifiedPersonPreview.biography}
+                    </Text>
+                  ) : null}
+                </View>
+              )}
+
+              {/* Actions */}
+              <View style={styles.passwordModalButtonsRow}>
+                <Button
+                  title="Cancel"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() => setConnectModalVisible(false)}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  title={isSyncing ? 'Syncing Works...' : 'Confirm & Sync Works'}
+                  variant="primary"
+                  size="sm"
+                  loading={isSyncing}
+                  disabled={!verifiedPersonPreview || isSyncing}
+                  onPress={handleConfirmAndSyncOrcid}
+                  style={{ flex: 1.6 }}
+                />
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
@@ -1613,10 +1625,14 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
   },
 
-  /* 3-Dot Action Sheet Modal */
+  /* Modal Styles */
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  keyboardAvoidWrapper: {
+    width: '100%',
     justifyContent: 'flex-end',
   },
   actionSheetCard: {
