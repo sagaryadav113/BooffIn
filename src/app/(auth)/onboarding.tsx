@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -23,6 +24,14 @@ import {
   AlertCircle,
   Sparkles,
   BookOpen,
+  Search,
+  X,
+  Layers,
+  ChevronRight,
+  ChevronDown,
+  Plus,
+  Compass,
+  Check,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -33,21 +42,13 @@ import {
   checkUsernameAvailability,
   normalizeHandle,
 } from '../../api/authService';
-
-const DISCIPLINE_TOPICS = [
-  'Neuroscience',
-  'Genetics & Genomics',
-  'AI in Science',
-  'Cancer Biology',
-  'Immunology',
-  'Structural Biology',
-  'Bioinformatics',
-  'Computational Biology',
-  'Biophysics',
-  'Quantum Physics',
-  'Microbiology',
-  'Ecology & Evolution',
-];
+import {
+  POPULAR_DISCIPLINES,
+  RESEARCH_TAXONOMY_FAMILIES,
+  INTERDISCIPLINARY_GROUPS,
+  TaxonomyItem,
+  searchResearchTaxonomy,
+} from '../../data/researchTaxonomy';
 
 export default function OnboardingScreen() {
   const user = useAuthStore((s) => s.user);
@@ -84,7 +85,7 @@ export default function OnboardingScreen() {
   const valResult = cleanHandle ? validateUsername(cleanHandle) : null;
 
   // Derived handle status without setState in effect
-  const handleStatus = React.useMemo(() => {
+  const handleStatus = useMemo(() => {
     if (!cleanHandle) {
       return { checking: false, available: null, message: null, normalized: '' };
     }
@@ -134,15 +135,26 @@ export default function OnboardingScreen() {
     };
   }, [cleanHandle, valResult?.isValid, user?.id]);
 
-  // Step 2: Research Disciplines & ORCID State
+  // Step 2: Research Disciplines & Search State
+  // Default to empty array so new user chooses with zero pre-selected checkboxes
   const [selectedTopics, setSelectedTopics] = useState<string[]>(
     user?.researchInterests && user.researchInterests.length > 0
       ? user.researchInterests
-      : ['Neuroscience', 'AI in Science']
+      : []
   );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFamilyFilter, setSelectedFamilyFilter] = useState<string>('all');
+  const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
+
   const [orcidId, setOrcidId] = useState(user?.orcidId || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [step2Error, setStep2Error] = useState<string | null>(null);
+
+  // Search matches computed in real-time
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    return searchResearchTaxonomy(searchQuery.trim(), 40);
+  }, [searchQuery]);
 
   const toggleTopic = (topic: string) => {
     try {
@@ -150,11 +162,22 @@ export default function OnboardingScreen() {
     } catch {}
 
     if (selectedTopics.includes(topic)) {
-      setSelectedTopics(selectedTopics.filter((t) => t !== topic));
+      setSelectedTopics(selectedTopics.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
     } else {
       setSelectedTopics([...selectedTopics, topic]);
     }
     if (step2Error) setStep2Error(null);
+  };
+
+  const isTopicSelected = (topic: string) => {
+    return selectedTopics.some((t) => t.toLowerCase() === topic.toLowerCase());
+  };
+
+  const removeTopic = (topic: string) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setSelectedTopics(selectedTopics.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
   };
 
   const handleNextToStep2 = async () => {
@@ -246,6 +269,13 @@ export default function OnboardingScreen() {
     handleStatus.available !== false &&
     !handleStatus.checking;
 
+  // Filtered families based on category tab
+  const displayedFamilies = useMemo(() => {
+    if (selectedFamilyFilter === 'all') return RESEARCH_TAXONOMY_FAMILIES;
+    if (selectedFamilyFilter === 'interdisciplinary') return [];
+    return RESEARCH_TAXONOMY_FAMILIES.filter((f) => f.id === selectedFamilyFilter);
+  }, [selectedFamilyFilter]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
@@ -275,6 +305,7 @@ export default function OnboardingScreen() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
           >
             {step === 1 ? (
               /* ================= STEP 1: RESEARCHER IDENTITY ================= */
@@ -381,7 +412,7 @@ export default function OnboardingScreen() {
                 </View>
               </View>
             ) : (
-              /* ================= STEP 2: RESEARCH DISCIPLINES & TOPICS ================= */
+              /* ================= STEP 2: RESEARCH DISCIPLINES & TAXONOMY SEARCH ================= */
               <View style={styles.stepContainer}>
                 <Text style={styles.stepTitle}>Select your research disciplines</Text>
                 <Text style={styles.stepSubtitle}>
@@ -394,34 +425,381 @@ export default function OnboardingScreen() {
                   </View>
                 )}
 
-                <View style={styles.topicsGrid}>
-                  {DISCIPLINE_TOPICS.map((topic) => {
-                    const isSelected = selectedTopics.includes(topic);
-                    return (
-                      <TouchableOpacity
-                        key={topic}
-                        activeOpacity={0.75}
-                        onPress={() => toggleTopic(topic)}
-                        style={[
-                          styles.topicChip,
-                          isSelected ? styles.topicChipActive : styles.topicChipInactive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.topicChipText,
-                            isSelected ? styles.topicChipTextActive : styles.topicChipTextInactive,
-                          ]}
-                        >
-                          {topic}
-                        </Text>
-                        {isSelected && (
-                          <CheckCircle2 size={14} color={colors.white} style={{ marginLeft: 4 }} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
+                {/* Search Bar for 1,000+ Fields */}
+                <View style={styles.searchBarContainer}>
+                  <Search size={18} color={colors.textSecondary} style={styles.searchIcon} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search 1,000+ fields, subfields, or topics..."
+                    placeholderTextColor={colors.textMuted}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    clearButtonMode="while-editing"
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setSearchQuery('')}
+                      style={styles.clearSearchBtn}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <X size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
                 </View>
+
+                {/* Selected Disciplines Summary Badge Bar (if user picked anything) */}
+                {selectedTopics.length > 0 && (
+                  <View style={styles.selectedSummaryContainer}>
+                    <View style={styles.selectedSummaryHeader}>
+                      <Text style={styles.selectedSummaryTitle}>
+                        SELECTED DISCIPLINES ({selectedTopics.length})
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setSelectedTopics([])}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.clearAllText}>Clear all</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.selectedTopicsWrap}>
+                      {selectedTopics.map((topic) => (
+                        <TouchableOpacity
+                          key={topic}
+                          onPress={() => removeTopic(topic)}
+                          style={styles.selectedPill}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.selectedPillText}>{topic}</Text>
+                          <X size={13} color={colors.white} style={{ marginLeft: 4 }} />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* ACTIVE SEARCH RESULTS LIST */}
+                {searchQuery.trim().length > 0 ? (
+                  <View style={styles.searchResultsContainer}>
+                    <Text style={styles.sectionHeaderTitle}>
+                      SEARCH RESULTS ({searchResults.length})
+                    </Text>
+
+                    {searchResults.length > 0 ? (
+                      <View style={styles.searchResultsList}>
+                        {searchResults.map((item) => {
+                          const isSelected = isTopicSelected(item.name);
+                          return (
+                            <TouchableOpacity
+                              key={item.id}
+                              style={[
+                                styles.searchResultCard,
+                                isSelected && styles.searchResultCardSelected,
+                              ]}
+                              onPress={() => toggleTopic(item.name)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={styles.searchResultInfo}>
+                                <Text
+                                  style={[
+                                    styles.searchResultName,
+                                    isSelected && styles.searchResultNameSelected,
+                                  ]}
+                                >
+                                  {item.name}
+                                </Text>
+                                <Text style={styles.searchResultHierarchy}>
+                                  {item.hierarchy}
+                                </Text>
+                              </View>
+                              <View
+                                style={[
+                                  styles.searchResultCheckCircle,
+                                  isSelected && styles.searchResultCheckCircleActive,
+                                ]}
+                              >
+                                {isSelected ? (
+                                  <Check size={13} color={colors.white} />
+                                ) : (
+                                  <Plus size={13} color={colors.textSecondary} />
+                                )}
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <View style={styles.noResultsBox}>
+                        <Text style={styles.noResultsText}>
+                          No standardized field found for "{searchQuery}".
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.addCustomTopicBtn}
+                          onPress={() => {
+                            toggleTopic(searchQuery.trim());
+                            setSearchQuery('');
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Plus size={15} color={colors.white} />
+                          <Text style={styles.addCustomTopicText}>
+                            Add "{searchQuery.trim()}" as custom topic
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  /* ================= DEFAULT VIEW (NO SEARCH QUERY) ================= */
+                  <>
+                    {/* SECTION 1: 10 POPULAR RESEARCH FIELDS */}
+                    <View style={styles.popularSection}>
+                      <View style={styles.sectionTitleRow}>
+                        <Sparkles size={16} color={colors.accentBlue} />
+                        <Text style={styles.sectionHeaderTitle}>POPULAR RESEARCH FIELDS</Text>
+                      </View>
+                      <Text style={styles.sectionHeaderDesc}>
+                        Choose from popular domains or browse the complete taxonomy below:
+                      </Text>
+
+                      <View style={styles.topicsGrid}>
+                        {POPULAR_DISCIPLINES.map((topic) => {
+                          const isSelected = isTopicSelected(topic);
+                          return (
+                            <TouchableOpacity
+                              key={topic}
+                              activeOpacity={0.75}
+                              onPress={() => toggleTopic(topic)}
+                              style={[
+                                styles.topicChip,
+                                isSelected ? styles.topicChipActive : styles.topicChipInactive,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.topicChipText,
+                                  isSelected
+                                    ? styles.topicChipTextActive
+                                    : styles.topicChipTextInactive,
+                                ]}
+                              >
+                                {topic}
+                              </Text>
+                              {isSelected && (
+                                <CheckCircle2
+                                  size={14}
+                                  color={colors.white}
+                                  style={{ marginLeft: 4 }}
+                                />
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+
+                    {/* SECTION 2: BROWSE 1,000+ FIELDS BY MAJOR DOMAIN */}
+                    <View style={styles.taxonomyBrowserSection}>
+                      <View style={styles.sectionTitleRow}>
+                        <Compass size={16} color={colors.textPrimary} />
+                        <Text style={styles.sectionHeaderTitle}>EXPLORE BY RESEARCH DOMAIN</Text>
+                      </View>
+
+                      {/* Domain Filter Tabs */}
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.filterTabsRow}
+                      >
+                        <TouchableOpacity
+                          style={[
+                            styles.filterTab,
+                            selectedFamilyFilter === 'all' && styles.filterTabActive,
+                          ]}
+                          onPress={() => setSelectedFamilyFilter('all')}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.filterTabText,
+                              selectedFamilyFilter === 'all' && styles.filterTabTextActive,
+                            ]}
+                          >
+                            All Domains
+                          </Text>
+                        </TouchableOpacity>
+
+                        {RESEARCH_TAXONOMY_FAMILIES.map((family) => (
+                          <TouchableOpacity
+                            key={family.id}
+                            style={[
+                              styles.filterTab,
+                              selectedFamilyFilter === family.id && styles.filterTabActive,
+                            ]}
+                            onPress={() => setSelectedFamilyFilter(family.id)}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.filterTabText,
+                                selectedFamilyFilter === family.id && styles.filterTabTextActive,
+                              ]}
+                            >
+                              {family.shortName}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+
+                        <TouchableOpacity
+                          style={[
+                            styles.filterTab,
+                            selectedFamilyFilter === 'interdisciplinary' && styles.filterTabActive,
+                          ]}
+                          onPress={() => setSelectedFamilyFilter('interdisciplinary')}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.filterTabText,
+                              selectedFamilyFilter === 'interdisciplinary' && styles.filterTabTextActive,
+                            ]}
+                          >
+                            Cross-Domain
+                          </Text>
+                        </TouchableOpacity>
+                      </ScrollView>
+
+                      {/* Accordion / Field Cards */}
+                      {selectedFamilyFilter === 'interdisciplinary' ? (
+                        <View style={styles.interdisciplinaryCardsContainer}>
+                          {INTERDISCIPLINARY_GROUPS.map((group) => (
+                            <View key={group.name} style={styles.fieldCard}>
+                              <Text style={styles.fieldCardTitle}>{group.name}</Text>
+                              <View style={styles.subfieldGrid}>
+                                {group.topics.map((topic) => {
+                                  const isSelected = isTopicSelected(topic);
+                                  return (
+                                    <TouchableOpacity
+                                      key={topic}
+                                      onPress={() => toggleTopic(topic)}
+                                      style={[
+                                        styles.subfieldChip,
+                                        isSelected && styles.subfieldChipActive,
+                                      ]}
+                                      activeOpacity={0.75}
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.subfieldChipText,
+                                          isSelected && styles.subfieldChipTextActive,
+                                        ]}
+                                      >
+                                        {topic}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <View style={styles.familiesList}>
+                          {displayedFamilies.map((family) => (
+                            <View key={family.id} style={styles.familyGroup}>
+                              <Text style={styles.familyGroupName}>{family.name}</Text>
+                              {family.fields.map((field) => {
+                                const isExpanded =
+                                  expandedFieldId === field.id || selectedFamilyFilter !== 'all';
+                                return (
+                                  <View key={field.id} style={styles.fieldCard}>
+                                    <TouchableOpacity
+                                      style={styles.fieldCardHeader}
+                                      onPress={() =>
+                                        setExpandedFieldId(
+                                          expandedFieldId === field.id ? null : field.id
+                                        )
+                                      }
+                                      activeOpacity={0.7}
+                                    >
+                                      <View style={styles.fieldCardHeaderLeft}>
+                                        <Text style={styles.fieldCode}>{field.id}</Text>
+                                        <Text style={styles.fieldCardTitle}>{field.name}</Text>
+                                      </View>
+                                      {isExpanded ? (
+                                        <ChevronDown size={18} color={colors.textSecondary} />
+                                      ) : (
+                                        <ChevronRight size={18} color={colors.textSecondary} />
+                                      )}
+                                    </TouchableOpacity>
+
+                                    {isExpanded && (
+                                      <View style={styles.disciplinesContainer}>
+                                        {field.disciplines.map((discipline) => (
+                                          <View
+                                            key={discipline.id}
+                                            style={styles.disciplineBlock}
+                                          >
+                                            <TouchableOpacity
+                                              onPress={() => toggleTopic(discipline.name)}
+                                              style={styles.disciplineNameRow}
+                                              activeOpacity={0.7}
+                                            >
+                                              <Text
+                                                style={[
+                                                  styles.disciplineName,
+                                                  isTopicSelected(discipline.name) &&
+                                                    styles.disciplineNameSelected,
+                                                ]}
+                                              >
+                                                {discipline.name}
+                                              </Text>
+                                              {isTopicSelected(discipline.name) && (
+                                                <Check size={13} color="#16a34a" />
+                                              )}
+                                            </TouchableOpacity>
+
+                                            <View style={styles.subfieldGrid}>
+                                              {discipline.subfields.map((subfield) => {
+                                                const isSelected = isTopicSelected(subfield);
+                                                return (
+                                                  <TouchableOpacity
+                                                    key={subfield}
+                                                    onPress={() => toggleTopic(subfield)}
+                                                    style={[
+                                                      styles.subfieldChip,
+                                                      isSelected && styles.subfieldChipActive,
+                                                    ]}
+                                                    activeOpacity={0.75}
+                                                  >
+                                                    <Text
+                                                      style={[
+                                                        styles.subfieldChipText,
+                                                        isSelected && styles.subfieldChipTextActive,
+                                                      ]}
+                                                    >
+                                                      {subfield}
+                                                    </Text>
+                                                  </TouchableOpacity>
+                                                );
+                                              })}
+                                            </View>
+                                          </View>
+                                        ))}
+                                      </View>
+                                    )}
+                                  </View>
+                                );
+                              })}
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  </>
+                )}
 
                 {/* Optional ORCID and Bio */}
                 <View style={styles.extraSection}>
@@ -444,6 +822,7 @@ export default function OnboardingScreen() {
                   />
                 </View>
 
+                {/* Bottom Setup Button */}
                 <View style={styles.buttonBottomArea}>
                   <TouchableOpacity
                     style={[
@@ -461,7 +840,10 @@ export default function OnboardingScreen() {
                     ) : (
                       <>
                         <Sparkles size={18} color={colors.white} style={{ marginRight: 6 }} />
-                        <Text style={styles.primaryButtonText}>Complete Setup & Enter BooffIn</Text>
+                        <Text style={styles.primaryButtonText}>
+                          Complete Setup & Enter BooffIn
+                          {selectedTopics.length > 0 ? ` (${selectedTopics.length})` : ''}
+                        </Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -485,7 +867,7 @@ const styles = StyleSheet.create({
   },
   wrapper: {
     flex: 1,
-    maxWidth: 440,
+    maxWidth: 480,
     width: '100%',
     alignSelf: 'center',
     backgroundColor: colors.background,
@@ -519,7 +901,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   scrollContent: {
-    padding: spacing.xxl,
+    padding: spacing.lg,
     paddingBottom: spacing.xxxl * 2,
   },
   stepContainer: {
@@ -531,7 +913,7 @@ const styles = StyleSheet.create({
       android: 'serif',
       default: 'Georgia, Cambria, "Times New Roman", Times, serif',
     }),
-    fontSize: 28,
+    fontSize: 27,
     color: colors.textPrimary,
     fontWeight: '700',
     letterSpacing: -0.5,
@@ -542,7 +924,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     lineHeight: 20,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   errorBanner: {
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
@@ -561,11 +943,191 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginBottom: spacing.xl,
   },
+
+  /* Search Bar */
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    height: 48,
+    marginBottom: spacing.md,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    ...typography.body,
+    fontSize: 14,
+    color: colors.textPrimary,
+    paddingVertical: 0,
+  },
+  clearSearchBtn: {
+    padding: 4,
+  },
+
+  /* Selected Summary Box */
+  selectedSummaryContainer: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  selectedSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs + 2,
+  },
+  selectedSummaryTitle: {
+    ...typography.micro,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 0.6,
+  },
+  clearAllText: {
+    ...typography.micro,
+    color: colors.accentRed,
+    fontWeight: '600',
+  },
+  selectedTopicsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  selectedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.black,
+    paddingLeft: spacing.sm + 2,
+    paddingRight: 6,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+  },
+  selectedPillText: {
+    ...typography.micro,
+    fontWeight: '600',
+    color: colors.white,
+    fontSize: 12,
+  },
+
+  /* Search Results */
+  searchResultsContainer: {
+    marginBottom: spacing.xl,
+  },
+  searchResultsList: {
+    gap: spacing.xs,
+  },
+  searchResultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.cardBackground,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  searchResultCardSelected: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#86EFAC',
+  },
+  searchResultInfo: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  searchResultName: {
+    ...typography.captionBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  searchResultNameSelected: {
+    color: '#166534',
+  },
+  searchResultHierarchy: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  searchResultCheckCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchResultCheckCircleActive: {
+    backgroundColor: '#16A34A',
+    borderColor: '#16A34A',
+  },
+  noResultsBox: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  noResultsText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  addCustomTopicBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.black,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.full,
+  },
+  addCustomTopicText: {
+    ...typography.captionBold,
+    color: colors.white,
+    fontSize: 12.5,
+  },
+
+  /* Popular Section */
+  popularSection: {
+    marginBottom: spacing.xl,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  sectionHeaderTitle: {
+    ...typography.captionBold,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+  },
+  sectionHeaderDesc: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontSize: 12.5,
+    marginBottom: spacing.md,
+  },
   topicsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginBottom: spacing.xl,
   },
   topicChip: {
     flexDirection: 'row',
@@ -593,6 +1155,140 @@ const styles = StyleSheet.create({
   topicChipTextInactive: {
     color: colors.textPrimary,
   },
+
+  /* Taxonomy Browser Section */
+  taxonomyBrowserSection: {
+    marginBottom: spacing.xl,
+  },
+  filterTabsRow: {
+    gap: spacing.xs + 2,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  filterTab: {
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+  },
+  filterTabActive: {
+    backgroundColor: colors.textPrimary,
+    borderColor: colors.textPrimary,
+  },
+  filterTabText: {
+    ...typography.captionMedium,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  filterTabTextActive: {
+    color: colors.white,
+    fontWeight: '700',
+  },
+  familiesList: {
+    gap: spacing.md,
+  },
+  familyGroup: {
+    gap: spacing.sm,
+  },
+  familyGroupName: {
+    ...typography.captionBold,
+    color: colors.accentBlue,
+    fontSize: 12.5,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginTop: spacing.xs,
+  },
+  fieldCard: {
+    backgroundColor: colors.cardBackground,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    marginBottom: spacing.xs,
+  },
+  fieldCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    backgroundColor: '#FAFAFA',
+  },
+  fieldCardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  fieldCode: {
+    ...typography.micro,
+    fontWeight: '700',
+    color: colors.textMuted,
+    backgroundColor: colors.borderLight,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  fieldCardTitle: {
+    ...typography.captionBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  disciplinesContainer: {
+    padding: spacing.md,
+    gap: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  disciplineBlock: {
+    gap: 6,
+  },
+  disciplineNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  disciplineName: {
+    ...typography.captionBold,
+    color: colors.textSecondary,
+    fontSize: 12.5,
+  },
+  disciplineNameSelected: {
+    color: '#16A34A',
+    fontWeight: '700',
+  },
+  subfieldGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  subfieldChip: {
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+  },
+  subfieldChipActive: {
+    backgroundColor: colors.black,
+    borderColor: colors.black,
+  },
+  subfieldChipText: {
+    ...typography.micro,
+    fontSize: 11.5,
+    color: colors.textPrimary,
+  },
+  subfieldChipTextActive: {
+    color: colors.white,
+    fontWeight: '600',
+  },
+  interdisciplinaryCardsContainer: {
+    gap: spacing.sm,
+  },
+
   extraSection: {
     gap: spacing.xs,
     marginTop: spacing.md,
