@@ -246,6 +246,10 @@ export default function PaperDetailScreen() {
   const handleOpenPdfBrowser = async () => {
     const pdfUrl = paper?.openAccessUrl || paper?.canonicalUrl;
     if (!pdfUrl) return;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
     try {
       await WebBrowser.openBrowserAsync(pdfUrl);
     } catch {
@@ -606,34 +610,46 @@ export default function PaperDetailScreen() {
               </View>
 
               {Platform.OS === 'web' ? (
-                <ScrollView
-                  horizontal={pdfZoom > 1}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ flexGrow: 1, alignItems: 'center' }}
-                >
-                  <View
-                    style={[
-                      styles.webPdfContainer,
-                      {
-                        width: pdfZoom > 1 ? `${Math.round(pdfZoom * 100)}%` : '100%',
-                        minWidth: '100%',
-                      },
-                    ]}
+                <View style={styles.webPdfContainer}>
+                  {/* Direct Native PDF / Web Reader Object */}
+                  {/* @ts-ignore */}
+                  <object
+                    data={`${paper.openAccessUrl || paper.canonicalUrl}#toolbar=1&navpanes=0`}
+                    type="application/pdf"
+                    style={{
+                      width: '100%',
+                      height: 760,
+                      border: 'none',
+                      borderRadius: radii.md,
+                      backgroundColor: '#FFFFFF',
+                    }}
                   >
-                    {/* @ts-ignore Google Docs embedded viewer with touch-action for pinch-zoom */}
-                    <iframe
-                      src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(paper.openAccessUrl || '')}`}
-                      style={{
-                        width: '100%',
-                        height: 720,
-                        border: 'none',
-                        backgroundColor: '#FFFFFF',
-                        touchAction: 'pan-x pan-y pinch-zoom',
-                      }}
-                      title={paper.title}
-                    />
-                  </View>
-                </ScrollView>
+                    {/* Fallback for browsers or publishers with restrictive framing */}
+                    <View style={styles.mobilePdfCard}>
+                      <View style={styles.mobilePdfIconWrap}>
+                        <FileCheck size={36} color={colors.accentLink} />
+                      </View>
+                      <Typography variant="h4" style={styles.mobilePdfTitle}>
+                        Open Access Document Ready
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color={colors.textSecondary}
+                        style={styles.mobilePdfSubtitle}
+                      >
+                        Read the full verified original publication in full resolution.
+                      </Typography>
+                      <TouchableOpacity
+                        onPress={handleOpenPdfBrowser}
+                        style={styles.openPdfPrimaryBtn}
+                        activeOpacity={0.85}
+                      >
+                        <BookOpen size={18} color={colors.white} />
+                        <Text style={styles.openPdfBtnText}>Open Full High-Res PDF</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </object>
+                </View>
               ) : (
                 <View style={styles.mobilePdfCard}>
                   <View style={styles.mobilePdfIconWrap}>
