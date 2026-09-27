@@ -34,6 +34,9 @@ import {
   FileCheck,
   Globe,
   Maximize2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
@@ -108,6 +111,30 @@ export default function PaperDetailScreen() {
 
   // Reader View Mode: 'article' (Substack format) vs 'pdf' (Open Access Document)
   const [viewMode, setViewMode] = useState<'article' | 'pdf'>('article');
+
+  // Zoom State for PDF Reader (0.75x to 2.5x)
+  const [pdfZoom, setPdfZoom] = useState(1.0);
+
+  const handleZoomIn = () => {
+    setPdfZoom((prev) => Math.min(2.5, +(prev + 0.25).toFixed(2)));
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
+
+  const handleZoomOut = () => {
+    setPdfZoom((prev) => Math.max(0.75, +(prev - 0.25).toFixed(2)));
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
+
+  const handleResetZoom = () => {
+    setPdfZoom(1.0);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
 
   // Discussion / Comment State
   const [commentText, setCommentText] = useState('');
@@ -425,15 +452,48 @@ export default function PaperDetailScreen() {
           {/* ==================================================================== */}
           {viewMode === 'pdf' && hasOpenAccessPdf ? (
             <View style={styles.pdfViewWrapper}>
-              {/* Clean Light-Themed Reader Floating Bar */}
+              {/* Clean Light-Themed Reader Floating Bar with Zoom Controls */}
               <View style={styles.pdfControlsBar}>
                 <View style={styles.pdfControlsLeft}>
                   <Badge label={paper.journal || 'Open Access'} variant="oa" />
                   <Typography variant="micro" color={colors.textSecondary} numberOfLines={1}>
-                    Full Publication Document
+                    Full Document
                   </Typography>
                 </View>
+
                 <View style={styles.pdfControlsRight}>
+                  {/* Interactive Pinch/Tap Zoom Controls */}
+                  <View style={styles.zoomControlGroup}>
+                    <TouchableOpacity
+                      onPress={handleZoomOut}
+                      disabled={pdfZoom <= 0.75}
+                      style={[styles.zoomBtn, pdfZoom <= 0.75 && styles.zoomBtnDisabled]}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Zoom out"
+                    >
+                      <ZoomOut size={12} color={pdfZoom <= 0.75 ? colors.textMuted : colors.textPrimary} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={handleResetZoom}
+                      style={styles.zoomResetBtn}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Reset zoom to 100%"
+                    >
+                      <Text style={styles.zoomResetText}>{Math.round(pdfZoom * 100)}%</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={handleZoomIn}
+                      disabled={pdfZoom >= 2.5}
+                      style={[styles.zoomBtn, pdfZoom >= 2.5 && styles.zoomBtnDisabled]}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Zoom in"
+                    >
+                      <ZoomIn size={12} color={pdfZoom >= 2.5 ? colors.textMuted : colors.textPrimary} />
+                    </TouchableOpacity>
+                  </View>
+
                   <TouchableOpacity
                     onPress={handleOpenPdfBrowser}
                     style={styles.pdfControlBtn}
@@ -454,19 +514,34 @@ export default function PaperDetailScreen() {
               </View>
 
               {Platform.OS === 'web' ? (
-                <View style={styles.webPdfContainer}>
-                  {/* @ts-ignore Google Docs embedded viewer for clean white PDF presentation without dark browser plugin header */}
-                  <iframe
-                    src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(paper.openAccessUrl || '')}`}
-                    style={{
-                      width: '100%',
-                      height: 720,
-                      border: 'none',
-                      backgroundColor: '#FFFFFF',
-                    }}
-                    title={paper.title}
-                  />
-                </View>
+                <ScrollView
+                  horizontal={pdfZoom > 1}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ flexGrow: 1, alignItems: 'center' }}
+                >
+                  <View
+                    style={[
+                      styles.webPdfContainer,
+                      {
+                        width: pdfZoom > 1 ? `${Math.round(pdfZoom * 100)}%` : '100%',
+                        minWidth: '100%',
+                      },
+                    ]}
+                  >
+                    {/* @ts-ignore Google Docs embedded viewer with touch-action for pinch-zoom */}
+                    <iframe
+                      src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(paper.openAccessUrl || '')}`}
+                      style={{
+                        width: '100%',
+                        height: 720,
+                        border: 'none',
+                        backgroundColor: '#FFFFFF',
+                        touchAction: 'pan-x pan-y pinch-zoom',
+                      }}
+                      title={paper.title}
+                    />
+                  </View>
+                </ScrollView>
               ) : (
                 <View style={styles.mobilePdfCard}>
                   <View style={styles.mobilePdfIconWrap}>
@@ -890,6 +965,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  zoomControlGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+    marginRight: 2,
+  },
+  zoomBtn: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 4,
+  },
+  zoomBtnDisabled: {
+    opacity: 0.35,
+  },
+  zoomResetBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  zoomResetText: {
+    ...typography.micro,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    fontSize: 11,
   },
   pdfControlBtn: {
     flexDirection: 'row',
