@@ -1,5 +1,5 @@
 import { ResearcherSearchResult } from '../types';
-import { extractOrcidId } from '../../orcidService';
+import { isValidOrcidId, normalizeOrcidId } from '../../orcidService';
 
 /**
  * Searches the official ORCID Public Registry for researchers
@@ -12,8 +12,8 @@ export async function searchOrcidResearchers(
   if (!cleanQ) return [];
 
   // 1. Exact ORCID ID direct lookup
-  const exactOrcid = extractOrcidId(cleanQ);
-  if (exactOrcid) {
+  if (isValidOrcidId(cleanQ)) {
+    const exactOrcid = normalizeOrcidId(cleanQ);
     try {
       const res = await fetch(`https://pub.orcid.org/v3.0/${exactOrcid}/record`, {
         headers: {

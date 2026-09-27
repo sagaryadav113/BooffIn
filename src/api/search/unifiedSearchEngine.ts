@@ -1,9 +1,10 @@
+import { Paper } from '../../types';
 import { UnifiedSearchResults, SearchFilterCategory, ResearcherSearchResult, TopicSearchResult } from './types';
 import { searchPapers } from './providers/paperSearchProvider';
 import { searchOrcidResearchers } from './providers/orcidSearchProvider';
 import { searchBooffInUsers } from './providers/userSearchProvider';
-import { extractDoi, extractArxivId } from '../paper/inputParser';
-import { extractOrcidId } from '../orcidService';
+import { parseReferenceInput } from '../paper/inputParser';
+import { isValidOrcidId } from '../orcidService';
 
 // In-memory LRU-style cache
 const searchCache = new Map<string, { timestamp: number; results: UnifiedSearchResults }>();
@@ -34,9 +35,10 @@ export async function executeUnifiedSearch(
 
   // 1. Detect query intent
   let detectedType: UnifiedSearchResults['detectedInputType'] = 'keyword';
-  const isDoi = Boolean(extractDoi(query));
-  const isArxiv = Boolean(extractArxivId(query));
-  const isOrcid = Boolean(extractOrcidId(query));
+  const parsed = parseReferenceInput(query);
+  const isDoi = Boolean(parsed.doi);
+  const isArxiv = Boolean(parsed.arxivId);
+  const isOrcid = isValidOrcidId(query);
   const isUrl = query.startsWith('http://') || query.startsWith('https://');
   const isUserHandle = query.startsWith('@');
 
@@ -46,7 +48,7 @@ export async function executeUnifiedSearch(
   else if (isUrl) detectedType = 'url';
   else if (isUserHandle) detectedType = 'user';
 
-  let papers = [];
+  let papers: Paper[] = [];
   let researchers: ResearcherSearchResult[] = [];
   const topics: TopicSearchResult[] = [];
 

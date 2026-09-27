@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
-import { Award, UserCheck, ExternalLink, GraduationCap, Building2 } from 'lucide-react-native';
+import { Award, GraduationCap, Building2 } from 'lucide-react-native';
 import { Avatar } from '../core/Avatar';
 import { ResearcherSearchResult } from '../../api/search/types';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -18,13 +18,12 @@ export const ResearcherResultCard: React.FC<ResearcherResultCardProps> = ({
   const handlePress = () => {
     if (researcher.isRegisteredUser) {
       router.push({
-        pathname: '/user/[id]',
+        pathname: '/profile/[id]',
         params: { id: researcher.id },
       });
     } else if (researcher.orcidId) {
-      // If external ORCID scholar, can navigate to profile or open
       router.push({
-        pathname: '/user/[id]',
+        pathname: '/profile/[id]',
         params: { id: researcher.id, orcidId: researcher.orcidId },
       });
     }
@@ -87,7 +86,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.cardBackground,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.borderLight,

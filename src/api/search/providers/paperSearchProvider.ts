@@ -1,7 +1,6 @@
 import { Paper } from '../../../types';
-import { parseReferenceInput, extractDoi, extractArxivId } from '../../paper/inputParser';
-import { resolveReferenceMetadata } from '../../paper/metadataResolver';
-import { resolvePaperFigures } from '../../paper/figureResolver';
+import { parseReferenceInput } from '../../paper/inputParser';
+import { defaultPaperResolver } from '../../paper/metadataResolver';
 
 /**
  * Searches academic literature across Semantic Scholar, Europe PMC, arXiv, and Crossref
@@ -12,9 +11,9 @@ export async function searchPapers(query: string, limit = 15): Promise<Paper[]> 
 
   // 1. Check if exact reference (DOI, arXiv, URL, PMID)
   const parsed = parseReferenceInput(cleanQ);
-  if (parsed.type !== 'unknown' || extractDoi(cleanQ) || extractArxivId(cleanQ)) {
+  if (parsed.type !== 'generic_url' || parsed.doi || parsed.arxivId || parsed.pmid) {
     try {
-      const res = await resolveReferenceMetadata(cleanQ);
+      const res = await defaultPaperResolver.resolveReference(cleanQ);
       if (res.paper) {
         return [res.paper];
       }
@@ -101,6 +100,7 @@ async function searchEuropePmc(query: string, limit: number): Promise<Paper[]> {
 
       const journalName = item.journalTitle || item.journalInfo?.journal?.title || 'Scientific Publication';
       const year = item.pubYear ? parseInt(item.pubYear, 10) : new Date().getFullYear();
+      const canonicalUrl = doi ? `https://doi.org/${doi}` : `https://europepmc.org/article/MED/${item.id || ''}`;
 
       papers.push({
         id: `paper_epmc_${item.id || doi || Date.now()}`,
@@ -112,13 +112,14 @@ async function searchEuropePmc(query: string, limit: number): Promise<Paper[]> {
         publisher: item.journalInfo?.journal?.publisher || 'Academic Publisher',
         publicationYear: year,
         publicationDate: item.firstPublicationDate || `${year}`,
-        canonicalUrl: doi ? `https://doi.org/${doi}` : undefined,
+        canonicalUrl,
         openAccessUrl,
         isOpenAccess,
         topics: item.keywordList?.keyword || [journalName],
         citationCount: item.citedByCount || 0,
         discussionCount: 0,
-        saveCount: 0,
+        likesCount: 0,
+        savesCount: 0,
       });
     }
 
@@ -155,7 +156,11 @@ async function searchSemanticScholar(query: string, limit: number): Promise<Pape
       const arxivId = item.externalIds?.ArXiv;
       const isOpenAccess = Boolean(item.openAccessPdf?.url || arxivId);
       const openAccessUrl = item.openAccessPdf?.url || (arxivId ? `https://arxiv.org/pdf/${arxivId}.pdf` : undefined);
-      const canonicalUrl = doi ? `https://doi.org/${doi}` : arxivId ? `https://arxiv.org/abs/${arxivId}` : undefined;
+      const canonicalUrl = doi
+        ? `https://doi.org/${doi}`
+        : arxivId
+        ? `https://arxiv.org/abs/${arxivId}`
+        : `https://www.semanticscholar.org/paper/${item.paperId}`;
 
       const authors = (item.authors || []).map((a: any, idx: number) => ({
         id: `a_s2_${a.authorId || idx}`,
@@ -181,7 +186,8 @@ async function searchSemanticScholar(query: string, limit: number): Promise<Pape
         topics: [journalName],
         citationCount: item.citationCount || 0,
         discussionCount: 0,
-        saveCount: 0,
+        likesCount: 0,
+        savesCount: 0,
       });
     }
 

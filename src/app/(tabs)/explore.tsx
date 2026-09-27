@@ -160,7 +160,6 @@ export default function ExploreScreen() {
       {/* Header */}
       <AppHeader
         title="Explore"
-        subtitle="Discover scientific papers & verified scholars"
       />
 
       {/* Universal Search Bar */}

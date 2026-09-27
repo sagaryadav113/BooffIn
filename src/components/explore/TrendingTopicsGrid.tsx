@@ -22,7 +22,7 @@ export const TrendingTopicsGrid: React.FC<TrendingTopicsGridProps> = ({ onSelect
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Sparkles size={14} color={colors.accentGold} />
+        <Sparkles size={14} color={colors.accentOrange} />
         <Text style={styles.headerTitle}>TRENDING TOPICS & DISCIPLINES</Text>
       </View>
 
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.sm + 2,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.cardBackground,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.borderLight,
