@@ -67,6 +67,8 @@ import {
 } from '../../api/storageService';
 import { fetchUserPosts, fetchSavedPostsAndPapers } from '../../api/socialService';
 import { Post, Paper, CollaborationRequest } from '../../types';
+import { ScholarPublication } from '../../types/scholar';
+import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab';
 import { FollowListModal } from '../../components/modals/FollowListModal';
 import { ImageCropperModal, CroppedImageResult } from '../../components/modals/ImageCropperModal';
 
@@ -80,7 +82,7 @@ export default function CurrentUserProfileScreen() {
   const papers = usePaperStore((s) => s.papers);
   const savedPaperIds = usePaperStore((s) => s.savedPaperIds);
 
-  const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Saved' | 'Connects' | 'Cited' | 'Activity'>('Posts');
+  const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Saved' | 'Scholars' | 'Cited' | 'Activity'>('Posts');
   const [collaborationRequests, setCollaborationRequests] = useState<{
     incoming: CollaborationRequest[];
     outgoing: CollaborationRequest[];
@@ -340,6 +342,37 @@ export default function CurrentUserProfileScreen() {
         message: `${user.fullName} (@${user.handle}) on BooffIn - Academic Profile & Research Discussions`,
       });
     } catch {}
+  };
+
+  const handleSharePaperToFeed = (pub: ScholarPublication) => {
+    const paperAttachment: Paper = {
+      id: pub.id,
+      title: pub.title,
+      authors:
+        pub.authors && pub.authors.length > 0
+          ? pub.authors.map((name) => ({ name }))
+          : [{ name: user?.fullName || 'Author' }],
+      journal: pub.journalName || 'Verified Scholar Publication',
+      publicationYear: pub.publicationYear || new Date().getFullYear(),
+      doi: pub.doi,
+      canonicalUrl: pub.url || (pub.doi ? `https://doi.org/${pub.doi}` : 'https://booffin.com'),
+      openAccessUrl: pub.openAccessPdfUrl || pub.url,
+      abstract: pub.abstract || '',
+      isOpenAccess: Boolean(pub.isOpenAccess || pub.openAccessPdfUrl),
+      topics: pub.topics || [],
+      citationCount: pub.citationCount || 0,
+      discussionCount: 0,
+      likesCount: 0,
+      savesCount: 0,
+    };
+
+    router.push({
+      pathname: '/(tabs)/create',
+      params: {
+        paperData: JSON.stringify(paperAttachment),
+        initialContent: `Sharing my paper: "${pub.title}". Welcoming peer feedback, questions, and critique from fellow researchers!`,
+      },
+    });
   };
 
   const formatCount = (count: number = 0) => {
@@ -629,10 +662,9 @@ export default function CurrentUserProfileScreen() {
           </View>
         </View>
 
-        {/* Sub-Tabs: Posts | Saved | Connects | Cited | Activity */}
+        {/* Sub-Tabs: Posts | Saved | Scholars | Cited | Activity */}
         <View style={styles.tabsRow}>
-          {(['Posts', 'Saved', 'Connects', 'Cited', 'Activity'] as const).map((tab) => {
-            const pendingIncomingCount = collaborationRequests.incoming.filter((r) => r.status === 'pending').length;
+          {(['Posts', 'Saved', 'Scholars', 'Cited', 'Activity'] as const).map((tab) => {
             return (
               <TouchableOpacity
                 key={tab}
@@ -650,11 +682,11 @@ export default function CurrentUserProfileScreen() {
                       activeSubTab === tab && styles.tabTextActive,
                     ]}
                   >
-                    {tab}
+                    {tab === 'Scholars' ? 'Scholars' : tab}
                   </Text>
-                  {tab === 'Connects' && pendingIncomingCount > 0 && (
-                    <View style={styles.tabBadge}>
-                      <Text style={styles.tabBadgeText}>{pendingIncomingCount}</Text>
+                  {tab === 'Scholars' && user.orcidVerified && (
+                    <View style={styles.scholarTabBadge}>
+                      <CheckCircle2 size={11} color="#16A34A" />
                     </View>
                   )}
                   {tab === 'Saved' && (displaySavedPosts.length + displaySavedPapers.length) > 0 && (
@@ -810,157 +842,15 @@ export default function CurrentUserProfileScreen() {
           </View>
         )}
 
-        {activeSubTab === 'Connects' && (
-          <View style={styles.connectsList}>
-            {/* Incoming Collaboration Requests */}
-            <Text style={styles.connectSectionHeading}>
-              Incoming Collaboration Requests ({collaborationRequests.incoming.length})
-            </Text>
-
-            {collaborationRequests.incoming.length > 0 ? (
-              collaborationRequests.incoming.map((req) => (
-                <View key={req.id} style={styles.requestCard}>
-                  <View style={styles.requestHeader}>
-                    <Avatar
-                      url={req.sender?.avatarUrl}
-                      name={req.sender?.fullName || 'Researcher'}
-                      size={40}
-                      verified={req.sender?.orcidVerified}
-                    />
-                    <View style={styles.requestMeta}>
-                      <Text style={styles.requestSenderName}>
-                        {req.sender?.fullName || 'Researcher'}
-                      </Text>
-                      <Text style={styles.requestSenderRole} numberOfLines={1}>
-                        {req.sender?.academicTitle} · {req.sender?.institution}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusTag,
-                        req.status === 'accepted' && styles.statusTagAccepted,
-                        req.status === 'declined' && styles.statusTagDeclined,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusTagText,
-                          req.status === 'accepted' && styles.statusTagTextAccepted,
-                          req.status === 'declined' && styles.statusTagTextDeclined,
-                        ]}
-                      >
-                        {req.status.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.requestTopicPill}>
-                    <Sparkles size={12} color="#2563EB" style={{ marginRight: 4 }} />
-                    <Text style={styles.requestTopicText}>Topic: {req.topic}</Text>
-                  </View>
-
-                  <Text style={styles.requestMessage}>{req.message}</Text>
-
-                  {req.status === 'pending' && (
-                    <View style={styles.requestActionsRow}>
-                      <TouchableOpacity
-                        style={styles.acceptButton}
-                        onPress={() => handleRespond(req.id, 'accepted')}
-                        activeOpacity={0.8}
-                      >
-                        <Check size={14} color={colors.white} style={{ marginRight: 4 }} />
-                        <Text style={styles.acceptButtonText}>Accept Collaboration</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.declineButton}
-                        onPress={() => handleRespond(req.id, 'declined')}
-                        activeOpacity={0.8}
-                      >
-                        <XIcon size={14} color={colors.textSecondary} style={{ marginRight: 4 }} />
-                        <Text style={styles.declineButtonText}>Decline</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              ))
-            ) : (
-              <View style={styles.emptyRequests}>
-                <Typography variant="caption" color={colors.textMuted} align="center">
-                  No incoming collaboration proposals right now.
-                </Typography>
-              </View>
-            )}
-
-            {/* Sent Collaboration Requests */}
-            <Text style={[styles.connectSectionHeading, { marginTop: spacing.xl }]}>
-              Sent Collaboration Proposals ({collaborationRequests.outgoing.length})
-            </Text>
-
-            {collaborationRequests.outgoing.length > 0 ? (
-              collaborationRequests.outgoing.map((req) => (
-                <View key={req.id} style={styles.requestCard}>
-                  <View style={styles.requestHeader}>
-                    <Avatar
-                      url={req.recipient?.avatarUrl}
-                      name={req.recipient?.fullName || 'Researcher'}
-                      size={40}
-                      verified={req.recipient?.orcidVerified}
-                    />
-                    <View style={styles.requestMeta}>
-                      <Text style={styles.requestSenderName}>
-                        To: {req.recipient?.fullName || 'Researcher'}
-                      </Text>
-                      <Text style={styles.requestSenderRole} numberOfLines={1}>
-                        {req.recipient?.academicTitle} · {req.recipient?.institution}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusTag,
-                        req.status === 'accepted' && styles.statusTagAccepted,
-                        req.status === 'declined' && styles.statusTagDeclined,
-                        req.status === 'withdrawn' && styles.statusTagDeclined,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusTagText,
-                          req.status === 'accepted' && styles.statusTagTextAccepted,
-                          req.status === 'declined' && styles.statusTagTextDeclined,
-                          req.status === 'withdrawn' && styles.statusTagTextDeclined,
-                        ]}
-                      >
-                        {req.status.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.requestTopicPill}>
-                    <Sparkles size={12} color="#2563EB" style={{ marginRight: 4 }} />
-                    <Text style={styles.requestTopicText}>Topic: {req.topic}</Text>
-                  </View>
-
-                  <Text style={styles.requestMessage}>{req.message}</Text>
-
-                  {req.status === 'pending' && (
-                    <TouchableOpacity
-                      style={styles.withdrawLink}
-                      onPress={() => handleWithdraw(req.id)}
-                    >
-                      <Text style={styles.withdrawLinkText}>Withdraw Proposal</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))
-            ) : (
-              <View style={styles.emptyRequests}>
-                <Typography variant="caption" color={colors.textMuted} align="center">
-                  You haven't sent any research collaboration requests yet. Visit a researcher's profile and tap "Connect"!
-                </Typography>
-              </View>
-            )}
-          </View>
+        {activeSubTab === 'Scholars' && (
+          <BooffInScholarsTab
+            userId={user.id}
+            isCurrentUser={true}
+            userFullName={user.fullName}
+            orcidId={user.orcidId}
+            orcidVerified={user.orcidVerified}
+            onSharePaperToFeed={handleSharePaperToFeed}
+          />
         )}
 
         {activeSubTab === 'Cited' && (
@@ -1473,6 +1363,12 @@ const styles = StyleSheet.create({
   tabBadge: {
     backgroundColor: '#2563EB',
     paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: radii.full,
+  },
+  scholarTabBadge: {
+    backgroundColor: 'rgba(22, 163, 74, 0.12)',
+    paddingHorizontal: 4,
     paddingVertical: 1.5,
     borderRadius: radii.full,
   },

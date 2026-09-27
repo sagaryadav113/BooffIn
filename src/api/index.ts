@@ -7,3 +7,4 @@ export * from './paperResolver';
 export * from './settingsService';
 export * from './moderationService';
 export * from './storageService';
+export * from './orcidService';

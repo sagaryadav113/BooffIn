@@ -49,6 +49,7 @@ import { fetchUserPosts } from '../../api/socialService';
 import { ConnectionStatus, UserProfile, Post } from '../../types';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { FollowListModal } from '../../components/modals/FollowListModal';
+import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab';
 
 export default function OtherResearcherProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -61,7 +62,7 @@ export default function OtherResearcherProfileScreen() {
   const [researcherPosts, setResearcherPosts] = useState<Post[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Papers' | 'Activity'>('Posts');
+  const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Scholars' | 'Activity'>('Posts');
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('none');
   const [followModalVisible, setFollowModalVisible] = useState(false);
@@ -537,9 +538,9 @@ export default function OtherResearcherProfileScreen() {
           </View>
         </View>
 
-        {/* Sub-Tabs: Posts | Papers | Activity */}
+        {/* Sub-Tabs: Posts | Scholars | Activity */}
         <View style={styles.tabsRow}>
-          {(['Posts', 'Papers', 'Activity'] as const).map((tab) => (
+          {(['Posts', 'Scholars', 'Activity'] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveSubTab(tab)}
@@ -555,7 +556,7 @@ export default function OtherResearcherProfileScreen() {
                   activeSubTab === tab && styles.tabTextActive,
                 ]}
               >
-                {tab === 'Posts' ? 'All Posts & Shares' : tab === 'Papers' ? 'Referenced Papers' : 'Activity'}
+                {tab === 'Posts' ? 'All Posts & Shares' : tab === 'Scholars' ? 'BooffIn Scholars' : 'Activity'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -583,20 +584,14 @@ export default function OtherResearcherProfileScreen() {
           </View>
         )}
 
-        {activeSubTab === 'Papers' && (
-          <View style={styles.papersList}>
-            {paperPosts.length > 0 ? (
-              paperPosts.map((p) => (
-                <TrendingPaperCard key={p.id} paper={p.paper!} style={{ marginBottom: spacing.md }} />
-              ))
-            ) : (
-              <EmptyState
-                icon="FileText"
-                title="No papers referenced"
-                description="This researcher has not shared external peer-reviewed paper links yet."
-              />
-            )}
-          </View>
+        {activeSubTab === 'Scholars' && (
+          <BooffInScholarsTab
+            userId={researcher.id}
+            isCurrentUser={isOwnProfile}
+            userFullName={researcher.fullName}
+            orcidId={researcher.orcidId}
+            orcidVerified={researcher.orcidVerified}
+          />
         )}
 
         {activeSubTab === 'Activity' && (

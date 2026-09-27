@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   X,
   FileText,
@@ -102,6 +102,26 @@ export default function CreatePostScreen() {
 
   const [visibility, setVisibility] = useState<'public' | 'followers'>('public');
   const [isPublishing, setIsPublishing] = useState(false);
+
+  const searchParams = useLocalSearchParams<{
+    initialContent?: string;
+    paperData?: string;
+  }>();
+
+  useEffect(() => {
+    if (searchParams.initialContent) {
+      setContent(searchParams.initialContent);
+    }
+    if (searchParams.paperData) {
+      try {
+        const parsed = JSON.parse(searchParams.paperData);
+        if (parsed && parsed.title) {
+          setAttachedPaper(parsed);
+          setPostType('research_share');
+        }
+      } catch (e) {}
+    }
+  }, [searchParams.initialContent, searchParams.paperData]);
 
   const handleOpenImageOptions = () => {
     if (attachedImages.length >= 4) {

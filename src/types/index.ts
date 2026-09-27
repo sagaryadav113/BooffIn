@@ -8,3 +8,4 @@ export * from './search';
 export * from './connection';
 export * from './moderation';
 export * from './settings';
+export * from './scholar';
