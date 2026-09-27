@@ -47,7 +47,10 @@ import {
   getScholarPublications,
   syncScholarPublications,
   normalizeOrcidId,
+  isValidOrcidId,
   connectOrcidOAuth,
+  fetchOrcidPersonDetails,
+  OrcidPersonDetails,
 } from '../../api/orcidService';
 import { verifyPasswordAndDisconnectOrcid } from '../../api/authService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -86,13 +89,19 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isQuickSharing, setIsQuickSharing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'journal' | 'preprint' | 'oa'>('all');
 
   // 3-dot Action Sheet state
   const [selectedMenuPublication, setSelectedMenuPublication] = useState<ScholarPublication | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
+
+  // Connect & Verify ORCID Modal state
+  const [connectModalVisible, setConnectModalVisible] = useState(false);
+  const [connectInputOrcid, setConnectInputOrcid] = useState('');
+  const [isVerifyingRecord, setIsVerifyingRecord] = useState(false);
+  const [verifiedPersonPreview, setVerifiedPersonPreview] = useState<OrcidPersonDetails | null>(null);
+  const [connectStepError, setConnectStepError] = useState<string | null>(null);
 
   // Password verification modal for disconnecting ORCID
   const [disconnectModalVisible, setDisconnectModalVisible] = useState(false);
@@ -153,54 +162,97 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   }, [userId, propOrcidId, propOrcidVerified]);
 
   /**
-   * Official ORCID OAuth 2.0 Web Authentication flow
-   * Requires the user to enter their private password or university SSO on orcid.org
+   * Opens the Connect & Verify ORCID Modal
    */
-  const handleConnectWithOrcid = async () => {
+  const handleOpenConnectModal = () => {
+    setConnectInputOrcid('');
+    setVerifiedPersonPreview(null);
+    setConnectStepError(null);
     setConnectError(null);
-    setIsAuthenticating(true);
+    setConnectModalVisible(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
+
+  /**
+   * Live Query to ORCID Public Registry to verify the researcher record
+   */
+  const handleVerifyOrcidRecord = async () => {
+    const clean = normalizeOrcidId(connectInputOrcid);
+    if (!isValidOrcidId(clean)) {
+      setConnectStepError('Please enter a valid 16-digit ORCID iD (e.g. 0000-0002-1825-0097).');
+      return;
+    }
+
+    setConnectStepError(null);
+    setIsVerifyingRecord(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
 
-    const authRes = await connectOrcidOAuth();
-    if (!authRes.success || !authRes.orcidId) {
-      setIsAuthenticating(false);
-      setConnectError(authRes.error || 'ORCID authentication could not be completed.');
-      return;
+    const res = await fetchOrcidPersonDetails(clean);
+    setIsVerifyingRecord(false);
+
+    if (res.success && res.person) {
+      setVerifiedPersonPreview(res.person);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    } else {
+      setConnectStepError(res.error || 'Could not find a public ORCID record with this ID.');
     }
+  };
 
-    // Successfully verified through ORCID OAuth login
-    const cleanOrcid = authRes.orcidId;
+  /**
+   * Confirms binding the verified ORCID and syncs publications
+   */
+  const handleConfirmAndSyncOrcid = async () => {
+    if (!verifiedPersonPreview) return;
+    const cleanOrcid = verifiedPersonPreview.orcidId;
 
-    // Persist verified status to user store and database
+    setIsSyncing(true);
+    setConnectStepError(null);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+
+    // 1. Update user profile with verified status
     await updateProfile({
       orcidId: cleanOrcid,
       orcidVerified: true,
     });
 
-    // Now pull all publications for this verified researcher
-    setIsSyncing(true);
-    const syncRes = await syncScholarPublications(userId, cleanOrcid, userFullName || authRes.name);
-    setIsAuthenticating(false);
+    // 2. Sync all publications
+    const syncRes = await syncScholarPublications(
+      userId,
+      cleanOrcid,
+      userFullName || verifiedPersonPreview.name
+    );
+
     setIsSyncing(false);
 
     if (syncRes.success) {
+      setConnectModalVisible(false);
+      setVerifiedPersonPreview(null);
+      setConnectInputOrcid('');
       setPublications(syncRes.publications);
       setStats({
         ...syncRes.stats,
         isVerified: true,
         orcidId: cleanOrcid,
       });
+
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
+
       Alert.alert(
-        'ORCID Verified & Connected',
-        `Successfully authenticated! Synced ${syncRes.publications.length} verified publications for your BooffIn Scholar profile.`
+        'ORCID Record Verified & Connected',
+        `Successfully linked ${verifiedPersonPreview.name}'s ORCID record! Synced ${syncRes.publications.length} verified publications for your BooffIn Scholar profile.`
       );
     } else {
-      setConnectError(syncRes.error || 'Failed to sync publications from ORCID.');
+      setConnectStepError(syncRes.error || 'Failed to sync publications from ORCID.');
     }
   };
 
@@ -525,12 +577,12 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
           </View>
 
           <Text style={styles.emptyTitle}>
-            {isCurrentUser ? 'Connect Your Official ORCID iD' : 'No Verified Publications'}
+            {isCurrentUser ? 'Connect & Verify Your ORCID iD' : 'No Verified Publications'}
           </Text>
           <Text style={styles.emptyDesc}>
             {isCurrentUser
-              ? 'Authenticate with your official ORCID account to prove identity, prevent impersonation, and automatically pull your verified papers, citation metrics, and open-access PDFs.'
-              : 'This researcher has not authenticated their official ORCID publication record yet.'}
+              ? 'Connect your official ORCID record to showcase verified papers, citation counts, open-access PDFs, and gain the verified researcher badge on BooffIn.'
+              : 'This researcher has not connected their official ORCID publication record yet.'}
           </Text>
 
           {isCurrentUser && (
@@ -539,17 +591,17 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 <Text style={styles.errorText}>{connectError}</Text>
               )}
 
-              {/* Official ORCID OAuth Sign In Button */}
+              {/* Connect & Verify Button */}
               <TouchableOpacity
-                onPress={handleConnectWithOrcid}
-                disabled={isAuthenticating || isSyncing}
+                onPress={handleOpenConnectModal}
+                disabled={isSyncing}
                 style={[
                   styles.orcidOAuthButton,
-                  (isAuthenticating || isSyncing) && { opacity: 0.7 },
+                  isSyncing && { opacity: 0.7 },
                 ]}
                 activeOpacity={0.85}
               >
-                {isAuthenticating || isSyncing ? (
+                {isSyncing ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
                   <>
@@ -557,7 +609,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                       <Text style={styles.orcidLogoMiniText}>iD</Text>
                     </View>
                     <Text style={styles.orcidOAuthButtonText}>
-                      Sign In with ORCID iD
+                      Connect & Verify ORCID iD
                     </Text>
                   </>
                 )}
@@ -566,7 +618,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
               <View style={styles.securityPledgeRow}>
                 <ShieldCheck size={13} color="#16A34A" />
                 <Text style={styles.securityPledgeText}>
-                  Official 2-factor / password authentication on orcid.org. Impersonation is blocked.
+                  Verified against the official ORCID Public Registry. Instant paper sync.
                 </Text>
               </View>
             </View>
@@ -957,6 +1009,130 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 disabled={!disconnectPassword.trim() || isDisconnecting}
                 onPress={handleConfirmDisconnect}
                 style={{ flex: 1.3 }}
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 6. Connect & Verify ORCID Modal */}
+      <Modal
+        visible={connectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConnectModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setConnectModalVisible(false)}
+        >
+          <View style={styles.connectModalCard}>
+            <View style={styles.connectModalHeader}>
+              <View style={styles.orcidModalIconWrap}>
+                <Text style={styles.orcidModalIconText}>iD</Text>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.connectModalTitle}>Connect & Verify ORCID</Text>
+                <Text style={styles.connectModalSubtitle}>
+                  Enter your 16-digit ORCID iD. We will verify your official record with the ORCID registry.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setConnectModalVisible(false)}
+                style={styles.closeModalBtn}
+              >
+                <XIcon size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {connectStepError && (
+              <View style={styles.passwordErrorBox}>
+                <Text style={styles.passwordErrorText}>{connectStepError}</Text>
+              </View>
+            )}
+
+            {/* Input Form */}
+            <View style={styles.orcidInputWrap}>
+              <Text style={styles.passwordInputLabel}>ORCID iD or Profile URL</Text>
+              <View style={styles.orcidInputFieldRow}>
+                <TextInput
+                  style={styles.orcidTextInput}
+                  placeholder="0000-0002-1825-0097"
+                  placeholderTextColor={colors.textMuted}
+                  value={connectInputOrcid}
+                  onChangeText={(val) => {
+                    setConnectInputOrcid(val);
+                    if (connectStepError) setConnectStepError(null);
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  onPress={handleVerifyOrcidRecord}
+                  disabled={isVerifyingRecord || !connectInputOrcid.trim()}
+                  style={[
+                    styles.verifyPillBtn,
+                    (!connectInputOrcid.trim() || isVerifyingRecord) && { opacity: 0.6 },
+                  ]}
+                  activeOpacity={0.75}
+                >
+                  {isVerifyingRecord ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.verifyPillBtnText}>Verify Record</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Live Verified Record Preview Card */}
+            {verifiedPersonPreview && (
+              <View style={styles.verifiedPreviewCard}>
+                <View style={styles.verifiedPreviewHeader}>
+                  <View style={styles.verifiedGreenCircle}>
+                    <CheckCircle2 size={16} color="#16A34A" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.verifiedAuthorName}>{verifiedPersonPreview.name}</Text>
+                    <Text style={styles.verifiedOrcidId}>ORCID: {verifiedPersonPreview.orcidId}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.verifiedStatsRow}>
+                  <View style={styles.verifiedStatBadge}>
+                    <BookOpen size={12} color={colors.accentBlue} />
+                    <Text style={styles.verifiedStatText}>
+                      {verifiedPersonPreview.worksCount} Works Found on ORCID
+                    </Text>
+                  </View>
+                </View>
+
+                {verifiedPersonPreview.biography ? (
+                  <Text style={styles.verifiedBioSnippet} numberOfLines={2}>
+                    {verifiedPersonPreview.biography}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+
+            {/* Actions */}
+            <View style={styles.passwordModalButtonsRow}>
+              <Button
+                title="Cancel"
+                variant="secondary"
+                size="sm"
+                onPress={() => setConnectModalVisible(false)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title={isSyncing ? 'Syncing Works...' : 'Confirm & Sync Works'}
+                variant="primary"
+                size="sm"
+                loading={isSyncing}
+                disabled={!verifiedPersonPreview || isSyncing}
+                onPress={handleConfirmAndSyncOrcid}
+                style={{ flex: 1.6 }}
               />
             </View>
           </View>
@@ -1603,5 +1779,146 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginTop: spacing.xs,
+  },
+
+  /* Connect & Verify Modal */
+  connectModalCard: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+  },
+  connectModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    paddingBottom: spacing.sm + 2,
+  },
+  orcidModalIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#A6CE39',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orcidModalIconText: {
+    color: colors.white,
+    fontWeight: '900',
+    fontSize: 16,
+  },
+  connectModalTitle: {
+    ...typography.bodyBold,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  connectModalSubtitle: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  orcidInputWrap: {
+    gap: 6,
+  },
+  orcidInputFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.md,
+    paddingLeft: spacing.md,
+    paddingRight: 6,
+    paddingVertical: 4,
+    gap: spacing.sm,
+  },
+  orcidTextInput: {
+    flex: 1,
+    ...typography.body,
+    fontSize: 14,
+    color: colors.textPrimary,
+    minHeight: 38,
+  },
+  verifyPillBtn: {
+    backgroundColor: colors.textPrimary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyPillBtnText: {
+    ...typography.captionBold,
+    color: colors.white,
+    fontSize: 12,
+  },
+  verifiedPreviewCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: radii.md,
+    padding: spacing.md,
+    gap: spacing.xs + 2,
+  },
+  verifiedPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  verifiedGreenCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifiedAuthorName: {
+    ...typography.bodyBold,
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  verifiedOrcidId: {
+    ...typography.micro,
+    fontSize: 11.5,
+    color: '#166534',
+  },
+  verifiedStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: 2,
+  },
+  verifiedStatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  verifiedStatText: {
+    ...typography.micro,
+    color: colors.textPrimary,
+    fontWeight: '600',
+    fontSize: 11.5,
+  },
+  verifiedBioSnippet: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 2,
   },
 });

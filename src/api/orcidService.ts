@@ -274,6 +274,78 @@ export async function fetchWorksFromOpenAlex(
   }
 }
 
+export interface OrcidPersonDetails {
+  orcidId: string;
+  name: string;
+  creditName?: string;
+  biography?: string;
+  worksCount: number;
+}
+
+/**
+ * Fetches live verified person metadata from the ORCID Public API v3.0
+ */
+export async function fetchOrcidPersonDetails(orcidId: string): Promise<{
+  success: boolean;
+  person?: OrcidPersonDetails;
+  error?: string;
+}> {
+  try {
+    const cleanOrcid = normalizeOrcidId(orcidId);
+    if (!isValidOrcidId(cleanOrcid)) {
+      return {
+        success: false,
+        error: 'Invalid ORCID format. Expected 16 digits (e.g. 0000-0002-1825-0097).',
+      };
+    }
+
+    const [personRes, worksRes] = await Promise.all([
+      fetch(`${ORCID_PUBLIC_API_BASE}/${cleanOrcid}/person`, {
+        headers: { Accept: 'application/json' },
+      }),
+      fetch(`${ORCID_PUBLIC_API_BASE}/${cleanOrcid}/works`, {
+        headers: { Accept: 'application/json' },
+      }),
+    ]);
+
+    if (!personRes.ok) {
+      if (personRes.status === 404) {
+        return { success: false, error: `No public ORCID record found for ${cleanOrcid}.` };
+      }
+      return { success: false, error: `Failed to fetch ORCID public record (Status ${personRes.status}).` };
+    }
+
+    const personData = await personRes.json();
+    let worksCount = 0;
+    if (worksRes.ok) {
+      const worksData = await worksRes.json();
+      worksCount = (worksData.group || []).length;
+    }
+
+    const givenNames = personData.name?.['given-names']?.value || '';
+    const familyName = personData.name?.['family-name']?.value || '';
+    const creditName = personData.name?.['credit-name']?.value || undefined;
+    const fullName = creditName || [givenNames, familyName].filter(Boolean).join(' ') || 'Verified ORCID Scholar';
+    const biography = personData.biography?.content || undefined;
+
+    return {
+      success: true,
+      person: {
+        orcidId: cleanOrcid,
+        name: fullName,
+        creditName,
+        biography,
+        worksCount,
+      },
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Could not verify ORCID record.',
+    };
+  }
+}
+
 /**
  * Initiates the ORCID OAuth 2.0 Web Authentication flow
  */
@@ -282,17 +354,28 @@ export async function connectOrcidOAuth(clientId?: string): Promise<{
   orcidId?: string;
   name?: string;
   accessToken?: string;
+  hasConfiguredOAuth?: boolean;
   error?: string;
 }> {
   try {
-    const resolvedClientId = clientId || process.env.EXPO_PUBLIC_ORCID_CLIENT_ID || 'APP-BOFFIN-SCHOLARS';
+    const rawClientId = clientId || process.env.EXPO_PUBLIC_ORCID_CLIENT_ID;
+    
+    // If no real developer client ID is configured in .env yet, return friendly signal
+    if (!rawClientId || rawClientId === 'APP-BOFFIN-SCHOLARS') {
+      return {
+        success: false,
+        hasConfiguredOAuth: false,
+        error: 'ORCID_CLIENT_NOT_CONFIGURED',
+      };
+    }
+
     const redirectUri = AuthSession.makeRedirectUri({
       scheme: 'booffin',
       path: 'orcid-callback',
     });
 
     const authUrl = `${ORCID_OAUTH_AUTHORIZE_URL}?client_id=${encodeURIComponent(
-      resolvedClientId
+      rawClientId
     )}&response_type=code&scope=%2Fauthenticate%20%2Fread-public&redirect_uri=${encodeURIComponent(
       redirectUri
     )}`;
