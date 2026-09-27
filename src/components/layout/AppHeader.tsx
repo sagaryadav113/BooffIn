@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ViewStyle, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { colors, spacing, layout, typography } from '../../theme';
@@ -9,6 +9,8 @@ import { Icon, IconName } from '../core/Icon';
 export interface AppHeaderProps {
   title?: string;
   isBrandTitle?: boolean;
+  onTitlePress?: () => void;
+  isRefreshing?: boolean;
   showBack?: boolean;
   onBack?: () => void;
   showSearch?: boolean;
@@ -26,6 +28,8 @@ export interface AppHeaderProps {
 export const AppHeader: React.FC<AppHeaderProps> = ({
   title = 'BooffIn',
   isBrandTitle = false,
+  onTitlePress,
+  isRefreshing = false,
   showBack = false,
   onBack,
   showSearch = false,
@@ -54,7 +58,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   return (
     <View style={[styles.container, style]}>
       {/* Left side */}
-      <View style={styles.leftSection}>
+      <TouchableOpacity
+        disabled={!onTitlePress}
+        onPress={onTitlePress}
+        activeOpacity={onTitlePress ? 0.7 : 1}
+        style={styles.leftSection}
+      >
         {showBack && (
           <TouchableOpacity
             accessibilityRole="button"
@@ -83,7 +92,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         >
           {title}
         </Typography>
-      </View>
+        {isRefreshing && (
+          <ActivityIndicator size="small" color={colors.textSecondary} style={{ marginLeft: 6 }} />
+        )}
+      </TouchableOpacity>
 
       {/* Right side actions */}
       <View style={styles.rightSection}>

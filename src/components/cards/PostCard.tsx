@@ -97,6 +97,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   return (
     <TouchableOpacity
       activeOpacity={0.95}
+      delayPressIn={50}
       onPress={handlePostPress}
       style={[styles.container, style]}
     >

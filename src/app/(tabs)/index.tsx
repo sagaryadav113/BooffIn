@@ -21,6 +21,7 @@ import { PostCard } from '../../components/cards/PostCard';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useNotificationStore } from '../../store/useNotificationStore';
 import { Post } from '../../types';
 
 export default function HomeScreen() {
@@ -63,7 +64,11 @@ export default function HomeScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    await refreshFeed(currentUser?.id);
+    await Promise.all([
+      refreshFeed(currentUser?.id),
+      useNotificationStore.getState().loadUnreadCount(),
+      useAuthStore.getState().refreshCurrentUserProfile(),
+    ]);
   }, [currentUser?.id, refreshFeed]);
 
   const handleEndReached = useCallback(() => {
@@ -108,6 +113,8 @@ export default function HomeScreen() {
       <AppHeader
         title="BooffIn"
         isBrandTitle
+        onTitlePress={handleRefresh}
+        isRefreshing={isRefreshing}
         showSearch
         onSearch={() => router.push('/search')}
         showCreate
@@ -145,14 +152,23 @@ export default function HomeScreen() {
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
         ListFooterComponent={renderFooter}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
             tintColor={colors.black}
-            colors={[colors.black]}
+            title="Pull to refresh..."
+            titleColor={colors.textSecondary}
+            colors={[colors.black, colors.accentBlue]}
+            progressBackgroundColor={colors.white}
+            progressViewOffset={Platform.OS === 'android' ? 20 : 0}
           />
         }
+        bounces={true}
+        alwaysBounceVertical={true}
+        overScrollMode="always"
         contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
         ListEmptyComponent={
           isLoading && filteredPosts.length === 0 ? (
