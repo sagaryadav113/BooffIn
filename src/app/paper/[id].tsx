@@ -59,6 +59,7 @@ import { Comment, DiscussionType, Paper } from '../../types';
 export default function PaperDetailScreen() {
   const { id, fromPostId } = useLocalSearchParams<{ id: string; fromPostId?: string }>();
   const paperId = id || '';
+  const activePostId = fromPostId || '';
 
   const getPaperById = usePaperStore((s) => s.getPaperById);
   const fetchPaperById = usePaperStore((s) => s.fetchPaperById);
@@ -66,15 +67,15 @@ export default function PaperDetailScreen() {
   const toggleLikePaper = usePaperStore((s) => s.toggleLikePaper);
   const currentUser = useAuthStore((s) => s.user);
 
-  // Post & Synchronized Feed Comments
-  const activePostId = fromPostId || '';
-  const postComments = usePostStore((s) => (activePostId ? s.getCommentsForPost(activePostId) : []));
+  // Stable Post & Comments Store Selectors
+  const getCommentsForPost = usePostStore((s) => s.getCommentsForPost);
+  const commentsMap = usePostStore((s) => s.comments);
   const fetchCommentsForPost = usePostStore((s) => s.fetchCommentsForPost);
   const addPostComment = usePostStore((s) => s.addComment);
   const deletePostComment = usePostStore((s) => s.deleteComment);
 
-  // Fallback paper-level discussions
-  const discussions = useDiscussionStore((s) => (paperId ? s.discussions[paperId] || [] : []));
+  // Stable Discussion Store Selectors
+  const discussionsMap = useDiscussionStore((s) => s.discussions);
   const fetchDiscussionsForPaper = useDiscussionStore((s) => s.fetchDiscussionsForPaper);
   const activeFilter = useDiscussionStore((s) => s.activeFilter);
   const setActiveFilter = useDiscussionStore((s) => s.setActiveFilter);
@@ -85,8 +86,23 @@ export default function PaperDetailScreen() {
   const getParticipatingResearchers = useDiscussionStore((s) => s.getParticipatingResearchers);
   const getInterestedPeople = useDiscussionStore((s) => s.getInterestedPeople);
 
-  const [paper, setPaper] = useState<Paper | null>(getPaperById(paperId) || null);
-  const [isLoading, setIsLoading] = useState(!paper);
+  // Derive initial paper object from local state or post
+  const initialPaper = useMemo(() => {
+    let p = getPaperById(paperId);
+    if (!p && activePostId) {
+      p = usePostStore.getState().getPostById(activePostId)?.paper || undefined;
+    }
+    if (!p) {
+      const match = usePostStore.getState().posts.find(
+        (item) => item.paper && (item.paper.id === paperId || item.paper.doi === paperId)
+      );
+      if (match?.paper) p = match.paper;
+    }
+    return p || null;
+  }, [paperId, activePostId, getPaperById]);
+
+  const [paper, setPaper] = useState<Paper | null>(initialPaper);
+  const [isLoading, setIsLoading] = useState(!initialPaper);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Reader View Mode: 'article' (Substack format) vs 'pdf' (Open Access Document)
@@ -97,33 +113,64 @@ export default function PaperDetailScreen() {
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
+  // Memoized comments and discussions to prevent selector reference thrashing
+  const postComments = useMemo(() => {
+    return activePostId ? getCommentsForPost(activePostId) : [];
+  }, [activePostId, commentsMap, getCommentsForPost]);
+
+  const discussions = useMemo(() => {
+    return (paperId && discussionsMap[paperId]) ? discussionsMap[paperId] : [];
+  }, [paperId, discussionsMap]);
+
   const loadData = useCallback(async (isRefresh = false) => {
     if (!paperId) {
       setIsLoading(false);
       return;
     }
 
-    if (!isRefresh && !paper) {
-      setIsLoading(true);
+    // Try finding paper in paperStore or postStore first
+    let currentPaper = getPaperById(paperId);
+    if (!currentPaper && activePostId) {
+      currentPaper = usePostStore.getState().getPostById(activePostId)?.paper || undefined;
     }
-    const fetched = await fetchPaperById(paperId);
-    if (fetched) {
-      setPaper(fetched);
+    if (!currentPaper) {
+      const matchingPost = usePostStore.getState().posts.find(
+        (p) => p.paper && (p.paper.id === paperId || p.paper.doi === paperId)
+      );
+      if (matchingPost?.paper) {
+        currentPaper = matchingPost.paper;
+      }
     }
 
-    if (activePostId) {
-      await fetchCommentsForPost(activePostId, currentUser.id);
-    } else {
-      await fetchDiscussionsForPaper(paperId);
+    if (currentPaper) {
+      setPaper(currentPaper);
+      setIsLoading(false);
+    } else if (!isRefresh) {
+      setIsLoading(true);
     }
+
+    try {
+      const fetched = await fetchPaperById(paperId);
+      if (fetched) {
+        setPaper(fetched);
+      }
+    } catch (e) {}
+
+    try {
+      if (activePostId) {
+        await fetchCommentsForPost(activePostId, currentUser?.id);
+      } else {
+        await fetchDiscussionsForPaper(paperId);
+      }
+    } catch (e) {}
 
     setIsLoading(false);
     if (isRefresh) setIsRefreshing(false);
-  }, [paperId, activePostId, currentUser.id, fetchPaperById, fetchCommentsForPost, fetchDiscussionsForPaper]);
+  }, [paperId, activePostId, currentUser?.id, getPaperById, fetchPaperById, fetchCommentsForPost, fetchDiscussionsForPaper]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [paperId, activePostId]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -147,7 +194,7 @@ export default function PaperDetailScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleSavePaper(paper.id, currentUser.id);
+    toggleSavePaper(paper.id, currentUser?.id);
   };
 
   const handleLike = () => {
@@ -187,7 +234,7 @@ export default function PaperDetailScreen() {
     try {
       if (activePostId) {
         // Direct synchronization with the post feed comment thread
-        await addPostComment(activePostId, textToSend, targetParentId, currentUser.id);
+        await addPostComment(activePostId, textToSend, targetParentId, currentUser?.id);
       } else {
         // Fallback to paper discussion store
         addDiscussion({
@@ -212,7 +259,7 @@ export default function PaperDetailScreen() {
     if (Platform.OS === 'web') {
       const confirmed = window.confirm('Are you sure you want to delete this comment?');
       if (confirmed) {
-        deletePostComment(commentId, activePostId, currentUser.id);
+        deletePostComment(commentId, activePostId, currentUser?.id);
       }
     } else {
       Alert.alert('Delete Comment', 'Are you sure you want to delete this critique?', [
@@ -220,7 +267,7 @@ export default function PaperDetailScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deletePostComment(commentId, activePostId, currentUser.id),
+          onPress: () => deletePostComment(commentId, activePostId, currentUser?.id),
         },
       ]);
     }
@@ -237,13 +284,13 @@ export default function PaperDetailScreen() {
   // Participating researchers for this paper
   const participatingResearchers = useMemo(() => {
     return getParticipatingResearchers(paperId);
-  }, [paperId, getParticipatingResearchers]);
+  }, [paperId, getParticipatingResearchers, discussionsMap]);
 
   // People interested in this paper
   const interestedPeople = useMemo(() => {
     if (!paper) return [];
-    return getInterestedPeople(paper, currentUser.id);
-  }, [paper, currentUser.id, getInterestedPeople]);
+    return getInterestedPeople(paper, currentUser?.id);
+  }, [paper, currentUser?.id, getInterestedPeople]);
 
   if (isLoading) {
     return (
@@ -634,8 +681,8 @@ export default function PaperDetailScreen() {
             {/* Comment Composer Input Box */}
             <View style={styles.commentComposerBox}>
               <Avatar
-                url={currentUser.avatarUrl}
-                name={currentUser.fullName}
+                url={currentUser?.avatarUrl}
+                name={currentUser?.fullName}
                 size={32}
                 style={{ marginRight: spacing.sm }}
               />
@@ -674,7 +721,7 @@ export default function PaperDetailScreen() {
                       comment={c}
                       onReply={(target) => setReplyingTo(target)}
                       onDelete={handleDeleteComment}
-                      currentUserId={currentUser.id}
+                      currentUserId={currentUser?.id}
                     />
                   ))
                 ) : (
