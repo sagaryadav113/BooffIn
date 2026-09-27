@@ -13,6 +13,7 @@ import {
   TextInput,
   Pressable,
   KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -38,6 +39,10 @@ import {
   KeyRound,
   Eye,
   EyeOff,
+  Globe,
+  Users,
+  Tag,
+  Send,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -61,6 +66,21 @@ import {
 } from '../../api/authService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
+
+const SCHOLAR_TOPICS = [
+  'Neuroscience',
+  'AI & Bio',
+  'Genetics',
+  'Cancer',
+  'Immunology',
+  'Bioinformatics',
+  'Physics',
+  'Medicine',
+  'Chemistry',
+  'Biophysics',
+  'Materials Science',
+  'Ecology',
+];
 
 export interface BooffInScholarsTabProps {
   userId: string;
@@ -101,6 +121,14 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   // 3-dot Action Sheet state
   const [selectedMenuPublication, setSelectedMenuPublication] = useState<ScholarPublication | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
+
+  // Share with Caption Modal state
+  const [captionModalVisible, setCaptionModalVisible] = useState(false);
+  const [captionPaper, setCaptionPaper] = useState<ScholarPublication | null>(null);
+  const [captionText, setCaptionText] = useState('');
+  const [selectedCaptionTopics, setSelectedCaptionTopics] = useState<string[]>([]);
+  const [captionVisibility, setCaptionVisibility] = useState<'public' | 'followers'>('public');
+  const [isPostingCaption, setIsPostingCaption] = useState(false);
 
   // Connect & Verify ORCID Modal state
   const [connectModalVisible, setConnectModalVisible] = useState(false);
@@ -361,6 +389,9 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
     }
   };
 
+  /**
+   * Opens the Share Paper with Caption Modal Sheet
+   */
   const handleShareWithCaption = (pub: ScholarPublication) => {
     setSelectedMenuPublication(null);
     try {
@@ -372,23 +403,118 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
       return;
     }
 
-    // Default fallback to compose screen
+    setCaptionPaper(pub);
+    setCaptionText('');
+    setSelectedCaptionTopics(pub.topics && pub.topics.length > 0 ? [...pub.topics] : []);
+    setCaptionVisibility('public');
+    setCaptionModalVisible(true);
+  };
+
+  /**
+   * Publishes the post with custom caption & paper attachment to the feed
+   */
+  const handlePublishCaptionPost = async () => {
+    if (!captionPaper || isPostingCaption) return;
+    setIsPostingCaption(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
     const paperAttachment: Paper = {
-      id: pub.id,
-      title: pub.title,
+      id: captionPaper.id,
+      title: captionPaper.title,
       authors:
-        pub.authors && pub.authors.length > 0
-          ? pub.authors.map((name) => ({ name }))
+        captionPaper.authors && captionPaper.authors.length > 0
+          ? captionPaper.authors.map((name) => ({ name }))
           : [{ name: userFullName || 'Author' }],
-      journal: pub.journalName || 'Verified Scholar Publication',
-      publicationYear: pub.publicationYear || new Date().getFullYear(),
-      doi: pub.doi,
-      canonicalUrl: pub.url || (pub.doi ? `https://doi.org/${pub.doi}` : 'https://booffin.com'),
-      openAccessUrl: pub.openAccessPdfUrl || pub.url,
-      abstract: pub.abstract || '',
-      isOpenAccess: Boolean(pub.isOpenAccess || pub.openAccessPdfUrl),
-      topics: pub.topics || [],
-      citationCount: pub.citationCount || 0,
+      journal: captionPaper.journalName || 'Verified Scholar Publication',
+      publicationYear: captionPaper.publicationYear || new Date().getFullYear(),
+      doi: captionPaper.doi,
+      canonicalUrl:
+        captionPaper.url ||
+        (captionPaper.doi ? `https://doi.org/${captionPaper.doi}` : 'https://booffin.com'),
+      openAccessUrl: captionPaper.openAccessPdfUrl || captionPaper.url,
+      abstract: captionPaper.abstract || '',
+      isOpenAccess: Boolean(captionPaper.isOpenAccess || captionPaper.openAccessPdfUrl),
+      topics: selectedCaptionTopics.length > 0 ? selectedCaptionTopics : captionPaper.topics || [],
+      citationCount: captionPaper.citationCount || 0,
+      discussionCount: 0,
+      likesCount: 0,
+      savesCount: 0,
+    };
+
+    const finalContent =
+      captionText.trim() ||
+      `Sharing our paper: "${captionPaper.title}". Read the findings and join the scientific discussion!`;
+
+    try {
+      await createPost(
+        {
+          content: finalContent,
+          postType: 'research_share',
+          paper: paperAttachment,
+          topics: selectedCaptionTopics,
+          visibility: captionVisibility,
+        },
+        userId
+      );
+
+      setIsPostingCaption(false);
+      setCaptionModalVisible(false);
+      setCaptionPaper(null);
+      setCaptionText('');
+
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+
+      Alert.alert(
+        'Paper Shared to Feed',
+        'Your publication and caption have been posted to the home feed for peer discussion!',
+        [
+          { text: 'Done', style: 'cancel' },
+          {
+            text: 'View on Feed',
+            onPress: () => router.push('/(tabs)'),
+          },
+        ]
+      );
+    } catch (err: any) {
+      setIsPostingCaption(false);
+      Alert.alert('Posting Error', err?.message || 'Failed to post paper to feed.');
+    }
+  };
+
+  /**
+   * Opens full compose screen with paper attachment
+   */
+  const handleOpenFullComposer = () => {
+    if (!captionPaper) return;
+    const paperToAttach = { ...captionPaper };
+    const currentCaption = captionText;
+    const topicsToPass = [...selectedCaptionTopics];
+
+    setCaptionModalVisible(false);
+    setCaptionPaper(null);
+
+    const paperAttachment: Paper = {
+      id: paperToAttach.id,
+      title: paperToAttach.title,
+      authors:
+        paperToAttach.authors && paperToAttach.authors.length > 0
+          ? paperToAttach.authors.map((name) => ({ name }))
+          : [{ name: userFullName || 'Author' }],
+      journal: paperToAttach.journalName || 'Verified Scholar Publication',
+      publicationYear: paperToAttach.publicationYear || new Date().getFullYear(),
+      doi: paperToAttach.doi,
+      canonicalUrl:
+        paperToAttach.url ||
+        (paperToAttach.doi ? `https://doi.org/${paperToAttach.doi}` : 'https://booffin.com'),
+      openAccessUrl: paperToAttach.openAccessPdfUrl || paperToAttach.url,
+      abstract: paperToAttach.abstract || '',
+      isOpenAccess: Boolean(paperToAttach.isOpenAccess || paperToAttach.openAccessPdfUrl),
+      topics: topicsToPass.length > 0 ? topicsToPass : paperToAttach.topics || [],
+      citationCount: paperToAttach.citationCount || 0,
       discussionCount: 0,
       likesCount: 0,
       savesCount: 0,
@@ -398,7 +524,9 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
       pathname: '/(tabs)/create',
       params: {
         paperData: JSON.stringify(paperAttachment),
-        initialContent: `Sharing my paper: "${pub.title}". Welcoming feedback and questions from fellow researchers!`,
+        initialContent:
+          currentCaption ||
+          `Sharing my paper: "${paperToAttach.title}". Welcoming feedback and questions from fellow researchers!`,
       },
     });
   };
@@ -1303,6 +1431,221 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* 7. Share Paper with Caption Modal Sheet */}
+      <Modal
+        visible={captionModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCaptionModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setCaptionModalVisible(false)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.keyboardAvoidWrapper}
+          >
+            <View style={styles.captionModalCard}>
+              {/* Header */}
+              <View style={styles.captionModalHeader}>
+                <View style={styles.captionIconWrap}>
+                  <Edit3 size={18} color={colors.accentBlue} />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.captionModalTitle}>Share Paper with Caption</Text>
+                  <Text style={styles.captionModalSubtitle}>
+                    Add your thoughts, key findings, or questions to initiate a peer discussion.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setCaptionModalVisible(false)}
+                  style={styles.closeModalBtn}
+                >
+                  <XIcon size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                style={{ maxHeight: 380 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Attached Paper Mini Card */}
+                {captionPaper && (
+                  <View style={styles.captionPaperCard}>
+                    <View style={styles.captionPaperTopRow}>
+                      <View style={styles.captionJournalBadge}>
+                        <BookOpen size={11} color={colors.textSecondary} />
+                        <Text style={styles.captionJournalText} numberOfLines={1}>
+                          {captionPaper.journalName || 'Verified Publication'} · {captionPaper.publicationYear}
+                        </Text>
+                      </View>
+                      {captionPaper.isOpenAccess && (
+                        <View style={styles.oaBadge}>
+                          <Unlock size={10} color="#16A34A" />
+                          <Text style={styles.oaBadgeText}>Open Access</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <Text style={styles.captionPaperTitle} numberOfLines={2}>
+                      {captionPaper.title}
+                    </Text>
+
+                    {captionPaper.authors && captionPaper.authors.length > 0 && (
+                      <Text style={styles.captionPaperAuthors} numberOfLines={1}>
+                        {captionPaper.authors.join(', ')}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Caption Input */}
+                <View style={styles.captionInputWrap}>
+                  <Text style={styles.captionInputLabel}>Your Caption & Commentary</Text>
+                  <TextInput
+                    style={styles.captionTextInput}
+                    placeholder="Highlight main discoveries, ask peers questions, or explain significance..."
+                    placeholderTextColor={colors.textMuted}
+                    multiline
+                    numberOfLines={4}
+                    value={captionText}
+                    onChangeText={setCaptionText}
+                    textAlignVertical="top"
+                    autoFocus
+                  />
+                  <Text style={styles.captionCharCount}>
+                    {captionText.length} characters
+                  </Text>
+                </View>
+
+                {/* Topics Selection */}
+                <View style={styles.captionTopicsSection}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Tag size={13} color={colors.textSecondary} />
+                    <Text style={styles.captionTopicsLabel}>Add Research Topics / Disciplines</Text>
+                  </View>
+                  <View style={styles.captionTopicsRow}>
+                    {SCHOLAR_TOPICS.map((topic) => {
+                      const isSelected = selectedCaptionTopics.includes(topic);
+                      return (
+                        <TouchableOpacity
+                          key={topic}
+                          style={[
+                            styles.captionTopicChip,
+                            isSelected && styles.captionTopicChipActive,
+                          ]}
+                          onPress={() => {
+                            if (isSelected) {
+                              setSelectedCaptionTopics((prev) =>
+                                prev.filter((t) => t !== topic)
+                              );
+                            } else {
+                              if (selectedCaptionTopics.length >= 4) {
+                                Alert.alert('Topic Limit', 'You can select up to 4 topics.');
+                                return;
+                              }
+                              setSelectedCaptionTopics((prev) => [...prev, topic]);
+                            }
+                            try {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            } catch {}
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.captionTopicChipText,
+                              isSelected && styles.captionTopicChipTextActive,
+                            ]}
+                          >
+                            {isSelected ? `✓ ${topic}` : `+ ${topic}`}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Audience Visibility Toggle */}
+                <View style={styles.captionVisibilityRow}>
+                  <Text style={styles.captionVisibilityLabel}>Visibility:</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.visibilityOptionBtn,
+                      captionVisibility === 'public' && styles.visibilityOptionBtnActive,
+                    ]}
+                    onPress={() => setCaptionVisibility('public')}
+                    activeOpacity={0.7}
+                  >
+                    <Globe size={13} color={captionVisibility === 'public' ? colors.white : colors.textSecondary} />
+                    <Text
+                      style={[
+                        styles.visibilityOptionText,
+                        captionVisibility === 'public' && styles.visibilityOptionTextActive,
+                      ]}
+                    >
+                      Public Feed
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.visibilityOptionBtn,
+                      captionVisibility === 'followers' && styles.visibilityOptionBtnActive,
+                    ]}
+                    onPress={() => setCaptionVisibility('followers')}
+                    activeOpacity={0.7}
+                  >
+                    <Users size={13} color={captionVisibility === 'followers' ? colors.white : colors.textSecondary} />
+                    <Text
+                      style={[
+                        styles.visibilityOptionText,
+                        captionVisibility === 'followers' && styles.visibilityOptionTextActive,
+                      ]}
+                    >
+                      Followers Only
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+
+              {/* Footer Actions */}
+              <View style={styles.captionFooterRow}>
+                <TouchableOpacity
+                  style={styles.fullComposerLinkBtn}
+                  onPress={handleOpenFullComposer}
+                  activeOpacity={0.7}
+                >
+                  <ExternalLink size={13} color={colors.accentBlue} />
+                  <Text style={styles.fullComposerLinkText}>Full Composer</Text>
+                </TouchableOpacity>
+
+                <View style={styles.captionActionButtonsRight}>
+                  <Button
+                    title="Cancel"
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => setCaptionModalVisible(false)}
+                  />
+                  <Button
+                    title={isPostingCaption ? 'Publishing...' : 'Publish to Feed'}
+                    variant="primary"
+                    size="sm"
+                    loading={isPostingCaption}
+                    disabled={isPostingCaption}
+                    onPress={handlePublishCaptionPost}
+                    style={{ minWidth: 120 }}
+                  />
+                </View>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -2107,5 +2450,207 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     lineHeight: 16,
   },
+
+  /* Share with Caption Modal */
+  captionModalCard: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    padding: spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? spacing.xxl : spacing.xl,
+    gap: spacing.md,
+    maxHeight: '85%',
+  },
+  captionModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    paddingBottom: spacing.sm + 2,
+  },
+  captionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captionModalTitle: {
+    ...typography.bodyBold,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  captionModalSubtitle: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  captionPaperCard: {
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    gap: 6,
+    marginBottom: spacing.md,
+  },
+  captionPaperTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  captionJournalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+  },
+  captionJournalText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  captionPaperTitle: {
+    ...typography.bodyBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+    lineHeight: 19,
+  },
+  captionPaperAuthors: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  captionInputWrap: {
+    gap: 6,
+    marginBottom: spacing.md,
+  },
+  captionInputLabel: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 12.5,
+  },
+  captionTextInput: {
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    ...typography.body,
+    fontSize: 14,
+    color: colors.textPrimary,
+    minHeight: 88,
+  },
+  captionCharCount: {
+    ...typography.micro,
+    color: colors.textMuted,
+    fontSize: 11,
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  captionTopicsSection: {
+    gap: 8,
+    marginBottom: spacing.md,
+  },
+  captionTopicsLabel: {
+    ...typography.captionBold,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  captionTopicsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  captionTopicChip: {
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radii.full,
+  },
+  captionTopicChipActive: {
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    borderColor: colors.accentBlue,
+  },
+  captionTopicChipText: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  captionTopicChipTextActive: {
+    color: colors.accentBlue,
+    fontWeight: '600',
+  },
+  captionVisibilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  captionVisibilityLabel: {
+    ...typography.captionBold,
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginRight: 4,
+  },
+  visibilityOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radii.full,
+  },
+  visibilityOptionBtnActive: {
+    backgroundColor: colors.textPrimary,
+    borderColor: colors.textPrimary,
+  },
+  visibilityOptionText: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  visibilityOptionTextActive: {
+    color: colors.white,
+    fontWeight: '600',
+  },
+  captionFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+    gap: spacing.sm,
+  },
+  fullComposerLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+  },
+  fullComposerLinkText: {
+    ...typography.captionBold,
+    color: colors.accentBlue,
+    fontSize: 12,
+  },
+  captionActionButtonsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
 });
+
 
