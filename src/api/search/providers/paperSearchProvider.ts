@@ -13,7 +13,7 @@ export async function searchPapers(query: string, limit = 15): Promise<Paper[]> 
   const parsed = parseReferenceInput(cleanQ);
   if (parsed.type !== 'generic_url' || parsed.doi || parsed.arxivId || parsed.pmid) {
     try {
-      const res = await defaultPaperResolver.resolveReference(cleanQ);
+      const res = await defaultPaperResolver.resolve(cleanQ);
       if (res.paper) {
         return [res.paper];
       }
