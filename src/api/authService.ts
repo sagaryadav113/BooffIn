@@ -527,7 +527,9 @@ export async function persistUserProfile(
     if (updates.bio !== undefined) dbPayload.bio = updates.bio.trim();
     if (updates.orcidId !== undefined) {
       dbPayload.orcid_id = updates.orcidId.trim() || null;
-      dbPayload.orcid_verified = Boolean(updates.orcidId.trim());
+    }
+    if (updates.orcidVerified !== undefined) {
+      dbPayload.orcid_verified = Boolean(updates.orcidVerified);
     }
     if (updates.researchInterests !== undefined) dbPayload.research_interests = updates.researchInterests;
     if (updates.avatarUrl !== undefined) dbPayload.avatar_url = updates.avatarUrl;
