@@ -33,6 +33,7 @@ import {
   X,
   FileCheck,
   Globe,
+  Maximize2,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
@@ -424,16 +425,44 @@ export default function PaperDetailScreen() {
           {/* ==================================================================== */}
           {viewMode === 'pdf' && hasOpenAccessPdf ? (
             <View style={styles.pdfViewWrapper}>
+              {/* Clean Light-Themed Reader Floating Bar */}
+              <View style={styles.pdfControlsBar}>
+                <View style={styles.pdfControlsLeft}>
+                  <Badge label={paper.journal || 'Open Access'} variant="oa" />
+                  <Typography variant="micro" color={colors.textSecondary} numberOfLines={1}>
+                    Full Publication Document
+                  </Typography>
+                </View>
+                <View style={styles.pdfControlsRight}>
+                  <TouchableOpacity
+                    onPress={handleOpenPdfBrowser}
+                    style={styles.pdfControlBtn}
+                    activeOpacity={0.75}
+                  >
+                    <Maximize2 size={13} color={colors.textPrimary} />
+                    <Text style={styles.pdfControlBtnText}>Fullscreen</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleOpenPublisher}
+                    style={styles.pdfControlBtn}
+                    activeOpacity={0.75}
+                  >
+                    <ExternalLink size={13} color={colors.textPrimary} />
+                    <Text style={styles.pdfControlBtnText}>Publisher</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               {Platform.OS === 'web' ? (
                 <View style={styles.webPdfContainer}>
-                  {/* @ts-ignore Web iframe embed */}
+                  {/* @ts-ignore Google Docs embedded viewer for clean white PDF presentation without dark browser plugin header */}
                   <iframe
-                    src={paper.openAccessUrl}
+                    src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(paper.openAccessUrl || '')}`}
                     style={{
                       width: '100%',
-                      height: 650,
+                      height: 720,
                       border: 'none',
-                      borderRadius: radii.md,
+                      backgroundColor: '#FFFFFF',
                     }}
                     title={paper.title}
                   />
@@ -833,11 +862,62 @@ const styles = StyleSheet.create({
   pdfViewWrapper: {
     padding: spacing.md,
   },
+  pdfControlsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  pdfControlsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  pdfControlsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  pdfControlBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  pdfControlBtnText: {
+    ...typography.micro,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
   webPdfContainer: {
     borderRadius: radii.md,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.borderLight,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   mobilePdfCard: {
     backgroundColor: colors.backgroundSecondary,
