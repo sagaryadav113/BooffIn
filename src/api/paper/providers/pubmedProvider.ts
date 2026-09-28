@@ -5,7 +5,7 @@ export class PubMedProvider implements MetadataProvider {
   name = 'EuropePMC / PubMed';
 
   supports(input: ParsedReferenceInput): boolean {
-    return Boolean(input.pmid || input.pmcid || input.type === 'pubmed_url');
+    return Boolean(input.pmid || input.pmcid || input.type === 'pubmed_url' || input.doi);
   }
 
   async resolve(input: ParsedReferenceInput): Promise<NormalizedPaperMetadata | null> {
@@ -59,8 +59,11 @@ export class PubMedProvider implements MetadataProvider {
         ? `https://pubmed.ncbi.nlm.nih.gov/${item.pmid}/`
         : input.canonicalUrl || '';
 
-      const isOpenAccess = item.isOpenAccess === 'Y';
-      const openAccessPdfUrl = item.fullTextUrlList?.fullTextUrl?.find((u: any) => u.documentStyle === 'pdf')?.url;
+      const isOpenAccess = item.isOpenAccess === 'Y' || Boolean(item.pmcid);
+      let openAccessPdfUrl = item.fullTextUrlList?.fullTextUrl?.find((u: any) => u.documentStyle === 'pdf')?.url;
+      if (!openAccessPdfUrl && item.pmcid) {
+        openAccessPdfUrl = `https://europepmc.org/backend/ptpmcrender.fcgi?accid=${item.pmcid}&blobtype=pdf`;
+      }
 
       return {
         doi,

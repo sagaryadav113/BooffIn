@@ -186,6 +186,18 @@ export class CompositePaperResolver {
       };
     }
 
+    // 3.5. If normalized metadata has DOI but lacks a direct OA PDF, auto-resolve via Europe PMC / OpenAlex
+    if (normalized.doi && !normalized.openAccessUrl) {
+      try {
+        const oaPdf = await fetchDirectOpenAccessPdf(normalized.doi);
+        if (oaPdf) {
+          normalized.openAccessUrl = oaPdf;
+          normalized.isOpenAccess = true;
+          normalized.openAccessStatus = 'gold';
+        }
+      } catch {}
+    }
+
     let figures: Paper['figures'] = undefined;
     try {
       const resolvedFigs = await resolvePaperFigures({
@@ -277,3 +289,62 @@ export class CompositePaperResolver {
 
 // Global default instance
 export const defaultPaperResolver = new CompositePaperResolver();
+
+/**
+ * Fast direct Open Access PDF resolver querying Europe PMC & OpenAlex
+ */
+export async function fetchDirectOpenAccessPdf(doi: string): Promise<string | null> {
+  if (!doi) return null;
+  const cleanDoi = doi.replace(/^https?:\/\/doi\.org\//i, '').trim();
+
+  // 1. Try Europe PMC (covers vast majority of life sciences, biochemistry, computational biology, medicine)
+  try {
+    const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=doi:${encodeURIComponent(cleanDoi)}&format=json&resultType=core`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4500);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'BooffIn-Academic-Discovery/1.0 (mailto:academic@booffin.science)',
+        Accept: 'application/json',
+      },
+    });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const data = await res.json();
+      const item = data?.resultList?.result?.[0];
+      if (item) {
+        const directPdf = item.fullTextUrlList?.fullTextUrl?.find((u: any) => u.documentStyle === 'pdf')?.url;
+        if (directPdf) return directPdf;
+        if (item.pmcid) {
+          return `https://europepmc.org/backend/ptpmcrender.fcgi?accid=${item.pmcid}&blobtype=pdf`;
+        }
+      }
+    }
+  } catch {}
+
+  // 2. Try OpenAlex
+  try {
+    const url = `https://api.openalex.org/works/https://doi.org/${encodeURIComponent(cleanDoi)}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4500);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'BooffIn-Academic-Discovery/1.0 (mailto:academic@booffin.science)',
+        Accept: 'application/json',
+      },
+    });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const data = await res.json();
+      const pdf =
+        data.best_oa_location?.pdf_url ||
+        data.primary_location?.pdf_url ||
+        data.locations?.find((loc: any) => loc.pdf_url)?.pdf_url;
+      if (pdf) return pdf;
+    }
+  } catch {}
+
+  return null;
+}

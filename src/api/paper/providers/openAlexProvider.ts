@@ -85,6 +85,14 @@ export class OpenAlexProvider implements MetadataProvider {
       const publicationYear = data.publication_year || new Date().getFullYear();
       const canonicalUrl = data.doi || input.canonicalUrl || (input.doi ? `https://doi.org/${input.doi}` : '');
 
+      const openAccessPdfUrl =
+        data.best_oa_location?.pdf_url ||
+        data.primary_location?.pdf_url ||
+        data.locations?.find((loc: any) => loc.pdf_url)?.pdf_url ||
+        (data.open_access?.oa_url && (data.open_access.oa_url.endsWith('.pdf') || data.open_access.oa_url.includes('/pdf'))
+          ? data.open_access.oa_url
+          : undefined);
+
       return {
         doi: input.doi || (data.doi ? data.doi.replace('https://doi.org/', '').toLowerCase() : undefined),
         title,
@@ -95,8 +103,8 @@ export class OpenAlexProvider implements MetadataProvider {
         publicationYear,
         publicationDate: data.publication_date,
         canonicalUrl,
-        openAccessUrl: data.open_access?.oa_url || undefined,
-        isOpenAccess: Boolean(data.open_access?.is_oa),
+        openAccessUrl: openAccessPdfUrl,
+        isOpenAccess: Boolean(data.open_access?.is_oa || openAccessPdfUrl),
         openAccessStatus: data.open_access?.oa_status || (data.open_access?.is_oa ? 'gold' : 'closed'),
         citationCount: data.cited_by_count || 0,
         topics: topics.length > 0 ? topics : ['General Science'],

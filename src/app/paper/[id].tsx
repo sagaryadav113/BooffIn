@@ -60,6 +60,7 @@ import {
 import { Comment, DiscussionType, Paper } from '../../types';
 
 import { usePaperFigures } from '../../hooks/usePaperFigures';
+import { fetchDirectOpenAccessPdf } from '../../api/paper/metadataResolver';
 
 export default function PaperDetailScreen() {
   const { id, fromPostId } = useLocalSearchParams<{ id: string; fromPostId?: string }>();
@@ -247,6 +248,8 @@ export default function PaperDetailScreen() {
         lower.includes('blobtype=pdf') ||
         lower.includes('format=pdf') ||
         lower.includes('ptpmcrender.fcgi') ||
+        lower.includes('?pdf=render') ||
+        lower.includes('/pdf') ||
         (lower.includes('/pmc/articles/pmc') && lower.includes('/pdf')) ||
         lower.includes('.full.pdf')
       ) {
@@ -254,6 +257,10 @@ export default function PaperDetailScreen() {
       }
       if (oa.includes('arxiv.org/abs/')) {
         return oa.replace('arxiv.org/abs/', 'arxiv.org/pdf/') + '.pdf';
+      }
+      const pmcMatch = oa.match(/PMC\d+/i);
+      if (pmcMatch) {
+        return `https://europepmc.org/backend/ptpmcrender.fcgi?accid=${pmcMatch[0]}&blobtype=pdf`;
       }
     }
 
@@ -274,7 +281,9 @@ export default function PaperDetailScreen() {
       if (
         lower.endsWith('.pdf') ||
         lower.includes('blobtype=pdf') ||
+        lower.includes('format=pdf') ||
         lower.includes('ptpmcrender.fcgi') ||
+        lower.includes('?pdf=render') ||
         (lower.includes('/pmc/articles/pmc') && lower.includes('/pdf')) ||
         lower.includes('.full.pdf')
       ) {
@@ -284,6 +293,22 @@ export default function PaperDetailScreen() {
 
     return '';
   }, [paper?.openAccessUrl, paper?.canonicalUrl]);
+
+  // Background auto-resolver for Open Access PDFs when DOI is present
+  useEffect(() => {
+    if (!paper?.doi || resolvedPdfUrl) return;
+    let isMounted = true;
+    fetchDirectOpenAccessPdf(paper.doi)
+      .then((oaPdf) => {
+        if (oaPdf && isMounted) {
+          setPaper((prev) => (prev ? { ...prev, openAccessUrl: oaPdf, isOpenAccess: true } : prev));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [paper?.doi, resolvedPdfUrl]);
 
   const isDirectPdf = Boolean(resolvedPdfUrl);
 
