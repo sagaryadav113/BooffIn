@@ -242,8 +242,26 @@ export default function PaperDetailScreen() {
     }
   };
 
+  const directPdfUrl = useMemo(() => {
+    const raw = paper?.openAccessUrl || paper?.canonicalUrl || '';
+    if (!raw) return '';
+    let clean = raw.trim();
+    if (clean.includes('arxiv.org/abs/')) {
+      clean = clean.replace('arxiv.org/abs/', 'arxiv.org/pdf/') + '.pdf';
+    } else if (clean.includes('arxiv.org/pdf/') && !clean.endsWith('.pdf')) {
+      clean = `${clean}.pdf`;
+    }
+    return clean;
+  }, [paper?.openAccessUrl, paper?.canonicalUrl]);
+
+  const embedViewerUrl = useMemo(() => {
+    if (!directPdfUrl) return '';
+    if (directPdfUrl.includes('docs.google.com/viewer')) return directPdfUrl;
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(directPdfUrl)}&embedded=true`;
+  }, [directPdfUrl]);
+
   const handleOpenPdfBrowser = async () => {
-    const pdfUrl = paper?.openAccessUrl || paper?.canonicalUrl;
+    const pdfUrl = directPdfUrl || paper?.openAccessUrl || paper?.canonicalUrl;
     if (!pdfUrl) return;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.open(pdfUrl, '_blank', 'noopener,noreferrer');
@@ -479,7 +497,7 @@ export default function PaperDetailScreen() {
   }
 
   const authorsString = paper.authors.map((a) => a.name).join(', ');
-  const hasOpenAccessPdf = Boolean(paper.isOpenAccess && paper.openAccessUrl);
+  const hasOpenAccessPdf = Boolean(paper.openAccessUrl || paper.canonicalUrl || paper.isOpenAccess);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -644,18 +662,45 @@ export default function PaperDetailScreen() {
 
               {Platform.OS === 'web' ? (
                 <View style={styles.webPdfContainer}>
-                  {/* @ts-ignore Direct Native PDF Iframe */}
+                  {/* Google Docs PDF Embed to bypass X-Frame-Options / CORS blocks */}
                   <iframe
-                    src={`${paper.openAccessUrl || paper.canonicalUrl}`}
+                    src={embedViewerUrl}
                     style={{
                       width: '100%',
-                      height: 780,
+                      height: 800,
                       border: 'none',
                       backgroundColor: '#FFFFFF',
                     }}
                     title={paper.title}
                     allow="fullscreen"
                   />
+                  {/* Interactive Quick Action Footer Bar */}
+                  <View style={styles.pdfFooterBar}>
+                    <View style={styles.pdfFooterLeft}>
+                      <Globe size={13} color={colors.textSecondary} />
+                      <Text style={styles.pdfFooterText}>
+                        Streaming from open academic repository
+                      </Text>
+                    </View>
+                    <View style={styles.pdfFooterActions}>
+                      <TouchableOpacity
+                        onPress={handleOpenPdfBrowser}
+                        style={styles.pdfFooterBtn}
+                        activeOpacity={0.75}
+                      >
+                        <ExternalLink size={12} color={colors.accentLink} />
+                        <Text style={styles.pdfFooterBtnText}>Open in New Tab</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setViewMode('article')}
+                        style={styles.pdfFooterBtnSecondary}
+                        activeOpacity={0.75}
+                      >
+                        <BookOpen size={12} color={colors.textPrimary} />
+                        <Text style={styles.pdfFooterBtnSecondaryText}>Article View</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
               ) : (
                 <View style={styles.mobilePdfCard}>
@@ -1091,6 +1136,65 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+  },
+  pdfFooterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.backgroundSecondary,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  pdfFooterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  pdfFooterText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11.5,
+  },
+  pdfFooterActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  pdfFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  pdfFooterBtnText: {
+    ...typography.microBold,
+    color: colors.accentLink,
+    fontSize: 11.5,
+  },
+  pdfFooterBtnSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.cardBackground,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  pdfFooterBtnSecondaryText: {
+    ...typography.microBold,
+    color: colors.textPrimary,
+    fontSize: 11.5,
   },
   mobilePdfCard: {
     backgroundColor: colors.backgroundSecondary,
