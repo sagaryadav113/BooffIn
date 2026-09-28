@@ -544,7 +544,7 @@ export default function CurrentUserProfileScreen() {
             <Text style={styles.bio}>{user.bio}</Text>
           ) : null}
 
-          {/* RESEARCH IMPACT & ANALYTICS BAR */}
+          {/* RESEARCH IMPACT & ANALYTICS BAR (Compact Single Row, Private to Owner) */}
           <ProfileAnalyticsBar
             totalViews={Math.max(
               posts.length * 115 +
@@ -552,9 +552,6 @@ export default function CurrentUserProfileScreen() {
                 posts.reduce((acc: number, p) => acc + (p.commentsCount || 0), 0) * 8,
               posts.length > 0 ? 120 : 0
             )}
-            totalPosts={posts.filter((p) => p.author.id === user.id && !p.isReposted).length || user.postsCount || posts.length || 0}
-            totalShares={posts.reduce((acc: number, p) => acc + (p.repostsCount || 0), 0) + posts.filter((p) => p.isReposted).length}
-            totalDiscussions={posts.reduce((acc: number, p) => acc + (p.commentsCount || 0), 0)}
             onPress={() => setAnalyticsModalOpen(true)}
           />
 

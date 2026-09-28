@@ -420,19 +420,18 @@ export default function OtherResearcherProfileScreen() {
             <Text style={styles.bio}>{researcher.bio}</Text>
           ) : null}
 
-          {/* RESEARCH IMPACT & ANALYTICS BAR */}
-          <ProfileAnalyticsBar
-            totalViews={Math.max(
-              posts.length * 95 +
-                posts.reduce((acc: number, p: Post) => acc + (p.likesCount || 0), 0) * 4 +
-                posts.reduce((acc: number, p: Post) => acc + (p.commentsCount || 0), 0) * 6,
-              posts.length > 0 ? 90 : 0
-            )}
-            totalPosts={posts.filter((p) => p.author.id === researcher.id && !p.isReposted).length || researcher.postsCount || posts.length || 0}
-            totalShares={posts.reduce((acc: number, p) => acc + (p.repostsCount || 0), 0) + posts.filter((p) => p.isReposted).length}
-            totalDiscussions={posts.reduce((acc: number, p) => acc + (p.commentsCount || 0), 0)}
-            onPress={() => setAnalyticsModalOpen(true)}
-          />
+          {/* RESEARCH IMPACT & ANALYTICS BAR (Private to Account Owner Only) */}
+          {isOwnProfile && (
+            <ProfileAnalyticsBar
+              totalViews={Math.max(
+                posts.length * 95 +
+                  posts.reduce((acc: number, p: Post) => acc + (p.likesCount || 0), 0) * 4 +
+                  posts.reduce((acc: number, p: Post) => acc + (p.commentsCount || 0), 0) * 6,
+                posts.length > 0 ? 90 : 0
+              )}
+              onPress={() => setAnalyticsModalOpen(true)}
+            />
+          )}
 
           {/* Metadata: Country, Location, ORCID, Website, Joined */}
           <View style={styles.metaContainer}>
@@ -595,13 +594,15 @@ export default function OtherResearcherProfileScreen() {
         userName={researcher.fullName}
       />
 
-      {/* Comprehensive Profile Analytics Modal */}
-      <ProfileAnalyticsModal
-        visible={analyticsModalOpen}
-        userId={researcher.id}
-        userFullName={researcher.fullName}
-        onClose={() => setAnalyticsModalOpen(false)}
-      />
+      {/* Comprehensive Profile Analytics Modal (Private to Account Owner Only) */}
+      {isOwnProfile && (
+        <ProfileAnalyticsModal
+          visible={analyticsModalOpen}
+          userId={researcher.id}
+          userFullName={researcher.fullName}
+          onClose={() => setAnalyticsModalOpen(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }

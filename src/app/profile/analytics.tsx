@@ -10,7 +10,7 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import {
   ArrowLeft,
   Activity,
@@ -40,9 +40,8 @@ const TIMEFRAMES: { key: AnalyticsTimeframe; label: string }[] = [
 ];
 
 export default function ProfileAnalyticsScreen() {
-  const { user } = useAuthStore();
-  const params = useLocalSearchParams<{ userId?: string }>();
-  const targetUserId = params.userId || user?.id;
+  const { user, isAuthenticated } = useAuthStore();
+  const targetUserId = user?.id;
 
   const [selectedTimeframe, setSelectedTimeframe] = useState<AnalyticsTimeframe>('28d');
   const [summary, setSummary] = useState<UserAnalyticsSummary | null>(null);
