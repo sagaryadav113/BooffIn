@@ -176,6 +176,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
       <View style={styles.actionRow}>
         <TouchableOpacity
           onPress={handleLike}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={[styles.actionButton, discussion.isLiked && styles.actionButtonActive]}
           activeOpacity={0.7}
         >
@@ -201,6 +202,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
               setReplyText(`@${discussion.author.handle} `);
             }
           }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={styles.actionButton}
           activeOpacity={0.7}
         >
@@ -214,6 +216,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
 
         <TouchableOpacity
           onPress={handleShare}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={styles.actionButton}
           activeOpacity={0.7}
         >
@@ -303,10 +306,32 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
               {/* Action row for sub-reply */}
               <View style={styles.replyActionRow}>
                 <TouchableOpacity
+                  onPress={() => handleLikeReply(reply.id)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={[styles.replyActionButton, reply.isLiked && { opacity: 0.9 }]}
+                  activeOpacity={0.7}
+                >
+                  <Heart
+                    size={13}
+                    color={reply.isLiked ? colors.accentRed : colors.textSecondary}
+                    fill={reply.isLiked ? colors.accentRed : 'transparent'}
+                  />
+                  <Text
+                    style={[
+                      styles.replyActionText,
+                      reply.isLiked && { color: colors.accentRed, fontWeight: '700' },
+                    ]}
+                  >
+                    {reply.likesCount > 0 ? reply.likesCount : 'Helpful'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   onPress={() => {
                     setIsReplying(true);
                     setReplyText(`@${reply.author.handle} `);
                   }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   style={styles.replyActionButton}
                   activeOpacity={0.7}
                 >

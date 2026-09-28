@@ -8,6 +8,11 @@ import {
   UserProfile,
 } from '../types';
 import { supabase } from '../api/client';
+import {
+  isCommentLikedSync,
+  loadUserLikedComments,
+  toggleCommentLike,
+} from '../utils/persistentLikes';
 
 interface DiscussionState {
   discussions: Record<string, DiscussionContribution[]>;
@@ -16,7 +21,7 @@ interface DiscussionState {
 
   // Actions
   setActiveFilter: (filter: 'all' | DiscussionType) => void;
-  fetchDiscussionsForPaper: (paperId: string) => Promise<void>;
+  fetchDiscussionsForPaper: (paperId: string, currentUserId?: string) => Promise<void>;
   getDiscussionsForPaper: (paperId: string, filter?: 'all' | DiscussionType) => DiscussionContribution[];
   addDiscussion: (params: {
     paperId: string;
@@ -31,8 +36,8 @@ interface DiscussionState {
     author: UserProfile;
     content: string;
   }) => DiscussionReply | null;
-  toggleLikeDiscussion: (paperId: string, discussionId: string) => void;
-  toggleLikeReply: (paperId: string, discussionId: string, replyId: string) => void;
+  toggleLikeDiscussion: (paperId: string, discussionId: string, currentUserId?: string) => void;
+  toggleLikeReply: (paperId: string, discussionId: string, replyId: string, currentUserId?: string) => void;
   getParticipatingResearchers: (paperId: string) => UserProfile[];
   getInterestedPeople: (paper: Paper, currentUserId?: string) => InterestedPerson[];
 }
@@ -53,9 +58,11 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
 
   setActiveFilter: (activeFilter) => set({ activeFilter }),
 
-  fetchDiscussionsForPaper: async (paperId: string) => {
+  fetchDiscussionsForPaper: async (paperId: string, currentUserId?: string) => {
     set({ isLoading: true });
     try {
+      await loadUserLikedComments(currentUserId);
+
       // Find posts and comments referencing this paper in Supabase
       const { data, error } = await supabase
         .from('posts')
@@ -63,11 +70,13 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
           id,
           content,
           post_type,
+          likes_count,
           created_at,
           author:profiles(id, username, full_name, avatar_url, academic_title, institution, orcid_id, is_orcid_verified),
           comments(
             id,
             content,
+            likes_count,
             created_at,
             author:profiles(id, username, full_name, avatar_url, academic_title, institution, orcid_id, is_orcid_verified)
           )
@@ -102,8 +111,8 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
         type: (row.post_type as DiscussionType) || 'discussion',
         content: row.content || '',
         mentions: extractMentions(row.content || ''),
-        likesCount: 0,
-        isLiked: false,
+        likesCount: typeof row.likes_count === 'number' ? row.likes_count : 0,
+        isLiked: isCommentLikedSync(row.id, currentUserId),
         repliesCount: row.comments?.length || 0,
         createdAt: 'Recently',
         replies: (row.comments || []).map((c: any) => ({
@@ -127,8 +136,8 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
           },
           content: c.content || '',
           mentions: extractMentions(c.content || ''),
-          likesCount: 0,
-          isLiked: false,
+          likesCount: typeof c.likes_count === 'number' ? c.likes_count : 0,
+          isLiked: isCommentLikedSync(c.id, currentUserId),
           createdAt: 'Recently',
         })),
       }));
@@ -225,12 +234,14 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
     return replyCreated;
   },
 
-  toggleLikeDiscussion: (paperId: string, discussionId: string) => {
+  toggleLikeDiscussion: (paperId: string, discussionId: string, currentUserId?: string) => {
+    let wasLiked = false;
     set((state) => {
       const paperList = state.discussions[paperId] || [];
       const updated = paperList.map((disc) => {
         if (disc.id === discussionId) {
-          const isLiked = !disc.isLiked;
+          wasLiked = Boolean(disc.isLiked);
+          const isLiked = !wasLiked;
           return {
             ...disc,
             isLiked,
@@ -247,16 +258,20 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
         },
       };
     });
+
+    toggleCommentLike(discussionId, wasLiked, currentUserId).catch(() => {});
   },
 
-  toggleLikeReply: (paperId: string, discussionId: string, replyId: string) => {
+  toggleLikeReply: (paperId: string, discussionId: string, replyId: string, currentUserId?: string) => {
+    let wasLiked = false;
     set((state) => {
       const paperList = state.discussions[paperId] || [];
       const updated = paperList.map((disc) => {
         if (disc.id === discussionId && disc.replies) {
           const updatedReplies = disc.replies.map((rep) => {
             if (rep.id === replyId) {
-              const isLiked = !rep.isLiked;
+              wasLiked = Boolean(rep.isLiked);
+              const isLiked = !wasLiked;
               return {
                 ...rep,
                 isLiked,
@@ -281,6 +296,8 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
         },
       };
     });
+
+    toggleCommentLike(replyId, wasLiked, currentUserId).catch(() => {});
   },
 
   getParticipatingResearchers: (paperId: string) => {

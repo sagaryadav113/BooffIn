@@ -102,29 +102,50 @@ export default function PostDetailScreen() {
   const storePost = usePostStore((s) => s.getPostById(postId));
   const activePost = storePost || post;
 
-  // Filter counts
+  // Total discussions including all recursive nested replies
+  const totalDiscussionCount = useMemo(() => {
+    const countAll = (list: Comment[]): number => {
+      let total = 0;
+      for (const item of list) {
+        total += 1;
+        if (item.replies && item.replies.length > 0) {
+          total += countAll(item.replies);
+        }
+      }
+      return total;
+    };
+    return countAll(comments);
+  }, [comments]);
+
+  // Filter counts calculation including recursive nested replies
   const filterCounts = useMemo(() => {
     const counts = {
-      all: comments.length,
+      all: totalDiscussionCount,
       discussion: 0,
       question: 0,
       insight: 0,
       methodology: 0,
     };
-    comments.forEach((c) => {
-      const textLower = c.content.toLowerCase();
-      if (textLower.startsWith('[question]') || textLower.includes('?')) {
-        counts.question += 1;
-      } else if (textLower.startsWith('[insight]') || textLower.includes('hypothesis') || textLower.includes('insight')) {
-        counts.insight += 1;
-      } else if (textLower.startsWith('[methodology]') || textLower.includes('protocol') || textLower.includes('method')) {
-        counts.methodology += 1;
-      } else {
-        counts.discussion += 1;
-      }
-    });
+    const countTree = (list: Comment[]) => {
+      list.forEach((c) => {
+        const textLower = c.content.toLowerCase();
+        if (textLower.startsWith('[question]') || textLower.includes('?')) {
+          counts.question += 1;
+        } else if (textLower.startsWith('[insight]') || textLower.includes('hypothesis') || textLower.includes('insight')) {
+          counts.insight += 1;
+        } else if (textLower.startsWith('[methodology]') || textLower.includes('protocol') || textLower.includes('method')) {
+          counts.methodology += 1;
+        } else {
+          counts.discussion += 1;
+        }
+        if (c.replies && c.replies.length > 0) {
+          countTree(c.replies);
+        }
+      });
+    };
+    countTree(comments);
     return counts;
-  }, [comments]);
+  }, [comments, totalDiscussionCount]);
 
   // Filtered comments
   const filteredComments = useMemo(() => {
@@ -279,7 +300,7 @@ export default function PostDetailScreen() {
               <Text style={styles.discussionTitleText}>Discussion</Text>
               <View style={styles.discussionCountBadge}>
                 <Text style={styles.discussionCountBadgeText}>
-                  {comments.length}
+                  {totalDiscussionCount}
                 </Text>
               </View>
             </View>

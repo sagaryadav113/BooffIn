@@ -12,6 +12,7 @@ import {
   fetchComments as apiFetchComments,
   addComment as apiAddComment,
   deleteComment as apiDeleteComment,
+  toggleCommentLike as apiToggleCommentLike,
   votePoll as apiVotePoll,
 } from '../api/socialService';
 
@@ -623,13 +624,16 @@ export const usePostStore = create<PostState>((set, get) => ({
     return true;
   },
 
-  toggleLikeComment: (commentId, postId) => {
+  toggleLikeComment: (commentId, postId, currentUserId) => {
+    const activeUserId = currentUserId || useAuthStore.getState().user?.id;
+    let wasLiked = false;
+
     set((state) => {
       const currentList = state.comments[postId] || [];
       const updateInList = (list: Comment[]): Comment[] => {
         return list.map((c) => {
           if (c.id === commentId) {
-            const wasLiked = Boolean(c.isLiked);
+            wasLiked = Boolean(c.isLiked);
             return {
               ...c,
               isLiked: !wasLiked,
@@ -652,6 +656,11 @@ export const usePostStore = create<PostState>((set, get) => ({
           [postId]: updateInList(currentList),
         },
       };
+    });
+
+    // Asynchronously persist to local storage and DB
+    apiToggleCommentLike(commentId, wasLiked, activeUserId).catch((err) => {
+      console.warn('[usePostStore] toggleLikeComment persistence warning:', err);
     });
   },
 

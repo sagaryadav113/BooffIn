@@ -2,6 +2,13 @@ import { supabase } from './client';
 import { Post, Comment, PostType, Paper, UserProfile } from '../types';
 import { getFeedRanker, buildUserRankingContext } from './ranking/feedRanker';
 import { sanitizeExternalUrl, sanitizeTextContent } from '../utils/security';
+import {
+  isCommentLikedSync,
+  loadUserLikedComments,
+  toggleCommentLike,
+} from '../utils/persistentLikes';
+
+export { toggleCommentLike };
 
 /**
  * Explainable "For You" Feed Ranking Function
@@ -355,16 +362,17 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
 }
 
 // Map raw Supabase comment row to Comment
-export function mapSupabaseComment(row: any, _currentUserId?: string): Comment {
+export function mapSupabaseComment(row: any, currentUserId?: string): Comment {
   const author = mapSupabaseProfile(row.author);
+  const isLiked = isCommentLikedSync(row.id, currentUserId);
   return {
     id: row.id,
     postId: row.post_id,
     author,
     content: row.content,
     parentId: row.parent_id || undefined,
-    likesCount: row.likes_count || 0,
-    isLiked: false,
+    likesCount: typeof row.likes_count === 'number' ? row.likes_count : 0,
+    isLiked,
     createdAt: formatRelativeTime(row.created_at),
     replies: [],
   };
@@ -1070,6 +1078,9 @@ export async function fetchComments(
   currentUserId?: string
 ): Promise<{ comments: Comment[]; error: string | null }> {
   try {
+    // Preload user liked comment IDs from persistent storage into synchronous memory
+    await loadUserLikedComments(currentUserId);
+
     const { data, error } = await supabase
       .from('comments')
       .select(
@@ -1189,6 +1200,17 @@ export async function addComment(
       entityType: 'comment',
     }).catch(() => {});
 
+    // Synchronize posts.comments_count in DB
+    try {
+      const { count } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', postId);
+      if (typeof count === 'number') {
+        await supabase.from('posts').update({ comments_count: count }).eq('id', postId);
+      }
+    } catch {}
+
     return { comment: mapSupabaseComment(data, verifiedAuthorId), error: null };
   } catch (err: any) {
     return { comment: null, error: err?.message || 'Failed to post comment.' };
@@ -1197,7 +1219,7 @@ export async function addComment(
 
 export async function deleteComment(
   commentId: string,
-  _postId: string,
+  postId: string,
   _userId?: string
 ): Promise<{ success: boolean; error: string | null }> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -1215,6 +1237,17 @@ export async function deleteComment(
     if (error) {
       return { success: false, error: error.message };
     }
+
+    // Synchronize posts.comments_count in DB
+    try {
+      const { count } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', postId);
+      if (typeof count === 'number') {
+        await supabase.from('posts').update({ comments_count: count }).eq('id', postId);
+      }
+    } catch {}
 
     return { success: true, error: null };
   } catch (err: any) {

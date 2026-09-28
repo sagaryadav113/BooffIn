@@ -247,43 +247,48 @@ export const CommentCard: React.FC<CommentCardProps> = ({
 
       {/* Bottom Action Row */}
       <View style={isRoot ? styles.actionRow : styles.replyActionRow}>
-        {isRoot && (
-          <TouchableOpacity
-            onPress={handleLike}
-            style={[styles.actionButton, comment.isLiked && styles.actionButtonActive]}
-            activeOpacity={0.7}
+        {/* Like Button */}
+        <TouchableOpacity
+          onPress={handleLike}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={[styles.actionButton, comment.isLiked && styles.actionButtonActive]}
+          activeOpacity={0.7}
+        >
+          <Heart
+            size={isRoot ? 15 : 13}
+            color={comment.isLiked ? colors.accentRed : colors.textSecondary}
+            fill={comment.isLiked ? colors.accentRed : 'transparent'}
+          />
+          <Text
+            style={[
+              styles.actionLabel,
+              !isRoot && { fontSize: 11 },
+              comment.isLiked && { color: colors.accentRed, fontWeight: '700' },
+            ]}
           >
-            <Heart
-              size={15}
-              color={comment.isLiked ? colors.accentRed : colors.textSecondary}
-              fill={comment.isLiked ? colors.accentRed : 'transparent'}
-            />
-            <Text
-              style={[
-                styles.actionLabel,
-                comment.isLiked && { color: colors.accentRed, fontWeight: '700' },
-              ]}
-            >
-              {comment.likesCount > 0 ? comment.likesCount : 'Helpful'}
-            </Text>
-          </TouchableOpacity>
-        )}
+            {comment.likesCount > 0 ? comment.likesCount : 'Helpful'}
+          </Text>
+        </TouchableOpacity>
 
         {/* Reply button on every comment and every nested reply */}
         <TouchableOpacity
           onPress={handleTriggerReply}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={styles.actionButton}
           activeOpacity={0.7}
         >
           <CornerDownRight size={isRoot ? 15 : 13} color={colors.textSecondary} />
           <Text style={[styles.actionLabel, !isRoot && { fontSize: 11 }]}>
-            Reply
+            {repliesCount > 0
+              ? `${repliesCount} ${repliesCount === 1 ? 'Reply' : 'Replies'}`
+              : 'Reply'}
           </Text>
         </TouchableOpacity>
 
         {isRoot && (
           <TouchableOpacity
             onPress={handleShare}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={styles.actionButton}
             activeOpacity={0.7}
           >
@@ -294,6 +299,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
         {isOwnComment && onDelete && (
           <TouchableOpacity
             onPress={() => onDelete(comment.id)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={styles.actionButton}
             activeOpacity={0.7}
           >

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const ExpoSecureStoreAdapter = {
+export const appStorage = {
   getItem: async (key: string) => {
     if (typeof localStorage !== 'undefined') {
       return localStorage.getItem(key);
@@ -43,7 +43,7 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOi
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: ExpoSecureStoreAdapter,
+    storage: appStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: typeof window !== 'undefined',

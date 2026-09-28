@@ -192,7 +192,7 @@ export default function PaperDetailScreen() {
       if (activePostId) {
         await fetchCommentsForPost(activePostId, currentUser?.id);
       } else {
-        await fetchDiscussionsForPaper(paperId);
+        await fetchDiscussionsForPaper(paperId, currentUser?.id);
       }
     } catch (e) {}
 
@@ -339,10 +339,36 @@ export default function PaperDetailScreen() {
     }
   };
 
-  // Filter counts calculation
+  // Total discussions and replies count
+  const totalCommentsCount = useMemo(() => {
+    if (activePostId) {
+      const countAll = (list: Comment[]): number => {
+        let total = 0;
+        for (const item of list) {
+          total += 1;
+          if (item.replies && item.replies.length > 0) {
+            total += countAll(item.replies);
+          }
+        }
+        return total;
+      };
+      return countAll(postComments);
+    } else {
+      let total = 0;
+      for (const disc of discussions) {
+        total += 1;
+        if (disc.replies && disc.replies.length > 0) {
+          total += disc.replies.length;
+        }
+      }
+      return total;
+    }
+  }, [activePostId, postComments, discussions]);
+
+  // Filter counts calculation including recursive nested replies
   const filterCounts = useMemo(() => {
     const counts = {
-      all: activePostId ? postComments.length : discussions.length,
+      all: totalCommentsCount,
       discussion: 0,
       question: 0,
       insight: 0,
@@ -350,18 +376,24 @@ export default function PaperDetailScreen() {
     };
 
     if (activePostId) {
-      postComments.forEach((c) => {
-        const textLower = c.content.toLowerCase();
-        if (textLower.startsWith('[question]') || textLower.includes('?')) {
-          counts.question += 1;
-        } else if (textLower.startsWith('[insight]') || textLower.includes('hypothesis') || textLower.includes('insight')) {
-          counts.insight += 1;
-        } else if (textLower.startsWith('[methodology]') || textLower.includes('protocol') || textLower.includes('method')) {
-          counts.methodology += 1;
-        } else {
-          counts.discussion += 1;
-        }
-      });
+      const countTree = (list: Comment[]) => {
+        list.forEach((c) => {
+          const textLower = c.content.toLowerCase();
+          if (textLower.startsWith('[question]') || textLower.includes('?')) {
+            counts.question += 1;
+          } else if (textLower.startsWith('[insight]') || textLower.includes('hypothesis') || textLower.includes('insight')) {
+            counts.insight += 1;
+          } else if (textLower.startsWith('[methodology]') || textLower.includes('protocol') || textLower.includes('method')) {
+            counts.methodology += 1;
+          } else {
+            counts.discussion += 1;
+          }
+          if (c.replies && c.replies.length > 0) {
+            countTree(c.replies);
+          }
+        });
+      };
+      countTree(postComments);
     } else {
       discussions.forEach((d) => {
         if (counts[d.type] !== undefined) {
@@ -369,10 +401,13 @@ export default function PaperDetailScreen() {
         } else {
           counts.discussion += 1;
         }
+        if (d.replies && d.replies.length > 0) {
+          counts.discussion += d.replies.length;
+        }
       });
     }
     return counts;
-  }, [activePostId, postComments, discussions]);
+  }, [activePostId, postComments, discussions, totalCommentsCount]);
 
   // Filtered discussions/comments
   const filteredPostComments = useMemo(() => {
@@ -445,7 +480,6 @@ export default function PaperDetailScreen() {
   }
 
   const authorsString = paper.authors.map((a) => a.name).join(', ');
-  const totalCommentsCount = activePostId ? postComments.length : discussions.length;
   const hasOpenAccessPdf = Boolean(paper.isOpenAccess && paper.openAccessUrl);
 
   return (
@@ -891,9 +925,9 @@ export default function PaperDetailScreen() {
                       key={disc.id}
                       discussion={disc}
                       currentUser={currentUser}
-                      onLike={() => toggleLikeDiscussion(paper.id, disc.id)}
+                      onLike={() => toggleLikeDiscussion(paper.id, disc.id, currentUser?.id)}
                       onLikeReply={(_, replyId) =>
-                        toggleLikeReply(paper.id, disc.id, replyId)
+                        toggleLikeReply(paper.id, disc.id, replyId, currentUser?.id)
                       }
                       onAddReply={(_, replyContent) =>
                         addReply({
