@@ -22,7 +22,6 @@ import { TrendingDiscussionCard } from '../../components/cards/TrendingDiscussio
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { ExploreFilterTabs } from '../../components/explore/ExploreFilterTabs';
 import { RecentSearchesList } from '../../components/explore/RecentSearchesList';
-import { TrendingTopicsGrid } from '../../components/explore/TrendingTopicsGrid';
 import { ResearcherResultCard } from '../../components/explore/ResearcherResultCard';
 import { useExploreSearchStore } from '../../store/useExploreSearchStore';
 import { usePaperStore } from '../../store/usePaperStore';
@@ -274,9 +273,6 @@ export default function ExploreScreen() {
               onRemoveSearch={removeRecentSearch}
               onClearAll={clearRecentSearches}
             />
-
-            {/* Trending Topics & Disciplines Grid */}
-            <TrendingTopicsGrid onSelectTopic={handleSelectRecentOrTopic} />
 
             {/* Featured Trending Papers */}
             {trendingPapers.length > 0 && (

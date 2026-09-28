@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { SearchFilterCategory, UnifiedSearchResults } from '../api/search/types';
 import { executeUnifiedSearch } from '../api/search/unifiedSearchEngine';
 import { usePaperStore } from './usePaperStore';
+import { appStorage } from '../api/client';
+
+const RECENT_SEARCHES_STORAGE_KEY = '@booffin_recent_searches';
 
 interface ExploreSearchState {
   searchQuery: string;
@@ -9,6 +12,7 @@ interface ExploreSearchState {
   isSearching: boolean;
   results: UnifiedSearchResults | null;
   recentSearches: string[];
+  loadRecentSearches: () => Promise<void>;
   setSearchQuery: (query: string) => void;
   setActiveCategory: (category: SearchFilterCategory) => void;
   executeSearch: (queryOverride?: string) => Promise<void>;
@@ -18,20 +22,24 @@ interface ExploreSearchState {
   clearRecentSearches: () => void;
 }
 
-const DEFAULT_RECENT_SEARCHES = [
-  'Molecular docking',
-  'CRISPR-Cas9',
-  'AlphaFold 3',
-  'Transformers attention',
-  '0000-0002-1825-0097',
-];
-
 export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
   searchQuery: '',
   activeCategory: 'all',
   isSearching: false,
   results: null,
-  recentSearches: DEFAULT_RECENT_SEARCHES,
+  recentSearches: [],
+
+  loadRecentSearches: async () => {
+    try {
+      const raw = await appStorage.getItem(RECENT_SEARCHES_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          set({ recentSearches: parsed });
+        }
+      }
+    } catch {}
+  },
 
   setSearchQuery: (query: string) => {
     set({ searchQuery: query });
@@ -84,16 +92,23 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
     if (!trimmed) return;
     const current = get().recentSearches;
     const filtered = current.filter((item) => item.toLowerCase() !== trimmed.toLowerCase());
-    set({ recentSearches: [trimmed, ...filtered].slice(0, 8) });
+    const updated = [trimmed, ...filtered].slice(0, 8);
+    set({ recentSearches: updated });
+    appStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
   },
 
   removeRecentSearch: (query: string) => {
-    set({
-      recentSearches: get().recentSearches.filter((item) => item !== query),
-    });
+    const updated = get().recentSearches.filter((item) => item !== query);
+    set({ recentSearches: updated });
+    appStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
   },
 
   clearRecentSearches: () => {
     set({ recentSearches: [] });
+    appStorage.removeItem(RECENT_SEARCHES_STORAGE_KEY).catch(() => {});
   },
 }));
+
+// Initialize recent searches from local storage on module load
+useExploreSearchStore.getState().loadRecentSearches();
+
