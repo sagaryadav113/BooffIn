@@ -50,7 +50,7 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
       onPress={handlePress}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel="View Research Impact & Analytics"
+      accessibilityLabel="View Research Impact"
     >
       {/* Left: Icon, Title & Real Views in last 28d */}
       <View style={styles.leftContent}>
@@ -60,7 +60,7 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
 
         <View style={styles.textContainer}>
           <Text style={styles.title} numberOfLines={1}>
-            RESEARCH IMPACT & ANALYTICS
+            RESEARCH IMPACT
           </Text>
           <View style={styles.viewsRow}>
             <Text style={styles.colonText}>:</Text>
