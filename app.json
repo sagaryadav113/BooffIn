@@ -4,17 +4,16 @@
     "slug": "booffin",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/booffin-symbol.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "booffin",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
