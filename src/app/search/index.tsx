@@ -21,7 +21,6 @@ import {
   Users,
   FileText,
   Tag,
-  MessageSquare,
   Compass,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -30,6 +29,7 @@ import { SearchBar } from '../../components/core/SearchBar';
 import { TopicChip } from '../../components/core/TopicChip';
 import { Typography } from '../../components/core/Typography';
 import { Button } from '../../components/core/Button';
+import { DiscussionIcon } from '../../components/core/DiscussionIcon';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
 import { TopicCard } from '../../components/cards/TopicCard';
 import { ResearcherCard } from '../../components/cards/ResearcherCard';
@@ -53,7 +53,7 @@ const FILTER_TABS: FilterTabOption[] = [
   { key: 'researchers', label: 'Researchers', icon: Users },
   { key: 'papers', label: 'Papers', icon: FileText },
   { key: 'topics', label: 'Topics', icon: Tag },
-  { key: 'discussions', label: 'Discussions', icon: MessageSquare },
+  { key: 'discussions', label: 'Discussions', icon: DiscussionIcon },
 ];
 
 export default function SearchScreen() {
@@ -393,7 +393,7 @@ export default function SearchScreen() {
                 <View style={styles.resultsBlock}>
                   <View style={styles.blockHeader}>
                     <View style={styles.blockTitleRow}>
-                      <MessageSquare size={16} color={colors.textPrimary} />
+                      <DiscussionIcon size={16} color={colors.textPrimary} />
                       <Typography variant="captionBold" color={colors.textPrimary} style={styles.blockTitleText}>
                         SCIENTIFIC DISCUSSIONS
                       </Typography>

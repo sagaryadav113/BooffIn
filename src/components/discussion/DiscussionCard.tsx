@@ -10,7 +10,6 @@ import {
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  MessageSquare,
   HelpCircle,
   Lightbulb,
   FlaskConical,
@@ -23,6 +22,7 @@ import { colors, radii, spacing, typography } from '../../theme';
 import { DiscussionContribution, DiscussionReply, DiscussionType, UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
 import { Badge } from '../core/Badge';
+import { DiscussionIcon } from '../core/DiscussionIcon';
 
 export interface DiscussionCardProps {
   discussion: DiscussionContribution;
@@ -82,7 +82,12 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
     } catch {}
   };
 
-  const getTypeBadge = (type: DiscussionType) => {
+  const getTypeBadge = (type: DiscussionType): {
+    label: string;
+    icon: React.ComponentType<{ size?: number; color?: string }>;
+    color: string;
+    bg: string;
+  } => {
     switch (type) {
       case 'question':
         return { label: 'Question', icon: HelpCircle, color: colors.accentBlue, bg: 'rgba(2, 132, 199, 0.08)' };
@@ -91,7 +96,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
       case 'methodology':
         return { label: 'Methodology', icon: FlaskConical, color: colors.accentGreen, bg: 'rgba(16, 185, 129, 0.08)' };
       default:
-        return { label: 'Discussion', icon: MessageSquare, color: colors.textPrimary, bg: colors.backgroundSecondary };
+        return { label: 'Discussion', icon: DiscussionIcon, color: colors.textPrimary, bg: colors.backgroundSecondary };
     }
   };
 

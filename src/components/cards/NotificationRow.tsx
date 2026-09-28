@@ -45,9 +45,9 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
       case 'like':
         return { icon: 'Heart', bg: colors.accentRed };
       case 'comment':
-        return { icon: 'MessageCircle', bg: colors.accentBlue };
       case 'reply':
-        return { icon: 'MessageSquare', bg: colors.accentBlue };
+      case 'mention':
+        return { icon: 'Discussion', bg: colors.accentBlue };
       case 'repost':
         return { icon: 'Repeat2', bg: colors.accentGreen };
       case 'follow':

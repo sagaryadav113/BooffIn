@@ -8,11 +8,12 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Heart, MessageCircle, Bookmark } from 'lucide-react-native';
+import { Heart, Bookmark } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Paper } from '../../types';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Badge } from '../core/Badge';
+import { DiscussionIcon } from '../core/DiscussionIcon';
 import { usePaperStore } from '../../store/usePaperStore';
 
 interface TrendingPaperCardProps {
@@ -88,7 +89,7 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
               <Text style={styles.metricText}>{paper.likesCount}</Text>
             </View>
             <View style={styles.metricItem}>
-              <MessageCircle size={15} color={colors.textSecondary} />
+              <DiscussionIcon size={15} color={colors.textSecondary} />
               <Text style={styles.metricText}>{paper.discussionCount}</Text>
             </View>
           </View>

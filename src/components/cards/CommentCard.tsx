@@ -12,7 +12,6 @@ import {
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  MessageSquare,
   HelpCircle,
   Lightbulb,
   FlaskConical,
@@ -25,6 +24,7 @@ import {
 import { colors, radii, spacing, typography } from '../../theme';
 import { Comment, DiscussionType, UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
+import { DiscussionIcon } from '../core/DiscussionIcon';
 
 export interface CommentCardProps {
   comment: Comment;
@@ -126,11 +126,11 @@ export const CommentCard: React.FC<CommentCardProps> = ({
     if (textLower.startsWith('[methodology]') || textLower.includes('protocol') || textLower.includes('method')) {
       return { label: 'Methodology', icon: FlaskConical, color: colors.accentGreen, bg: 'rgba(16, 185, 129, 0.08)' };
     }
-    return { label: 'Discussion', icon: MessageSquare, color: colors.textPrimary, bg: colors.backgroundSecondary };
+    return { label: 'Discussion', icon: DiscussionIcon, color: colors.textPrimary, bg: colors.backgroundSecondary };
   };
 
   const badgeInfo = getTypeBadge();
-  const IconComp = badgeInfo.icon;
+  const IconComp: any = badgeInfo.icon;
 
   // Format mentions with clickable blue text
   const renderFormattedContent = (text: string) => {

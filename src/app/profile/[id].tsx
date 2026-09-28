@@ -576,7 +576,7 @@ export default function OtherResearcherProfileScreen() {
               posts.map((p) => <PostCard key={p.id} post={p} />)
             ) : (
               <EmptyState
-                icon="MessageSquare"
+                icon="Discussion"
                 title="No posts yet"
                 description="This researcher hasn't shared any public research thoughts or questions yet."
               />

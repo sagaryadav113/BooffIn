@@ -25,7 +25,6 @@ import {
   Share2,
   FileText,
   Sparkles,
-  MessageSquare,
   Lock,
   Unlock,
   Award,
@@ -48,6 +47,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Button } from '../core/Button';
+import { DiscussionIcon } from '../core/DiscussionIcon';
 import { ScholarPublication, ScholarProfileStats } from '../../types/scholar';
 import { Paper } from '../../types/paper';
 import {
@@ -942,7 +942,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                           onPress={() => handleShareWithCaption(pub)}
                           activeOpacity={0.75}
                         >
-                          <MessageSquare size={13} color={colors.white} />
+                          <DiscussionIcon size={14} color={colors.white} frontColor="#1E293B" backColor="#FFFFFF" />
                           <Text style={styles.shareFeedBtnText}>Discuss on Feed</Text>
                         </TouchableOpacity>
                       )}

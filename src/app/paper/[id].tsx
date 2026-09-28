@@ -23,7 +23,6 @@ import {
   ExternalLink,
   ArrowRight,
   Heart,
-  MessageSquare,
   TrendingUp,
   Bookmark,
   Share2,
@@ -44,6 +43,7 @@ import { Badge } from '../../components/core/Badge';
 import { TopicChip } from '../../components/core/TopicChip';
 import { IconButton } from '../../components/core/IconButton';
 import { Typography } from '../../components/core/Typography';
+import { DiscussionIcon } from '../../components/core/DiscussionIcon';
 import { Avatar } from '../../components/core/Avatar';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { CommentCard } from '../../components/cards/CommentCard';
@@ -825,7 +825,7 @@ export default function PaperDetailScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.interactionItem}>
-                  <MessageSquare size={18} color={colors.textSecondary} />
+                  <DiscussionIcon size={18} color={colors.textSecondary} />
                   <Typography variant="captionMedium" color={colors.textSecondary}>
                     {totalCommentsCount} Discussions
                   </Typography>
@@ -860,7 +860,7 @@ export default function PaperDetailScreen() {
           <View style={styles.discussionSectionWrapper}>
             <View style={styles.discussionHeader}>
               <View style={styles.discussionTitleRow}>
-                <MessageSquare size={20} color={colors.textPrimary} />
+                <DiscussionIcon size={20} color={colors.textPrimary} />
                 <Text style={styles.discussionTitle}>Discussion</Text>
                 <View style={styles.discussionCountBadge}>
                   <Text style={styles.discussionCountBadgeText}>
@@ -909,7 +909,7 @@ export default function PaperDetailScreen() {
                 ) : (
                   <View style={styles.emptyDiscussionWrap}>
                     <EmptyState
-                      icon="MessageSquare"
+                      icon="Discussion"
                       title="No discussions yet"
                       description="Start a constructive scientific discussion on this paper reference."
                     />
@@ -942,7 +942,7 @@ export default function PaperDetailScreen() {
                 ) : (
                   <View style={styles.emptyDiscussionWrap}>
                     <EmptyState
-                      icon="MessageSquare"
+                      icon="Discussion"
                       title="No discussions yet"
                       description="Start a constructive scientific discussion on this paper reference."
                     />

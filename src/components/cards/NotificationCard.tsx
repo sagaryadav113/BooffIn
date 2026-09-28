@@ -9,8 +9,6 @@ import {
 import { router } from 'expo-router';
 import {
   Heart,
-  MessageCircle,
-  MessageSquare,
   Repeat2,
   UserPlus,
   TrendingUp,
@@ -22,6 +20,7 @@ import {
 import { AppNotification } from '../../types';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
+import { DiscussionIcon } from '../core/DiscussionIcon';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { getNotificationDeepLink } from '../../api/notificationService';
 
@@ -57,15 +56,10 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
           </View>
         );
       case 'comment':
-        return (
-          <View style={[styles.badgeContainer, { backgroundColor: colors.accentLink }]}>
-            <MessageCircle size={size} color={colors.white} />
-          </View>
-        );
       case 'reply':
         return (
           <View style={[styles.badgeContainer, { backgroundColor: colors.accentLink }]}>
-            <MessageSquare size={size} color={colors.white} />
+            <DiscussionIcon size={12} color={colors.white} frontColor="#1E293B" backColor="#FFFFFF" />
           </View>
         );
       case 'repost':

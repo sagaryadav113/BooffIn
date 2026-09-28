@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { MessageSquare } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
+import { DiscussionIcon } from '../../components/core/DiscussionIcon';
 import { PostCard } from '../../components/cards/PostCard';
 import { CommentCard } from '../../components/cards/CommentCard';
 import { DiscussionComposer, DiscussionTypePills } from '../../components/discussion';
@@ -296,7 +296,7 @@ export default function PostDetailScreen() {
           {/* Section Header */}
           <View style={styles.discussionHeader}>
             <View style={styles.discussionTitleRow}>
-              <MessageSquare size={20} color={colors.textPrimary} />
+              <DiscussionIcon size={20} color={colors.textPrimary} />
               <Text style={styles.discussionTitleText}>Discussion</Text>
               <View style={styles.discussionCountBadge}>
                 <Text style={styles.discussionCountBadgeText}>
@@ -343,7 +343,7 @@ export default function PostDetailScreen() {
             ) : (
               <View style={styles.emptyWrap}>
                 <EmptyState
-                  icon="MessageSquare"
+                  icon="Discussion"
                   title="No discussions yet"
                   description="Start a constructive scientific discussion on this research post."
                 />

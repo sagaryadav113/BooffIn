@@ -2,6 +2,7 @@ import React from 'react';
 import { ViewStyle } from 'react-native';
 import * as LucideIcons from 'lucide-react-native';
 import { colors } from '../../theme';
+import { DiscussionIcon } from './DiscussionIcon';
 
 export type IconName =
   | 'Home'
@@ -21,6 +22,7 @@ export type IconName =
   | 'Heart'
   | 'MessageCircle'
   | 'MessageSquare'
+  | 'Discussion'
   | 'Repeat2'
   | 'Bookmark'
   | 'Share2'
@@ -103,6 +105,17 @@ export const Icon: React.FC<IconProps> = ({
   style,
 }) => {
   const pixelSize = typeof size === 'number' ? size : sizeMap[size] || 22;
+
+  if (name === 'Discussion' || name === 'MessageSquare' || name === 'MessageCircle') {
+    return (
+      <DiscussionIcon
+        size={pixelSize}
+        color={color}
+        style={style}
+      />
+    );
+  }
+
   const IconComponent = (LucideIcons as any)[name] || LucideIcons.Circle;
 
   return (

@@ -716,7 +716,7 @@ export default function CurrentUserProfileScreen() {
               posts.map((p) => <PostCard key={p.id} post={p} />)
             ) : (
               <EmptyState
-                icon="MessageSquare"
+                icon="Discussion"
                 title="No posts published yet"
                 description="Share research insights, preprints, or methodology questions with the scientific community."
                 actionTitle="Create First Post"

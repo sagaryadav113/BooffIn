@@ -15,7 +15,6 @@ import * as Haptics from 'expo-haptics';
 import {
   Flame,
   Share2,
-  MessageSquare,
   Users,
   Compass,
   Check,
@@ -25,6 +24,7 @@ import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Badge } from '../../components/core/Badge';
 import { Typography } from '../../components/core/Typography';
+import { DiscussionIcon } from '../../components/core/DiscussionIcon';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { PostCard } from '../../components/cards/PostCard';
 import { PaperCard } from '../../components/cards/PaperCard';
@@ -146,7 +146,7 @@ export default function TopicDetailScreen() {
     {
       id: 'discussions',
       label: 'Discussions',
-      icon: MessageSquare,
+      icon: DiscussionIcon,
       count: data?.discussions.length || 0,
     },
     {
@@ -336,7 +336,7 @@ export default function TopicDetailScreen() {
                   ))
                 ) : (
                   <EmptyState
-                    icon="MessageSquare"
+                    icon="Discussion"
                     title={`No discussions in ${currentTopic.name} yet`}
                     description="Ask a question, share an insight, or start a methodology debate."
                   />

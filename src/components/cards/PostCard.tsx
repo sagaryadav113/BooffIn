@@ -10,7 +10,6 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
   Heart,
-  MessageCircle,
   Repeat2,
   Bookmark,
   MoreHorizontal,
@@ -21,6 +20,7 @@ import { Post } from '../../types';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { ReshareButton } from '../core/ReshareButton';
+import { DiscussionButton } from '../core/DiscussionButton';
 import { PaperCard } from './PaperCard';
 import { PostImageCluster } from './PostImageCluster';
 import { PostOptionsModal } from '../modals/PostOptionsModal';
@@ -320,18 +320,13 @@ export const PostCard: React.FC<PostCardProps> = ({
           </Text>
         </TouchableOpacity>
 
-        {/* Comment */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Comments"
-          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+        {/* Discussions (Animated Dual Speech Bubble & Acoustic Waves) */}
+        <DiscussionButton
+          commentsCount={post.commentsCount}
           onPress={handlePostPress}
-          activeOpacity={0.7}
+          size={19}
           style={styles.actionItem}
-        >
-          <MessageCircle size={20} color={colors.textSecondary} />
-          <Text style={styles.actionCount}>{post.commentsCount}</Text>
-        </TouchableOpacity>
+        />
 
         {/* Re-share (Animated Paper Plane & Orbit) */}
         <ReshareButton

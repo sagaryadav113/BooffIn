@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { MessageSquare, HelpCircle, Lightbulb, FlaskConical, Layers } from 'lucide-react-native';
+import { HelpCircle, Lightbulb, FlaskConical, Layers } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { DiscussionType } from '../../types';
+import { DiscussionIcon } from '../core/DiscussionIcon';
 
 export interface DiscussionTypePillsProps {
   activeType: 'all' | DiscussionType;
@@ -24,11 +25,11 @@ export const DiscussionTypePills: React.FC<DiscussionTypePillsProps> = ({
   const tabs: Array<{
     type: 'all' | DiscussionType;
     label: string;
-    icon: React.ComponentType<{ size: number; color: string }>;
+    icon: React.ComponentType<{ size?: number; color?: string }>;
     count: number;
   }> = [
     { type: 'all', label: 'All', icon: Layers, count: counts.all },
-    { type: 'discussion', label: 'Discussions', icon: MessageSquare, count: counts.discussion },
+    { type: 'discussion', label: 'Discussions', icon: DiscussionIcon, count: counts.discussion },
     { type: 'question', label: 'Questions', icon: HelpCircle, count: counts.question },
     { type: 'insight', label: 'Insights', icon: Lightbulb, count: counts.insight },
     { type: 'methodology', label: 'Methodology', icon: FlaskConical, count: counts.methodology },

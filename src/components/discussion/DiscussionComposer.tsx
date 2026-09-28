@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
-  MessageSquare,
   HelpCircle,
   Lightbulb,
   FlaskConical,
@@ -21,6 +20,7 @@ import {
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { DiscussionType, UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
+import { DiscussionIcon } from '../core/DiscussionIcon';
 
 export interface DiscussionComposerProps {
   currentUser: UserProfile;
@@ -88,10 +88,10 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
   const types: Array<{
     value: DiscussionType;
     label: string;
-    icon: React.ComponentType<{ size: number; color: string }>;
+    icon: React.ComponentType<{ size?: number; color?: string }>;
     accentColor: string;
   }> = [
-    { value: 'discussion', label: 'Discussion', icon: MessageSquare, accentColor: colors.textPrimary },
+    { value: 'discussion', label: 'Discussion', icon: DiscussionIcon, accentColor: colors.textPrimary },
     { value: 'question', label: 'Question', icon: HelpCircle, accentColor: colors.accentBlue },
     { value: 'insight', label: 'Insight', icon: Lightbulb, accentColor: colors.journalScience },
     { value: 'methodology', label: 'Methodology', icon: FlaskConical, accentColor: colors.accentGreen },
