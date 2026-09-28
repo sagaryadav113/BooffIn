@@ -15,7 +15,6 @@ import {
   HelpCircle,
   Lightbulb,
   FlaskConical,
-  Heart,
   CornerDownRight,
   Send,
   Share2,
@@ -25,6 +24,7 @@ import { colors, radii, spacing, typography } from '../../theme';
 import { Comment, DiscussionType, UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
 import { DiscussionIcon } from '../core/DiscussionIcon';
+import { LikeIcon } from '../core/LikeIcon';
 
 export interface CommentCardProps {
   comment: Comment;
@@ -221,16 +221,16 @@ export const CommentCard: React.FC<CommentCardProps> = ({
             style={styles.replyLikeButton}
             activeOpacity={0.7}
           >
-            <Heart
+            <LikeIcon
               size={13}
-              color={comment.isLiked ? colors.accentRed : colors.textMuted}
-              fill={comment.isLiked ? colors.accentRed : 'transparent'}
+              isLiked={Boolean(comment.isLiked)}
+              color={comment.isLiked ? colors.textPrimary : colors.textMuted}
             />
             {comment.likesCount > 0 && (
               <Text
                 style={[
                   styles.replyLikeCount,
-                  comment.isLiked && { color: colors.accentRed },
+                  comment.isLiked && { color: colors.textPrimary, fontWeight: '700' },
                 ]}
               >
                 {comment.likesCount}
@@ -254,16 +254,16 @@ export const CommentCard: React.FC<CommentCardProps> = ({
           style={[styles.actionButton, comment.isLiked && styles.actionButtonActive]}
           activeOpacity={0.7}
         >
-          <Heart
+          <LikeIcon
             size={isRoot ? 15 : 13}
-            color={comment.isLiked ? colors.accentRed : colors.textSecondary}
-            fill={comment.isLiked ? colors.accentRed : 'transparent'}
+            isLiked={Boolean(comment.isLiked)}
+            color={comment.isLiked ? colors.textPrimary : colors.textSecondary}
           />
           <Text
             style={[
               styles.actionLabel,
               !isRoot && { fontSize: 11 },
-              comment.isLiked && { color: colors.accentRed, fontWeight: '700' },
+              comment.isLiked && { color: colors.textPrimary, fontWeight: '700' },
             ]}
           >
             {comment.likesCount > 0 ? comment.likesCount : 'Helpful'}

@@ -13,7 +13,6 @@ import {
   HelpCircle,
   Lightbulb,
   FlaskConical,
-  Heart,
   CornerDownRight,
   Send,
   Share2,
@@ -23,6 +22,7 @@ import { DiscussionContribution, DiscussionReply, DiscussionType, UserProfile } 
 import { Avatar } from '../core/Avatar';
 import { Badge } from '../core/Badge';
 import { DiscussionIcon } from '../core/DiscussionIcon';
+import { LikeIcon } from '../core/LikeIcon';
 
 export interface DiscussionCardProps {
   discussion: DiscussionContribution;
@@ -185,15 +185,15 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
           style={[styles.actionButton, discussion.isLiked && styles.actionButtonActive]}
           activeOpacity={0.7}
         >
-          <Heart
+          <LikeIcon
             size={15}
-            color={discussion.isLiked ? colors.accentRed : colors.textSecondary}
-            fill={discussion.isLiked ? colors.accentRed : 'transparent'}
+            isLiked={Boolean(discussion.isLiked)}
+            color={discussion.isLiked ? colors.textPrimary : colors.textSecondary}
           />
           <Text
             style={[
               styles.actionLabel,
-              discussion.isLiked && { color: colors.accentRed, fontWeight: '700' },
+              discussion.isLiked && { color: colors.textPrimary, fontWeight: '700' },
             ]}
           >
             {discussion.likesCount > 0 ? discussion.likesCount : 'Helpful'}
@@ -286,16 +286,16 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
                   onPress={() => handleLikeReply(reply.id)}
                   style={styles.replyLikeButton}
                 >
-                  <Heart
+                  <LikeIcon
                     size={13}
-                    color={reply.isLiked ? colors.accentRed : colors.textMuted}
-                    fill={reply.isLiked ? colors.accentRed : 'transparent'}
+                    isLiked={Boolean(reply.isLiked)}
+                    color={reply.isLiked ? colors.textPrimary : colors.textMuted}
                   />
                   {reply.likesCount > 0 && (
                     <Text
                       style={[
                         styles.replyLikeCount,
-                        reply.isLiked && { color: colors.accentRed },
+                        reply.isLiked && { color: colors.textPrimary, fontWeight: '700' },
                       ]}
                     >
                       {reply.likesCount}
@@ -316,15 +316,15 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
                   style={[styles.replyActionButton, reply.isLiked && { opacity: 0.9 }]}
                   activeOpacity={0.7}
                 >
-                  <Heart
+                  <LikeIcon
                     size={13}
-                    color={reply.isLiked ? colors.accentRed : colors.textSecondary}
-                    fill={reply.isLiked ? colors.accentRed : 'transparent'}
+                    isLiked={Boolean(reply.isLiked)}
+                    color={reply.isLiked ? colors.textPrimary : colors.textSecondary}
                   />
                   <Text
                     style={[
                       styles.replyActionText,
-                      reply.isLiked && { color: colors.accentRed, fontWeight: '700' },
+                      reply.isLiked && { color: colors.textPrimary, fontWeight: '700' },
                     ]}
                   >
                     {reply.likesCount > 0 ? reply.likesCount : 'Helpful'}

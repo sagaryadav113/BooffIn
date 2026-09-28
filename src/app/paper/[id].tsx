@@ -22,7 +22,6 @@ import * as WebBrowser from 'expo-web-browser';
 import {
   ExternalLink,
   ArrowRight,
-  Heart,
   TrendingUp,
   Bookmark,
   Share2,
@@ -44,6 +43,7 @@ import { TopicChip } from '../../components/core/TopicChip';
 import { IconButton } from '../../components/core/IconButton';
 import { Typography } from '../../components/core/Typography';
 import { DiscussionIcon } from '../../components/core/DiscussionIcon';
+import { LikeButton } from '../../components/core/LikeButton';
 import { Avatar } from '../../components/core/Avatar';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { CommentCard } from '../../components/cards/CommentCard';
@@ -806,23 +806,13 @@ export default function PaperDetailScreen() {
 
               {/* Interaction Bar (Like, Citations, Share) */}
               <View style={styles.interactionBar}>
-                <TouchableOpacity
+                <LikeButton
+                  isLiked={Boolean(paper.isLiked)}
+                  likesCount={paper.likesCount}
                   onPress={handleLike}
+                  size={18}
                   style={styles.interactionItem}
-                  activeOpacity={0.7}
-                >
-                  <Heart
-                    size={18}
-                    color={paper.isLiked ? colors.accentRed : colors.textSecondary}
-                    fill={paper.isLiked ? colors.accentRed : 'transparent'}
-                  />
-                  <Typography
-                    variant="captionMedium"
-                    color={paper.isLiked ? colors.accentRed : colors.textSecondary}
-                  >
-                    {paper.likesCount}
-                  </Typography>
-                </TouchableOpacity>
+                />
 
                 <View style={styles.interactionItem}>
                   <DiscussionIcon size={18} color={colors.textSecondary} />

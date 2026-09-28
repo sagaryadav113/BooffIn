@@ -3,6 +3,7 @@ import { ViewStyle } from 'react-native';
 import * as LucideIcons from 'lucide-react-native';
 import { colors } from '../../theme';
 import { DiscussionIcon } from './DiscussionIcon';
+import { LikeIcon } from './LikeIcon';
 
 export type IconName =
   | 'Home'
@@ -20,6 +21,7 @@ export type IconName =
   | 'Check'
   | 'CheckCircle2'
   | 'Heart'
+  | 'Like'
   | 'MessageCircle'
   | 'MessageSquare'
   | 'Discussion'
@@ -109,6 +111,16 @@ export const Icon: React.FC<IconProps> = ({
   if (name === 'Discussion' || name === 'MessageSquare' || name === 'MessageCircle') {
     return (
       <DiscussionIcon
+        size={pixelSize}
+        color={color}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'Like') {
+    return (
+      <LikeIcon
         size={pixelSize}
         color={color}
         style={style}

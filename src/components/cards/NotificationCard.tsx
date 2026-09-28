@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import {
-  Heart,
   Repeat2,
   UserPlus,
   TrendingUp,
@@ -21,6 +20,7 @@ import { AppNotification } from '../../types';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { DiscussionIcon } from '../core/DiscussionIcon';
+import { LikeIcon } from '../core/LikeIcon';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { getNotificationDeepLink } from '../../api/notificationService';
 
@@ -52,7 +52,7 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
       case 'like':
         return (
           <View style={[styles.badgeContainer, { backgroundColor: colors.accentRed }]}>
-            <Heart size={size} color={colors.white} fill={colors.white} />
+            <LikeIcon size={12} isLiked={true} color={colors.white} frontPaperColor="#FFFFFF" backPaperColor="#1E293B" handColor="#1E293B" />
           </View>
         );
       case 'comment':

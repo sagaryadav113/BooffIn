@@ -17,6 +17,8 @@ export * from './core/Typography';
 export * from './core/ReshareButton';
 export * from './core/DiscussionIcon';
 export * from './core/DiscussionButton';
+export * from './core/LikeIcon';
+export * from './core/LikeButton';
 
 // Card Components
 export * from './cards/CommentCard';

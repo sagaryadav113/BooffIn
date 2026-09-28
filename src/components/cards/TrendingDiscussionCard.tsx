@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
-import { Heart, FileText, ArrowRight } from 'lucide-react-native';
+import { FileText, ArrowRight } from 'lucide-react-native';
 import { Post } from '../../types';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { Badge } from '../core/Badge';
 import { DiscussionIcon } from '../core/DiscussionIcon';
+import { LikeIcon } from '../core/LikeIcon';
 
 export interface TrendingDiscussionCardProps {
   post: Post;
@@ -80,7 +81,7 @@ export const TrendingDiscussionCard: React.FC<TrendingDiscussionCardProps> = ({
             <Text style={styles.metricText}>{post.commentsCount} replies</Text>
           </View>
           <View style={styles.metricItem}>
-            <Heart size={15} color={colors.textSecondary} />
+            <LikeIcon size={15} isLiked={Boolean(post.isLiked)} color={colors.textSecondary} />
             <Text style={styles.metricText}>{post.likesCount}</Text>
           </View>
           {post.topics[0] && (

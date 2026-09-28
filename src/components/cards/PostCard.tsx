@@ -9,7 +9,6 @@ import {
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
-  Heart,
   Repeat2,
   Bookmark,
   MoreHorizontal,
@@ -21,6 +20,7 @@ import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { ReshareButton } from '../core/ReshareButton';
 import { DiscussionButton } from '../core/DiscussionButton';
+import { LikeButton } from '../core/LikeButton';
 import { PaperCard } from './PaperCard';
 import { PostImageCluster } from './PostImageCluster';
 import { PostOptionsModal } from '../modals/PostOptionsModal';
@@ -67,8 +67,8 @@ export const PostCard: React.FC<PostCardProps> = ({
     });
   };
 
-  const handleLike = (e: any) => {
-    e.stopPropagation();
+  const handleLike = (e?: any) => {
+    if (e?.stopPropagation) e.stopPropagation();
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
@@ -296,29 +296,14 @@ export const PostCard: React.FC<PostCardProps> = ({
 
       {/* Interactions Row: Like, Comment, Repost, Bookmark */}
       <View style={styles.actionsRow}>
-        {/* Like */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={post.isLiked ? 'Unlike post' : 'Like post'}
-          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+        {/* Like (Animated Dual Papercraft Fold & Thumbs-Up Stamp) */}
+        <LikeButton
+          isLiked={Boolean(post.isLiked)}
+          likesCount={post.likesCount}
           onPress={handleLike}
-          activeOpacity={0.7}
+          size={19}
           style={styles.actionItem}
-        >
-          <Heart
-            size={20}
-            color={post.isLiked ? colors.accentRed : colors.textSecondary}
-            fill={post.isLiked ? colors.accentRed : 'transparent'}
-          />
-          <Text
-            style={[
-              styles.actionCount,
-              post.isLiked && { color: colors.accentRed, fontWeight: '600' },
-            ]}
-          >
-            {post.likesCount}
-          </Text>
-        </TouchableOpacity>
+        />
 
         {/* Discussions (Animated Dual Speech Bubble & Acoustic Waves) */}
         <DiscussionButton
