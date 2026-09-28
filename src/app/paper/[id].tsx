@@ -236,41 +236,88 @@ export default function PaperDetailScreen() {
     toggleLikePaper(paper.id);
   };
 
-  const handleOpenPublisher = () => {
-    if (paper?.canonicalUrl) {
-      Linking.openURL(paper.canonicalUrl);
+  const resolvedPdfUrl = useMemo(() => {
+    // 1. Direct openAccessUrl if already a PDF stream
+    if (paper?.openAccessUrl) {
+      const oa = paper.openAccessUrl.trim();
+      const lower = oa.toLowerCase();
+      if (
+        lower.endsWith('.pdf') ||
+        lower.includes('arxiv.org/pdf/') ||
+        lower.includes('blobtype=pdf') ||
+        lower.includes('format=pdf') ||
+        lower.includes('ptpmcrender.fcgi') ||
+        (lower.includes('/pmc/articles/pmc') && lower.includes('/pdf')) ||
+        lower.includes('.full.pdf')
+      ) {
+        return oa;
+      }
+      if (oa.includes('arxiv.org/abs/')) {
+        return oa.replace('arxiv.org/abs/', 'arxiv.org/pdf/') + '.pdf';
+      }
     }
-  };
 
-  const directPdfUrl = useMemo(() => {
-    const raw = paper?.openAccessUrl || paper?.canonicalUrl || '';
-    if (!raw) return '';
-    let clean = raw.trim();
-    if (clean.includes('arxiv.org/abs/')) {
-      clean = clean.replace('arxiv.org/abs/', 'arxiv.org/pdf/') + '.pdf';
-    } else if (clean.includes('arxiv.org/pdf/') && !clean.endsWith('.pdf')) {
-      clean = `${clean}.pdf`;
+    // 2. Canonical URL conversions (arXiv, PMC, direct PDFs)
+    if (paper?.canonicalUrl) {
+      const can = paper.canonicalUrl.trim();
+      const lower = can.toLowerCase();
+      if (lower.includes('arxiv.org/abs/')) {
+        return can.replace('arxiv.org/abs/', 'arxiv.org/pdf/') + '.pdf';
+      }
+      if (lower.includes('arxiv.org/pdf/')) {
+        return lower.endsWith('.pdf') ? can : `${can}.pdf`;
+      }
+      const pmcMatch = can.match(/PMC\d+/i);
+      if (pmcMatch) {
+        return `https://europepmc.org/backend/ptpmcrender.fcgi?accid=${pmcMatch[0]}&blobtype=pdf`;
+      }
+      if (
+        lower.endsWith('.pdf') ||
+        lower.includes('blobtype=pdf') ||
+        lower.includes('ptpmcrender.fcgi') ||
+        (lower.includes('/pmc/articles/pmc') && lower.includes('/pdf')) ||
+        lower.includes('.full.pdf')
+      ) {
+        return can;
+      }
     }
-    return clean;
+
+    return '';
   }, [paper?.openAccessUrl, paper?.canonicalUrl]);
 
+  const isDirectPdf = Boolean(resolvedPdfUrl);
+
   const embedViewerUrl = useMemo(() => {
-    if (!directPdfUrl) return '';
-    if (directPdfUrl.includes('docs.google.com/viewer')) return directPdfUrl;
-    return `https://docs.google.com/viewer?url=${encodeURIComponent(directPdfUrl)}&embedded=true`;
-  }, [directPdfUrl]);
+    if (!resolvedPdfUrl) return '';
+    if (resolvedPdfUrl.includes('docs.google.com/viewer')) return resolvedPdfUrl;
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(resolvedPdfUrl)}&embedded=true`;
+  }, [resolvedPdfUrl]);
 
   const handleOpenPdfBrowser = async () => {
-    const pdfUrl = directPdfUrl || paper?.openAccessUrl || paper?.canonicalUrl;
-    if (!pdfUrl) return;
+    const targetUrl = resolvedPdfUrl || paper?.openAccessUrl || paper?.canonicalUrl || (paper?.doi ? `https://doi.org/${paper.doi}` : '');
+    if (!targetUrl) return;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
       return;
     }
     try {
-      await WebBrowser.openBrowserAsync(pdfUrl);
+      await WebBrowser.openBrowserAsync(targetUrl);
     } catch {
-      Linking.openURL(pdfUrl);
+      Linking.openURL(targetUrl);
+    }
+  };
+
+  const handleOpenPublisher = async () => {
+    const pubUrl = paper?.canonicalUrl || (paper?.doi ? `https://doi.org/${paper.doi}` : '') || paper?.openAccessUrl;
+    if (!pubUrl) return;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.open(pubUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    try {
+      await WebBrowser.openBrowserAsync(pubUrl);
+    } catch {
+      Linking.openURL(pubUrl);
     }
   };
 
@@ -574,7 +621,7 @@ export default function PaperDetailScreen() {
                     viewMode === 'pdf' && styles.viewModeTabTextActive,
                   ]}
                 >
-                  Original PDF
+                  {isDirectPdf ? 'Original PDF' : 'Publisher Portal'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -595,51 +642,53 @@ export default function PaperDetailScreen() {
           }
         >
           {/* ==================================================================== */}
-          {/* VIEW MODE 1: ORIGINAL OPEN ACCESS PDF DOCUMENT                      */}
+          {/* VIEW MODE 1: ORIGINAL OPEN ACCESS PDF DOCUMENT / PUBLISHER PORTAL    */}
           {/* ==================================================================== */}
           {viewMode === 'pdf' && hasOpenAccessPdf ? (
             <View style={styles.pdfViewWrapper}>
-              {/* Clean Light-Themed Reader Floating Bar with Zoom Controls */}
+              {/* Clean Light-Themed Reader Floating Bar */}
               <View style={styles.pdfControlsBar}>
                 <View style={styles.pdfControlsLeft}>
-                  <Badge label={paper.journal || 'Open Access'} variant="oa" />
+                  <Badge label={paper.journal || (isDirectPdf ? 'Open Access' : 'Publisher')} variant={isDirectPdf ? 'oa' : 'journal'} />
                   <Typography variant="micro" color={colors.textSecondary} numberOfLines={1}>
-                    Full Document
+                    {isDirectPdf ? 'Full Document' : 'Publisher Source'}
                   </Typography>
                 </View>
 
                 <View style={styles.pdfControlsRight}>
-                  {/* Interactive Pinch/Tap Zoom Controls */}
-                  <View style={styles.zoomControlGroup}>
-                    <TouchableOpacity
-                      onPress={handleZoomOut}
-                      disabled={pdfZoom <= 0.75}
-                      style={[styles.zoomBtn, pdfZoom <= 0.75 && styles.zoomBtnDisabled]}
-                      activeOpacity={0.7}
-                      accessibilityLabel="Zoom out"
-                    >
-                      <ZoomOut size={12} color={pdfZoom <= 0.75 ? colors.textMuted : colors.textPrimary} />
-                    </TouchableOpacity>
+                  {/* Interactive Pinch/Tap Zoom Controls (only shown for direct PDF document streams) */}
+                  {isDirectPdf && (
+                    <View style={styles.zoomControlGroup}>
+                      <TouchableOpacity
+                        onPress={handleZoomOut}
+                        disabled={pdfZoom <= 0.75}
+                        style={[styles.zoomBtn, pdfZoom <= 0.75 && styles.zoomBtnDisabled]}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Zoom out"
+                      >
+                        <ZoomOut size={12} color={pdfZoom <= 0.75 ? colors.textMuted : colors.textPrimary} />
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      onPress={handleResetZoom}
-                      style={styles.zoomResetBtn}
-                      activeOpacity={0.7}
-                      accessibilityLabel="Reset zoom to 100%"
-                    >
-                      <Text style={styles.zoomResetText}>{Math.round(pdfZoom * 100)}%</Text>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleResetZoom}
+                        style={styles.zoomResetBtn}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Reset zoom to 100%"
+                      >
+                        <Text style={styles.zoomResetText}>{Math.round(pdfZoom * 100)}%</Text>
+                      </TouchableOpacity>
 
-                    <TouchableOpacity
-                      onPress={handleZoomIn}
-                      disabled={pdfZoom >= 2.5}
-                      style={[styles.zoomBtn, pdfZoom >= 2.5 && styles.zoomBtnDisabled]}
-                      activeOpacity={0.7}
-                      accessibilityLabel="Zoom in"
-                    >
-                      <ZoomIn size={12} color={pdfZoom >= 2.5 ? colors.textMuted : colors.textPrimary} />
-                    </TouchableOpacity>
-                  </View>
+                      <TouchableOpacity
+                        onPress={handleZoomIn}
+                        disabled={pdfZoom >= 2.5}
+                        style={[styles.zoomBtn, pdfZoom >= 2.5 && styles.zoomBtnDisabled]}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Zoom in"
+                      >
+                        <ZoomIn size={12} color={pdfZoom >= 2.5 ? colors.textMuted : colors.textPrimary} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
                   <TouchableOpacity
                     onPress={handleOpenPdfBrowser}
@@ -647,7 +696,7 @@ export default function PaperDetailScreen() {
                     activeOpacity={0.75}
                   >
                     <Maximize2 size={13} color={colors.textPrimary} />
-                    <Text style={styles.pdfControlBtnText}>Fullscreen</Text>
+                    <Text style={styles.pdfControlBtnText}>{isDirectPdf ? 'Fullscreen' : 'Open Link'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleOpenPublisher}
@@ -661,70 +710,144 @@ export default function PaperDetailScreen() {
               </View>
 
               {Platform.OS === 'web' ? (
-                <View style={styles.webPdfContainer}>
-                  {/* Google Docs PDF Embed to bypass X-Frame-Options / CORS blocks */}
-                  <iframe
-                    src={embedViewerUrl}
-                    style={{
-                      width: '100%',
-                      height: 800,
-                      border: 'none',
-                      backgroundColor: '#FFFFFF',
-                    }}
-                    title={paper.title}
-                    allow="fullscreen"
-                  />
-                  {/* Interactive Quick Action Footer Bar */}
-                  <View style={styles.pdfFooterBar}>
-                    <View style={styles.pdfFooterLeft}>
-                      <Globe size={13} color={colors.textSecondary} />
-                      <Text style={styles.pdfFooterText}>
-                        Streaming from open academic repository
-                      </Text>
+                isDirectPdf ? (
+                  <View style={styles.webPdfContainer}>
+                    {/* Google Docs PDF Embed for verified direct PDF streams */}
+                    <iframe
+                      src={embedViewerUrl}
+                      style={{
+                        width: '100%',
+                        height: 800,
+                        border: 'none',
+                        backgroundColor: '#FFFFFF',
+                      }}
+                      title={paper.title}
+                      allow="fullscreen"
+                    />
+                    {/* Interactive Quick Action Footer Bar */}
+                    <View style={styles.pdfFooterBar}>
+                      <View style={styles.pdfFooterLeft}>
+                        <Globe size={13} color={colors.textSecondary} />
+                        <Text style={styles.pdfFooterText}>
+                          Streaming from open academic repository
+                        </Text>
+                      </View>
+                      <View style={styles.pdfFooterActions}>
+                        <TouchableOpacity
+                          onPress={handleOpenPdfBrowser}
+                          style={styles.pdfFooterBtn}
+                          activeOpacity={0.75}
+                        >
+                          <ExternalLink size={12} color={colors.accentLink} />
+                          <Text style={styles.pdfFooterBtnText}>Open in New Tab</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => setViewMode('article')}
+                          style={styles.pdfFooterBtnSecondary}
+                          activeOpacity={0.75}
+                        >
+                          <BookOpen size={12} color={colors.textPrimary} />
+                          <Text style={styles.pdfFooterBtnSecondaryText}>Article View</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <View style={styles.pdfFooterActions}>
+                  </View>
+                ) : (
+                  <View style={styles.webPublisherCard}>
+                    <View style={styles.webPublisherIconWrap}>
+                      <BookOpen size={36} color="#064E3B" />
+                    </View>
+                    <Badge label={paper.journal || 'Publisher Portal'} variant="journal" />
+                    <Typography variant="h4" style={styles.webPublisherTitle}>
+                      Original Article via Publisher Portal
+                    </Typography>
+                    <Typography
+                      variant="body"
+                      color={colors.textSecondary}
+                      style={styles.webPublisherSubtitle}
+                    >
+                      This peer-reviewed research is hosted by {paper.publisher || paper.journal || 'the academic publisher'}. You can read the original interactive publication directly at the publisher portal or enjoy BooffIn's formatted Article View.
+                    </Typography>
+
+                    {paper.doi && (
+                      <View style={styles.doiPill}>
+                        <Text style={styles.doiPillText}>DOI: {paper.doi}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.webPublisherActionsRow}>
                       <TouchableOpacity
-                        onPress={handleOpenPdfBrowser}
-                        style={styles.pdfFooterBtn}
-                        activeOpacity={0.75}
+                        onPress={handleOpenPublisher}
+                        style={styles.openPublisherPrimaryBtn}
+                        activeOpacity={0.85}
                       >
-                        <ExternalLink size={12} color={colors.accentLink} />
-                        <Text style={styles.pdfFooterBtnText}>Open in New Tab</Text>
+                        <ExternalLink size={16} color={colors.white} />
+                        <Text style={styles.openPublisherBtnText}>
+                          Open Full Article at Publisher
+                        </Text>
                       </TouchableOpacity>
+
                       <TouchableOpacity
                         onPress={() => setViewMode('article')}
-                        style={styles.pdfFooterBtnSecondary}
-                        activeOpacity={0.75}
+                        style={styles.openArticleSecondaryBtn}
+                        activeOpacity={0.85}
                       >
-                        <BookOpen size={12} color={colors.textPrimary} />
-                        <Text style={styles.pdfFooterBtnSecondaryText}>Article View</Text>
+                        <BookOpen size={16} color={colors.textPrimary} />
+                        <Text style={styles.openArticleSecondaryBtnText}>
+                          Read Formatted Article View
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-                </View>
+                )
               ) : (
                 <View style={styles.mobilePdfCard}>
                   <View style={styles.mobilePdfIconWrap}>
-                    <FileCheck size={36} color={colors.accentLink} />
+                    <BookOpen size={36} color="#064E3B" />
                   </View>
+                  <Badge label={paper.journal || (isDirectPdf ? 'Open Access' : 'Publisher')} variant={isDirectPdf ? 'oa' : 'journal'} />
                   <Typography variant="h4" style={styles.mobilePdfTitle}>
-                    Open Access Document Ready
+                    {isDirectPdf ? 'Open Access Document Ready' : 'Original Article via Publisher Portal'}
                   </Typography>
                   <Typography
                     variant="caption"
                     color={colors.textSecondary}
                     style={styles.mobilePdfSubtitle}
                   >
-                    Read the full original publication PDF in high fidelity.
+                    {isDirectPdf
+                      ? 'Read the full original publication PDF in high fidelity.'
+                      : `This research is published by ${paper.publisher || paper.journal || 'the journal'}. You can open the publication in the in-app browser or read the formatted view.`}
                   </Typography>
-                  <TouchableOpacity
-                    onPress={handleOpenPdfBrowser}
-                    style={styles.openPdfPrimaryBtn}
-                    activeOpacity={0.85}
-                  >
-                    <BookOpen size={18} color={colors.white} />
-                    <Text style={styles.openPdfBtnText}>Open Full PDF in In-App Reader</Text>
-                  </TouchableOpacity>
+
+                  {paper.doi && (
+                    <View style={styles.doiPill}>
+                      <Text style={styles.doiPillText}>DOI: {paper.doi}</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.webPublisherActionsRow}>
+                    <TouchableOpacity
+                      onPress={handleOpenPdfBrowser}
+                      style={styles.openPublisherPrimaryBtn}
+                      activeOpacity={0.85}
+                    >
+                      <ExternalLink size={16} color={colors.white} />
+                      <Text style={styles.openPublisherBtnText}>
+                        {isDirectPdf ? 'Open Full PDF in In-App Reader' : 'Open Full Article at Publisher'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setViewMode('article')}
+                      style={styles.openArticleSecondaryBtn}
+                      activeOpacity={0.85}
+                    >
+                      <BookOpen size={16} color={colors.textPrimary} />
+                      <Text style={styles.openArticleSecondaryBtnText}>
+                        Read Formatted Article View
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
@@ -1195,6 +1318,106 @@ const styles = StyleSheet.create({
     ...typography.microBold,
     color: colors.textPrimary,
     fontSize: 11.5,
+  },
+  webPublisherCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.lg,
+    padding: spacing.xl + 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+    marginVertical: spacing.sm,
+  },
+  webPublisherIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: radii.full,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  webPublisherTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+    letterSpacing: -0.4,
+  },
+  webPublisherSubtitle: {
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    maxWidth: 520,
+    lineHeight: 22,
+    fontSize: 14,
+  },
+  doiPill: {
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    marginBottom: spacing.lg,
+  },
+  doiPillText: {
+    ...typography.microBold,
+    color: colors.textSecondary,
+    fontSize: 11.5,
+  },
+  webPublisherActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  openPublisherPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#064E3B', // Brand dark green
+    paddingHorizontal: spacing.lg + 4,
+    paddingVertical: spacing.md - 2,
+    borderRadius: radii.md,
+    shadowColor: '#064E3B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  openPublisherBtnText: {
+    ...typography.captionBold,
+    color: colors.white,
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  openArticleSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: spacing.lg + 4,
+    paddingVertical: spacing.md - 2,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  openArticleSecondaryBtnText: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 13.5,
+    fontWeight: '700',
   },
   mobilePdfCard: {
     backgroundColor: colors.backgroundSecondary,
