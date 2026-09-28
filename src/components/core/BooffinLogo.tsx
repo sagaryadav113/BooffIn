@@ -52,15 +52,13 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
     <View style={[styles.container, style]}>
       <Image
         source={require('../../../assets/images/booffin-symbol.png')}
-        style={{ width: size, height: size * 1.15 }}
+        style={{ width: size, height: size * 1.05 }}
         contentFit="contain"
         transition={200}
       />
       {showTagline && (
         <View style={styles.taglineContainer}>
-          <Text style={styles.wordmark}>
-            Let's <Text style={{ fontWeight: '800' }}>BooffIn</Text>
-          </Text>
+          <Text style={styles.wordmark}>BooffIn</Text>
           <Text style={styles.tagline}>Research finds its people.</Text>
         </View>
       )}

@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '../store/useAuthStore';
 import { isProfileComplete } from '../api/authService';
 import { colors } from '../theme';
-import { BooffinLogo } from '../components/core/BooffinLogo';
+import { BooffinIntroAnimation } from '../components/core/BooffinIntroAnimation';
 
 export default function Index() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -19,8 +19,7 @@ export default function Index() {
   if (!isInitialized) {
     return (
       <View style={styles.container}>
-        <BooffinLogo size={64} />
-        <ActivityIndicator size="small" color={colors.textPrimary} style={{ marginTop: 24 }} />
+        <BooffinIntroAnimation size={110} showTagline={true} />
       </View>
     );
   }

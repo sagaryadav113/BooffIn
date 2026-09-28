@@ -2,6 +2,7 @@
 export * from './core/Avatar';
 export * from './core/Badge';
 export * from './core/BooffinLogo';
+export * from './core/BooffinIntroAnimation';
 export * from './core/Button';
 export * from './core/Card';
 export * from './core/Divider';
