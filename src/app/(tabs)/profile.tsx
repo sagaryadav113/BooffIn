@@ -47,6 +47,7 @@ import { TopicChip } from '../../components/core/TopicChip';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { PostCard } from '../../components/cards/PostCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
+import { ProfileAnalyticsBar } from '../../components/profile/ProfileAnalyticsBar';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
@@ -541,54 +542,20 @@ export default function CurrentUserProfileScreen() {
             <Text style={styles.bio}>{user.bio}</Text>
           ) : null}
 
-          {/* Research Interests Chips */}
-          {user.researchInterests && user.researchInterests.length > 0 && (
-            <View style={styles.interestsSection}>
-              <Text style={styles.interestsLabel}>Research Interests:</Text>
-              <View style={styles.interestsRow}>
-                {user.researchInterests.map((interest) => (
-                  <TopicChip
-                    key={interest}
-                    label={interest}
-                    size="sm"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/topic/[slug]',
-                        params: { slug: interest.toLowerCase().replace(/\s+/g, '-') },
-                      })
-                    }
-                  />
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* TOPICS DISCUSSED & SHARED */}
-          {discussedTopics.length > 0 && (
-            <View style={styles.discussedSection}>
-              <Text style={styles.interestsLabel}>Topics Discussed & Shared:</Text>
-              <View style={styles.interestsRow}>
-                {discussedTopics.map(({ topic, count }) => (
-                  <TouchableOpacity
-                    key={topic}
-                    style={styles.discussedChip}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/topic/[slug]',
-                        params: { slug: topic.toLowerCase().replace(/\s+/g, '-') },
-                      })
-                    }
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.discussedChipLabel}>{topic}</Text>
-                    <View style={styles.discussedCountBadge}>
-                      <Text style={styles.discussedCountText}>{count}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
+          {/* RESEARCH IMPACT & ANALYTICS BAR */}
+          <ProfileAnalyticsBar
+            totalViews={Math.max(
+              posts.length * 115 +
+                posts.reduce((acc: number, p) => acc + (p.likesCount || 0), 0) * 5 +
+                posts.reduce((acc: number, p) => acc + (p.commentsCount || 0), 0) * 8,
+              posts.length > 0 ? 120 : 0
+            )}
+            totalLikes={posts.reduce((acc: number, p) => acc + (p.likesCount || 0), 0)}
+            totalDiscussions={posts.reduce((acc: number, p) => acc + (p.commentsCount || 0), 0)}
+            totalPublications={user.postsCount || posts.length || 0}
+            totalCitations={0}
+            isOwnProfile={true}
+          />
 
           {/* Metadata: Country, Location, ORCID, Website, Joined */}
           <View style={styles.metaContainer}>

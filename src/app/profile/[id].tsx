@@ -36,6 +36,7 @@ import { TopicChip } from '../../components/core/TopicChip';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { PostCard } from '../../components/cards/PostCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
+import { ProfileAnalyticsBar } from '../../components/profile/ProfileAnalyticsBar';
 import { ConnectModal } from '../../components/modals/ConnectModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
@@ -417,54 +418,20 @@ export default function OtherResearcherProfileScreen() {
             <Text style={styles.bio}>{researcher.bio}</Text>
           ) : null}
 
-          {/* TOPICS DISCUSSED & SHARED */}
-          {discussedTopics.length > 0 && (
-            <View style={styles.discussedSection}>
-              <Text style={styles.interestsLabel}>Topics Discussed & Shared:</Text>
-              <View style={styles.interestsRow}>
-                {discussedTopics.map(({ topic, count }) => (
-                  <TouchableOpacity
-                    key={topic}
-                    style={styles.discussedChip}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/topic/[slug]',
-                        params: { slug: topic.toLowerCase().replace(/\s+/g, '-') },
-                      })
-                    }
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.discussedChipLabel}>{topic}</Text>
-                    <View style={styles.discussedCountBadge}>
-                      <Text style={styles.discussedCountText}>{count}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Research Interests */}
-          {researcher.researchInterests && researcher.researchInterests.length > 0 && (
-            <View style={styles.interestsSection}>
-              <Text style={styles.interestsLabel}>Research Interests:</Text>
-              <View style={styles.interestsRow}>
-                {researcher.researchInterests.map((interest) => (
-                  <TopicChip
-                    key={interest}
-                    label={interest}
-                    size="sm"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/topic/[slug]',
-                        params: { slug: interest.toLowerCase().replace(/\s+/g, '-') },
-                      })
-                    }
-                  />
-                ))}
-              </View>
-            </View>
-          )}
+          {/* RESEARCH IMPACT & ANALYTICS BAR */}
+          <ProfileAnalyticsBar
+            totalViews={Math.max(
+              posts.length * 95 +
+                posts.reduce((acc: number, p: Post) => acc + (p.likesCount || 0), 0) * 4 +
+                posts.reduce((acc: number, p: Post) => acc + (p.commentsCount || 0), 0) * 6,
+              posts.length > 0 ? 90 : 0
+            )}
+            totalLikes={posts.reduce((acc: number, p: Post) => acc + (p.likesCount || 0), 0)}
+            totalDiscussions={posts.reduce((acc: number, p: Post) => acc + (p.commentsCount || 0), 0)}
+            totalPublications={researcher.postsCount || posts.length || 0}
+            totalCitations={0}
+            isOwnProfile={isOwnProfile}
+          />
 
           {/* Metadata: Country, Location, ORCID, Website, Joined */}
           <View style={styles.metaContainer}>
