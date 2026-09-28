@@ -5,7 +5,7 @@ import { typography, colors, spacing } from '../../theme';
 
 export interface BooffinLogoProps {
   size?: number;
-  variant?: 'symbol' | 'full';
+  variant?: 'symbol' | 'full' | 'wordmark';
   showTagline?: boolean;
   style?: ViewStyle;
 }
@@ -16,6 +16,22 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
   showTagline = false,
   style,
 }) => {
+  if (variant === 'wordmark') {
+    return (
+      <View style={[styles.container, style]}>
+        <Image
+          source={require('../../../assets/images/booffin-wordmark.jpg')}
+          style={{ width: size * 2.8, height: size }}
+          contentFit="contain"
+          transition={200}
+        />
+        {showTagline && (
+          <Text style={styles.tagline}>Research finds its people.</Text>
+        )}
+      </View>
+    );
+  }
+
   if (variant === 'full') {
     return (
       <View style={[styles.container, style]}>

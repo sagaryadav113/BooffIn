@@ -75,23 +75,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             <Icon name="ArrowLeft" size="md" color={colors.textPrimary} />
           </TouchableOpacity>
         )}
-        {isBrandTitle && (
+        {isBrandTitle ? (
           <Image
-            source={require('../../../assets/images/booffin-symbol.png')}
-            style={styles.brandIcon}
+            source={require('../../../assets/images/booffin-wordmark.jpg')}
+            style={styles.brandLogoImage}
             contentFit="contain"
+            accessibilityLabel="BooffIn"
           />
+        ) : (
+          <Typography
+            variant="sectionTitle"
+            style={[
+              styles.title,
+              showBack && { marginLeft: spacing.xs + 2 },
+            ]}
+            numberOfLines={1}
+          >
+            {title}
+          </Typography>
         )}
-        <Typography
-          variant={isBrandTitle ? 'pageTitle' : 'sectionTitle'}
-          style={[
-            isBrandTitle ? styles.brandTitle : styles.title,
-            showBack && { marginLeft: spacing.xs + 2 },
-          ]}
-          numberOfLines={1}
-        >
-          {title}
-        </Typography>
         {isRefreshing && (
           <ActivityIndicator size="small" color={colors.textSecondary} style={{ marginLeft: 6 }} />
         )}
@@ -157,16 +159,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  brandIcon: {
-    width: 24,
-    height: 28,
-    marginRight: spacing.sm + 2,
-  },
-  brandTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    color: colors.textPrimary,
+  brandLogoImage: {
+    width: 108,
+    height: 34,
   },
   title: {
     fontSize: 20,
