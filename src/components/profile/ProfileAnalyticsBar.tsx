@@ -3,38 +3,39 @@ import {
   View,
   Text,
   StyleSheet,
+  TouchableOpacity,
   ViewStyle,
 } from 'react-native';
 import {
   Activity,
   Eye,
-  GraduationCap,
-  Sparkles,
+  FileText,
+  Share2,
+  ChevronRight,
 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { DiscussionIcon } from '../core/DiscussionIcon';
-import { LikeIcon } from '../core/LikeIcon';
 
 export interface ProfileAnalyticsBarProps {
   totalViews?: number;
-  totalLikes?: number;
+  totalPosts?: number;
+  totalShares?: number;
   totalDiscussions?: number;
-  totalPublications?: number;
-  totalCitations?: number;
-  isOwnProfile?: boolean;
+  onPress?: () => void;
   style?: ViewStyle;
 }
 
 export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
   totalViews = 0,
-  totalLikes = 0,
+  totalPosts = 0,
+  totalShares = 0,
   totalDiscussions = 0,
-  totalPublications = 0,
-  totalCitations = 0,
-  isOwnProfile = false,
+  onPress,
   style,
 }) => {
   const formatStatNumber = (num: number): string => {
+    if (!num && num !== 0) return '0';
     if (num >= 1000000) {
       return `${(num / 1000000).toFixed(1)}M`;
     }
@@ -44,8 +45,21 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
     return `${num}`;
   };
 
+  const handlePress = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    if (onPress) {
+      onPress();
+    }
+  };
+
   return (
-    <View style={[styles.container, style]}>
+    <TouchableOpacity
+      style={[styles.container, style]}
+      onPress={handlePress}
+      activeOpacity={0.85}
+    >
       {/* Header Row */}
       <View style={styles.headerRow}>
         <View style={styles.headerTitleRow}>
@@ -55,15 +69,14 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
           <Text style={styles.headerTitle}>RESEARCH IMPACT & ANALYTICS</Text>
         </View>
 
-        <View style={styles.badgePill}>
-          <Sparkles size={11} color={colors.accentGreen} />
-          <Text style={styles.badgePillText}>
-            {isOwnProfile ? 'Active Scholar' : 'Verified Impact'}
-          </Text>
+        {/* View Details Action (replaces the removed Active Scholar badge) */}
+        <View style={styles.viewAnalyticsBadge}>
+          <Text style={styles.viewAnalyticsText}>View Analytics</Text>
+          <ChevronRight size={12} color={colors.accentBlue} />
         </View>
       </View>
 
-      {/* 4-Stat Metric Grid */}
+      {/* 4-Stat Metric Grid: Views, Posts, Shares, Discussions */}
       <View style={styles.grid}>
         {/* 1. Research Reach / Views */}
         <View style={styles.statCard}>
@@ -76,18 +89,29 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
           </Text>
         </View>
 
-        {/* 2. Peer Endorsements / Likes */}
+        {/* 2. Posts (Authored Posts) */}
         <View style={styles.statCard}>
           <View style={styles.statHeader}>
-            <LikeIcon size={14} isLiked={true} color={colors.textPrimary} />
-            <Text style={styles.statLabel}>Peer Endorsements</Text>
+            <FileText size={14} color="#8B5CF6" />
+            <Text style={styles.statLabel}>Posts</Text>
           </View>
           <Text style={styles.statValue}>
-            {formatStatNumber(totalLikes)}
+            {formatStatNumber(totalPosts)}
           </Text>
         </View>
 
-        {/* 3. Scientific Discussions */}
+        {/* 3. Shares (Reposts & Shares) */}
+        <View style={styles.statCard}>
+          <View style={styles.statHeader}>
+            <Share2 size={14} color="#EC4899" />
+            <Text style={styles.statLabel}>Shares</Text>
+          </View>
+          <Text style={styles.statValue}>
+            {formatStatNumber(totalShares)}
+          </Text>
+        </View>
+
+        {/* 4. Scientific Discussions */}
         <View style={styles.statCard}>
           <View style={styles.statHeader}>
             <DiscussionIcon size={14} color={colors.accentGreen} />
@@ -97,26 +121,8 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
             {formatStatNumber(totalDiscussions)}
           </Text>
         </View>
-
-        {/* 4. Publications & Citations */}
-        <View style={styles.statCard}>
-          <View style={styles.statHeader}>
-            <GraduationCap size={14} color="#8B5CF6" />
-            <Text style={styles.statLabel}>Publications</Text>
-          </View>
-          <View style={styles.statValueRow}>
-            <Text style={styles.statValue}>
-              {formatStatNumber(totalPublications)}
-            </Text>
-            {totalCitations > 0 && (
-              <Text style={styles.statSubValue}>
-                · {formatStatNumber(totalCitations)} cites
-              </Text>
-            )}
-          </View>
-        </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -154,21 +160,21 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     color: colors.textSecondary,
   },
-  badgePill: {
+  viewAnalyticsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    gap: 2,
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: 'rgba(2, 132, 199, 0.2)',
   },
-  badgePillText: {
+  viewAnalyticsText: {
     ...typography.microBold,
     fontSize: 10.5,
-    color: colors.accentGreen,
+    color: colors.accentBlue,
   },
   grid: {
     flexDirection: 'row',
@@ -201,15 +207,5 @@ const styles = StyleSheet.create({
     ...typography.bodyBold,
     fontSize: 16,
     color: colors.textPrimary,
-  },
-  statValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  statSubValue: {
-    ...typography.caption,
-    fontSize: 11,
-    color: colors.textSecondary,
   },
 });

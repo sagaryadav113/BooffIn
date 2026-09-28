@@ -22,6 +22,8 @@ export * from './core/LikeButton';
 export * from './core/SaveIcon';
 export * from './core/SaveButton';
 export * from './profile/ProfileAnalyticsBar';
+export * from './profile/ProfileAnalyticsModal';
+export * from './profile/AnalyticsChart';
 
 // Card Components
 export * from './cards/CommentCard';

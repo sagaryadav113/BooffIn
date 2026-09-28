@@ -48,6 +48,7 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { PostCard } from '../../components/cards/PostCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
 import { ProfileAnalyticsBar } from '../../components/profile/ProfileAnalyticsBar';
+import { ProfileAnalyticsModal } from '../../components/profile/ProfileAnalyticsModal';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
@@ -95,6 +96,7 @@ export default function CurrentUserProfileScreen() {
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
+  const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
 
   const [cropperState, setCropperState] = useState<{
     visible: boolean;
@@ -550,11 +552,10 @@ export default function CurrentUserProfileScreen() {
                 posts.reduce((acc: number, p) => acc + (p.commentsCount || 0), 0) * 8,
               posts.length > 0 ? 120 : 0
             )}
-            totalLikes={posts.reduce((acc: number, p) => acc + (p.likesCount || 0), 0)}
+            totalPosts={posts.filter((p) => p.author.id === user.id && !p.isReposted).length || user.postsCount || posts.length || 0}
+            totalShares={posts.reduce((acc: number, p) => acc + (p.repostsCount || 0), 0) + posts.filter((p) => p.isReposted).length}
             totalDiscussions={posts.reduce((acc: number, p) => acc + (p.commentsCount || 0), 0)}
-            totalPublications={user.postsCount || posts.length || 0}
-            totalCitations={0}
-            isOwnProfile={true}
+            onPress={() => setAnalyticsModalOpen(true)}
           />
 
           {/* Metadata: Country, Location, ORCID, Website, Joined */}
@@ -997,6 +998,14 @@ export default function CurrentUserProfileScreen() {
         cropType={cropperState.cropType}
         onSave={handleCropperSave}
         onCancel={() => setCropperState((prev) => ({ ...prev, visible: false }))}
+      />
+
+      {/* Comprehensive Profile Analytics Modal */}
+      <ProfileAnalyticsModal
+        visible={analyticsModalOpen}
+        userId={user.id}
+        userFullName={user.fullName}
+        onClose={() => setAnalyticsModalOpen(false)}
       />
     </SafeAreaView>
   );

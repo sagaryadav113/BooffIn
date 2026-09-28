@@ -37,6 +37,7 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { PostCard } from '../../components/cards/PostCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
 import { ProfileAnalyticsBar } from '../../components/profile/ProfileAnalyticsBar';
+import { ProfileAnalyticsModal } from '../../components/profile/ProfileAnalyticsModal';
 import { ConnectModal } from '../../components/modals/ConnectModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
@@ -68,6 +69,7 @@ export default function OtherResearcherProfileScreen() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('none');
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
+  const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
 
   const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
   const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
@@ -426,11 +428,10 @@ export default function OtherResearcherProfileScreen() {
                 posts.reduce((acc: number, p: Post) => acc + (p.commentsCount || 0), 0) * 6,
               posts.length > 0 ? 90 : 0
             )}
-            totalLikes={posts.reduce((acc: number, p: Post) => acc + (p.likesCount || 0), 0)}
-            totalDiscussions={posts.reduce((acc: number, p: Post) => acc + (p.commentsCount || 0), 0)}
-            totalPublications={researcher.postsCount || posts.length || 0}
-            totalCitations={0}
-            isOwnProfile={isOwnProfile}
+            totalPosts={posts.filter((p) => p.author.id === researcher.id && !p.isReposted).length || researcher.postsCount || posts.length || 0}
+            totalShares={posts.reduce((acc: number, p) => acc + (p.repostsCount || 0), 0) + posts.filter((p) => p.isReposted).length}
+            totalDiscussions={posts.reduce((acc: number, p) => acc + (p.commentsCount || 0), 0)}
+            onPress={() => setAnalyticsModalOpen(true)}
           />
 
           {/* Metadata: Country, Location, ORCID, Website, Joined */}
@@ -592,6 +593,14 @@ export default function OtherResearcherProfileScreen() {
         userId={researcher.id}
         type={followModalType}
         userName={researcher.fullName}
+      />
+
+      {/* Comprehensive Profile Analytics Modal */}
+      <ProfileAnalyticsModal
+        visible={analyticsModalOpen}
+        userId={researcher.id}
+        userFullName={researcher.fullName}
+        onClose={() => setAnalyticsModalOpen(false)}
       />
     </SafeAreaView>
   );
