@@ -23,7 +23,6 @@ import {
   ExternalLink,
   ArrowRight,
   TrendingUp,
-  Bookmark,
   Share2,
   BookOpen,
   FileText,

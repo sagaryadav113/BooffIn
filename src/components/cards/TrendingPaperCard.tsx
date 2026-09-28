@@ -8,13 +8,13 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Bookmark } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Paper } from '../../types';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Badge } from '../core/Badge';
 import { DiscussionIcon } from '../core/DiscussionIcon';
 import { LikeIcon } from '../core/LikeIcon';
+import { SaveButton } from '../core/SaveButton';
 import { usePaperStore } from '../../store/usePaperStore';
 
 interface TrendingPaperCardProps {
@@ -95,17 +95,12 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
             </View>
           </View>
 
-          <TouchableOpacity
+          <SaveButton
+            isSaved={Boolean(paper.isSaved)}
             onPress={handleSave}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            size={18}
             style={styles.saveBtn}
-          >
-            <Bookmark
-              size={18}
-              color={paper.isSaved ? colors.black : colors.textSecondary}
-              fill={paper.isSaved ? colors.black : 'transparent'}
-            />
-          </TouchableOpacity>
+          />
         </View>
       </View>
     </TouchableOpacity>

@@ -4,6 +4,7 @@ import * as LucideIcons from 'lucide-react-native';
 import { colors } from '../../theme';
 import { DiscussionIcon } from './DiscussionIcon';
 import { LikeIcon } from './LikeIcon';
+import { SaveIcon } from './SaveIcon';
 
 export type IconName =
   | 'Home'
@@ -27,6 +28,7 @@ export type IconName =
   | 'Discussion'
   | 'Repeat2'
   | 'Bookmark'
+  | 'Save'
   | 'Share2'
   | 'MoreHorizontal'
   | 'SlidersHorizontal'
@@ -121,6 +123,16 @@ export const Icon: React.FC<IconProps> = ({
   if (name === 'Like') {
     return (
       <LikeIcon
+        size={pixelSize}
+        color={color}
+        style={style}
+      />
+    );
+  }
+
+  if (name === 'Bookmark' || name === 'Save') {
+    return (
+      <SaveIcon
         size={pixelSize}
         color={color}
         style={style}

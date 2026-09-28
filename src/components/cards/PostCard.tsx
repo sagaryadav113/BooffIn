@@ -10,7 +10,6 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
   Repeat2,
-  Bookmark,
   MoreHorizontal,
   Check,
 } from 'lucide-react-native';
@@ -21,6 +20,7 @@ import { Avatar } from '../core/Avatar';
 import { ReshareButton } from '../core/ReshareButton';
 import { DiscussionButton } from '../core/DiscussionButton';
 import { LikeButton } from '../core/LikeButton';
+import { SaveButton } from '../core/SaveButton';
 import { PaperCard } from './PaperCard';
 import { PostImageCluster } from './PostImageCluster';
 import { PostOptionsModal } from '../modals/PostOptionsModal';
@@ -322,21 +322,13 @@ export const PostCard: React.FC<PostCardProps> = ({
           style={styles.actionItem}
         />
 
-        {/* Bookmark / Save */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={post.isSaved ? 'Remove bookmark' : 'Bookmark post'}
-          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+        {/* Bookmark / Save (Animated Dual Papercraft & Ribbon Stamp) */}
+        <SaveButton
+          isSaved={Boolean(post.isSaved)}
           onPress={handleSave}
-          activeOpacity={0.7}
+          size={19}
           style={styles.actionItemRight}
-        >
-          <Bookmark
-            size={20}
-            color={post.isSaved ? colors.black : colors.textSecondary}
-            fill={post.isSaved ? colors.black : 'transparent'}
-          />
-        </TouchableOpacity>
+        />
       </View>
 
       {/* Post Options Menu Modal */}

@@ -13,7 +13,6 @@ import {
   Edit3,
   Share2,
   Trash2,
-  Bookmark,
   Link as LinkIcon,
   Flag,
   Copy,
@@ -22,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { Post } from '../../types';
 import { colors, radii, spacing, fontSizes, typography, shadows } from '../../theme';
+import { SaveIcon } from '../core/SaveIcon';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -245,10 +245,11 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
                   activeOpacity={0.7}
                 >
                   <View style={[styles.iconContainer, { backgroundColor: colors.accentGreen + '15' }]}>
-                    <Bookmark
+                    <SaveIcon
                       size={18}
+                      isSaved={Boolean(post.isSaved)}
                       color={colors.accentGreen}
-                      fill={post.isSaved ? colors.accentGreen : 'none'}
+                      ribbonColor={colors.accentGreen}
                     />
                   </View>
                   <View style={styles.itemTextContainer}>
