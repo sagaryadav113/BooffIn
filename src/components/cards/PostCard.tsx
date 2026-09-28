@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { Post } from '../../types';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../core/Avatar';
+import { ReshareButton } from '../core/ReshareButton';
 import { PaperCard } from './PaperCard';
 import { PostImageCluster } from './PostImageCluster';
 import { PostOptionsModal } from '../modals/PostOptionsModal';
@@ -332,28 +333,14 @@ export const PostCard: React.FC<PostCardProps> = ({
           <Text style={styles.actionCount}>{post.commentsCount}</Text>
         </TouchableOpacity>
 
-        {/* Repost */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={post.isReposted ? 'Undo repost' : 'Repost'}
-          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
-          onPress={handleRepost}
-          activeOpacity={0.7}
+        {/* Re-share (Animated Paper Plane & Orbit) */}
+        <ReshareButton
+          isReposted={Boolean(post.isReposted)}
+          repostsCount={post.repostsCount}
+          onPress={() => toggleRepost(post.id, currentUser?.id)}
+          size={19}
           style={styles.actionItem}
-        >
-          <Repeat2
-            size={20}
-            color={post.isReposted ? colors.accentGreen : colors.textSecondary}
-          />
-          <Text
-            style={[
-              styles.actionCount,
-              post.isReposted && { color: colors.accentGreen, fontWeight: '600' },
-            ]}
-          >
-            {post.repostsCount}
-          </Text>
-        </TouchableOpacity>
+        />
 
         {/* Bookmark / Save */}
         <TouchableOpacity

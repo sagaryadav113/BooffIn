@@ -14,6 +14,7 @@ export * from './core/SearchBar';
 export * from './core/Sheet';
 export * from './core/TopicChip';
 export * from './core/Typography';
+export * from './core/ReshareButton';
 
 // Card Components
 export * from './cards/CommentCard';
