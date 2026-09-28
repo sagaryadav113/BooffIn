@@ -408,8 +408,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomWidth: 1.5,
+    borderBottomColor: colors.borderDark,
   },
   repostBanner: {
     flexDirection: 'row',

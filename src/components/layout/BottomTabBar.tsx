@@ -88,8 +88,8 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
               <Icon
                 name={meta.name}
                 size={isCreate ? 26 : 22}
-                color={isFocused ? colors.black : colors.textSecondary}
-                strokeWidth={isFocused ? 2.3 : 1.9}
+                color={isFocused ? colors.black : '#374151'}
+                strokeWidth={isFocused ? 2.5 : 2.1}
               />
               {isNotifications && unreadCount > 0 && (
                 <View style={styles.badge}>
@@ -101,7 +101,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
             </View>
             <Typography
               variant="micro"
-              color={isFocused ? colors.black : colors.textSecondary}
+              color={isFocused ? colors.black : '#374151'}
               style={[styles.label, isFocused && styles.labelFocused]}
             >
               {meta.label}
@@ -118,8 +118,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: layout.tabBarHeight,
     backgroundColor: colors.background,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopWidth: 1.5,
+    borderTopColor: colors.border,
     paddingBottom: 6,
     paddingTop: 6,
   },
@@ -154,7 +154,8 @@ const styles = StyleSheet.create({
   label: {
     marginTop: 3,
     fontSize: 11.5,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#374151',
   },
   labelFocused: {
     fontWeight: '700',
