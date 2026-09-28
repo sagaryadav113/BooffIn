@@ -48,12 +48,14 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
     <TouchableOpacity
       style={[styles.container, style]}
       onPress={handlePress}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel="View Research Impact & Analytics"
     >
       {/* Left: Icon, Title & Real Views in last 28d */}
       <View style={styles.leftContent}>
         <View style={styles.iconBadge}>
-          <Activity size={14} color={colors.accentBlue} />
+          <Activity size={15} color="#FFFFFF" />
         </View>
 
         <View style={styles.textContainer}>
@@ -73,7 +75,7 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
       {/* Right: View Analytics Action Pill */}
       <View style={styles.actionPill}>
         <Text style={styles.actionText}>View Analytics</Text>
-        <ChevronRight size={13} color={colors.accentBlue} />
+        <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
       </View>
     </TouchableOpacity>
   );
@@ -84,13 +86,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: '#064E3B', // Rich dark green
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: '#047857',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.sm + 3,
     marginVertical: spacing.sm,
+    shadowColor: '#064E3B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
   },
   leftContent: {
     flexDirection: 'row',
@@ -100,10 +107,10 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   iconBadge: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(2, 132, 199, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -114,44 +121,49 @@ const styles = StyleSheet.create({
   title: {
     ...typography.captionBold,
     fontSize: 11,
-    letterSpacing: 0.5,
-    color: colors.textSecondary,
+    letterSpacing: 0.6,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '700',
   },
   viewsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 1,
+    marginTop: 1.5,
   },
   colonText: {
     ...typography.captionBold,
     fontSize: 12,
-    color: colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   viewsValue: {
     ...typography.bodyBold,
-    fontSize: 13.5,
-    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   viewsLabel: {
     ...typography.caption,
     fontSize: 11.5,
-    color: colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '500',
   },
   actionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    backgroundColor: 'rgba(2, 132, 199, 0.08)',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 5,
+    gap: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: spacing.sm + 3,
+    paddingVertical: 5.5,
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: 'rgba(2, 132, 199, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.32)',
   },
   actionText: {
     ...typography.microBold,
-    fontSize: 11,
-    color: colors.accentBlue,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
+
