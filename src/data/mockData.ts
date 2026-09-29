@@ -1,12 +1,16 @@
 import { UserProfile, Paper, Topic, Post, Comment, AppNotification } from '../types';
 
+/**
+ * Blank UserProfile used as the initial/reset state in the auth store.
+ * No hardcoded data — all fields are empty defaults.
+ */
 export const emptyUserProfile: UserProfile = {
   id: '',
   handle: '',
   fullName: '',
+  avatarUrl: undefined,
   academicTitle: '',
   institution: '',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
   bio: '',
   researchInterests: [],
   orcidVerified: false,
@@ -14,10 +18,11 @@ export const emptyUserProfile: UserProfile = {
   followersCount: 0,
   postsCount: 0,
   savedCount: 0,
-  joinedDate: 'September 2026',
+  joinedDate: '',
 };
 
-export const currentUser: UserProfile = emptyUserProfile;
+// These are kept as named exports for any future use, but are intentionally empty.
+// Do NOT populate with hardcoded prototype data.
 export const mockUsers: UserProfile[] = [];
 export const mockTopics: Topic[] = [];
 export const mockPapers: Paper[] = [];

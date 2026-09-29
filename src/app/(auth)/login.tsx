@@ -262,45 +262,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     width: '100%',
   },
-  demoSection: {
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  demoHeader: {
-    marginBottom: spacing.sm,
-  },
-  demoList: {
-    gap: spacing.xs,
-  },
-  demoUserCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundCard,
-    padding: spacing.sm,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  demoUserMeta: {
-    flex: 1,
-    marginLeft: spacing.sm,
-    marginRight: spacing.xs,
-  },
-  demoUserName: {
-    ...typography.captionBold,
-    fontSize: 13,
-    color: colors.textPrimary,
-  },
-  demoUserRole: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 1,
-  },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',

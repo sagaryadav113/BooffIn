@@ -54,7 +54,6 @@ interface AuthState {
   signUp: (params: SignUpParams) => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
   signInWithORCID: () => Promise<boolean>;
-  signInWithDemoUser: (user: UserProfile) => void;
   resetPassword: (email: string) => Promise<{ success: boolean; error: string | null }>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -297,17 +296,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     // Browser is actively navigating to ORCID OAuth consent page; keep loading active
     return false;
-  },
-
-  signInWithDemoUser: (demoUser: UserProfile) => {
-    setStoredLocalSession(demoUser);
-    set({
-      user: demoUser,
-      authStatus: 'authenticated',
-      isAuthenticated: true,
-      isLoading: false,
-      authError: null,
-    });
   },
 
   resetPassword: async (email) => {
