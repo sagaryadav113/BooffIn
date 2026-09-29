@@ -409,6 +409,10 @@ export default function PaperDetailScreen() {
   }, [paper?.doi, resolvedPdfUrl]);
 
   const isDirectPdf = Boolean(resolvedPdfUrl);
+  // Only arXiv PDFs can be reliably embedded via iframe (they don't set X-Frame-Options).
+  // PMC, EuropePMC, Springer, Nature, etc. all block iframe embedding — we detect this
+  // upfront and show a clean card UI instead of a broken browser error page.
+  const isArxivPdf = isDirectPdf && resolvedPdfUrl.includes('arxiv.org');
 
   const handleOpenPdfBrowser = async () => {
     // bestOpenUrl: direct PDF if available, stable landing page otherwise
@@ -774,8 +778,8 @@ export default function PaperDetailScreen() {
                 </View>
 
                 <View style={styles.pdfControlsRight}>
-                  {/* Zoom controls — shown whenever a direct PDF is available */}
-                  {isDirectPdf && (
+                  {/* Zoom controls — only for arXiv (the only embeddable PDF source) */}
+                  {isArxivPdf && (
                     <View style={styles.zoomControlGroup}>
                       <TouchableOpacity
                         onPress={handleZoomOut}
@@ -820,11 +824,9 @@ export default function PaperDetailScreen() {
               </View>
 
               {Platform.OS === 'web' ? (
-                isDirectPdf ? (
+                isArxivPdf ? (
+                  // arXiv: fully embeddable, render inline PDF
                   <View style={styles.webPdfContainer}>
-                    {/* Direct iframe — works for arXiv, PMC, EuropePMC and any OA source */}
-                    {/* that doesn't set X-Frame-Options. Publisher PDFs gracefully fall back */}
-                    {/* to the "Not loading?" hint + Open in New Tab footer below. */}
                     <iframe
                       src={resolvedPdfUrl}
                       style={{
@@ -835,7 +837,6 @@ export default function PaperDetailScreen() {
                         display: 'block',
                         transform: `scale(${pdfZoom})`,
                         transformOrigin: 'top left',
-                        // Scale causes visual overflow — compensate height so container doesn't collapse
                         marginBottom: pdfZoom !== 1 ? `${(pdfZoom - 1) * 820}px` : undefined,
                       }}
                       title={paper.title}
@@ -843,22 +844,12 @@ export default function PaperDetailScreen() {
                       loading="lazy"
                     />
 
-                    {/* "Not loading?" inline helper — shown always, subtle */}
-                    <View style={styles.pdfNotLoadingHint}>
-                      <Text style={styles.pdfNotLoadingText}>
-                        PDF not displaying?{' '}
-                      </Text>
-                      <TouchableOpacity onPress={handleOpenPdfBrowser} activeOpacity={0.7}>
-                        <Text style={styles.pdfNotLoadingLink}>Open in new tab →</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Footer with Open in New Tab fallback */}
+                    {/* Footer with Open in New Tab */}
                     <View style={styles.pdfFooterBar}>
                       <View style={styles.pdfFooterLeft}>
                         <Globe size={13} color={colors.textSecondary} />
                         <Text style={styles.pdfFooterText}>
-                          Streaming from open academic repository
+                          Streaming from arXiv open-access repository
                         </Text>
                       </View>
                       <View style={styles.pdfFooterActions}>
@@ -868,7 +859,7 @@ export default function PaperDetailScreen() {
                           activeOpacity={0.75}
                         >
                           <ExternalLink size={12} color={colors.accentLink} />
-                          <Text style={styles.pdfFooterBtnText}>Open in New Tab</Text>
+                          <Text style={styles.pdfFooterBtnText}>Open PDF in New Tab</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => setViewMode('article')}
@@ -882,21 +873,45 @@ export default function PaperDetailScreen() {
                     </View>
                   </View>
                 ) : (
+                  // Non-arXiv (PMC, EuropePMC, Nature, Springer, etc.):
+                  // These publishers enforce browser security policies (X-Frame-Options / CSP)
+                  // that prevent embedding their content inside other apps — this is intentional
+                  // on their part to protect copyright and ensure proper attribution.
+                  // We show a clear, friendly card instead of a broken browser error.
                   <View style={styles.webPublisherCard}>
-                    <View style={styles.webPublisherIconWrap}>
-                      <BookOpen size={36} color="#064E3B" />
+                    <View style={styles.publisherProtectedIconRow}>
+                      <View style={styles.publisherProtectedIconWrap}>
+                        <FileCheck size={28} color="#0F4C81" />
+                      </View>
                     </View>
-                    <Badge label={paper.journal || 'Publisher Portal'} variant="generic" />
+
+                    <Badge
+                      label={paper.journal || paper.publisher || 'Academic Publisher'}
+                      variant="generic"
+                    />
+
                     <Typography variant="h4" style={styles.webPublisherTitle}>
-                      Original Article via Publisher Portal
+                      PDF Available on Official Website
                     </Typography>
+
                     <Typography
                       variant="body"
                       color={colors.textSecondary}
                       style={styles.webPublisherSubtitle}
                     >
-                      This peer-reviewed research is hosted by {paper.publisher || paper.journal || 'the academic publisher'}. You can read the original interactive publication directly at the publisher portal or enjoy BooffIn's formatted Article View.
+                      {`${paper.publisher || paper.journal || 'This publisher'} restricts in-app PDF preview to protect the integrity of peer-reviewed research. This is a standard academic publishing policy, not a technical error.`}
                     </Typography>
+
+                    <View style={styles.publisherProtectedInfoRow}>
+                      <View style={styles.publisherProtectedInfoBadge}>
+                        <Globe size={12} color="#0F4C81" />
+                        <Text style={styles.publisherProtectedInfoText}>Open Access</Text>
+                      </View>
+                      <View style={styles.publisherProtectedInfoBadge}>
+                        <FileText size={12} color="#0F4C81" />
+                        <Text style={styles.publisherProtectedInfoText}>Full PDF Available</Text>
+                      </View>
+                    </View>
 
                     {paper.doi && (
                       <View style={styles.doiPill}>
@@ -906,13 +921,13 @@ export default function PaperDetailScreen() {
 
                     <View style={styles.webPublisherActionsRow}>
                       <TouchableOpacity
-                        onPress={handleOpenPublisher}
+                        onPress={handleOpenPdfBrowser}
                         style={styles.openPublisherPrimaryBtn}
                         activeOpacity={0.85}
                       >
                         <ExternalLink size={16} color={colors.white} />
                         <Text style={styles.openPublisherBtnText}>
-                          Open Full Article at Publisher
+                          Read Paper on Official Website
                         </Text>
                       </TouchableOpacity>
 
@@ -1825,5 +1840,43 @@ const styles = StyleSheet.create({
   },
   emptyDiscussionWrap: {
     paddingVertical: spacing.xl,
+  },
+  publisherProtectedIconRow: {
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  publisherProtectedIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.full,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  publisherProtectedInfoRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  publisherProtectedInfoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  publisherProtectedInfoText: {
+    ...typography.micro,
+    color: '#0F4C81',
+    fontWeight: '600',
+    fontSize: 11,
   },
 });
