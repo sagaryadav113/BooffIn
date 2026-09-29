@@ -325,24 +325,70 @@ export default function PaperDetailScreen() {
 
   /**
    * Best URL to open in new tab / external browser.
-   * This is separate from resolvedPdfUrl — it picks the most useful page to open,
-   * even when the iframe URL is blocked. Priority:
-   *   arXiv abs page > NIH PMC article page > DOI page > openAccessUrl > canonicalUrl
+   *
+   * Priority — PDF first, then stable landing page as fallback:
+   *   1. arXiv PDF  (arxiv.org/pdf/xxx.pdf)  — direct, always works
+   *   2. NIH PMC PDF (ncbi.nlm.nih.gov/pmc/articles/PMCxxx/pdf/)
+   *   3. Any other direct .pdf URL
+   *   4. openAccessUrl (if it looks like a PDF stream)
+   *   5. arXiv abstract page (good landing for arXiv papers)
+   *   6. DOI page (publisher landing, canonical fallback)
+   *   7. NIH PMC article page
+   *   8. canonicalUrl / openAccessUrl
    */
   const bestOpenUrl = useMemo(() => {
-    // arXiv abs page (better landing than raw PDF for external open)
     const allUrls = [paper?.openAccessUrl || '', paper?.canonicalUrl || ''].filter(Boolean);
+
+    // 1. arXiv PDF — most reliable direct PDF link
     for (const url of allUrls) {
-      if (url.includes('arxiv.org')) return url.includes('/abs/') ? url : url.replace('/pdf/', '/abs/').replace(/\.pdf$/, '');
+      const absMatch = url.match(/arxiv\.org\/abs\/(\S+)/i);
+      if (absMatch) return `https://arxiv.org/pdf/${absMatch[1].replace(/\.pdf$/i, '')}.pdf`;
+      const pdfMatch = url.match(/arxiv\.org\/pdf\/(\S+)/i);
+      if (pdfMatch) return url.endsWith('.pdf') ? url : `${url}.pdf`;
     }
-    // DOI — resolves to publisher page or PMC
+    if (paper?.doi) {
+      const doiArxiv = paper.doi.match(/arxiv\.org\/abs\/(\S+)/i);
+      if (doiArxiv) return `https://arxiv.org/pdf/${doiArxiv[1].replace(/\.pdf$/i, '')}.pdf`;
+    }
+
+    // 2. NIH PMC PDF
+    for (const url of allUrls) {
+      const pmcMatch = url.match(/PMC(\d+)/i);
+      if (pmcMatch) return `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcMatch[1]}/pdf/`;
+    }
+
+    // 3. Any other direct PDF URL
+    for (const url of allUrls) {
+      const lower = url.toLowerCase();
+      if (
+        lower.endsWith('.pdf') ||
+        lower.includes('format=pdf') ||
+        lower.includes('blobtype=pdf') ||
+        lower.includes('.full.pdf') ||
+        lower.includes('ptpmcrender.fcgi')
+      ) {
+        return url;
+      }
+    }
+
+    // 4. openAccessUrl if it seems like a PDF stream
+    if (paper?.openAccessUrl) {
+      const lower = paper.openAccessUrl.toLowerCase();
+      if (lower.includes('/pdf')) return paper.openAccessUrl;
+    }
+
+    // 5–8. No direct PDF — fall back to stable landing pages
+    // arXiv abstract page
+    for (const url of allUrls) {
+      if (url.includes('arxiv.org')) return url.includes('/abs/') ? url : url.replace('/pdf/', '/abs/').replace(/\.pdf$/i, '');
+    }
+    // DOI — resolves to publisher page
     if (paper?.doi) return `https://doi.org/${paper.doi}`;
-    // PMC via NIH
+    // NIH PMC article page
     for (const url of allUrls) {
       const pmcMatch = url.match(/PMC(\d+)/i);
       if (pmcMatch) return `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcMatch[1]}/`;
     }
-    // Anything else
     return paper?.canonicalUrl || paper?.openAccessUrl || '';
   }, [paper?.openAccessUrl, paper?.canonicalUrl, paper?.doi]);
 
@@ -365,9 +411,8 @@ export default function PaperDetailScreen() {
   const isDirectPdf = Boolean(resolvedPdfUrl);
 
   const handleOpenPdfBrowser = async () => {
-    // Use bestOpenUrl (not resolvedPdfUrl) — gives a proper landing page even when
-    // the raw PDF stream is blocked or the source is currently down (e.g. EuropePMC 520)
-    const targetUrl = bestOpenUrl || resolvedPdfUrl || paper?.canonicalUrl || (paper?.doi ? `https://doi.org/${paper.doi}` : '');
+    // bestOpenUrl: direct PDF if available, stable landing page otherwise
+    const targetUrl = bestOpenUrl || paper?.canonicalUrl || (paper?.doi ? `https://doi.org/${paper.doi}` : '');
     if (!targetUrl) return;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
