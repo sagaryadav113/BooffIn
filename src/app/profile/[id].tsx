@@ -38,17 +38,15 @@ import { PostCard } from '../../components/cards/PostCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
 import { ProfileAnalyticsBar } from '../../components/profile/ProfileAnalyticsBar';
 import { ProfileAnalyticsModal } from '../../components/profile/ProfileAnalyticsModal';
-import { ConnectModal } from '../../components/modals/ConnectModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 import {
-  getConnectionStatus,
   getSharedResearchInterests,
   getResearcherDiscussedTopics,
 } from '../../api/connectionService';
 import { fetchUserProfile, fetchUserProfileByUsername } from '../../api/authService';
 import { fetchUserPosts } from '../../api/socialService';
-import { ConnectionStatus, UserProfile, Post } from '../../types';
+import { UserProfile, Post } from '../../types';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { FollowListModal } from '../../components/modals/FollowListModal';
 import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab';
@@ -65,8 +63,6 @@ export default function OtherResearcherProfileScreen() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Scholars' | 'Activity'>('Posts');
-  const [connectModalVisible, setConnectModalVisible] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('none');
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
@@ -126,16 +122,6 @@ export default function OtherResearcherProfileScreen() {
 
   const isOwnProfile = researcher?.id === currentUser?.id;
 
-  const loadConnectionStatus = useCallback(async () => {
-    if (!researcher?.id || isOwnProfile || !currentUser?.id) return;
-    const status = await getConnectionStatus(currentUser.id, researcher.id);
-    setConnectionStatus(status);
-  }, [currentUser?.id, researcher?.id, isOwnProfile]);
-
-  useEffect(() => {
-    loadConnectionStatus();
-  }, [loadConnectionStatus]);
-
   const handleRefresh = async () => {
     if (!researcher?.id) return;
     setIsRefreshing(true);
@@ -153,7 +139,6 @@ export default function OtherResearcherProfileScreen() {
     await Promise.all([
       refreshProfile(),
       loadResearcherPosts(researcher.id),
-      loadConnectionStatus(),
     ]);
     setIsRefreshing(false);
   };
@@ -214,14 +199,6 @@ export default function OtherResearcherProfileScreen() {
   const handleOpenFollowing = () => {
     setFollowModalType('following');
     setFollowModalVisible(true);
-  };
-
-  const handleConnectPress = () => {
-    if (isOwnProfile || !researcher?.id) return;
-    try {
-      Haptics.selectionAsync();
-    } catch {}
-    setConnectModalVisible(true);
   };
 
   if (isLoading) {
@@ -354,42 +331,6 @@ export default function OtherResearcherProfileScreen() {
                 onPress={handleFollowToggle}
                 style={styles.followButton}
               />
-
-              {/* Connect Button (Separate from Follow) */}
-              {!isOwnProfile && (
-                <TouchableOpacity
-                  style={[
-                    styles.connectButton,
-                    connectionStatus === 'connected' && styles.connectButtonConnected,
-                    connectionStatus === 'pending_sent' && styles.connectButtonPending,
-                    connectionStatus === 'pending_received' && styles.connectButtonAction,
-                  ]}
-                  onPress={handleConnectPress}
-                  activeOpacity={0.8}
-                >
-                  {connectionStatus === 'connected' ? (
-                    <>
-                      <Users size={13} color="#059669" style={{ marginRight: 4 }} />
-                      <Text style={styles.connectButtonTextConnected}>Connected</Text>
-                    </>
-                  ) : connectionStatus === 'pending_sent' ? (
-                    <>
-                      <Clock size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
-                      <Text style={styles.connectButtonTextPending}>Request Sent</Text>
-                    </>
-                  ) : connectionStatus === 'pending_received' ? (
-                    <>
-                      <Sparkles size={13} color={colors.white} style={{ marginRight: 4 }} />
-                      <Text style={styles.connectButtonTextAction}>Respond</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={13} color={colors.textPrimary} style={{ marginRight: 4 }} />
-                      <Text style={styles.connectButtonText}>Connect</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
             </View>
           </View>
 
@@ -572,19 +513,6 @@ export default function OtherResearcherProfileScreen() {
         )}
       </ScrollView>
 
-      {/* Connect & Collaboration Request Modal */}
-      {!isOwnProfile && (
-        <ConnectModal
-          visible={connectModalVisible}
-          onClose={() => {
-            setConnectModalVisible(false);
-            loadConnectionStatus();
-          }}
-          recipient={researcher}
-          onSuccess={loadConnectionStatus}
-        />
-      )}
-
       {/* Followers & Following List Modal */}
       <FollowListModal
         visible={followModalVisible}
@@ -657,51 +585,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs + 2,
   },
   followButton: {
-    minWidth: 84,
+    minWidth: 90,
     borderRadius: radii.full,
-  },
-  connectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radii.full,
-  },
-  connectButtonConnected: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-  },
-  connectButtonPending: {
-    backgroundColor: colors.backgroundSecondary,
-    borderColor: colors.borderLight,
-  },
-  connectButtonAction: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  connectButtonText: {
-    ...typography.captionBold,
-    color: colors.textPrimary,
-    fontSize: 12,
-  },
-  connectButtonTextConnected: {
-    ...typography.captionBold,
-    color: '#059669',
-    fontSize: 12,
-  },
-  connectButtonTextPending: {
-    ...typography.captionMedium,
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  connectButtonTextAction: {
-    ...typography.captionBold,
-    color: colors.white,
-    fontSize: 12,
   },
   nameSection: {
     marginBottom: spacing.xs,
