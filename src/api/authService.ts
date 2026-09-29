@@ -1,18 +1,19 @@
+import { Platform } from 'react-native';
 import { supabase } from './client';
 import { UserProfile } from '../types';
 
-const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
+const isWeb = Platform.OS === 'web';
 
 function createAuthRedirectUrl(path: string): string {
   try {
-    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location && window.location.origin) {
       const cleanPath = path.startsWith('/') ? path : `/${path}`;
       return `${window.location.origin}${cleanPath}`;
     }
     const Linking = require('expo-linking');
     return Linking.createURL(path);
   } catch {
-    return `https://booffin.app/${path}`;
+    return `booffin://${path}`;
   }
 }
 
@@ -601,8 +602,10 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
       return { user: null, error: error.message };
     }
 
-    if (typeof window !== 'undefined' && data?.url) {
-      window.location.href = data.url;
+    if (isWeb && data?.url) {
+      if (typeof window !== 'undefined') {
+        window.location.href = data.url;
+      }
       return { user: null, error: null };
     }
 
@@ -655,8 +658,10 @@ export async function signInWithORCID(): Promise<AuthResponse> {
       return { user: null, error: error.message };
     }
 
-    if (typeof window !== 'undefined' && data?.url) {
-      window.location.href = data.url;
+    if (isWeb && data?.url) {
+      if (typeof window !== 'undefined') {
+        window.location.href = data.url;
+      }
       return { user: null, error: null };
     }
 
