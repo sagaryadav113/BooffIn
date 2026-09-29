@@ -1,36 +1,47 @@
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 export const appStorage = {
   getItem: async (key: string) => {
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem(key);
+    if (Platform.OS === 'web') {
+      try {
+        return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+      } catch {
+        return null;
+      }
     }
     try {
-      const SecureStore = require('expo-secure-store');
       return await SecureStore.getItemAsync(key);
     } catch {
       return null;
     }
   },
   setItem: async (key: string, value: string) => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, value);
+    if (Platform.OS === 'web') {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(key, value);
+        }
+      } catch {}
       return;
     }
     try {
-      const SecureStore = require('expo-secure-store');
       await SecureStore.setItemAsync(key, value);
     } catch {
       // noop
     }
   },
   removeItem: async (key: string) => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(key);
+    if (Platform.OS === 'web') {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(key);
+        }
+      } catch {}
       return;
     }
     try {
-      const SecureStore = require('expo-secure-store');
       await SecureStore.deleteItemAsync(key);
     } catch {
       // noop
@@ -46,6 +57,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: appStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: typeof window !== 'undefined',
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });

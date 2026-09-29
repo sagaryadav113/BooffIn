@@ -15,7 +15,7 @@ export interface PWAInstallState {
 }
 
 export function usePWAInstall(): PWAInstallState {
-  const isWeb = Platform.OS === 'web' || typeof window !== 'undefined';
+  const isWeb = Platform.OS === 'web';
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [hasNativePrompt, setHasNativePrompt] = useState<boolean>(false);
   const [isInstalled, setIsInstalled] = useState<boolean>(false);
@@ -28,7 +28,7 @@ export function usePWAInstall(): PWAInstallState {
   const [isDesktop, setIsDesktop] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!isWeb || typeof window === 'undefined' || typeof navigator === 'undefined') {
+    if (!isWeb || typeof window === 'undefined' || typeof navigator === 'undefined' || typeof window.addEventListener !== 'function') {
       return;
     }
 
@@ -47,20 +47,26 @@ export function usePWAInstall(): PWAInstallState {
 
     // Check if already launched in standalone PWA mode
     const checkStandalone = () => {
-      const isStandaloneMode =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true ||
-        document.referrer.includes('android-app://');
-      setIsInstalled(Boolean(isStandaloneMode));
+      try {
+        const isStandaloneMode =
+          (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches) ||
+          (window.navigator as any)?.standalone === true ||
+          (typeof document !== 'undefined' && typeof document.referrer === 'string' && document.referrer.includes('android-app://'));
+        setIsInstalled(Boolean(isStandaloneMode));
+      } catch {
+        setIsInstalled(false);
+      }
     };
 
     checkStandalone();
 
     // Listen for beforeinstallprompt event (Chromium based browsers)
     const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setHasNativePrompt(true);
+      try {
+        e.preventDefault();
+        setDeferredPrompt(e);
+        setHasNativePrompt(true);
+      } catch {}
     };
 
     // Listen for appinstalled event
@@ -70,12 +76,16 @@ export function usePWAInstall(): PWAInstallState {
       setHasNativePrompt(false);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
+    try {
+      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.addEventListener('appinstalled', handleAppInstalled);
+    } catch {}
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
+      try {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        window.removeEventListener('appinstalled', handleAppInstalled);
+      } catch {}
     };
   }, [isWeb]);
 

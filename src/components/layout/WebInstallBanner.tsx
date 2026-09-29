@@ -15,6 +15,10 @@ import { InstallAppModal } from '../modals/InstallAppModal';
 const DISMISS_STORAGE_KEY = 'booffin_pwa_banner_dismissed';
 
 export const WebInstallBanner: React.FC = () => {
+  if (Platform.OS !== 'web') {
+    return null;
+  }
+
   const { isWeb, isInstalled, canInstall } = usePWAInstall();
   const [isDismissed, setIsDismissed] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);

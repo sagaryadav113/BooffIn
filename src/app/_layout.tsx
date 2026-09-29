@@ -20,7 +20,7 @@ export default function RootLayout() {
       <ErrorBoundary>
         <View style={styles.outerContainer}>
           <View style={styles.mobileFrame}>
-            <WebInstallBanner />
+            {Platform.OS === 'web' && <WebInstallBanner />}
             <Stack
               screenOptions={{
                 headerShown: false,

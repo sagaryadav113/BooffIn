@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, StyleSheet, SafeAreaView } from 'react-native';
+import { View, StyleSheet, SafeAreaView, Platform } from 'react-native';
 import { colors, spacing } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Button } from '../core/Button';
@@ -60,6 +60,17 @@ export class ErrorBoundary extends Component<Props, State> {
                 'An unexpected error occurred in the application view.'}
             </Typography>
 
+            {this.state.error?.stack ? (
+              <Typography
+                variant="micro"
+                color={colors.textMuted}
+                align="center"
+                style={styles.stackText}
+              >
+                {this.state.error.stack.split('\n').slice(0, 3).join('\n')}
+              </Typography>
+            ) : null}
+
             <Button
               title="Try Again"
               variant="primary"
@@ -100,8 +111,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   message: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
     maxWidth: 300,
+  },
+  stackText: {
+    marginBottom: spacing.lg,
+    maxWidth: 320,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    opacity: 0.8,
   },
   retryButton: {
     minWidth: 140,
