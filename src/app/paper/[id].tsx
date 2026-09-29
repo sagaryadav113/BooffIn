@@ -312,11 +312,7 @@ export default function PaperDetailScreen() {
 
   const isDirectPdf = Boolean(resolvedPdfUrl);
 
-  const embedViewerUrl = useMemo(() => {
-    if (!resolvedPdfUrl) return '';
-    if (resolvedPdfUrl.includes('docs.google.com/viewer')) return resolvedPdfUrl;
-    return `https://docs.google.com/viewer?url=${encodeURIComponent(resolvedPdfUrl)}&embedded=true`;
-  }, [resolvedPdfUrl]);
+
 
   const handleOpenPdfBrowser = async () => {
     const targetUrl = resolvedPdfUrl || paper?.openAccessUrl || paper?.canonicalUrl || (paper?.doi ? `https://doi.org/${paper.doi}` : '');
@@ -674,14 +670,14 @@ export default function PaperDetailScreen() {
               {/* Clean Light-Themed Reader Floating Bar */}
               <View style={styles.pdfControlsBar}>
                 <View style={styles.pdfControlsLeft}>
-                  <Badge label={paper.journal || (isDirectPdf ? 'Open Access' : 'Publisher')} variant={isDirectPdf ? 'oa' : 'journal'} />
+                  <Badge label={paper.journal || (isDirectPdf ? 'Open Access' : 'Publisher')} variant={isDirectPdf ? 'oa' : 'generic'} />
                   <Typography variant="micro" color={colors.textSecondary} numberOfLines={1}>
                     {isDirectPdf ? 'Full Document' : 'Publisher Source'}
                   </Typography>
                 </View>
 
                 <View style={styles.pdfControlsRight}>
-                  {/* Interactive Pinch/Tap Zoom Controls (only shown for direct PDF document streams) */}
+                  {/* Zoom controls — shown whenever a direct PDF is available */}
                   {isDirectPdf && (
                     <View style={styles.zoomControlGroup}>
                       <TouchableOpacity
@@ -721,15 +717,7 @@ export default function PaperDetailScreen() {
                     activeOpacity={0.75}
                   >
                     <Maximize2 size={13} color={colors.textPrimary} />
-                    <Text style={styles.pdfControlBtnText}>{isDirectPdf ? 'Fullscreen' : 'Open Link'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleOpenPublisher}
-                    style={styles.pdfControlBtn}
-                    activeOpacity={0.75}
-                  >
-                    <ExternalLink size={13} color={colors.textPrimary} />
-                    <Text style={styles.pdfControlBtnText}>Publisher</Text>
+                    <Text style={styles.pdfControlBtnText}>Open Link</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -737,19 +725,38 @@ export default function PaperDetailScreen() {
               {Platform.OS === 'web' ? (
                 isDirectPdf ? (
                   <View style={styles.webPdfContainer}>
-                    {/* Google Docs PDF Embed for verified direct PDF streams */}
+                    {/* Direct iframe — works for arXiv, PMC, EuropePMC and any OA source */}
+                    {/* that doesn't set X-Frame-Options. Publisher PDFs gracefully fall back */}
+                    {/* to the "Not loading?" hint + Open in New Tab footer below. */}
                     <iframe
-                      src={embedViewerUrl}
+                      src={resolvedPdfUrl}
                       style={{
                         width: '100%',
-                        height: 800,
+                        height: 820,
                         border: 'none',
-                        backgroundColor: '#FFFFFF',
+                        backgroundColor: '#F9FAFB',
+                        display: 'block',
+                        transform: `scale(${pdfZoom})`,
+                        transformOrigin: 'top left',
+                        // Scale causes visual overflow — compensate height so container doesn't collapse
+                        marginBottom: pdfZoom !== 1 ? `${(pdfZoom - 1) * 820}px` : undefined,
                       }}
                       title={paper.title}
                       allow="fullscreen"
+                      loading="lazy"
                     />
-                    {/* Interactive Quick Action Footer Bar */}
+
+                    {/* "Not loading?" inline helper — shown always, subtle */}
+                    <View style={styles.pdfNotLoadingHint}>
+                      <Text style={styles.pdfNotLoadingText}>
+                        PDF not displaying?{' '}
+                      </Text>
+                      <TouchableOpacity onPress={handleOpenPdfBrowser} activeOpacity={0.7}>
+                        <Text style={styles.pdfNotLoadingLink}>Open in new tab →</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Footer with Open in New Tab fallback */}
                     <View style={styles.pdfFooterBar}>
                       <View style={styles.pdfFooterLeft}>
                         <Globe size={13} color={colors.textSecondary} />
@@ -782,7 +789,7 @@ export default function PaperDetailScreen() {
                     <View style={styles.webPublisherIconWrap}>
                       <BookOpen size={36} color="#064E3B" />
                     </View>
-                    <Badge label={paper.journal || 'Publisher Portal'} variant="journal" />
+                    <Badge label={paper.journal || 'Publisher Portal'} variant="generic" />
                     <Typography variant="h4" style={styles.webPublisherTitle}>
                       Original Article via Publisher Portal
                     </Typography>
@@ -830,7 +837,7 @@ export default function PaperDetailScreen() {
                   <View style={styles.mobilePdfIconWrap}>
                     <BookOpen size={36} color="#064E3B" />
                   </View>
-                  <Badge label={paper.journal || (isDirectPdf ? 'Open Access' : 'Publisher')} variant={isDirectPdf ? 'oa' : 'journal'} />
+                  <Badge label={paper.journal || (isDirectPdf ? 'Open Access' : 'Publisher')} variant={isDirectPdf ? 'oa' : 'generic'} />
                   <Typography variant="h4" style={styles.mobilePdfTitle}>
                     {isDirectPdf ? 'Open Access Document Ready' : 'Original Article via Publisher Portal'}
                   </Typography>
@@ -1284,6 +1291,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+  },
+  pdfNotLoadingHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    backgroundColor: '#FFFBEB',
+    borderTopWidth: 1,
+    borderTopColor: '#FDE68A',
+    flexWrap: 'wrap',
+  },
+  pdfNotLoadingText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  pdfNotLoadingLink: {
+    ...typography.micro,
+    color: colors.accentLink,
+    fontSize: 12,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   pdfFooterBar: {
     flexDirection: 'row',

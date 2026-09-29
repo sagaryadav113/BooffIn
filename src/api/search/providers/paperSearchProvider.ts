@@ -3,71 +3,100 @@ import { parseReferenceInput } from '../../paper/inputParser';
 import { defaultPaperResolver } from '../../paper/metadataResolver';
 
 /**
- * Searches academic literature across Semantic Scholar, Europe PMC, arXiv, and Crossref
+ * Fetch with retry on network failure (not on 4xx/5xx)
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit & { signal?: AbortSignal },
+  retries = 2
+): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      return res;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+    }
+  }
+  throw new Error('fetch failed after retries');
+}
+
+/**
+ * Searches academic literature across EuropePMC, Semantic Scholar, arXiv, and OpenAlex
+ * — 4 sources in parallel for maximum recall.
  */
 export async function searchPapers(query: string, limit = 15): Promise<Paper[]> {
   const cleanQ = query.trim();
   if (!cleanQ) return [];
 
-  // 1. Check if exact reference (DOI, arXiv, URL, PMID)
+  // 1. Check if exact reference (DOI, arXiv ID, URL, PMID) — resolve directly first
   const parsed = parseReferenceInput(cleanQ);
-  if (parsed.type !== 'generic_url' || parsed.doi || parsed.arxivId || parsed.pmid) {
+  if (parsed.doi || parsed.arxivId || parsed.pmid) {
     try {
       const res = await defaultPaperResolver.resolve(cleanQ);
       if (res.paper) {
-        return [res.paper];
+        // Still do a broad search too, but put the exact match first
+        const broadResults = await _broadKeywordSearch(cleanQ, limit - 1);
+        return deduplicatePapers([res.paper, ...broadResults]).slice(0, limit);
       }
     } catch {}
   }
 
-  // 2. Parallel keyword search across Europe PMC and Semantic Scholar
-  const results: Paper[] = [];
+  // 2. Broad keyword search across all sources
+  return _broadKeywordSearch(cleanQ, limit);
+}
+
+async function _broadKeywordSearch(query: string, limit: number): Promise<Paper[]> {
+  const perSource = Math.ceil(limit * 0.6); // each source fetches a bit more, we deduplicate
+
+  const [epmcRes, s2Res, arxivRes, openAlexRes] = await Promise.allSettled([
+    searchEuropePmc(query, perSource),
+    searchSemanticScholar(query, perSource),
+    searchArxiv(query, Math.min(perSource, 10)),
+    searchOpenAlex(query, perSource),
+  ]);
+
+  const all: Paper[] = [];
+  if (epmcRes.status === 'fulfilled') all.push(...epmcRes.value);
+  if (s2Res.status === 'fulfilled') all.push(...s2Res.value);
+  if (arxivRes.status === 'fulfilled') all.push(...arxivRes.value);
+  if (openAlexRes.status === 'fulfilled') all.push(...openAlexRes.value);
+
+  return deduplicatePapers(all).slice(0, limit);
+}
+
+function deduplicatePapers(papers: Paper[]): Paper[] {
   const seenDois = new Set<string>();
   const seenTitles = new Set<string>();
+  const out: Paper[] = [];
 
-  const addPaper = (paper: Paper) => {
-    const titleKey = paper.title.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const doiKey = paper.doi ? paper.doi.toLowerCase() : '';
+  for (const paper of papers) {
+    const doiKey = paper.doi?.toLowerCase().trim() ?? '';
+    const titleKey = paper.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60);
 
-    if (doiKey && seenDois.has(doiKey)) return;
-    if (seenTitles.has(titleKey)) return;
+    if (doiKey && seenDois.has(doiKey)) continue;
+    if (seenTitles.has(titleKey)) continue;
 
     if (doiKey) seenDois.add(doiKey);
     seenTitles.add(titleKey);
-    results.push(paper);
-  };
-
-  try {
-    const [epmcRes, s2Res] = await Promise.allSettled([
-      searchEuropePmc(cleanQ, limit),
-      searchSemanticScholar(cleanQ, limit),
-    ]);
-
-    if (epmcRes.status === 'fulfilled') {
-      epmcRes.value.forEach(addPaper);
-    }
-    if (s2Res.status === 'fulfilled') {
-      s2Res.value.forEach(addPaper);
-    }
-  } catch (err) {
-    console.warn('[paperSearchProvider] Search error:', err);
+    out.push(paper);
   }
-
-  return results.slice(0, limit);
+  return out;
 }
 
-/**
- * Europe PMC Search
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Europe PMC
+// ─────────────────────────────────────────────────────────────────────────────
 async function searchEuropePmc(query: string, limit: number): Promise<Paper[]> {
   try {
     const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(
       query
     )}&format=json&resultType=core&pageSize=${limit}`;
 
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(7000),
     });
 
     if (!res.ok) return [];
@@ -87,26 +116,30 @@ async function searchEuropePmc(query: string, limit: number): Promise<Paper[]> {
 
       const authors = item.authorList?.author
         ? item.authorList.author.map((a: any, idx: number) => ({
-            id: `a_${doi || item.id}_${idx}`,
+            id: `a_epmc_${doi || item.id}_${idx}`,
             name: a.fullName || `${a.firstName || ''} ${a.lastName || ''}`.trim() || 'Author',
             affiliation: a.authorAffiliationDetailsList?.authorAffiliation?.[0]?.affiliation,
           }))
         : item.authorString
         ? item.authorString.split(',').map((name: string, idx: number) => ({
-            id: `a_${doi || item.id}_${idx}`,
+            id: `a_epmc_${doi || item.id}_${idx}`,
             name: name.trim(),
           }))
         : [{ id: 'a_0', name: 'Unknown Author' }];
 
       const journalName = item.journalTitle || item.journalInfo?.journal?.title || 'Scientific Publication';
       const year = item.pubYear ? parseInt(item.pubYear, 10) : new Date().getFullYear();
-      const canonicalUrl = doi ? `https://doi.org/${doi}` : `https://europepmc.org/article/MED/${item.id || ''}`;
+      const canonicalUrl = doi
+        ? `https://doi.org/${doi}`
+        : `https://europepmc.org/article/MED/${item.id || ''}`;
 
       papers.push({
         id: `paper_epmc_${item.id || doi || Date.now()}`,
         doi,
         title: cleanTitle,
-        abstract: item.abstractText ? item.abstractText.replace(/<[^>]+>/g, '').trim() : 'Abstract available on canonical publisher website.',
+        abstract: item.abstractText
+          ? item.abstractText.replace(/<[^>]+>/g, '').trim()
+          : 'Abstract available on publisher website.',
         authors,
         journal: journalName,
         publisher: item.journalInfo?.journal?.publisher || 'Academic Publisher',
@@ -129,9 +162,9 @@ async function searchEuropePmc(query: string, limit: number): Promise<Paper[]> {
   }
 }
 
-/**
- * Semantic Scholar Graph Search
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Semantic Scholar
+// ─────────────────────────────────────────────────────────────────────────────
 async function searchSemanticScholar(query: string, limit: number): Promise<Paper[]> {
   try {
     const fields = 'paperId,title,abstract,authors,year,venue,externalIds,openAccessPdf,citationCount';
@@ -139,9 +172,9 @@ async function searchSemanticScholar(query: string, limit: number): Promise<Pape
       query
     )}&limit=${limit}&fields=${fields}`;
 
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(7000),
     });
 
     if (!res.ok) return [];
@@ -155,7 +188,8 @@ async function searchSemanticScholar(query: string, limit: number): Promise<Pape
       const doi = item.externalIds?.DOI;
       const arxivId = item.externalIds?.ArXiv;
       const isOpenAccess = Boolean(item.openAccessPdf?.url || arxivId);
-      const openAccessUrl = item.openAccessPdf?.url || (arxivId ? `https://arxiv.org/pdf/${arxivId}.pdf` : undefined);
+      const openAccessUrl =
+        item.openAccessPdf?.url || (arxivId ? `https://arxiv.org/pdf/${arxivId}.pdf` : undefined);
       const canonicalUrl = doi
         ? `https://doi.org/${doi}`
         : arxivId
@@ -174,7 +208,7 @@ async function searchSemanticScholar(query: string, limit: number): Promise<Pape
         id: `paper_s2_${item.paperId || doi || Date.now()}`,
         doi,
         title: item.title.trim(),
-        abstract: item.abstract || 'Abstract available on canonical publisher website.',
+        abstract: item.abstract || 'Abstract available on publisher website.',
         authors: authors.length > 0 ? authors : [{ id: 'a_0', name: 'Unknown Author' }],
         journal: journalName,
         publisher: journalName,
@@ -185,6 +219,171 @@ async function searchSemanticScholar(query: string, limit: number): Promise<Pape
         isOpenAccess,
         topics: [journalName],
         citationCount: item.citationCount || 0,
+        discussionCount: 0,
+        likesCount: 0,
+        savesCount: 0,
+      });
+    }
+
+    return papers;
+  } catch {
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// arXiv (excellent for CS, physics, math, biology preprints)
+// ─────────────────────────────────────────────────────────────────────────────
+async function searchArxiv(query: string, limit: number): Promise<Paper[]> {
+  try {
+    // arXiv Atom feed — search all fields (ti, au, abs)
+    const searchQ = `all:${encodeURIComponent(query)}`;
+    const url = `https://export.arxiv.org/api/query?search_query=${searchQ}&start=0&max_results=${limit}&sortBy=relevance`;
+
+    const res = await fetchWithRetry(url, {
+      headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
+      signal: AbortSignal.timeout(7000),
+    });
+
+    if (!res.ok) return [];
+    const text = await res.text();
+
+    // Parse Atom XML
+    const entries = text.match(/<entry>([\s\S]*?)<\/entry>/g) || [];
+    const papers: Paper[] = [];
+
+    for (const entry of entries.slice(0, limit)) {
+      const getTag = (tag: string) => {
+        const m = entry.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+        return m ? m[1].replace(/<[^>]+>/g, '').trim() : '';
+      };
+
+      const title = getTag('title');
+      if (!title) continue;
+
+      const arxivUrl = entry.match(/<id>(.*?)<\/id>/)?.[1]?.trim() || '';
+      const arxivIdMatch = arxivUrl.match(/abs\/([^v]+)/);
+      const arxivId = arxivIdMatch ? arxivIdMatch[1].trim() : '';
+
+      // Extract DOI if present
+      const doiMatch = entry.match(/doi\.org\/([^<"\s]+)/);
+      const doi = doiMatch ? doiMatch[1] : undefined;
+
+      // Extract authors
+      const authorMatches = [...entry.matchAll(/<name>([\s\S]*?)<\/name>/g)];
+      const authors = authorMatches.map((m, idx) => ({
+        id: `a_ax_${arxivId}_${idx}`,
+        name: m[1].trim(),
+      }));
+
+      const abstract = getTag('summary').replace(/\n/g, ' ').trim();
+      const published = getTag('published');
+      const year = published ? parseInt(published.slice(0, 4), 10) : new Date().getFullYear();
+
+      // Try to determine subject category
+      const categoryMatch = entry.match(/<category[^>]+term="([^"]+)"/);
+      const category = categoryMatch ? categoryMatch[1] : 'arXiv';
+
+      papers.push({
+        id: `paper_arxiv_${arxivId || Date.now()}`,
+        doi,
+        title,
+        abstract: abstract || 'Abstract available on arXiv.',
+        authors: authors.length > 0 ? authors : [{ id: 'a_0', name: 'Unknown Author' }],
+        journal: 'arXiv Preprint',
+        publisher: 'arXiv',
+        publicationYear: year,
+        publicationDate: published || `${year}`,
+        canonicalUrl: arxivId ? `https://arxiv.org/abs/${arxivId}` : arxivUrl,
+        openAccessUrl: arxivId ? `https://arxiv.org/pdf/${arxivId}.pdf` : undefined,
+        isOpenAccess: true,
+        topics: [category, 'arXiv'],
+        citationCount: 0,
+        discussionCount: 0,
+        likesCount: 0,
+        savesCount: 0,
+      });
+    }
+
+    return papers;
+  } catch {
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenAlex (200M+ works, best broad coverage, completely free)
+// ─────────────────────────────────────────────────────────────────────────────
+async function searchOpenAlex(query: string, limit: number): Promise<Paper[]> {
+  try {
+    const url = `https://api.openalex.org/works?search=${encodeURIComponent(
+      query
+    )}&per-page=${limit}&select=id,doi,title,abstract_inverted_index,authorships,publication_year,host_venue,open_access,cited_by_count,primary_location&mailto=dev@booffin.science`;
+
+    const res = await fetchWithRetry(url, {
+      headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
+      signal: AbortSignal.timeout(7000),
+    });
+
+    if (!res.ok) return [];
+    const data = await res.json();
+    const hits: any[] = data.results || [];
+
+    const papers: Paper[] = [];
+    for (const item of hits) {
+      if (!item.title) continue;
+
+      const doi = item.doi?.replace('https://doi.org/', '');
+      const oaUrl: string | undefined =
+        item.primary_location?.pdf_url ||
+        item.open_access?.oa_url ||
+        undefined;
+      const isOpenAccess = Boolean(item.open_access?.is_oa);
+      const canonicalUrl = item.doi || `https://openalex.org/${item.id}`;
+
+      // Reconstruct abstract from inverted index
+      let abstract = 'Abstract available on publisher website.';
+      if (item.abstract_inverted_index) {
+        try {
+          const wordMap: Record<number, string> = {};
+          for (const [word, positions] of Object.entries(item.abstract_inverted_index as Record<string, number[]>)) {
+            for (const pos of positions) {
+              wordMap[pos] = word;
+            }
+          }
+          const maxPos = Math.max(...Object.keys(wordMap).map(Number));
+          const words: string[] = [];
+          for (let i = 0; i <= maxPos; i++) {
+            words.push(wordMap[i] || '');
+          }
+          abstract = words.join(' ').trim() || abstract;
+        } catch {}
+      }
+
+      const authors = (item.authorships || []).slice(0, 8).map((a: any, idx: number) => ({
+        id: `a_oa_${item.id}_${idx}`,
+        name: a.author?.display_name || 'Author',
+        affiliation: a.institutions?.[0]?.display_name,
+      }));
+
+      const journalName = item.host_venue?.display_name || item.primary_location?.source?.display_name || 'Academic Journal';
+      const year = item.publication_year || new Date().getFullYear();
+
+      papers.push({
+        id: `paper_oa_${item.id?.replace('https://openalex.org/', '') || Date.now()}`,
+        doi,
+        title: item.title.trim(),
+        abstract,
+        authors: authors.length > 0 ? authors : [{ id: 'a_0', name: 'Unknown Author' }],
+        journal: journalName,
+        publisher: journalName,
+        publicationYear: year,
+        publicationDate: `${year}`,
+        canonicalUrl,
+        openAccessUrl: oaUrl,
+        isOpenAccess,
+        topics: [journalName],
+        citationCount: item.cited_by_count || 0,
         discussionCount: 0,
         likesCount: 0,
         savesCount: 0,

@@ -2,16 +2,33 @@ import { Paper } from '../../types';
 import { UnifiedSearchResults, SearchFilterCategory, ResearcherSearchResult, TopicSearchResult } from './types';
 import { searchPapers } from './providers/paperSearchProvider';
 import { searchOrcidResearchers } from './providers/orcidSearchProvider';
-import { searchBooffInUsers } from './providers/userSearchProvider';
+import { searchBooffInUsers, searchOpenAlexAuthors } from './providers/userSearchProvider';
 import { parseReferenceInput } from '../paper/inputParser';
 import { isValidOrcidId } from '../orcidService';
 
-// In-memory LRU-style cache
+// In-memory LRU-style cache (10 min TTL)
 const searchCache = new Map<string, { timestamp: number; results: UnifiedSearchResults }>();
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
 /**
- * Universal Search & Discovery Engine for Explore tab
+ * Detect if a query looks like a personal name (2-4 words, alpha only).
+ * Used to always trigger researcher search alongside paper search.
+ */
+function looksLikePersonName(query: string): boolean {
+  const parts = query.trim().split(/\s+/);
+  return (
+    parts.length >= 2 &&
+    parts.length <= 4 &&
+    parts.every((p) => /^[a-zA-ZÀ-ÖØ-öø-ÿ'\-\.]{2,}$/.test(p))
+  );
+}
+
+/**
+ * Universal Search & Discovery Engine for Explore tab.
+ *
+ * Sources:
+ *   Papers     → EuropePMC + Semantic Scholar + arXiv + OpenAlex Works
+ *   Researchers → BooffIn profiles (Supabase) + ORCID Registry + OpenAlex Authors
  */
 export async function executeUnifiedSearch(
   rawQuery: string,
@@ -19,21 +36,16 @@ export async function executeUnifiedSearch(
 ): Promise<UnifiedSearchResults> {
   const query = rawQuery.trim();
   if (!query) {
-    return {
-      papers: [],
-      researchers: [],
-      topics: [],
-      rawQuery: '',
-    };
+    return { papers: [], researchers: [], topics: [], rawQuery: '' };
   }
 
-  const cacheKey = `${query.toLowerCase()}_${category}`;
+  const cacheKey = `${query.toLowerCase()}__${category}`;
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return cached.results;
   }
 
-  // 1. Detect query intent
+  // ── 1. Detect query intent ───────────────────────────────────────────────
   let detectedType: UnifiedSearchResults['detectedInputType'] = 'keyword';
   const parsed = parseReferenceInput(query);
   const isDoi = Boolean(parsed.doi);
@@ -41,6 +53,7 @@ export async function executeUnifiedSearch(
   const isOrcid = isValidOrcidId(query);
   const isUrl = query.startsWith('http://') || query.startsWith('https://');
   const isUserHandle = query.startsWith('@');
+  const isName = looksLikePersonName(query);
 
   if (isDoi) detectedType = 'doi';
   else if (isArxiv) detectedType = 'arxiv';
@@ -48,51 +61,67 @@ export async function executeUnifiedSearch(
   else if (isUrl) detectedType = 'url';
   else if (isUserHandle) detectedType = 'user';
 
+  // ── 2. Determine what to search ──────────────────────────────────────────
+  // Papers: always search unless user is only filtering researchers,
+  //         OR the query is a pure ORCID ID or @handle
+  const shouldSearchPapers =
+    !isOrcid &&
+    !isUserHandle &&
+    (category === 'all' || category === 'papers' || isDoi || isArxiv || isUrl);
+
+  // Researchers: always search when:
+  //   - filter = all or researchers
+  //   - query is an ORCID ID
+  //   - query is an @handle
+  //   - query looks like a person's name (NEW — catches "John Smith")
+  const shouldSearchResearchers =
+    category === 'all' ||
+    category === 'researchers' ||
+    isOrcid ||
+    isUserHandle ||
+    isName;
+
   let papers: Paper[] = [];
   let researchers: ResearcherSearchResult[] = [];
   const topics: TopicSearchResult[] = [];
 
-  // 2. Fetch based on intent and active filter
   const tasks: Promise<any>[] = [];
 
-  // Papers fetch
-  if (category === 'all' || category === 'papers' || isDoi || isArxiv || isUrl) {
+  // ── Papers search ────────────────────────────────────────────────────────
+  if (shouldSearchPapers) {
     tasks.push(
-      searchPapers(query, 12)
-        .then((res) => {
-          papers = res;
-        })
+      searchPapers(query, 15)
+        .then((res) => { papers = res; })
         .catch(() => {})
     );
   }
 
-  // Researchers fetch
-  if (category === 'all' || category === 'researchers' || isOrcid || isUserHandle) {
+  // ── Researchers search ───────────────────────────────────────────────────
+  if (shouldSearchResearchers) {
     tasks.push(
       Promise.allSettled([
-        searchBooffInUsers(query, 6),
+        searchBooffInUsers(query, 6),   // Always check our own DB first
         searchOrcidResearchers(query, 6),
-      ]).then(([usersRes, orcidRes]) => {
+        searchOpenAlexAuthors(query, 6),  // NEW: OpenAlex author index
+      ]).then(([usersRes, orcidRes, oaAuthorsRes]) => {
         const combined: ResearcherSearchResult[] = [];
         const seenIds = new Set<string>();
 
-        if (usersRes.status === 'fulfilled') {
-          usersRes.value.forEach((u) => {
-            if (!seenIds.has(u.id)) {
-              seenIds.add(u.id);
-              combined.push(u);
-            }
-          });
-        }
+        const addResearcher = (r: ResearcherSearchResult) => {
+          // Deduplicate by ORCID ID if both sources return the same person
+          const key = r.orcidId ? `orcid:${r.orcidId}` : r.id;
+          if (!seenIds.has(key)) {
+            seenIds.add(key);
+            // Also dedup by id
+            seenIds.add(r.id);
+            combined.push(r);
+          }
+        };
 
-        if (orcidRes.status === 'fulfilled') {
-          orcidRes.value.forEach((r) => {
-            if (!seenIds.has(r.id)) {
-              seenIds.add(r.id);
-              combined.push(r);
-            }
-          });
-        }
+        // Priority: our own users first, then ORCID, then OpenAlex
+        if (usersRes.status === 'fulfilled') usersRes.value.forEach(addResearcher);
+        if (orcidRes.status === 'fulfilled') orcidRes.value.forEach(addResearcher);
+        if (oaAuthorsRes.status === 'fulfilled') oaAuthorsRes.value.forEach(addResearcher);
 
         researchers = combined;
       })
@@ -110,6 +139,5 @@ export async function executeUnifiedSearch(
   };
 
   searchCache.set(cacheKey, { timestamp: Date.now(), results: finalResults });
-
   return finalResults;
 }
