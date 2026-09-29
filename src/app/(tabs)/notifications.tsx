@@ -2,13 +2,13 @@ import React, { useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   FlatList,
   ScrollView,
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
@@ -89,7 +89,7 @@ export default function NotificationsScreen() {
   const emptyInfo = getEmptyStateContent();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
       {/* Header */}

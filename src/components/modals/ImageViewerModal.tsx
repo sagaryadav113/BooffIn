@@ -8,11 +8,11 @@ import {
   ScrollView,
   StatusBar,
   Platform,
-  SafeAreaView,
   useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -96,7 +96,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
       statusBarTranslucent
     >
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
         {/* Top Header Bar */}
         <View style={styles.header}>
           <TouchableOpacity

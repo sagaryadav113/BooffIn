@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   Modal,
-  SafeAreaView,
   StatusBar,
   TouchableOpacity,
   Dimensions,
@@ -14,6 +13,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
@@ -304,7 +304,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
       statusBarTranslucent
       onRequestClose={onCancel}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
         <StatusBar barStyle="light-content" backgroundColor="#0B0F17" />
 
         {/* Modal Header */}

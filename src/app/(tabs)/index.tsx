@@ -1,7 +1,6 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   FlatList,
   RefreshControl,
@@ -11,6 +10,7 @@ import {
   TouchableOpacity,
   Text,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -106,7 +106,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
       {/* Header with BooffIn Wordmark, Search icon, and Create Button */}

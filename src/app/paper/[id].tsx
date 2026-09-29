@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   ScrollView,
   TouchableOpacity,
@@ -15,6 +14,7 @@ import {
   Alert,
   KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -639,7 +639,7 @@ export default function PaperDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <AppHeader showBack title="Research Article" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Typography variant="caption" color={colors.textSecondary}>
@@ -652,7 +652,7 @@ export default function PaperDetailScreen() {
 
   if (!paper) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <AppHeader showBack title="Research Article" />
         <EmptyState
           icon="FileText"
@@ -669,7 +669,7 @@ export default function PaperDetailScreen() {
   const hasOpenAccessPdf = Boolean(paper.openAccessUrl || paper.canonicalUrl || paper.isOpenAccess);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

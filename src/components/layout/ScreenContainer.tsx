@@ -1,12 +1,12 @@
 import React from 'react';
 import {
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   View,
   ViewStyle,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 
 export interface ScreenContainerProps {
@@ -27,7 +27,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   statusBarStyle = 'dark-content',
 }) => {
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor }]} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={statusBarStyle} backgroundColor={backgroundColor} />
       {scrollable ? (
         <ScrollView

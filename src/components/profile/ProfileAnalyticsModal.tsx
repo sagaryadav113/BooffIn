@@ -8,9 +8,9 @@ import {
   Modal,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   X,
   Activity,
@@ -106,7 +106,7 @@ export const ProfileAnalyticsModal: React.FC<ProfileAnalyticsModalProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {/* Modal Top Navigation Bar */}
         <View style={styles.navBar}>
           <View style={styles.navTitleRow}>

@@ -7,9 +7,9 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   ArrowLeft,
@@ -90,7 +90,7 @@ export default function ProfileAnalyticsScreen() {
   const activeTimeframeLabel = TIMEFRAMES.find((t) => t.key === selectedTimeframe)?.label || '28 Days';
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
       {/* Top Header */}

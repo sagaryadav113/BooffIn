@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   Modal,
-  SafeAreaView,
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Users } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { UserProfile } from '../../types';
@@ -88,7 +88,7 @@ export const FollowListModal: React.FC<FollowListModalProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.titleContainer}>

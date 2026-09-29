@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, StyleSheet, SafeAreaView, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Button } from '../core/Button';
@@ -40,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
           <View style={styles.container}>
             <View style={styles.iconCircle}>
               <Icon name="AlertTriangle" size="xl" color={colors.accentRed} />

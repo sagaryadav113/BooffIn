@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   ScrollView,
   TouchableOpacity,
@@ -12,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
 import {
@@ -226,7 +226,7 @@ export default function OtherResearcherProfileScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
         <AppHeader showBack title="Researcher Profile" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -238,7 +238,7 @@ export default function OtherResearcherProfileScreen() {
 
   if (!researcher) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
         <AppHeader showBack title="Researcher Profile" />
         <EmptyState
@@ -287,7 +287,7 @@ export default function OtherResearcherProfileScreen() {
     : null;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" />
 
       <ScrollView
