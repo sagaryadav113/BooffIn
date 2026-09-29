@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
+import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { supabase } from '../../api/client';
 import { fetchUserProfile, setStoredLocalSession } from '../../api/authService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -11,67 +12,94 @@ import { UserProfile } from '../../types';
 export default function AuthCallbackScreen() {
   const [statusText, setStatusText] = useState('Completing authentication...');
   const [errorText, setErrorText] = useState<string | null>(null);
+  const params = useLocalSearchParams<{
+    code?: string;
+    error?: string;
+    error_description?: string;
+    access_token?: string;
+    refresh_token?: string;
+  }>();
 
   useEffect(() => {
     let isMounted = true;
 
     async function handleAuthCallback() {
       try {
-        if (typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search);
-          const errorDesc =
-            urlParams.get('error_description') ||
-            urlParams.get('error') ||
-            new URLSearchParams(window.location.hash.substring(1)).get('error_description');
+        let errorDesc: string | undefined = (params.error_description || params.error) as string | undefined;
+        let code: string | undefined = params.code as string | undefined;
+        let accessToken: string | undefined = params.access_token as string | undefined;
+        let refreshToken: string | undefined = params.refresh_token as string | undefined;
 
-          if (errorDesc) {
-            if (isMounted) {
-              setErrorText(decodeURIComponent(errorDesc));
-            }
-            setTimeout(() => {
-              router.replace('/(auth)/welcome');
-            }, 3500);
-            return;
-          }
-
-          // In PKCE flow: if code is present in query parameters, exchange for session
-          const code = urlParams.get('code');
-          if (code) {
-            if (isMounted) setStatusText('Exchanging authorization code...');
-            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-            if (exchangeError) {
-              console.warn('exchangeCodeForSession warning:', exchangeError.message);
-            }
-          }
+        // If on web, safely check window.location for params/hash
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+          try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const webError = urlParams.get('error_description') || urlParams.get('error') || hashParams.get('error_description');
+            if (webError) errorDesc = webError;
+            const webCode = urlParams.get('code');
+            if (webCode) code = webCode;
+            const webAccess = hashParams.get('access_token');
+            if (webAccess) accessToken = webAccess;
+            const webRefresh = hashParams.get('refresh_token');
+            if (webRefresh) refreshToken = webRefresh;
+          } catch {}
         }
 
-        // Wait a short tick for detectSessionInUrl to complete hash/token parsing
+        // On native mobile, also check initial deep link URL if parameters were in hash/query
+        if (!code && !accessToken && Platform.OS !== 'web') {
+          try {
+            const initialUrl = await Linking.getInitialURL();
+            if (initialUrl) {
+              const parsed = Linking.parse(initialUrl);
+              code = code || (parsed.queryParams?.code as string);
+              accessToken = accessToken || (parsed.queryParams?.access_token as string);
+              refreshToken = refreshToken || (parsed.queryParams?.refresh_token as string);
+              errorDesc = errorDesc || (parsed.queryParams?.error_description as string) || (parsed.queryParams?.error as string);
+            }
+          } catch {}
+        }
+
+        if (errorDesc) {
+          if (isMounted) {
+            setErrorText(decodeURIComponent(errorDesc));
+          }
+          setTimeout(() => {
+            router.replace('/(auth)/welcome');
+          }, 3500);
+          return;
+        }
+
+        // In PKCE flow: if code is present in query parameters, exchange for session
+        if (code) {
+          if (isMounted) setStatusText('Exchanging authorization code...');
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            console.warn('exchangeCodeForSession warning:', exchangeError.message);
+          }
+        } else if (accessToken && refreshToken) {
+          if (isMounted) setStatusText('Saving authenticated session...');
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+        }
+
+        // Wait a short tick for session state to register
         await new Promise((resolve) => setTimeout(resolve, 400));
 
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
-        if (sessionError || !session?.user) {
+        let activeSession = (await supabase.auth.getSession()).data.session;
+        if (!activeSession?.user) {
           // Retry once more
           await new Promise((resolve) => setTimeout(resolve, 600));
-          const retry = await supabase.auth.getSession();
-          if (!retry.data.session?.user) {
-            if (isMounted) {
-              setErrorText('Could not find active authentication session. Redirecting to welcome...');
-            }
-            setTimeout(() => router.replace('/(auth)/welcome'), 2500);
-            return;
-          }
+          activeSession = (await supabase.auth.getSession()).data.session;
         }
 
-        const activeSession = (await supabase.auth.getSession()).data.session;
         if (!activeSession?.user) {
           if (isMounted) {
-            setErrorText('Session expired. Redirecting to login...');
+            setErrorText('Could not find active authentication session. Redirecting to welcome...');
           }
-          setTimeout(() => router.replace('/(auth)/welcome'), 2000);
+          setTimeout(() => router.replace('/(auth)/welcome'), 2500);
           return;
         }
 
