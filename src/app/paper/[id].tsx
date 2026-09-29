@@ -237,62 +237,114 @@ export default function PaperDetailScreen() {
     toggleLikePaper(paper.id);
   };
 
+  /**
+   * PDF URL Priority Chain
+   *
+   * Priority (most embeddable first):
+   *   1. arXiv PDF  — freely embeddable, highly reliable
+   *   2. NIH PubMed Central PDF — embeddable (ncbi.nlm.nih.gov), not EuropePMC which blocks iframes
+   *   3. Any direct .pdf URL that isn't EuropePMC ptpmcrender (those block iframes)
+   *   4. openAccessUrl if it's a non-EuropePMC direct PDF stream
+   *
+   * EuropePMC ptpmcrender.fcgi URLs are deliberately excluded from the iframe source
+   * because europepmc.org sets X-Frame-Options: SAMEORIGIN.
+   */
   const resolvedPdfUrl = useMemo(() => {
-    // 1. Direct openAccessUrl if already a PDF stream
-    if (paper?.openAccessUrl) {
-      const oa = paper.openAccessUrl.trim();
-      const lower = oa.toLowerCase();
+    const allUrls: string[] = [
+      paper?.openAccessUrl || '',
+      paper?.canonicalUrl || '',
+    ].filter(Boolean);
+
+    // Helper: extract arXiv ID from any arXiv URL
+    const getArxivPdfUrl = (url: string): string => {
+      const absMatch = url.match(/arxiv\.org\/abs\/([\w.]+)/i);
+      if (absMatch) return `https://arxiv.org/pdf/${absMatch[1]}.pdf`;
+      const pdfMatch = url.match(/arxiv\.org\/pdf\/(\S+)/i);
+      if (pdfMatch) {
+        const id = pdfMatch[1].replace(/\.pdf$/i, '');
+        return `https://arxiv.org/pdf/${id}.pdf`;
+      }
+      return '';
+    };
+
+    // Helper: extract PMC ID and build NIH PDF URL (not EuropePMC — NIH allows embedding)
+    const getNihPmcPdfUrl = (url: string): string => {
+      const pmcMatch = url.match(/PMC(\d+)/i);
+      if (pmcMatch) {
+        // NIH PMC article page — browser renders PDF inline without X-Frame-Options block
+        return `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcMatch[1]}/pdf/`;
+      }
+      return '';
+    };
+
+    // 1. arXiv — best: no CORS, no X-Frame-Options, fully embeddable
+    for (const url of allUrls) {
+      const arxivPdf = getArxivPdfUrl(url);
+      if (arxivPdf) return arxivPdf;
+    }
+    // Also check DOI for arXiv (some papers store DOI as arxiv.org)
+    if (paper?.doi) {
+      const arxivPdf = getArxivPdfUrl(paper.doi);
+      if (arxivPdf) return arxivPdf;
+    }
+
+    // 2. NIH PubMed Central PDF (allows iframe; unlike EuropePMC which blocks it)
+    for (const url of allUrls) {
+      const nihPdf = getNihPmcPdfUrl(url);
+      if (nihPdf) return nihPdf;
+    }
+
+    // 3. Any direct PDF URL that is NOT EuropePMC ptpmcrender (blocks iframes)
+    for (const url of allUrls) {
+      const lower = url.toLowerCase();
+      const isEpmcStream = lower.includes('ptpmcrender.fcgi') || lower.includes('europepmc.org/backend');
+      if (isEpmcStream) continue; // skip — blocked by X-Frame-Options
       if (
         lower.endsWith('.pdf') ||
-        lower.includes('arxiv.org/pdf/') ||
-        lower.includes('blobtype=pdf') ||
         lower.includes('format=pdf') ||
-        lower.includes('ptpmcrender.fcgi') ||
         lower.includes('?pdf=render') ||
-        lower.includes('/pdf') ||
-        (lower.includes('/pmc/articles/pmc') && lower.includes('/pdf')) ||
-        lower.includes('.full.pdf')
+        lower.includes('.full.pdf') ||
+        (lower.includes('/pmc/articles/') && lower.includes('/pdf'))
       ) {
-        return oa;
-      }
-      if (oa.includes('arxiv.org/abs/')) {
-        return oa.replace('arxiv.org/abs/', 'arxiv.org/pdf/') + '.pdf';
-      }
-      const pmcMatch = oa.match(/PMC\d+/i);
-      if (pmcMatch) {
-        return `https://europepmc.org/backend/ptpmcrender.fcgi?accid=${pmcMatch[0]}&blobtype=pdf`;
+        return url;
       }
     }
 
-    // 2. Canonical URL conversions (arXiv, PMC, direct PDFs)
-    if (paper?.canonicalUrl) {
-      const can = paper.canonicalUrl.trim();
-      const lower = can.toLowerCase();
-      if (lower.includes('arxiv.org/abs/')) {
-        return can.replace('arxiv.org/abs/', 'arxiv.org/pdf/') + '.pdf';
-      }
-      if (lower.includes('arxiv.org/pdf/')) {
-        return lower.endsWith('.pdf') ? can : `${can}.pdf`;
-      }
-      const pmcMatch = can.match(/PMC\d+/i);
-      if (pmcMatch) {
-        return `https://europepmc.org/backend/ptpmcrender.fcgi?accid=${pmcMatch[0]}&blobtype=pdf`;
-      }
-      if (
-        lower.endsWith('.pdf') ||
-        lower.includes('blobtype=pdf') ||
-        lower.includes('format=pdf') ||
-        lower.includes('ptpmcrender.fcgi') ||
-        lower.includes('?pdf=render') ||
-        (lower.includes('/pmc/articles/pmc') && lower.includes('/pdf')) ||
-        lower.includes('.full.pdf')
-      ) {
-        return can;
+    // 4. openAccessUrl if it's a direct stream (last resort — may or may not embed)
+    if (paper?.openAccessUrl) {
+      const oa = paper.openAccessUrl.trim();
+      const lower = oa.toLowerCase();
+      const isEpmcStream = lower.includes('ptpmcrender.fcgi') || lower.includes('europepmc.org/backend');
+      if (!isEpmcStream && (lower.includes('/pdf') || lower.endsWith('.pdf'))) {
+        return oa;
       }
     }
 
     return '';
-  }, [paper?.openAccessUrl, paper?.canonicalUrl]);
+  }, [paper?.openAccessUrl, paper?.canonicalUrl, paper?.doi]);
+
+  /**
+   * Best URL to open in new tab / external browser.
+   * This is separate from resolvedPdfUrl — it picks the most useful page to open,
+   * even when the iframe URL is blocked. Priority:
+   *   arXiv abs page > NIH PMC article page > DOI page > openAccessUrl > canonicalUrl
+   */
+  const bestOpenUrl = useMemo(() => {
+    // arXiv abs page (better landing than raw PDF for external open)
+    const allUrls = [paper?.openAccessUrl || '', paper?.canonicalUrl || ''].filter(Boolean);
+    for (const url of allUrls) {
+      if (url.includes('arxiv.org')) return url.includes('/abs/') ? url : url.replace('/pdf/', '/abs/').replace(/\.pdf$/, '');
+    }
+    // DOI — resolves to publisher page or PMC
+    if (paper?.doi) return `https://doi.org/${paper.doi}`;
+    // PMC via NIH
+    for (const url of allUrls) {
+      const pmcMatch = url.match(/PMC(\d+)/i);
+      if (pmcMatch) return `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcMatch[1]}/`;
+    }
+    // Anything else
+    return paper?.canonicalUrl || paper?.openAccessUrl || '';
+  }, [paper?.openAccessUrl, paper?.canonicalUrl, paper?.doi]);
 
   // Background auto-resolver for Open Access PDFs when DOI is present
   useEffect(() => {
@@ -312,10 +364,10 @@ export default function PaperDetailScreen() {
 
   const isDirectPdf = Boolean(resolvedPdfUrl);
 
-
-
   const handleOpenPdfBrowser = async () => {
-    const targetUrl = resolvedPdfUrl || paper?.openAccessUrl || paper?.canonicalUrl || (paper?.doi ? `https://doi.org/${paper.doi}` : '');
+    // Use bestOpenUrl (not resolvedPdfUrl) — gives a proper landing page even when
+    // the raw PDF stream is blocked or the source is currently down (e.g. EuropePMC 520)
+    const targetUrl = bestOpenUrl || resolvedPdfUrl || paper?.canonicalUrl || (paper?.doi ? `https://doi.org/${paper.doi}` : '');
     if (!targetUrl) return;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
