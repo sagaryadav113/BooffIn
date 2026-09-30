@@ -220,6 +220,20 @@ export default function CurrentUserProfileScreen() {
     }
     if (res.papers) {
       setSavedPapersDb(res.papers);
+      // Synchronize into usePaperStore so every save icon across the app knows they are saved
+      const storeState = usePaperStore.getState();
+      const nextIds = new Set(storeState.savedPaperIds);
+      res.papers.forEach((p) => {
+        nextIds.add(p.id);
+        if (p.doi) nextIds.add(p.doi);
+      });
+      usePaperStore.setState({
+        savedPaperIds: nextIds,
+        papers: [
+          ...res.papers.filter((rp) => !storeState.papers.some((p) => p.id === rp.id)),
+          ...storeState.papers,
+        ],
+      });
     }
     setIsLoadingSaved(false);
   }, [user?.id]);
@@ -314,12 +328,20 @@ export default function CurrentUserProfileScreen() {
     return Array.from(combinedMap.values());
   }, [savedPosts, allPosts, user?.id]);
 
-  // Combine database saved papers with store saved papers
+  // Combine database saved papers with store saved papers, respecting unsaved state
   const displaySavedPapers = useMemo(() => {
     const combinedMap = new Map<string, Paper>();
-    savedPapersDb.forEach((p) => combinedMap.set(p.id, p));
+    savedPapersDb.forEach((p) => {
+      const isUnsaved =
+        savedPaperIds.size > 0 &&
+        !savedPaperIds.has(p.id) &&
+        (!p.doi || !savedPaperIds.has(p.doi));
+      if (!isUnsaved) {
+        combinedMap.set(p.id, p);
+      }
+    });
     papers.forEach((p) => {
-      if (savedPaperIds.has(p.id) || p.isSaved) {
+      if (savedPaperIds.has(p.id) || (p.doi && savedPaperIds.has(p.doi)) || p.isSaved) {
         combinedMap.set(p.id, p);
       }
     });

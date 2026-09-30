@@ -10,9 +10,13 @@ import {
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { ArrowRight, ExternalLink, X } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { Paper } from '../../types';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Badge } from '../core/Badge';
+import { SaveButton } from '../core/SaveButton';
+import { usePaperStore } from '../../store/usePaperStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 import { usePaperFigures } from '../../hooks/usePaperFigures';
 
@@ -31,6 +35,23 @@ export const PaperCard: React.FC<PaperCardProps> = ({
   compact = false,
   fromPostId,
 }) => {
+  const isSavedInStore = usePaperStore(
+    (s) =>
+      s.savedPaperIds.has(paper.id) ||
+      (paper.doi ? s.savedPaperIds.has(paper.doi) : false)
+  );
+  const isSaved = Boolean(isSavedInStore || paper.isSaved);
+  const toggleSavePaper = usePaperStore((s) => s.toggleSavePaper);
+  const currentUser = useAuthStore((s) => s.user);
+
+  const handleSave = (e?: any) => {
+    e?.stopPropagation?.();
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    toggleSavePaper(paper.id, currentUser?.id, paper);
+  };
+
   const getJournalVariant = (journal: string) => {
     const j = journal.toLowerCase();
     if (j.includes('nature')) return 'nature';
@@ -150,29 +171,34 @@ export const PaperCard: React.FC<PaperCardProps> = ({
             {paper.title}
           </Text>
 
-          {/* Journal Meta & External Read Paper Link */}
+          {/* Journal Meta, Official Save Button & External Read Paper Link */}
           <View style={styles.footerRow}>
             <View style={styles.journalRow}>
               <Badge
                 label={paper.journal}
                 variant={getJournalVariant(paper.journal)}
               />
-              <Text style={styles.yearText}>
-                {paper.journal} ({paper.publicationYear})
-              </Text>
             </View>
 
-            <TouchableOpacity
-              accessibilityRole="link"
-              accessibilityLabel={`Read paper on publisher website: ${paper.journal}`}
-              hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
-              onPress={handleOpenPublisher}
-              style={styles.linkButton}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.linkText}>Read paper</Text>
-              <ExternalLink size={14} color={colors.accentLink} strokeWidth={2.2} />
-            </TouchableOpacity>
+            <View style={styles.actionsRow}>
+              <SaveButton
+                isSaved={isSaved}
+                onPress={handleSave}
+                size={18}
+                style={styles.saveBtn}
+              />
+              <TouchableOpacity
+                accessibilityRole="link"
+                accessibilityLabel={`Read paper on publisher website: ${paper.journal}`}
+                hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+                onPress={handleOpenPublisher}
+                style={styles.linkButton}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.linkText}>Read paper</Text>
+                <ExternalLink size={13} color={colors.accentLink} strokeWidth={2.2} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -298,5 +324,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.accentLink,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+  },
+  saveBtn: {
+    paddingHorizontal: 2,
+    paddingVertical: 2,
   },
 });

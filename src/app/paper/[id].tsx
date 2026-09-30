@@ -51,6 +51,7 @@ import { LikeButton } from '../../components/core/LikeButton';
 import { Avatar } from '../../components/core/Avatar';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { CommentCard } from '../../components/cards/CommentCard';
+import { SaveButton } from '../../components/core/SaveButton';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
@@ -418,12 +419,22 @@ export default function PaperDetailScreen() {
     } catch {}
   };
 
+  const isPaperSaved = usePaperStore(
+    (s) =>
+      (paper?.id ? s.savedPaperIds.has(paper.id) : false) ||
+      (paperId ? s.savedPaperIds.has(paperId) : false) ||
+      (doi ? s.savedPaperIds.has(doi) : false) ||
+      (paper?.doi ? s.savedPaperIds.has(paper.doi) : false) ||
+      Boolean(paper?.isSaved)
+  );
+
   const handleSave = () => {
     if (!paper) return;
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleSavePaper(paper.id, currentUser?.id);
+    toggleSavePaper(paper.id, currentUser?.id, paper);
+    setPaper((prev) => (prev ? { ...prev, isSaved: !isPaperSaved } : null));
   };
 
   const handleLike = () => {
@@ -878,12 +889,10 @@ export default function PaperDetailScreen() {
           title="Research Article"
           rightAction={
             <View style={styles.headerRightActions}>
-              <IconButton
-                icon="Bookmark"
-                size="sm"
-                variant={paper.isSaved ? 'filled' : 'ghost'}
-                color={paper.isSaved ? colors.black : colors.textPrimary}
+              <SaveButton
+                isSaved={isPaperSaved}
                 onPress={handleSave}
+                size={20}
               />
               <IconButton
                 icon="Share2"

@@ -26,6 +26,12 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
   paper,
   style,
 }) => {
+  const isSavedInStore = usePaperStore(
+    (s) =>
+      s.savedPaperIds.has(paper.id) ||
+      (paper.doi ? s.savedPaperIds.has(paper.doi) : false)
+  );
+  const isSaved = Boolean(isSavedInStore || paper.isSaved);
   const toggleSave = usePaperStore((s) => s.toggleSavePaper);
 
   const handleCardPress = () => {
@@ -40,7 +46,7 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleSave(paper.id);
+    toggleSave(paper.id, undefined, paper);
   };
 
   const getJournalVariant = (journal: string) => {
@@ -96,7 +102,7 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
           </View>
 
           <SaveButton
-            isSaved={Boolean(paper.isSaved)}
+            isSaved={isSaved}
             onPress={handleSave}
             size={18}
             style={styles.saveBtn}
