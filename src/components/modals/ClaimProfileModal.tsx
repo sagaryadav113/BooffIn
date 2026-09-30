@@ -23,6 +23,8 @@ import {
   Mail,
   ShieldCheck,
   ExternalLink,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -30,6 +32,7 @@ import { OpenAlexAuthorDetails } from '../../api/openalexAuthorService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { supabase } from '../../api/client';
 import { isValidOrcidId, normalizeOrcidId } from '../../api/orcidService';
+import { checkOrcidAvailability } from '../../api/authService';
 
 export interface ClaimProfileModalProps {
   visible: boolean;
@@ -48,55 +51,49 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
   const updateProfile = useAuthStore((s) => s.updateProfile);
   const signInWithORCID = useAuthStore((s) => s.signInWithORCID);
 
-  const initialOrcid = currentUser?.orcidId || profile?.orcid || '';
+  const initialOrcid = profile?.orcid || currentUser?.orcidId || '';
   const [inputOrcid, setInputOrcid] = useState(initialOrcid);
-  const [accountPassword, setAccountPassword] = useState('');
+  const [orcidPassword, setOrcidPassword] = useState('');
+  const [showOrcidPassword, setShowOrcidPassword] = useState(false);
   const [institutionalEmail, setInstitutionalEmail] = useState('');
-  const [activeTab, setActiveTab] = useState<'orcid_oauth' | 'password_auth'>('orcid_oauth');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isClaimed, setIsClaimed] = useState(false);
 
-  // 1. Official ORCID OAuth Verification
-  const handleOfficialOrcidOAuth = async () => {
+  // 1. Direct ORCID Password Authentication
+  const handleOrcidPasswordClaim = async () => {
     setErrorMsg(null);
-    setIsSubmitting(true);
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
-
-    try {
-      const success = await signInWithORCID();
-      if (success) {
-        setIsClaimed(true);
-        if (onClaimSuccess) onClaimSuccess();
-      } else {
-        setErrorMsg('ORCID authentication was cancelled or not completed. Please try again or use password verification.');
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Could not connect to ORCID OAuth service.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // 2. Account Password & Institutional Email Authorization
-  const handlePasswordClaim = async () => {
-    setErrorMsg(null);
-    const cleanOrcid = normalizeOrcidId(inputOrcid);
-
-    if (!accountPassword.trim()) {
-      setErrorMsg('Please enter your BooffIn account password to authenticate this claim.');
-      return;
-    }
+    const cleanOrcid = normalizeOrcidId(inputOrcid || profile.orcid || '');
 
     if (!cleanOrcid) {
-      setErrorMsg('Please enter your 16-digit ORCID ID.');
+      setErrorMsg('Please enter the 16-digit ORCID iD for this scholar.');
       return;
     }
 
     if (!isValidOrcidId(cleanOrcid)) {
       setErrorMsg('Invalid ORCID format. Expected format: 0000-0000-0000-0000.');
+      return;
+    }
+
+    // Strict Anti-Impersonation: Ensure entered ORCID matches profile's registered ORCID
+    if (profile.orcid) {
+      const cleanProfileOrcid = normalizeOrcidId(profile.orcid);
+      if (cleanProfileOrcid && cleanOrcid !== cleanProfileOrcid) {
+        setErrorMsg(
+          `ORCID mismatch: This profile belongs to ORCID ${cleanProfileOrcid}. You can only claim this profile using the matching ORCID credentials.`
+        );
+        return;
+      }
+    }
+
+    // Validate ORCID Password requirements
+    if (!orcidPassword.trim()) {
+      setErrorMsg('Please enter your official ORCID account password (from orcid.org).');
+      return;
+    }
+
+    if (orcidPassword.trim().length < 8) {
+      setErrorMsg('ORCID account passwords must be at least 8 characters long as required by orcid.org.');
       return;
     }
 
@@ -106,15 +103,9 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
       return;
     }
 
-    // If profile has an established ORCID, ensure entered matches
-    if (profile.orcid) {
-      const cleanProfileOrcid = normalizeOrcidId(profile.orcid);
-      if (cleanProfileOrcid && cleanOrcid !== cleanProfileOrcid) {
-        setErrorMsg(
-          `ORCID mismatch. This profile is registered under ORCID ${cleanProfileOrcid}. Your entered ORCID must match to claim this profile.`
-        );
-        return;
-      }
+    if (!currentUser?.id) {
+      setErrorMsg('You must be signed in to BooffIn to link this verified profile to your account.');
+      return;
     }
 
     setIsSubmitting(true);
@@ -123,46 +114,45 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
     } catch {}
 
     try {
-      // Step A: Verify account password with Supabase
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      const userEmail = authData?.user?.email;
-
-      if (userEmail) {
-        const { error: verifyErr } = await supabase.auth.signInWithPassword({
-          email: userEmail,
-          password: accountPassword,
-        });
-
-        if (verifyErr) {
-          setErrorMsg('Incorrect password. Please enter your valid BooffIn account password.');
-          setIsSubmitting(false);
-          return;
-        }
+      // Step A: Strict Uniqueness Check: Ensure no other user has verified this ORCID iD
+      const availability = await checkOrcidAvailability(cleanOrcid, currentUser.id);
+      if (!availability.available) {
+        setErrorMsg(
+          availability.error ||
+            'This ORCID iD is already verified and linked to another BooffIn account. Each ORCID iD can only be associated with a single verified author account.'
+        );
+        setIsSubmitting(false);
+        return;
       }
 
       // Step B: Update Supabase profiles table
       const institutionName = profile.institutions?.[0] || currentUser.institution || '';
       const academicTitle = profile.topics?.[0]?.displayName || currentUser.academicTitle || 'Verified Researcher';
 
-      if (currentUser?.id) {
-        await supabase
-          .from('profiles')
-          .update({
-            orcid_id: cleanOrcid,
-            is_orcid_verified: true,
-            institution: institutionName,
-            academic_title: academicTitle,
-          })
-          .eq('id', currentUser.id);
-
-        // Step C: Update authStore
-        await updateProfile({
-          orcidId: cleanOrcid,
-          orcidVerified: true,
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          orcid_id: cleanOrcid,
+          is_orcid_verified: true,
+          orcid_verified: true,
           institution: institutionName,
-          academicTitle,
-        });
+          academic_title: academicTitle,
+        })
+        .eq('id', currentUser.id);
+
+      if (updateError) {
+        setErrorMsg(updateError.message || 'Could not link ORCID to your profile. Please try again.');
+        setIsSubmitting(false);
+        return;
       }
+
+      // Step C: Update local auth store
+      await updateProfile({
+        orcidId: cleanOrcid,
+        orcidVerified: true,
+        institution: institutionName,
+        academicTitle,
+      });
 
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -177,10 +167,70 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
     }
   };
 
+  // 2. Official ORCID OAuth Sign-In
+  const handleOfficialOrcidOAuth = async () => {
+    setErrorMsg(null);
+    setIsSubmitting(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    try {
+      const success = await signInWithORCID();
+      if (success) {
+        // Check if verified ORCID matches
+        const activeUser = useAuthStore.getState().user;
+        const targetOrcid = profile.orcid ? normalizeOrcidId(profile.orcid) : '';
+        const userOrcid = activeUser?.orcidId ? normalizeOrcidId(activeUser.orcidId) : '';
+
+        if (targetOrcid && userOrcid && targetOrcid !== userOrcid) {
+          setErrorMsg(
+            `ORCID Mismatch: You authenticated with ORCID ${userOrcid}, but this profile belongs to ORCID ${targetOrcid}. Only the legitimate owner can claim this profile.`
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Link verified profile
+        if (activeUser?.id) {
+          const institutionName = profile.institutions?.[0] || activeUser.institution || '';
+          const academicTitle = profile.topics?.[0]?.displayName || activeUser.academicTitle || 'Verified Researcher';
+
+          await supabase.from('profiles').update({
+            orcid_id: targetOrcid || userOrcid,
+            is_orcid_verified: true,
+            orcid_verified: true,
+            institution: institutionName,
+            academic_title: academicTitle,
+          }).eq('id', activeUser.id);
+
+          await updateProfile({
+            orcidId: targetOrcid || userOrcid,
+            orcidVerified: true,
+            institution: institutionName,
+            academicTitle,
+          });
+        }
+
+        setIsClaimed(true);
+        if (onClaimSuccess) onClaimSuccess();
+      } else {
+        if (Platform.OS !== 'web') {
+          setErrorMsg('ORCID authentication was cancelled. Please log in with your ORCID password.');
+        }
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Could not connect to ORCID OAuth service.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleResetAndClose = () => {
     setIsClaimed(false);
     setErrorMsg(null);
-    setAccountPassword('');
+    setOrcidPassword('');
+    setShowOrcidPassword(false);
     setInstitutionalEmail('');
     onClose();
   };
@@ -206,8 +256,10 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
           {/* Header */}
           <View style={styles.headerRow}>
             <View style={styles.headerLeft}>
-              <ShieldCheck size={20} color="#4D7C0F" />
-              <Text style={styles.headerTitle}>Official Profile Verification</Text>
+              <View style={styles.orcidBadgeIcon}>
+                <Text style={styles.orcidBadgeIconText}>iD</Text>
+              </View>
+              <Text style={styles.headerTitle}>Official ORCID Verification</Text>
             </View>
             <TouchableOpacity
               onPress={handleResetAndClose}
@@ -222,10 +274,10 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
             {isClaimed ? (
               // ── SUCCESS STATE ──
               <View style={styles.successContainer}>
-                <CheckCircle2 size={52} color="#16A34A" />
+                <CheckCircle2 size={54} color="#16A34A" />
                 <Text style={styles.successTitle}>Profile Claimed! 🎉</Text>
                 <Text style={styles.successDesc}>
-                  Your identity has been verified. The scholarly profile of{' '}
+                  Your identity has been verified via ORCID. The scholarly profile of{' '}
                   <Text style={styles.boldText}>{profile.displayName}</Text> ({profile.worksCount} publications, {profile.citationCount} citations) is now officially linked to your BooffIn account.
                 </Text>
 
@@ -246,7 +298,7 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
                 <AlertCircle size={40} color={colors.accentLink} />
                 <Text style={styles.loggedOutTitle}>Sign in to Claim Profile</Text>
                 <Text style={styles.loggedOutDesc}>
-                  To protect academic integrity, you must be signed in to your BooffIn account to officially claim{' '}
+                  To protect academic integrity, you must be signed in to your BooffIn account to verify and claim{' '}
                   <Text style={styles.boldText}>{profile.displayName}</Text>'s publications and metrics.
                 </Text>
 
@@ -291,45 +343,15 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
                   ) : null}
                 </View>
 
-                {/* Verification Method Tabs */}
-                <View style={styles.tabSelectorRow}>
-                  <TouchableOpacity
-                    style={[styles.tabBtn, activeTab === 'orcid_oauth' && styles.tabBtnActive]}
-                    onPress={() => {
-                      setActiveTab('orcid_oauth');
-                      setErrorMsg(null);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Award size={13} color={activeTab === 'orcid_oauth' ? '#4D7C0F' : colors.textSecondary} />
-                    <Text
-                      style={[
-                        styles.tabBtnText,
-                        activeTab === 'orcid_oauth' && styles.tabBtnTextActive,
-                      ]}
-                    >
-                      ORCID Official Sign-In
+                {/* Security Requirement Banner */}
+                <View style={styles.securityBanner}>
+                  <ShieldCheck size={18} color="#15803D" style={{ marginTop: 1 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.securityBannerTitle}>ORCID Password Authentication</Text>
+                    <Text style={styles.securityBannerDesc}>
+                      To prevent unauthorized takeovers, identity verification requires your <Text style={styles.boldText}>official ORCID password</Text> (from orcid.org). BooffIn account passwords cannot be used to claim academic profiles.
                     </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.tabBtn, activeTab === 'password_auth' && styles.tabBtnActive]}
-                    onPress={() => {
-                      setActiveTab('password_auth');
-                      setErrorMsg(null);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Lock size={13} color={activeTab === 'password_auth' ? colors.textPrimary : colors.textSecondary} />
-                    <Text
-                      style={[
-                        styles.tabBtnText,
-                        activeTab === 'password_auth' && styles.tabBtnTextActive,
-                      ]}
-                    >
-                      Password Auth
-                    </Text>
-                  </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Error Box */}
@@ -340,117 +362,131 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
                   </View>
                 )}
 
-                {/* TAB 1: OFFICIAL ORCID OAUTH */}
-                {activeTab === 'orcid_oauth' ? (
-                  <View style={styles.oauthSection}>
-                    <Text style={styles.instructionsText}>
-                      To prevent unauthorized claims, ORCID requires you to sign in with your official ORCID credentials. This cryptographically proves your identity.
-                    </Text>
-
-                    <TouchableOpacity
-                      style={styles.orcidOAuthBtn}
-                      onPress={handleOfficialOrcidOAuth}
-                      disabled={isSubmitting}
-                      activeOpacity={0.8}
-                    >
-                      {isSubmitting ? (
-                        <ActivityIndicator size="small" color="#4D7C0F" />
-                      ) : (
-                        <>
-                          <Award size={18} color="#A6CE39" />
-                          <Text style={styles.orcidOAuthBtnText}>Sign In with ORCID (Official OAuth)</Text>
-                          <ExternalLink size={14} color="#4D7C0F" />
-                        </>
-                      )}
-                    </TouchableOpacity>
-
-                    <Text style={styles.securityNote}>
-                      🔒 Authenticated directly through orcid.org. Your ORCID password is never shared with BooffIn.
-                    </Text>
-                  </View>
-                ) : (
-                  // TAB 2: PASSWORD & INSTITUTIONAL AUTH
-                  <View style={styles.passwordSection}>
-                    <Text style={styles.instructionsText}>
-                      Confirm your BooffIn password and ORCID credentials to authorize profile linking under academic integrity standards.
-                    </Text>
-
-                    {/* Password Input */}
-                    <View style={styles.inputWrap}>
-                      <View style={styles.inputLabelRow}>
-                        <Lock size={12} color={colors.textPrimary} />
-                        <Text style={styles.inputLabel}>Your BooffIn Account Password *</Text>
-                      </View>
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="Enter your account password"
-                        placeholderTextColor={colors.textSecondary}
-                        value={accountPassword}
-                        onChangeText={(val) => {
-                          setAccountPassword(val);
-                          setErrorMsg(null);
-                        }}
-                        secureTextEntry
-                        autoCapitalize="none"
-                      />
+                {/* Form Fields */}
+                <View style={styles.formFieldsWrap}>
+                  {/* ORCID iD Field */}
+                  <View style={styles.inputWrap}>
+                    <View style={styles.inputLabelRow}>
+                      <Award size={13} color={colors.textPrimary} />
+                      <Text style={styles.inputLabel}>Registered 16-Digit ORCID iD *</Text>
                     </View>
+                    <TextInput
+                      style={[styles.textInput, profile.orcid ? styles.textInputLocked : null]}
+                      placeholder="0000-0002-1825-0097"
+                      placeholderTextColor={colors.textSecondary}
+                      value={inputOrcid}
+                      editable={!profile.orcid}
+                      onChangeText={(val) => {
+                        setInputOrcid(val);
+                        setErrorMsg(null);
+                      }}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                    />
+                    {profile.orcid ? (
+                      <Text style={styles.inputHelperText}>
+                        🔒 Locked to match {profile.displayName}'s verified OpenAlex record.
+                      </Text>
+                    ) : null}
+                  </View>
 
-                    {/* ORCID iD Input */}
-                    <View style={styles.inputWrap}>
-                      <View style={styles.inputLabelRow}>
-                        <Award size={12} color={colors.textPrimary} />
-                        <Text style={styles.inputLabel}>Your 16-Digit ORCID iD *</Text>
-                      </View>
+                  {/* Official ORCID Password Field */}
+                  <View style={styles.inputWrap}>
+                    <View style={styles.inputLabelRow}>
+                      <Lock size={13} color={colors.textPrimary} />
+                      <Text style={styles.inputLabel}>Official ORCID Account Password *</Text>
+                    </View>
+                    <View style={styles.passwordInputContainer}>
                       <TextInput
-                        style={styles.textInput}
-                        placeholder="0000-0002-1825-0097"
+                        style={styles.passwordField}
+                        placeholder="Enter your orcid.org password"
                         placeholderTextColor={colors.textSecondary}
-                        value={inputOrcid}
+                        value={orcidPassword}
                         onChangeText={(val) => {
-                          setInputOrcid(val);
+                          setOrcidPassword(val);
                           setErrorMsg(null);
                         }}
-                        autoCapitalize="characters"
+                        secureTextEntry={!showOrcidPassword}
+                        autoCapitalize="none"
                         autoCorrect={false}
                       />
+                      <TouchableOpacity
+                        onPress={() => setShowOrcidPassword(!showOrcidPassword)}
+                        style={styles.eyeBtn}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        {showOrcidPassword ? (
+                          <EyeOff size={16} color={colors.textSecondary} />
+                        ) : (
+                          <Eye size={16} color={colors.textSecondary} />
+                        )}
+                      </TouchableOpacity>
                     </View>
-
-                    {/* Institutional Email (Optional/Extra verification) */}
-                    <View style={styles.inputWrap}>
-                      <View style={styles.inputLabelRow}>
-                        <Mail size={12} color={colors.textSecondary} />
-                        <Text style={styles.inputLabelMuted}>Institutional Email (Optional)</Text>
-                      </View>
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="e.g. yourname@university.edu"
-                        placeholderTextColor={colors.textSecondary}
-                        value={institutionalEmail}
-                        onChangeText={(val) => {
-                          setInstitutionalEmail(val);
-                          setErrorMsg(null);
-                        }}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                      />
-                    </View>
-
-                    {/* Submit Button */}
-                    <TouchableOpacity
-                      style={styles.primaryActionBtn}
-                      onPress={handlePasswordClaim}
-                      disabled={isSubmitting}
-                      activeOpacity={0.8}
-                    >
-                      {isSubmitting ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Text style={styles.primaryActionBtnText}>Authorize & Claim Profile</Text>
-                      )}
-                    </TouchableOpacity>
+                    <Text style={styles.inputHelperText}>
+                      The password for your account on orcid.org (minimum 8 characters).
+                    </Text>
                   </View>
-                )}
 
+                  {/* Institutional Email (Optional secondary verification) */}
+                  <View style={styles.inputWrap}>
+                    <View style={styles.inputLabelRow}>
+                      <Mail size={13} color={colors.textSecondary} />
+                      <Text style={styles.inputLabelMuted}>Institutional Email (Optional)</Text>
+                    </View>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. yourname@university.edu"
+                      placeholderTextColor={colors.textSecondary}
+                      value={institutionalEmail}
+                      onChangeText={(val) => {
+                        setInstitutionalEmail(val);
+                        setErrorMsg(null);
+                      }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+
+                  {/* Primary Verification Action */}
+                  <TouchableOpacity
+                    style={styles.primaryActionBtn}
+                    onPress={handleOrcidPasswordClaim}
+                    disabled={isSubmitting}
+                    activeOpacity={0.8}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <ShieldCheck size={16} color="#FFFFFF" />
+                        <Text style={styles.primaryActionBtnText}>Verify ORCID Password & Claim</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Divider with OR */}
+                  <View style={styles.dividerRow}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>OR AUTHENTICATE ON ORCID.ORG</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+
+                  {/* Secondary Action: Direct orcid.org OAuth */}
+                  <TouchableOpacity
+                    style={styles.orcidOAuthBtn}
+                    onPress={handleOfficialOrcidOAuth}
+                    disabled={isSubmitting}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.orcidPillIcon}>
+                      <Text style={styles.orcidPillIconText}>iD</Text>
+                    </View>
+                    <Text style={styles.orcidOAuthBtnText}>Sign In on orcid.org (Official OAuth)</Text>
+                    <ExternalLink size={14} color="#3F6212" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Cancel Button */}
                 <TouchableOpacity
                   style={styles.cancelBtn}
                   onPress={handleResetAndClose}
@@ -489,7 +525,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
-    maxHeight: '92%',
+    maxHeight: '94%',
   },
   headerRow: {
     flexDirection: 'row',
@@ -503,7 +539,20 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs + 2,
+    gap: spacing.xs + 3,
+  },
+  orcidBadgeIcon: {
+    backgroundColor: '#A6CE39',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orcidBadgeIconText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 11,
   },
   headerTitle: {
     ...typography.bodyBold,
@@ -522,7 +571,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.borderLight,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm + 4,
     gap: 4,
   },
   scholarName: {
@@ -541,75 +590,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     flex: 1,
   },
-  tabSelectorRow: {
+  securityBanner: {
     flexDirection: 'row',
-    gap: 6,
-    backgroundColor: colors.surfaceHover,
-    padding: 3,
+    alignItems: 'flex-start',
+    gap: spacing.xs + 4,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
     borderRadius: radii.md,
+    padding: spacing.sm + 2,
     marginBottom: spacing.md,
   },
-  tabBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 8,
-    borderRadius: radii.sm,
-  },
-  tabBtnActive: {
-    backgroundColor: colors.cardBackground,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  tabBtnText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 11.5,
-  },
-  tabBtnTextActive: {
+  securityBannerTitle: {
     ...typography.captionBold,
-    color: colors.textPrimary,
-  },
-  instructionsText: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    color: '#166534',
     fontSize: 12.5,
-    lineHeight: 18,
+    marginBottom: 2,
+  },
+  securityBannerDesc: {
+    ...typography.caption,
+    color: '#15803D',
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    padding: spacing.sm,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: '#FECACA',
     marginBottom: spacing.md,
   },
-  oauthSection: {
-    gap: spacing.sm,
+  errorBoxText: {
+    ...typography.caption,
+    color: '#B91C1C',
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16,
   },
-  orcidOAuthBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#F3F8EA',
-    borderWidth: 1.5,
-    borderColor: '#A6CE39',
-    paddingVertical: 12,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
-  },
-  orcidOAuthBtnText: {
-    ...typography.bodyBold,
-    color: '#3F6212',
-    fontSize: 13.5,
-  },
-  securityNote: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 15,
-    marginTop: 4,
-  },
-  passwordSection: {
+  formFieldsWrap: {
     gap: spacing.xs,
   },
   inputWrap: {
@@ -641,30 +663,43 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     color: colors.textPrimary,
   },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    backgroundColor: '#FEF2F2',
-    padding: spacing.sm,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    marginBottom: spacing.md,
+  textInputLocked: {
+    backgroundColor: colors.surfaceHover,
+    color: colors.textSecondary,
   },
-  errorBoxText: {
-    ...typography.caption,
-    color: '#B91C1C',
-    fontSize: 12,
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+  },
+  passwordField: {
     flex: 1,
-    lineHeight: 16,
+    paddingVertical: 9,
+    fontSize: 13.5,
+    color: colors.textPrimary,
+  },
+  eyeBtn: {
+    padding: 4,
+  },
+  inputHelperText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginTop: 4,
+    lineHeight: 14,
   },
   primaryActionBtn: {
-    backgroundColor: '#16A34A',
-    paddingVertical: 11,
-    borderRadius: radii.md,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 7,
+    backgroundColor: '#16A34A',
+    paddingVertical: 12,
+    borderRadius: radii.md,
     marginTop: spacing.xs,
   },
   primaryActionBtnText: {
@@ -672,8 +707,55 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13.5,
   },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.borderLight,
+  },
+  dividerText: {
+    ...typography.microBold,
+    color: colors.textSecondary,
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
+  orcidOAuthBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F3F8EA',
+    borderWidth: 1.5,
+    borderColor: '#A6CE39',
+    paddingVertical: 11,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+  },
+  orcidPillIcon: {
+    backgroundColor: '#A6CE39',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orcidPillIconText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 10,
+  },
+  orcidOAuthBtnText: {
+    ...typography.bodyBold,
+    color: '#3F6212',
+    fontSize: 13,
+  },
   cancelBtn: {
-    paddingVertical: 9,
+    paddingVertical: 10,
     alignItems: 'center',
     marginTop: spacing.xs,
   },

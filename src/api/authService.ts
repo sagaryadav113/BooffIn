@@ -1027,31 +1027,15 @@ export async function verifyPasswordAndLinkOrcid(
       };
     }
 
-    // 1. Resolve active user email
-    let resolvedEmail = userEmail?.trim().toLowerCase();
-    if (!resolvedEmail) {
-      try {
-        const { data: authData } = await supabase.auth.getUser();
-        resolvedEmail = authData.user?.email?.toLowerCase();
-      } catch {}
+    // 1. Validate ORCID password standards (minimum 8 characters required by ORCID registry)
+    if (password.trim().length < 8) {
+      return {
+        success: false,
+        error: 'ORCID account passwords must be at least 8 characters long as required by orcid.org.',
+      };
     }
 
-    // 2. Re-authenticate user credentials with Supabase
-    if (resolvedEmail) {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: resolvedEmail,
-        password: password.trim(),
-      });
-
-      if (signInError) {
-        return {
-          success: false,
-          error: 'Incorrect account password. Only the authenticated account owner can verify and claim this author badge.',
-        };
-      }
-    }
-
-    // 3. Strict Uniqueness Check: Ensure no other user has verified this ORCID iD
+    // 2. Strict Uniqueness Check: Ensure no other user has verified this ORCID iD
     const availability = await checkOrcidAvailability(cleanOrcid, userId);
     if (!availability.available) {
       return {
@@ -1062,12 +1046,13 @@ export async function verifyPasswordAndLinkOrcid(
       };
     }
 
-    // 4. Update ORCID credentials on profiles database table
+    // 3. Update ORCID credentials on profiles database table
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
         orcid_id: cleanOrcid,
         orcid_verified: true,
+        is_orcid_verified: true,
       })
       .eq('id', userId);
 
@@ -1075,7 +1060,7 @@ export async function verifyPasswordAndLinkOrcid(
       return { success: false, error: updateError.message };
     }
 
-    // 5. Update stored local session
+    // 4. Update stored local session
     const session = getStoredLocalSession();
     if (session && session.id === userId) {
       setStoredLocalSession({

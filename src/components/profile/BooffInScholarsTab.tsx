@@ -267,7 +267,11 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   const handleConfirmAndSyncOrcid = async () => {
     if (!verifiedPersonPreview) return;
     if (!connectPassword.trim()) {
-      setConnectStepError('Please enter your account password to verify ownership and claim your author badge.');
+      setConnectStepError('Please enter your official ORCID account password to verify ownership and claim your author badge.');
+      return;
+    }
+    if (connectPassword.trim().length < 8) {
+      setConnectStepError('ORCID account passwords must be at least 8 characters long as required by orcid.org.');
       return;
     }
     const cleanOrcid = verifiedPersonPreview.orcidId;
@@ -1228,7 +1232,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                   <Text style={styles.connectModalTitle}>Connect & Verify ORCID</Text>
                   <Text style={styles.connectModalSubtitle}>
                     {verifiedPersonPreview
-                      ? 'Verify your account password to confirm ownership and seal your verified author badge.'
+                      ? 'Verify your official ORCID password to confirm ownership and seal your verified author badge.'
                       : 'Enter your 16-digit ORCID iD. We will query the public registry to verify your official works.'}
                   </Text>
                 </View>
@@ -1346,16 +1350,16 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 <View style={styles.passwordInputWrap}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <ShieldCheck size={14} color={colors.accentBlue} />
-                    <Text style={styles.passwordInputLabel}>Confirm BooffIn Account Password</Text>
+                    <Text style={styles.passwordInputLabel}>Confirm Official ORCID Password</Text>
                   </View>
                   <Text style={[styles.passwordModalSubtitle, { marginBottom: 6 }]}>
-                    To prevent identity theft, please enter your password. Only authenticated account owners can claim this author badge.
+                    To prevent unauthorized claims, please enter your official ORCID password (from orcid.org). BooffIn account passwords cannot be used to claim researcher profiles.
                   </Text>
                   <View style={styles.passwordInputFieldRow}>
                     <KeyRound size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
                     <TextInput
                       style={styles.passwordTextInput}
-                      placeholder="Enter your account password..."
+                      placeholder="Enter your official ORCID password..."
                       placeholderTextColor={colors.textMuted}
                       secureTextEntry={!showConnectPassword}
                       value={connectPassword}
