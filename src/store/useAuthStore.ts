@@ -133,8 +133,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // 2. Set up listener for real-time auth state changes
       supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'TOKEN_REFRESHED' && get().isAuthenticated && get().user?.id === session?.user?.id) {
+          // Token refreshed silently in background; avoid disruptive re-fetch
+          return;
+        }
+
         if (session?.user) {
-          let profile = await fetchUserProfile(session.user.id);
+          const currentLoadedUser = get().user;
+          let profile = currentLoadedUser?.id === session.user.id && currentLoadedUser.handle
+            ? currentLoadedUser
+            : await fetchUserProfile(session.user.id);
           if (!profile) {
             const metadata = session.user.user_metadata || {};
             const fullName = metadata.full_name || metadata.name || session.user.email?.split('@')[0] || 'Researcher';

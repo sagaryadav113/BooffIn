@@ -842,168 +842,178 @@ export default function CurrentUserProfileScreen() {
       </ScrollView>
 
       {/* Avatar Action Modal */}
-      <Modal
-        visible={avatarModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setAvatarModalOpen(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setAvatarModalOpen(false)}
+      {avatarModalOpen && (
+        <Modal
+          visible={avatarModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAvatarModalOpen(false)}
         >
-          <View style={styles.actionModalSheet}>
-            <View style={styles.actionModalHeader}>
-              <Text style={styles.actionModalTitle}>Profile Photo</Text>
-              <TouchableOpacity onPress={() => setAvatarModalOpen(false)}>
-                <XIcon size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.actionModalSubtitle}>
-              Upload a clear academic headshot or avatar. (JPG, PNG, WebP, max 5MB)
-            </Text>
-
-            <TouchableOpacity
-              style={styles.actionModalOption}
-              onPress={handlePickAndUploadAvatar}
-              activeOpacity={0.7}
-            >
-              <View style={styles.actionModalOptionIcon}>
-                <Upload size={18} color={colors.textPrimary} />
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setAvatarModalOpen(false)}
+          >
+            <View style={styles.actionModalSheet}>
+              <View style={styles.actionModalHeader}>
+                <Text style={styles.actionModalTitle}>Profile Photo</Text>
+                <TouchableOpacity onPress={() => setAvatarModalOpen(false)}>
+                  <XIcon size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
-              <View style={styles.actionModalOptionText}>
-                <Text style={styles.actionOptionTitle}>
-                  {user.avatarUrl ? 'Upload New Photo' : 'Upload Profile Photo'}
-                </Text>
-                <Text style={styles.actionOptionDesc}>Choose from photo gallery / library</Text>
-              </View>
-            </TouchableOpacity>
 
-            {user.avatarUrl ? (
+              <Text style={styles.actionModalSubtitle}>
+                Upload a clear academic headshot or avatar. (JPG, PNG, WebP, max 5MB)
+              </Text>
+
               <TouchableOpacity
-                style={[styles.actionModalOption, styles.actionModalOptionDanger]}
-                onPress={handleRemoveAvatar}
+                style={styles.actionModalOption}
+                onPress={handlePickAndUploadAvatar}
                 activeOpacity={0.7}
               >
-                <View style={[styles.actionModalOptionIcon, { backgroundColor: '#FEE2E2' }]}>
-                  <Trash2 size={18} color={colors.accentRed} />
+                <View style={styles.actionModalOptionIcon}>
+                  <Upload size={18} color={colors.textPrimary} />
                 </View>
                 <View style={styles.actionModalOptionText}>
-                  <Text style={[styles.actionOptionTitle, { color: colors.accentRed }]}>
-                    Remove Profile Photo
+                  <Text style={styles.actionOptionTitle}>
+                    {user.avatarUrl ? 'Upload New Photo' : 'Upload Profile Photo'}
                   </Text>
-                  <Text style={styles.actionOptionDesc}>Reset to default initials</Text>
+                  <Text style={styles.actionOptionDesc}>Choose from photo gallery / library</Text>
                 </View>
               </TouchableOpacity>
-            ) : null}
 
-            <TouchableOpacity
-              style={styles.actionModalCancelBtn}
-              onPress={() => setAvatarModalOpen(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionModalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+              {user.avatarUrl ? (
+                <TouchableOpacity
+                  style={[styles.actionModalOption, styles.actionModalOptionDanger]}
+                  onPress={handleRemoveAvatar}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.actionModalOptionIcon, { backgroundColor: '#FEE2E2' }]}>
+                    <Trash2 size={18} color={colors.accentRed} />
+                  </View>
+                  <View style={styles.actionModalOptionText}>
+                    <Text style={[styles.actionOptionTitle, { color: colors.accentRed }]}>
+                      Remove Profile Photo
+                    </Text>
+                    <Text style={styles.actionOptionDesc}>Reset to default initials</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : null}
+
+              <TouchableOpacity
+                style={styles.actionModalCancelBtn}
+                onPress={() => setAvatarModalOpen(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.actionModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {/* Banner Action Modal */}
-      <Modal
-        visible={bannerModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setBannerModalOpen(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setBannerModalOpen(false)}
+      {bannerModalOpen && (
+        <Modal
+          visible={bannerModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setBannerModalOpen(false)}
         >
-          <View style={styles.actionModalSheet}>
-            <View style={styles.actionModalHeader}>
-              <Text style={styles.actionModalTitle}>Profile Banner Image</Text>
-              <TouchableOpacity onPress={() => setBannerModalOpen(false)}>
-                <XIcon size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.actionModalSubtitle}>
-              Customize your profile header cover image. (Panoramic 3:1 aspect ratio, max 5MB)
-            </Text>
-
-            <TouchableOpacity
-              style={styles.actionModalOption}
-              onPress={handlePickAndUploadBanner}
-              activeOpacity={0.7}
-            >
-              <View style={styles.actionModalOptionIcon}>
-                <ImageIcon size={18} color={colors.textPrimary} />
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setBannerModalOpen(false)}
+          >
+            <View style={styles.actionModalSheet}>
+              <View style={styles.actionModalHeader}>
+                <Text style={styles.actionModalTitle}>Profile Banner Image</Text>
+                <TouchableOpacity onPress={() => setBannerModalOpen(false)}>
+                  <XIcon size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
-              <View style={styles.actionModalOptionText}>
-                <Text style={styles.actionOptionTitle}>
-                  {user.bannerUrl ? 'Upload New Banner' : 'Upload Banner Image'}
-                </Text>
-                <Text style={styles.actionOptionDesc}>Choose panoramic cover image from library</Text>
-              </View>
-            </TouchableOpacity>
 
-            {user.bannerUrl ? (
+              <Text style={styles.actionModalSubtitle}>
+                Customize your profile header cover image. (Panoramic 3:1 aspect ratio, max 5MB)
+              </Text>
+
               <TouchableOpacity
-                style={[styles.actionModalOption, styles.actionModalOptionDanger]}
-                onPress={handleRemoveBanner}
+                style={styles.actionModalOption}
+                onPress={handlePickAndUploadBanner}
                 activeOpacity={0.7}
               >
-                <View style={[styles.actionModalOptionIcon, { backgroundColor: '#FEE2E2' }]}>
-                  <Trash2 size={18} color={colors.accentRed} />
+                <View style={styles.actionModalOptionIcon}>
+                  <ImageIcon size={18} color={colors.textPrimary} />
                 </View>
                 <View style={styles.actionModalOptionText}>
-                  <Text style={[styles.actionOptionTitle, { color: colors.accentRed }]}>
-                    Remove Custom Banner
+                  <Text style={styles.actionOptionTitle}>
+                    {user.bannerUrl ? 'Upload New Banner' : 'Upload Banner Image'}
                   </Text>
-                  <Text style={styles.actionOptionDesc}>Reset to default scientific background</Text>
+                  <Text style={styles.actionOptionDesc}>Choose panoramic cover image from library</Text>
                 </View>
               </TouchableOpacity>
-            ) : null}
 
-            <TouchableOpacity
-              style={styles.actionModalCancelBtn}
-              onPress={() => setBannerModalOpen(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionModalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+              {user.bannerUrl ? (
+                <TouchableOpacity
+                  style={[styles.actionModalOption, styles.actionModalOptionDanger]}
+                  onPress={handleRemoveBanner}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.actionModalOptionIcon, { backgroundColor: '#FEE2E2' }]}>
+                    <Trash2 size={18} color={colors.accentRed} />
+                  </View>
+                  <View style={styles.actionModalOptionText}>
+                    <Text style={[styles.actionOptionTitle, { color: colors.accentRed }]}>
+                      Remove Custom Banner
+                    </Text>
+                    <Text style={styles.actionOptionDesc}>Reset to default scientific background</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : null}
+
+              <TouchableOpacity
+                style={styles.actionModalCancelBtn}
+                onPress={() => setBannerModalOpen(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.actionModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {/* Followers & Following List Modal */}
-      <FollowListModal
-        visible={followModalVisible}
-        onClose={() => setFollowModalVisible(false)}
-        userId={user.id}
-        type={followModalType}
-        userName={user.fullName}
-      />
+      {followModalVisible && (
+        <FollowListModal
+          visible={followModalVisible}
+          onClose={() => setFollowModalVisible(false)}
+          userId={user.id}
+          type={followModalType}
+          userName={user.fullName}
+        />
+      )}
 
       {/* Interactive Image Cropper Modal */}
-      <ImageCropperModal
-        visible={cropperState.visible}
-        imageUri={cropperState.imageUri}
-        cropType={cropperState.cropType}
-        onSave={handleCropperSave}
-        onCancel={() => setCropperState((prev) => ({ ...prev, visible: false }))}
-      />
+      {cropperState.visible && (
+        <ImageCropperModal
+          visible={cropperState.visible}
+          imageUri={cropperState.imageUri}
+          cropType={cropperState.cropType}
+          onSave={handleCropperSave}
+          onCancel={() => setCropperState((prev) => ({ ...prev, visible: false }))}
+        />
+      )}
 
       {/* Comprehensive Profile Analytics Modal */}
-      <ProfileAnalyticsModal
-        visible={analyticsModalOpen}
-        userId={user.id}
-        userFullName={user.fullName}
-        onClose={() => setAnalyticsModalOpen(false)}
-      />
+      {analyticsModalOpen && (
+        <ProfileAnalyticsModal
+          visible={analyticsModalOpen}
+          userId={user.id}
+          userFullName={user.fullName}
+          onClose={() => setAnalyticsModalOpen(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }

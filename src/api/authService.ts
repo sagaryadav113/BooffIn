@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { supabase } from './client';
+import { supabase, appStorage } from './client';
 import { UserProfile } from '../types';
 
 const isWeb = Platform.OS === 'web';
@@ -176,6 +176,13 @@ export function setStoredLocalSession(profile: UserProfile | null): void {
       }
     }
   } catch {}
+  try {
+    if (profile) {
+      appStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(profile)).catch(() => {});
+    } else {
+      appStorage.removeItem(LOCAL_SESSION_KEY).catch(() => {});
+    }
+  } catch {}
 }
 
 /**
@@ -183,8 +190,20 @@ export function setStoredLocalSession(profile: UserProfile | null): void {
  */
 export async function getInitialAuthSession(): Promise<UserProfile | null> {
   try {
+    // If memory local session is empty, check appStorage
+    if (!memoryLocalSession) {
+      try {
+        const storedStr = await appStorage.getItem(LOCAL_SESSION_KEY);
+        if (storedStr) {
+          memoryLocalSession = JSON.parse(storedStr);
+        }
+      } catch {}
+    }
+
     const { data: { session }, error } = await supabase.auth.getSession();
-    if (error || !session?.user) return null;
+    if (error || !session?.user) {
+      return null;
+    }
 
     const profile = await fetchUserProfile(session.user.id);
     if (profile) {
@@ -213,7 +232,7 @@ export async function getInitialAuthSession(): Promise<UserProfile | null> {
     setStoredLocalSession(fallbackProfile);
     return fallbackProfile;
   } catch {
-    return null;
+    return memoryLocalSession;
   }
 }
 
@@ -612,22 +631,48 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
     if (data?.url && !isWeb) {
       const res = await openAuthSession(data.url, redirectUrl);
       if (res.type === 'success' && res.url) {
-        const urlObj = new URL(res.url);
-        const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
-        const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          const session = await getInitialAuthSession();
-          if (session) {
-            setStoredLocalSession(session);
-            return { user: session, error: null };
+        try {
+          const urlObj = new URL(res.url);
+          const code = urlObj.searchParams.get('code');
+          const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
+          const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
+          const errorDesc = urlObj.searchParams.get('error_description') || urlObj.searchParams.get('error');
+
+          if (errorDesc) {
+            return { user: null, error: decodeURIComponent(errorDesc) };
           }
+
+          if (code) {
+            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeError) {
+              console.warn('exchangeCodeForSession in signInWithGoogle:', exchangeError.message);
+            }
+          } else if (accessToken && refreshToken) {
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+          }
+        } catch (parseErr) {
+          console.warn('Error parsing auth redirect URL:', parseErr);
         }
       }
-      return { user: null, error: 'Google sign-in was cancelled.' };
+
+      // Check if session is now active (exchanged directly or via deep link)
+      const { data: { session: activeSession } } = await supabase.auth.getSession();
+      if (activeSession?.user) {
+        const session = await getInitialAuthSession();
+        if (session) {
+          setStoredLocalSession(session);
+          return { user: session, error: null };
+        }
+      }
+
+      if (res.type === 'cancel' || res.type === 'dismiss') {
+        return { user: null, error: 'Google sign-in was cancelled.' };
+      }
+
+      return { user: null, error: 'Could not complete Google authentication.' };
     }
 
     return { user: null, error: 'Could not obtain Google authentication URL.' };
@@ -668,22 +713,48 @@ export async function signInWithORCID(): Promise<AuthResponse> {
     if (data?.url && !isWeb) {
       const res = await openAuthSession(data.url, redirectUrl);
       if (res.type === 'success' && res.url) {
-        const urlObj = new URL(res.url);
-        const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
-        const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          const session = await getInitialAuthSession();
-          if (session) {
-            setStoredLocalSession(session);
-            return { user: session, error: null };
+        try {
+          const urlObj = new URL(res.url);
+          const code = urlObj.searchParams.get('code');
+          const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
+          const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
+          const errorDesc = urlObj.searchParams.get('error_description') || urlObj.searchParams.get('error');
+
+          if (errorDesc) {
+            return { user: null, error: decodeURIComponent(errorDesc) };
           }
+
+          if (code) {
+            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeError) {
+              console.warn('exchangeCodeForSession in signInWithORCID:', exchangeError.message);
+            }
+          } else if (accessToken && refreshToken) {
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+          }
+        } catch (parseErr) {
+          console.warn('Error parsing ORCID auth redirect URL:', parseErr);
         }
       }
-      return { user: null, error: 'ORCID authentication was cancelled.' };
+
+      // Check if session is now active
+      const { data: { session: activeSession } } = await supabase.auth.getSession();
+      if (activeSession?.user) {
+        const session = await getInitialAuthSession();
+        if (session) {
+          setStoredLocalSession(session);
+          return { user: session, error: null };
+        }
+      }
+
+      if (res.type === 'cancel' || res.type === 'dismiss') {
+        return { user: null, error: 'ORCID authentication was cancelled.' };
+      }
+
+      return { user: null, error: 'Could not complete ORCID authentication.' };
     }
 
     return { user: null, error: 'Could not obtain ORCID authentication URL.' };

@@ -39,7 +39,7 @@ interface PostCardProps {
   onUpdated?: (updated: Post) => void;
 }
 
-export const PostCard: React.FC<PostCardProps> = ({
+export const PostCard: React.FC<PostCardProps> = React.memo(({
   post,
   style,
   onDeleted,
@@ -377,34 +377,40 @@ export const PostCard: React.FC<PostCardProps> = ({
       </View>
 
       {/* Post Options Menu Modal */}
-      <PostOptionsModal
-        visible={isOptionsOpen}
-        onClose={() => setIsOptionsOpen(false)}
-        post={post}
-        onEditPress={() => setIsEditOpen(true)}
-        onSharePress={() => setIsShareOpen(true)}
-        onDeleteSuccess={onDeleted}
-      />
+      {isOptionsOpen && (
+        <PostOptionsModal
+          visible={isOptionsOpen}
+          onClose={() => setIsOptionsOpen(false)}
+          post={post}
+          onEditPress={() => setIsEditOpen(true)}
+          onSharePress={() => setIsShareOpen(true)}
+          onDeleteSuccess={onDeleted}
+        />
+      )}
 
       {/* Edit Post Modal */}
-      <EditPostModal
-        visible={isEditOpen}
-        onClose={() => setIsEditOpen(false)}
-        post={post}
-        onSaveSuccess={() => {
-          onUpdated?.(post);
-        }}
-      />
+      {isEditOpen && (
+        <EditPostModal
+          visible={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+          post={post}
+          onSaveSuccess={() => {
+            onUpdated?.(post);
+          }}
+        />
+      )}
 
       {/* Share Post Modal */}
-      <SharePostModal
-        visible={isShareOpen}
-        onClose={() => setIsShareOpen(false)}
-        post={post}
-      />
+      {isShareOpen && (
+        <SharePostModal
+          visible={isShareOpen}
+          onClose={() => setIsShareOpen(false)}
+          post={post}
+        />
+      )}
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

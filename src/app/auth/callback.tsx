@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-nativ
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { supabase } from '../../api/client';
-import { fetchUserProfile, setStoredLocalSession } from '../../api/authService';
+import { fetchUserProfile, setStoredLocalSession, getStoredLocalSession, getInitialAuthSession } from '../../api/authService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { BooffinLogo } from '../../components/core/BooffinLogo';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -90,12 +90,37 @@ export default function AuthCallbackScreen() {
 
         let activeSession = (await supabase.auth.getSession()).data.session;
         if (!activeSession?.user) {
-          // Retry once more
-          await new Promise((resolve) => setTimeout(resolve, 600));
-          activeSession = (await supabase.auth.getSession()).data.session;
+          // Retry up to 3 times
+          for (let attempt = 0; attempt < 3; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            activeSession = (await supabase.auth.getSession()).data.session;
+            if (activeSession?.user) break;
+          }
         }
 
+        // If still no session in getSession(), check if user already active in auth store or storage
         if (!activeSession?.user) {
+          const storeUser = useAuthStore.getState().user;
+          const storedProfile = getStoredLocalSession();
+          if (storeUser?.id || storedProfile?.id) {
+            router.replace('/(tabs)');
+            return;
+          }
+
+          // Fallback check via getInitialAuthSession
+          const initialUser = await getInitialAuthSession();
+          if (initialUser?.id) {
+            useAuthStore.setState({
+              user: initialUser,
+              authStatus: 'authenticated',
+              isAuthenticated: true,
+              isLoading: false,
+              authError: null,
+            });
+            router.replace('/(tabs)');
+            return;
+          }
+
           if (isMounted) {
             setErrorText('Could not find active authentication session. Redirecting to welcome...');
           }
