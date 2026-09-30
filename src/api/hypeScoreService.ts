@@ -110,49 +110,32 @@ export function calculateFinalHypeScore(ratingScore: number, popularityScore: nu
 /**
  * Generates initial baseline metrics for a paper based on its view/citation seed
  */
-export function createDefaultPaperMetrics(paperId: string, initialViews: number = 340): PaperMetrics {
-  const views = Math.max(initialViews, 120);
-  const uniqueReaders = Math.round(views * 0.78);
-  const viewsLastHour = Math.max(2, Math.round(views * 0.04));
-  const viewsLast24h = Math.max(14, Math.round(views * 0.22));
-
-  // Seed with natural baseline rating distribution (approx 3.8 - 4.2)
-  const seedRating = 3.9;
-  const seedCount = 6;
-  const impactSum = seedRating * seedCount;
-  const claritySum = (seedRating + 0.2) * seedCount;
-  const visualsSum = (seedRating - 0.1) * seedCount;
-
-  const impactAvg = parseFloat((impactSum / seedCount).toFixed(2));
-  const clarityAvg = parseFloat((claritySum / seedCount).toFixed(2));
-  const visualsAvg = parseFloat((visualsSum / seedCount).toFixed(2));
-  const rawCommunityRating = parseFloat(((impactAvg + clarityAvg + visualsAvg) / 3).toFixed(2));
-
-  const bayesianRating = applyBayesianShrinkage(rawCommunityRating, seedCount);
-  const ratingScore = calculateRatingScore(bayesianRating);
-  const popularityScore = calculatePopularityScore(views);
-  const hypeScore = calculateFinalHypeScore(ratingScore, popularityScore);
+export function createDefaultPaperMetrics(paperId: string, initialViews: number = 24): PaperMetrics {
+  const views = Math.max(initialViews, 1);
+  const uniqueReaders = Math.round(views * 0.75);
+  const viewsLastHour = Math.max(1, Math.round(views * 0.05));
+  const viewsLast24h = Math.max(2, Math.round(views * 0.2));
 
   return {
     paperId,
     views,
     uniqueReaders,
-    impactSum,
-    impactCount: seedCount,
-    claritySum,
-    clarityCount: seedCount,
-    visualsSum,
-    visualsCount: seedCount,
-    impactAvg,
-    clarityAvg,
-    visualsAvg,
-    communityRating: rawCommunityRating,
-    ratingScore,
-    popularityScore,
-    hypeScore,
+    impactSum: 0,
+    impactCount: 0,
+    claritySum: 0,
+    clarityCount: 0,
+    visualsSum: 0,
+    visualsCount: 0,
+    impactAvg: 0,
+    clarityAvg: 0,
+    visualsAvg: 0,
+    communityRating: 0,
+    ratingScore: 0,
+    popularityScore: calculatePopularityScore(views),
+    hypeScore: 0, // 0 signifies UNRATED until first community vote!
     viewsLastHour,
     viewsLast24h,
-    trendScore: Math.round((viewsLast24h / views) * 100),
+    trendScore: 0,
   };
 }
 
@@ -344,26 +327,33 @@ export async function submitPaperRating(params: {
   }
 
   const nextImpactSum = Math.max(0, currentMetrics.impactSum + deltaImpactSum);
-  const nextImpactCount = Math.max(1, currentMetrics.impactCount + deltaImpactCount);
+  const nextImpactCount = Math.max(0, currentMetrics.impactCount + deltaImpactCount);
   const nextClaritySum = Math.max(0, currentMetrics.claritySum + deltaClaritySum);
-  const nextClarityCount = Math.max(1, currentMetrics.clarityCount + deltaClarityCount);
+  const nextClarityCount = Math.max(0, currentMetrics.clarityCount + deltaClarityCount);
   const nextVisualsSum = Math.max(0, currentMetrics.visualsSum + deltaVisualsSum);
-  const nextVisualsCount = Math.max(1, currentMetrics.visualsCount + deltaVisualsCount);
+  const nextVisualsCount = Math.max(0, currentMetrics.visualsCount + deltaVisualsCount);
 
   // 3. Calculate new averages
-  const nextImpactAvg = parseFloat((nextImpactSum / nextImpactCount).toFixed(2));
-  const nextClarityAvg = parseFloat((nextClaritySum / nextClarityCount).toFixed(2));
-  const nextVisualsAvg = parseFloat((nextVisualsSum / nextVisualsCount).toFixed(2));
-  const nextCommunityRating = parseFloat(
-    ((nextImpactAvg + nextClarityAvg + nextVisualsAvg) / 3).toFixed(2)
-  );
+  const nextImpactAvg = nextImpactCount > 0 ? parseFloat((nextImpactSum / nextImpactCount).toFixed(2)) : 0;
+  const nextClarityAvg = nextClarityCount > 0 ? parseFloat((nextClaritySum / nextClarityCount).toFixed(2)) : 0;
+  const nextVisualsAvg = nextVisualsCount > 0 ? parseFloat((nextVisualsSum / nextVisualsCount).toFixed(2)) : 0;
+
+  const ratedList = [nextImpactAvg, nextClarityAvg, nextVisualsAvg].filter((v) => v > 0);
+  const nextCommunityRating = ratedList.length > 0
+    ? parseFloat((ratedList.reduce((a, b) => a + b, 0) / ratedList.length).toFixed(2))
+    : 0;
 
   // 4. Bayesian rating and HYPE score recalculation
-  const totalCount = Math.max(nextImpactCount, nextClarityCount, nextVisualsCount);
-  const bayesianRating = applyBayesianShrinkage(nextCommunityRating, totalCount);
-  const ratingScore = calculateRatingScore(bayesianRating);
+  const totalVotes = nextImpactCount + nextClarityCount + nextVisualsCount;
   const popularityScore = calculatePopularityScore(currentMetrics.views);
-  const hypeScore = calculateFinalHypeScore(ratingScore, popularityScore);
+  let ratingScore = 0;
+  let hypeScore = 0;
+
+  if (totalVotes > 0) {
+    const bayesianRating = applyBayesianShrinkage(nextCommunityRating, totalVotes);
+    ratingScore = calculateRatingScore(bayesianRating);
+    hypeScore = calculateFinalHypeScore(ratingScore, popularityScore);
+  }
 
   const updatedMetrics: PaperMetrics = {
     ...currentMetrics,

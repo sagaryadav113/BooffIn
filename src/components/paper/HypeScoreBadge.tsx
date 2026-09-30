@@ -25,13 +25,16 @@ export const HypeScoreBadge: React.FC<HypeScoreBadgeProps> = ({
 }) => {
   const [detailsVisible, setDetailsVisible] = useState(false);
 
-  const getBadgeColors = (s: number) => {
+  const isUnrated = !score || score === 0 || (metrics ? (metrics.impactCount === 0 && metrics.clarityCount === 0 && metrics.visualsCount === 0) : false);
+
+  const getBadgeColors = (s: number, unrated: boolean) => {
+    if (unrated) return { bg: '#F8FAFC', text: '#64748B', border: '#E2E8F0', flame: '#94A3B8' };
     if (s >= 80) return { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A', flame: '#D97706' };
     if (s >= 60) return { bg: '#F0FDF4', text: '#15803D', border: '#BBF7D0', flame: '#16A34A' };
     return { bg: '#F1F5F9', text: '#475569', border: '#E2E8F0', flame: '#64748B' };
   };
 
-  const c = getBadgeColors(score);
+  const c = getBadgeColors(score, isUnrated);
 
   return (
     <>
@@ -50,7 +53,7 @@ export const HypeScoreBadge: React.FC<HypeScoreBadgeProps> = ({
         <Flame
           size={size === 'sm' ? 11 : size === 'lg' ? 16 : 13}
           color={c.flame}
-          fill={c.flame}
+          fill={isUnrated ? 'transparent' : c.flame}
         />
         <Text
           style={[
@@ -60,7 +63,7 @@ export const HypeScoreBadge: React.FC<HypeScoreBadgeProps> = ({
             { color: c.text },
           ]}
         >
-          HYPE {score}
+          {isUnrated ? 'Unrated' : `HYPE ${score}`}
         </Text>
       </TouchableOpacity>
 
@@ -82,7 +85,7 @@ export const HypeScoreBadge: React.FC<HypeScoreBadgeProps> = ({
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Flame size={20} color="#D97706" fill="#D97706" />
+                  <Flame size={20} color={isUnrated ? '#64748B' : '#D97706'} fill={isUnrated ? 'transparent' : '#D97706'} />
                   <Text style={styles.modalTitle}>BOOFFIN HYPE SCORE</Text>
                 </View>
                 <TouchableOpacity onPress={() => setDetailsVisible(false)}>
@@ -91,15 +94,23 @@ export const HypeScoreBadge: React.FC<HypeScoreBadgeProps> = ({
               </View>
 
               <View style={styles.scoreHeroRow}>
-                <Text style={styles.heroScoreText}>{score}</Text>
-                <View>
-                  <Text style={styles.heroScoreMax}>/ 100</Text>
-                  <Text style={styles.heroScoreSub}>Scientific Impact Index</Text>
+                <Text style={[styles.heroScoreText, isUnrated && { fontSize: 32 }]}>
+                  {isUnrated ? 'Unrated' : score}
+                </Text>
+                <View style={{ marginLeft: 6 }}>
+                  <Text style={[styles.heroScoreMax, isUnrated && { color: '#1B4D3E' }]}>
+                    {isUnrated ? 'Pioneer Rating' : '/ 100'}
+                  </Text>
+                  <Text style={styles.heroScoreSub}>
+                    {isUnrated ? 'Be the first to rate!' : 'Scientific Impact Index'}
+                  </Text>
                 </View>
               </View>
 
               <Text style={styles.explanationText}>
-                HYPE combines peer community evaluation with real reader momentum. Large view counts are logarithmically scaled so scientific quality ratings always dominate.
+                {isUnrated
+                  ? 'This research paper has not received community evaluations on BooffIn yet. Rate its Impact, Clarity, and Visuals in the floating dock to establish its pioneer HYPE score!'
+                  : 'HYPE combines peer community evaluation with real reader momentum. Large view counts are logarithmically scaled so scientific quality ratings always dominate.'}
               </Text>
 
               {/* Weight Breakdown */}
