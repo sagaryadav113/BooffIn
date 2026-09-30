@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,11 @@ import {
   ExternalLink,
   BookOpen,
   FileText,
-  Maximize2,
   Globe,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
-import { colors, radii, spacing, typography } from '../../theme';
-import { Badge } from '../core/Badge';
+import { colors, radii, spacing } from '../../theme';
 import { Paper } from '../../types';
 import { FloatingRatingDock } from './FloatingRatingDock';
 import { PaperMetrics, UserPaperRating } from '../../api/hypeScoreService';
@@ -97,42 +95,6 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* ── TOOLBAR ── */}
-      <View style={styles.controlsBar}>
-        <View style={styles.controlsLeft}>
-          <Badge
-            label={paper.journal || (isDirectPdf ? 'Open Access' : 'Publisher')}
-            variant={isDirectPdf ? 'oa' : 'generic'}
-          />
-          <Text style={styles.controlsSubtext} numberOfLines={1}>
-            Original PDF Document
-          </Text>
-        </View>
-
-        <View style={styles.controlsRight}>
-          {onSwitchToArticleView && (
-            <TouchableOpacity
-              onPress={onSwitchToArticleView}
-              style={styles.controlSecondaryBtn}
-              activeOpacity={0.75}
-            >
-              <BookOpen size={13} color={colors.textPrimary} />
-              <Text style={styles.controlSecondaryBtnText}>Article View</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            onPress={handleOpenExternal}
-            style={styles.controlPrimaryBtn}
-            activeOpacity={0.75}
-          >
-            <Maximize2 size={13} color="#FFFFFF" />
-            <Text style={styles.controlPrimaryBtnText}>Full View</Text>
-            <ExternalLink size={11} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {/* ── IN-APP PDF VIEWER WITH EMBEDDED FLOATING RATING DOCK ── */}
       {Platform.OS === 'web' ? (
         <View style={styles.webPdfWrapper}>
@@ -238,64 +200,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-  },
-  controlsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    backgroundColor: '#F9FAFB',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    gap: spacing.sm,
-  },
-  controlsLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  controlsSubtext: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    fontFamily: typography.caption.fontFamily,
-  },
-  controlsRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  controlSecondaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 6,
-    borderRadius: radii.sm,
-  },
-  controlSecondaryBtnText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  controlPrimaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#1B4D3E',
-    paddingHorizontal: spacing.sm + 4,
-    paddingVertical: 6,
-    borderRadius: radii.sm,
-  },
-  controlPrimaryBtnText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   webPdfWrapper: {
     width: '100%',
