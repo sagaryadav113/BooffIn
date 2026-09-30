@@ -38,9 +38,12 @@ export default function ExploreScreen() {
     isSearching,
     results,
     recentSearches,
+    hasMoreResearchers,
+    isLoadingMoreResearchers,
     setSearchQuery,
     setActiveCategory,
     executeSearch,
+    loadMoreResearchers,
     clearSearch,
     removeRecentSearch,
     clearRecentSearches,
@@ -247,6 +250,25 @@ export default function ExploreScreen() {
                 {results.researchers.map((researcher) => (
                   <ResearcherResultCard key={researcher.id} researcher={researcher} />
                 ))}
+
+                {/* Load More Scholars button */}
+                {hasMoreResearchers && (
+                  <TouchableOpacity
+                    style={styles.loadMoreBtn}
+                    onPress={loadMoreResearchers}
+                    disabled={isLoadingMoreResearchers}
+                    activeOpacity={0.8}
+                  >
+                    {isLoadingMoreResearchers ? (
+                      <ActivityIndicator size="small" color={colors.textPrimary} />
+                    ) : (
+                      <>
+                        <Users size={14} color={colors.textPrimary} />
+                        <Text style={styles.loadMoreBtnText}>Load more scholars</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -427,5 +449,22 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 12,
+  },
+  loadMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs + 2,
+    paddingVertical: spacing.sm + 4,
+    backgroundColor: colors.cardBackground,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    marginTop: spacing.xs,
+  },
+  loadMoreBtnText: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 13,
   },
 });

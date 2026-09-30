@@ -50,9 +50,14 @@ import { UserProfile, Post } from '../../types';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { FollowListModal } from '../../components/modals/FollowListModal';
 import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab';
+import { OpenAlexAuthorProfileView } from '../../components/profile/OpenAlexAuthorProfileView';
 
 export default function OtherResearcherProfileScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, openAlexId, orcidId } = useLocalSearchParams<{
+    id: string;
+    openAlexId?: string;
+    orcidId?: string;
+  }>();
   const currentUser = useAuthStore((s) => s.user);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
   const allPosts = usePostStore((s) => s.posts);
@@ -82,7 +87,11 @@ export default function OtherResearcherProfileScreen() {
 
   useEffect(() => {
     async function loadProfile() {
-      if (!id) {
+      const isExplicitOpenAlex =
+        Boolean(openAlexId) ||
+        Boolean(id && (id.startsWith('openalex_author_') || /^A\d+$/i.test(id)));
+
+      if (!id || isExplicitOpenAlex) {
         setIsLoading(false);
         return;
       }
@@ -201,6 +210,24 @@ export default function OtherResearcherProfileScreen() {
     setFollowModalVisible(true);
   };
 
+  const isExplicitOpenAlex =
+    Boolean(openAlexId) ||
+    Boolean(id && (id.startsWith('openalex_author_') || /^A\d+$/i.test(id)));
+
+  if (isExplicitOpenAlex) {
+    const cleanOaId = openAlexId || (id ? id.replace(/^openalex_author_/i, '') : '');
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <OpenAlexAuthorProfileView
+          authorId={cleanOaId}
+          initialOrcid={orcidId}
+          onBack={() => router.back()}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -214,6 +241,20 @@ export default function OtherResearcherProfileScreen() {
   }
 
   if (!researcher) {
+    if (id?.startsWith('openalex_author_') || (id && /^A\d+$/i.test(id))) {
+      const cleanOaId = id.replace(/^openalex_author_/i, '');
+      return (
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+          <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+          <OpenAlexAuthorProfileView
+            authorId={cleanOaId}
+            initialOrcid={orcidId}
+            onBack={() => router.back()}
+          />
+        </SafeAreaView>
+      );
+    }
+
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />

@@ -21,10 +21,25 @@ export const ResearcherResultCard: React.FC<ResearcherResultCardProps> = ({
         pathname: '/profile/[id]',
         params: { id: researcher.id },
       });
+    } else if (researcher.id?.startsWith('openalex_author_') || researcher.id?.startsWith('A')) {
+      const cleanOaId = researcher.id.replace(/^openalex_author_/i, '');
+      router.push({
+        pathname: '/profile/[id]',
+        params: {
+          id: researcher.id,
+          openAlexId: cleanOaId,
+          ...(researcher.orcidId ? { orcidId: researcher.orcidId } : {}),
+        },
+      });
     } else if (researcher.orcidId) {
       router.push({
         pathname: '/profile/[id]',
         params: { id: researcher.id, orcidId: researcher.orcidId },
+      });
+    } else {
+      router.push({
+        pathname: '/profile/[id]',
+        params: { id: researcher.id },
       });
     }
   };

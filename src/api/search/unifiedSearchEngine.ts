@@ -141,3 +141,14 @@ export async function executeUnifiedSearch(
   searchCache.set(cacheKey, { timestamp: Date.now(), results: finalResults });
   return finalResults;
 }
+
+/**
+ * Loads additional pages of researchers/scholars matching query
+ */
+export async function loadMoreScholars(
+  query: string,
+  page: number,
+  limit = 10
+): Promise<ResearcherSearchResult[]> {
+  return searchOpenAlexAuthors(query, limit, page);
+}

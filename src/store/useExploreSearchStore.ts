@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { SearchFilterCategory, UnifiedSearchResults } from '../api/search/types';
-import { executeUnifiedSearch } from '../api/search/unifiedSearchEngine';
+import { executeUnifiedSearch, loadMoreScholars } from '../api/search/unifiedSearchEngine';
 import { usePaperStore } from './usePaperStore';
 import { appStorage } from '../api/client';
 
@@ -12,10 +12,14 @@ interface ExploreSearchState {
   isSearching: boolean;
   results: UnifiedSearchResults | null;
   recentSearches: string[];
+  researchersPage: number;
+  hasMoreResearchers: boolean;
+  isLoadingMoreResearchers: boolean;
   loadRecentSearches: () => Promise<void>;
   setSearchQuery: (query: string) => void;
   setActiveCategory: (category: SearchFilterCategory) => void;
   executeSearch: (queryOverride?: string) => Promise<void>;
+  loadMoreResearchers: () => Promise<void>;
   clearSearch: () => void;
   addRecentSearch: (query: string) => void;
   removeRecentSearch: (query: string) => void;
@@ -28,6 +32,9 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
   isSearching: false,
   results: null,
   recentSearches: [],
+  researchersPage: 1,
+  hasMoreResearchers: false,
+  isLoadingMoreResearchers: false,
 
   loadRecentSearches: async () => {
     try {
@@ -44,7 +51,13 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
   setSearchQuery: (query: string) => {
     set({ searchQuery: query });
     if (!query.trim()) {
-      set({ results: null, isSearching: false });
+      set({
+        results: null,
+        isSearching: false,
+        researchersPage: 1,
+        hasMoreResearchers: false,
+        isLoadingMoreResearchers: false,
+      });
     }
   },
 
@@ -59,16 +72,28 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
   executeSearch: async (queryOverride?: string) => {
     const targetQuery = (queryOverride !== undefined ? queryOverride : get().searchQuery).trim();
     if (!targetQuery) {
-      set({ results: null, isSearching: false });
+      set({
+        results: null,
+        isSearching: false,
+        researchersPage: 1,
+        hasMoreResearchers: false,
+        isLoadingMoreResearchers: false,
+      });
       return;
     }
 
-    set({ isSearching: true });
+    set({ isSearching: true, researchersPage: 1, hasMoreResearchers: false });
     get().addRecentSearch(targetQuery);
 
     try {
       const results = await executeUnifiedSearch(targetQuery, get().activeCategory);
-      set({ results, isSearching: false });
+      set({
+        results,
+        isSearching: false,
+        researchersPage: 1,
+        hasMoreResearchers: (results.researchers?.length || 0) >= 6,
+        isLoadingMoreResearchers: false,
+      });
 
       // Automatically hydrate found papers into in-memory paperStore
       if (results.papers && results.papers.length > 0) {
@@ -79,12 +104,54 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
       }
     } catch (err) {
       console.warn('[ExploreSearchStore] Error during search:', err);
-      set({ isSearching: false });
+      set({ isSearching: false, isLoadingMoreResearchers: false });
+    }
+  },
+
+  loadMoreResearchers: async () => {
+    const state = get();
+    if (state.isLoadingMoreResearchers || !state.hasMoreResearchers || !state.searchQuery.trim()) {
+      return;
+    }
+    const nextPage = state.researchersPage + 1;
+    set({ isLoadingMoreResearchers: true });
+    try {
+      const more = await loadMoreScholars(state.searchQuery.trim(), nextPage, 10);
+      if (!more || more.length === 0) {
+        set({ hasMoreResearchers: false, isLoadingMoreResearchers: false });
+        return;
+      }
+      const currentResults = state.results;
+      if (currentResults) {
+        const existingIds = new Set(currentResults.researchers.map((r) => r.id));
+        const newItems = more.filter((r) => !existingIds.has(r.id));
+        set({
+          results: {
+            ...currentResults,
+            researchers: [...currentResults.researchers, ...newItems],
+          },
+          researchersPage: nextPage,
+          hasMoreResearchers: more.length >= 8,
+          isLoadingMoreResearchers: false,
+        });
+      } else {
+        set({ isLoadingMoreResearchers: false });
+      }
+    } catch (err) {
+      console.warn('[ExploreSearchStore] Error loading more researchers:', err);
+      set({ isLoadingMoreResearchers: false });
     }
   },
 
   clearSearch: () => {
-    set({ searchQuery: '', results: null, isSearching: false });
+    set({
+      searchQuery: '',
+      results: null,
+      isSearching: false,
+      researchersPage: 1,
+      hasMoreResearchers: false,
+      isLoadingMoreResearchers: false,
+    });
   },
 
   addRecentSearch: (query: string) => {

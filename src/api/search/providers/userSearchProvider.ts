@@ -69,7 +69,8 @@ export async function searchBooffInUsers(
  */
 export async function searchOpenAlexAuthors(
   query: string,
-  limit = 8
+  limit = 8,
+  page = 1
 ): Promise<ResearcherSearchResult[]> {
   const cleanQ = query.trim().replace(/^@/, '');
   if (!cleanQ) return [];
@@ -77,7 +78,7 @@ export async function searchOpenAlexAuthors(
   try {
     const url = `https://api.openalex.org/authors?search=${encodeURIComponent(
       cleanQ
-    )}&per-page=${limit}&select=id,display_name,display_name_alternatives,last_known_institution,works_count,cited_by_count,orcid,x_concepts&mailto=dev@booffin.science`;
+    )}&per-page=${limit}&page=${page}&select=id,display_name,display_name_alternatives,last_known_institution,works_count,cited_by_count,orcid,x_concepts&mailto=dev@booffin.science`;
 
     const res = await fetchWithRetry(url, {
       headers: { 'User-Agent': 'BooffIn/1.0 (scholar-search; dev@booffin.science)' },
