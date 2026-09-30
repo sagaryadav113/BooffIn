@@ -234,6 +234,34 @@ export function extractPollAndCleanContent(rawContent?: string | null): {
   return { cleanContent: rawContent };
 }
 
+export function encodeArticleIntoContent(
+  content: string,
+  article?: import('../types').ArticleData
+): string {
+  if (!article) return content;
+  const articleMarker = `\n\n<!--ARTICLE_DATA:${JSON.stringify(article)}-->`;
+  return `${content.trim()}${articleMarker}`;
+}
+
+export function extractArticleAndCleanContent(rawContent?: string | null): {
+  cleanContent: string;
+  article?: import('../types').ArticleData;
+} {
+  if (!rawContent) return { cleanContent: '' };
+  const articleRegex = /(?:\n\n)?<!--ARTICLE_DATA:(.*?)-->/s;
+  const match = rawContent.match(articleRegex);
+  if (match) {
+    try {
+      const parsed: import('../types').ArticleData = JSON.parse(match[1]);
+      const cleanContent = rawContent.replace(match[0], '').trim();
+      return { cleanContent, article: parsed };
+    } catch (e) {
+      console.warn('[socialService] Failed to parse article metadata from content:', e);
+    }
+  }
+  return { cleanContent: rawContent };
+}
+
 // Helper to query and populate poll vote totals and current user's voted option
 export async function populatePollVotes(
   posts: Post[],
@@ -338,7 +366,8 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
     ? row.bookmarks.some((b: any) => b.user_id === currentUserId)
     : Boolean(row.is_saved);
 
-  const { cleanContent, poll } = extractPollAndCleanContent(row.content || '');
+  const { cleanContent: contentWithoutPoll, poll } = extractPollAndCleanContent(row.content || '');
+  const { cleanContent, article } = extractArticleAndCleanContent(contentWithoutPoll);
 
   return {
     id: row.id,
@@ -348,6 +377,7 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
     paper,
     images: Array.isArray(row.media_urls) ? row.media_urls : [],
     poll,
+    article,
     topics: topics.length > 0 ? topics : [],
     visibility: row.visibility || 'public',
     likesCount: row.likes_count || 0,
@@ -560,6 +590,7 @@ export interface CreatePostPayload {
   postType: PostType;
   paper?: Paper;
   poll?: import('../types').Poll;
+  article?: import('../types').ArticleData;
   topics: string[];
   visibility?: 'public' | 'followers';
   authorId?: string;
@@ -631,7 +662,10 @@ export async function createPost(
       }
     }
 
-    const rawContentWithPoll = encodePollIntoContent(content, poll);
+    let rawContentWithPoll = encodePollIntoContent(content, poll);
+    if (payload.article) {
+      rawContentWithPoll = encodeArticleIntoContent(rawContentWithPoll, payload.article);
+    }
 
     const { data: postRow, error: postError } = await supabase
       .from('posts')

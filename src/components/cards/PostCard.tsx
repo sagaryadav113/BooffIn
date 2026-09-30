@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ViewStyle,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -12,6 +13,8 @@ import {
   Repeat2,
   MoreHorizontal,
   Check,
+  BookOpen,
+  ArrowRight,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Post } from '../../types';
@@ -169,8 +172,50 @@ export const PostCard: React.FC<PostCardProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Post Text Body */}
-      {post.content ? (
+      {/* Research Article Preview Card */}
+      {post.postType === 'article' && post.article ? (
+        <TouchableOpacity
+          onPress={handlePostPress}
+          activeOpacity={0.88}
+          style={styles.articleCardPreview}
+        >
+          <View style={styles.articleBadgeRow}>
+            <View style={styles.articleBadge}>
+              <BookOpen size={12} color={colors.accentBlue} />
+              <Text style={styles.articleBadgeText}>RESEARCH ARTICLE</Text>
+            </View>
+            {post.article.readingTimeMinutes && (
+              <Text style={styles.articleReadTime}>
+                {post.article.readingTimeMinutes} min read
+              </Text>
+            )}
+          </View>
+
+          <Text style={styles.articleCardTitle}>{post.article.title}</Text>
+
+          {post.article.subheading ? (
+            <Text style={styles.articleCardSubheading}>{post.article.subheading}</Text>
+          ) : null}
+
+          {post.article.abstract ? (
+            <View style={styles.articleAbstractPreview}>
+              <Text style={styles.articleAbstractText} numberOfLines={3}>
+                {post.article.abstract}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.articleFooterRow}>
+            <Text style={styles.articleRefPill}>
+              {post.article.references?.length || 0} References (APA)
+            </Text>
+            <View style={styles.readArticleLink}>
+              <Text style={styles.readArticleLinkText}>Read Full Article</Text>
+              <ArrowRight size={13} color={colors.accentBlue} />
+            </View>
+          </View>
+        </TouchableOpacity>
+      ) : post.content ? (
         <Text style={styles.postBody}>
           {post.content.split(/(@[a-zA-Z0-9_]{2,30})/g).map((part, index) => {
             if (part.startsWith('@')) {
@@ -586,5 +631,92 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: colors.textSecondary,
     fontWeight: '600',
+  },
+  articleCardPreview: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  articleBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs + 2,
+  },
+  articleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
+  },
+  articleBadgeText: {
+    ...typography.captionBold,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    color: colors.accentBlue,
+  },
+  articleReadTime: {
+    ...typography.caption,
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  articleCardTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 24,
+    marginBottom: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  articleCardSubheading: {
+    ...typography.captionMedium,
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: spacing.sm,
+  },
+  articleAbstractPreview: {
+    backgroundColor: '#FFFFFF',
+    borderLeftWidth: 2.5,
+    borderLeftColor: '#0F172A',
+    padding: spacing.sm,
+    borderRadius: radii.xs,
+    marginBottom: spacing.sm,
+  },
+  articleAbstractText: {
+    ...typography.captionMedium,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#334155',
+    fontStyle: 'italic',
+  },
+  articleFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E2E8F0',
+  },
+  articleRefPill: {
+    ...typography.captionBold,
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  readArticleLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  readArticleLinkText: {
+    ...typography.captionBold,
+    fontSize: 12,
+    color: colors.accentBlue,
   },
 });

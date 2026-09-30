@@ -22,6 +22,7 @@ export interface CreatePostParams {
   paper?: Paper;
   images?: string[];
   poll?: import('../types').Poll;
+  article?: import('../types').ArticleData;
   topics: string[];
   visibility?: 'public' | 'followers';
   authorId?: string;
@@ -367,6 +368,7 @@ export const usePostStore = create<PostState>((set, get) => ({
       paper: params.paper,
       images: params.images,
       poll: params.poll,
+      article: params.article,
       topics: params.topics,
       visibility: params.visibility || 'public',
       likesCount: 0,
@@ -390,6 +392,7 @@ export const usePostStore = create<PostState>((set, get) => ({
       paper: params.paper,
       mediaUrls: params.images,
       poll: params.poll,
+      article: params.article,
       topics: params.topics,
       visibility: params.visibility || 'public',
       authorId,

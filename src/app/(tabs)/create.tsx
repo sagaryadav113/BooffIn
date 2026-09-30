@@ -40,7 +40,8 @@ import { PaperCard } from '../../components/cards/PaperCard';
 import { PaperLookupModal } from '../../components/modals/PaperLookupModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
-import { Paper, PostType, Poll } from '../../types';
+import { Paper, PostType, Poll, ArticleData } from '../../types';
+import { ArticleComposer } from '../../components/composer/ArticleComposer';
 import {
   pickPostImages,
   capturePostImage,
@@ -369,6 +370,41 @@ export default function CreatePostScreen() {
     !isPublishing &&
     !isUploadingImage;
 
+  const handlePublishArticle = async (articleData: ArticleData) => {
+    setIsPublishing(true);
+    try {
+      await createPost(
+        {
+          content: articleData.abstract || articleData.title,
+          postType: 'article',
+          article: articleData,
+          topics: selectedTopics.length > 0 ? selectedTopics : ['Research Article'],
+          visibility,
+        },
+        user.id
+      );
+      router.replace('/(tabs)');
+    } catch (err) {
+      console.error('[CreatePost] Error publishing article:', err);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  if (postType === 'article') {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <ArticleComposer
+          currentUser={user}
+          onExit={() => setPostType('discussion')}
+          onPublish={handlePublishArticle}
+          isPublishing={isPublishing}
+        />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
@@ -400,7 +436,7 @@ export default function CreatePostScreen() {
         >
           {/* Post Type Selector Pills */}
           <View style={styles.postTypeRow}>
-            {(['discussion', 'question', 'insight'] as const).map((type) => (
+            {(['discussion', 'question', 'insight', 'article'] as const).map((type) => (
               <TouchableOpacity
                 key={type}
                 onPress={() => setPostType(type)}

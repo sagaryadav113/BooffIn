@@ -20,6 +20,7 @@ import { PostCard } from '../../components/cards/PostCard';
 import { CommentCard } from '../../components/cards/CommentCard';
 import { DiscussionComposer, DiscussionTypePills } from '../../components/discussion';
 import { EmptyState } from '../../components/feedback/EmptyState';
+import { ResearchArticleView } from '../../components/article/ResearchArticleView';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Comment, DiscussionType, Post } from '../../types';
@@ -252,6 +253,15 @@ export default function PostDetailScreen() {
           title="Discussion not found"
           description="This scientific discussion may have been removed or does not exist."
         />
+      </SafeAreaView>
+    );
+  }
+
+  if (activePost.postType === 'article' && activePost.article) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <ResearchArticleView post={activePost} />
       </SafeAreaView>
     );
   }

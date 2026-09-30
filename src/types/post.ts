@@ -1,7 +1,47 @@
 import { UserProfile } from './user';
 import { Paper } from './paper';
 
-export type PostType = 'discussion' | 'research_share' | 'question' | 'insight';
+export type PostType = 'discussion' | 'research_share' | 'question' | 'insight' | 'article';
+
+export interface ArticleReference {
+  id: string;
+  paperId?: string;
+  title: string;
+  authors: string[];
+  publicationYear?: number;
+  journal?: string;
+  doi?: string;
+  url?: string;
+  openAccessPdfUrl?: string;
+  apaFullCitation: string;
+  apaInTextCitation: string;
+}
+
+export interface ArticleImage {
+  id: string;
+  uri: string;
+  caption?: string;
+  figureNumber?: number;
+}
+
+export interface ArticleSection {
+  id: string;
+  heading: string;
+  content: string;
+  images?: ArticleImage[];
+}
+
+export interface ArticleData {
+  title: string;
+  subheading?: string;
+  authors: string[];
+  abstract: string;
+  sections: ArticleSection[];
+  references: ArticleReference[];
+  doi?: string;
+  readingTimeMinutes?: number;
+  isDraft?: boolean;
+}
 
 export interface Comment {
   id: string;
@@ -37,6 +77,7 @@ export interface Post {
   paper?: Paper; // Referenced external paper
   images?: string[];
   poll?: Poll;
+  article?: ArticleData; // Rich Long-Form Research Article
   topics: string[];
   visibility: 'public' | 'followers';
   likesCount: number;
@@ -50,3 +91,4 @@ export interface Post {
   repostedBy?: UserProfile;
   repostedAt?: string;
 }
+
