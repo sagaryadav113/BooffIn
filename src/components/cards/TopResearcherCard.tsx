@@ -10,7 +10,7 @@ import { router } from 'expo-router';
 import { UserPlus, UserCheck } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { UserProfile } from '../../types';
-import { colors, radii, spacing, typography } from '../../theme';
+import { radii, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { followUser, unfollowUser } from '../../api/socialService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -36,9 +36,14 @@ export const TopResearcherCard: React.FC<TopResearcherCardProps> = ({
     if (hypeScore && hypeScore > 0) {
       return hypeScore.toFixed(1);
     }
-    const defaultScores = [4.9, 4.8, 4.7, 4.6, 4.5];
-    return (defaultScores[rank - 1] ?? 4.4).toFixed(1);
-  }, [hypeScore, rank]);
+    const followers = researcher.followersCount || 0;
+    const posts = researcher.postsCount || 1;
+    const calculated = Math.min(
+      5.0,
+      Math.max(3.5, 3.8 + Math.log10(1 + followers) * 0.25 + Math.min(0.5, posts * 0.05))
+    );
+    return calculated.toFixed(1);
+  }, [hypeScore, researcher.followersCount, researcher.postsCount]);
 
   const progressPercent = Math.min(100, Math.max(15, (parseFloat(displayScore) / 5.0) * 100));
 

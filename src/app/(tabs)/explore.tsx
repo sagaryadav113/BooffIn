@@ -37,6 +37,7 @@ import { useTopicStore } from '../../store/useTopicStore';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { getHypedDomainData, HypedDomainData } from '../../api/hypedFeedService';
+import { subscribeToPaperRead } from '../../api/hypeScoreService';
 import { Paper, UserProfile } from '../../types';
 
 export default function ExploreScreen() {
@@ -122,6 +123,18 @@ export default function ExploreScreen() {
     if (activeTab !== 'For You' && activeTab !== 'Following') {
       loadHypedFeed(activeTab, timeframe);
     }
+  }, [activeTab, timeframe, loadHypedFeed]);
+
+  // Dynamically update explore hyped feed when a paper is read
+  useEffect(() => {
+    const unsubscribe = subscribeToPaperRead(() => {
+      if (activeTab !== 'For You' && activeTab !== 'Following') {
+        loadHypedFeed(activeTab, timeframe);
+      }
+    });
+    return () => {
+      unsubscribe();
+    };
   }, [activeTab, timeframe, loadHypedFeed]);
 
   const loadInitialData = useCallback(async () => {

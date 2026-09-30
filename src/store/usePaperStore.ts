@@ -3,12 +3,14 @@ import { Paper } from '../types';
 import { toggleBookmark as apiToggleBookmark, mapSupabasePaper } from '../api/socialService';
 import { useAuthStore } from './useAuthStore';
 import { supabase, appStorage } from '../api/client';
+import { recordPaperView, getReadPapersRegistry } from '../api/hypeScoreService';
 
 const SAVED_PAPER_IDS_KEY = 'booffin_saved_paper_ids';
 const SAVED_PAPERS_CACHE_KEY = 'booffin_saved_papers_cache';
 
 interface PaperState {
   papers: Paper[];
+  readPapers: Paper[];
   savedPaperIds: Set<string>;
   isLoading: boolean;
   fetchPapers: () => Promise<void>;
@@ -18,11 +20,13 @@ interface PaperState {
   getPaperById: (id: string) => Paper | undefined;
   getPaperByDoi: (doi: string) => Paper | undefined;
   addPaper: (paper: Paper) => void;
+  recordPaperRead: (paper: Paper, currentUserId?: string) => Promise<void>;
   searchPapers: (query: string) => Paper[];
 }
 
 export const usePaperStore = create<PaperState>((set, get) => ({
   papers: [],
+  readPapers: [],
   savedPaperIds: new Set<string>(),
   isLoading: false,
 
@@ -202,6 +206,27 @@ export const usePaperStore = create<PaperState>((set, get) => ({
         ...state.papers.filter((p) => p.id !== paper.id && (!paper.doi || p.doi !== paper.doi)),
       ],
     })),
+  recordPaperRead: async (paper: Paper, currentUserId?: string) => {
+    if (!paper || !paper.id) return;
+    // 1. Update in-memory state immediately so UI refreshes without delay
+    set((state) => ({
+      readPapers: [
+        paper,
+        ...state.readPapers.filter((p) => p.id !== paper.id && (!paper.doi || p.doi !== paper.doi)),
+      ],
+      papers: [
+        paper,
+        ...state.papers.filter((p) => p.id !== paper.id && (!paper.doi || p.doi !== paper.doi)),
+      ],
+    }));
+
+    // 2. Persist view count and register paper in persistent storage
+    try {
+      await recordPaperView(paper.id, currentUserId, paper);
+    } catch (e) {
+      console.warn('[usePaperStore] Error recording paper read:', e);
+    }
+  },
   searchPapers: (query) => {
     const q = query.toLowerCase().trim();
     if (!q) return get().papers;
@@ -217,7 +242,7 @@ export const usePaperStore = create<PaperState>((set, get) => ({
   },
 }));
 
-// Auto-load saved IDs and cached saved papers from local storage
+// Auto-load saved IDs, cached saved papers, and read papers from local storage
 (async () => {
   try {
     const rawIds = await appStorage.getItem(SAVED_PAPER_IDS_KEY);
@@ -234,6 +259,18 @@ export const usePaperStore = create<PaperState>((set, get) => ({
       usePaperStore.setState((s) => ({
         papers: [
           ...parsedPapers.filter((sp) => !s.papers.some((p) => p.id === sp.id || (p.doi && sp.doi && p.doi === sp.doi))),
+          ...s.papers,
+        ],
+      }));
+    }
+
+    // Auto-load read papers
+    const readRegistry = await getReadPapersRegistry();
+    if (readRegistry && readRegistry.length > 0) {
+      usePaperStore.setState((s) => ({
+        readPapers: readRegistry,
+        papers: [
+          ...readRegistry.filter((rp) => !s.papers.some((p) => p.id === rp.id || (p.doi && rp.doi && p.doi === rp.doi))),
           ...s.papers,
         ],
       }));

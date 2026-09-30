@@ -1,4 +1,5 @@
 import { supabase, appStorage } from './client';
+import { Paper } from '../types';
 
 export interface UserPaperRating {
   userId: string;
@@ -42,6 +43,27 @@ export interface PaperMetrics {
 
 const STORAGE_KEY_PREFIX_RATINGS = 'booffin_paper_user_ratings_';
 const STORAGE_KEY_PREFIX_METRICS = 'booffin_paper_metrics_';
+const STORAGE_KEY_READ_PAPERS_REGISTRY = 'booffin_read_papers_registry';
+
+type PaperReadListener = (paperId: string, metrics: PaperMetrics, paper?: Paper) => void;
+const paperReadListeners = new Set<PaperReadListener>();
+
+export function subscribeToPaperRead(listener: PaperReadListener): () => void {
+  paperReadListeners.add(listener);
+  return () => {
+    paperReadListeners.delete(listener);
+  };
+}
+
+export function notifyPaperRead(paperId: string, metrics: PaperMetrics, paper?: Paper) {
+  paperReadListeners.forEach((fn) => {
+    try {
+      fn(paperId, metrics, paper);
+    } catch (e) {
+      console.warn('[hypeScoreService] Error in paper read listener:', e);
+    }
+  });
+}
 
 // Global baseline constants
 const BAYESIAN_MIN_CONFIDENCE = 10; // m
@@ -231,11 +253,12 @@ interface StoredViewEntry {
 
 /**
  * Records a real in-app view event whenever a user views a paper.
- * Tracks actual reader count and real 24-hour reading velocity.
+ * Tracks actual reader count, real 24-hour reading velocity, and registers read paper.
  */
 export async function recordPaperView(
   paperId: string,
-  userId?: string
+  userId?: string,
+  paper?: Paper
 ): Promise<PaperMetrics> {
   const normalizedId = paperId.trim();
   const effectiveUserId = userId || 'anonymous_reader';
@@ -299,7 +322,64 @@ export async function recordPaperView(
     );
   } catch {}
 
+  // If a Paper object is provided, register it in the persistent read papers registry
+  if (paper) {
+    await registerReadPaper(paper);
+  }
+
+  // Broadcast real-time read event to all active screens
+  notifyPaperRead(normalizedId, updatedMetrics, paper);
+
   return updatedMetrics;
+}
+
+/**
+ * Registers a real paper read into persistent storage
+ */
+export async function registerReadPaper(paper: Paper): Promise<void> {
+  if (!paper || !paper.id) return;
+  try {
+    const raw = await appStorage.getItem(STORAGE_KEY_READ_PAPERS_REGISTRY);
+    let list: { paper: Paper; lastReadAt: number; readCount: number }[] = raw ? JSON.parse(raw) : [];
+
+    const idx = list.findIndex(
+      (item) => item.paper.id === paper.id || (paper.doi && item.paper.doi === paper.doi)
+    );
+
+    if (idx >= 0) {
+      list[idx].paper = { ...list[idx].paper, ...paper };
+      list[idx].lastReadAt = Date.now();
+      list[idx].readCount += 1;
+      const [item] = list.splice(idx, 1);
+      list.unshift(item);
+    } else {
+      list.unshift({
+        paper,
+        lastReadAt: Date.now(),
+        readCount: 1,
+      });
+    }
+
+    // Keep top 300 recently read papers
+    list = list.slice(0, 300);
+    await appStorage.setItem(STORAGE_KEY_READ_PAPERS_REGISTRY, JSON.stringify(list));
+  } catch (err) {
+    console.warn('[hypeScoreService] Error registering read paper:', err);
+  }
+}
+
+/**
+ * Retrieves all papers that have been read by users in the app
+ */
+export async function getReadPapersRegistry(): Promise<Paper[]> {
+  try {
+    const raw = await appStorage.getItem(STORAGE_KEY_READ_PAPERS_REGISTRY);
+    if (!raw) return [];
+    const list: { paper: Paper; lastReadAt: number; readCount: number }[] = JSON.parse(raw);
+    return list.map((item) => item.paper);
+  } catch {
+    return [];
+  }
 }
 
 /**

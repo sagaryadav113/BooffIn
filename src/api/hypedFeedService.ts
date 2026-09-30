@@ -1,7 +1,12 @@
 import { Paper, UserProfile } from '../types';
-import { supabase, appStorage } from './client';
+import { supabase } from './client';
 import { searchPapers } from './search/providers/paperSearchProvider';
-import { getPaperMetrics } from './hypeScoreService';
+import {
+  getPaperMetrics,
+  getReadPapersRegistry,
+  subscribeToPaperRead,
+  PaperMetrics,
+} from './hypeScoreService';
 
 export interface HypedDomainData {
   domain: string;
@@ -12,104 +17,161 @@ export interface HypedDomainData {
 
 // In-memory cache for speed and offline stability
 const domainFeedCache = new Map<string, { timestamp: number; data: HypedDomainData }>();
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 2 * 60 * 1000;
 
-// Curated top researcher seed pool per domain for instant rich display matching user's screenshot
-const CURATED_RESEARCHERS: Record<string, Partial<UserProfile>[]> = {
-  neuroscience: [
+export function invalidateDomainFeedCache() {
+  domainFeedCache.clear();
+}
+
+// Automatically invalidate domain cache whenever any paper is read across the app
+subscribeToPaperRead(() => {
+  invalidateDomainFeedCache();
+});
+
+/**
+ * Checks if a paper relates to a target scientific domain keyword
+ */
+function isPaperInDomain(paper: Paper, domain: string): boolean {
+  const normDomain = domain.trim().toLowerCase();
+  if (normDomain === 'for you' || normDomain === 'following' || normDomain === 'all' || !normDomain) {
+    return true;
+  }
+
+  // Check topics
+  if (paper.topics && paper.topics.some((t) => t.toLowerCase().includes(normDomain))) {
+    return true;
+  }
+
+  // Check title, abstract, or journal
+  const text = `${paper.title} ${paper.abstract || ''} ${paper.journal || ''}`.toLowerCase();
+  const domainWords = normDomain.split(/\s+/).filter((w) => w.length > 2);
+  return domainWords.some((w) => text.includes(w));
+}
+
+/**
+ * Derives real top researchers dynamically from paper authors and Supabase profiles
+ */
+async function deriveTopResearchers(
+  papers: Paper[],
+  domain: string
+): Promise<UserProfile[]> {
+  const researchers: UserProfile[] = [];
+  const authorMap = new Map<
+    string,
     {
-      id: 'res-neuro-1',
-      fullName: 'Lorenza C. Colón',
-      handle: 'lorenzacolon',
-      academicTitle: 'Principal Investigator',
-      institution: 'Harvard University',
-      avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
-      primaryField: 'Neuroscience',
-      secondaryFields: ['Neural Circuits', 'Zebrafish'],
-      researchInterests: ['Neural Circuits', 'Zebrafish', 'Social Behavior'],
-      followersCount: 4210,
-    },
-    {
-      id: 'res-neuro-2',
-      fullName: 'Karl Deisseroth',
-      handle: 'deisseroth',
-      academicTitle: 'Professor of Bioengineering',
-      institution: 'Stanford University',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-      primaryField: 'Neuroscience',
-      secondaryFields: ['Optogenetics', 'Neural Circuits'],
-      researchInterests: ['Optogenetics', 'Neural Circuits', 'Hydrogel-Tissue Chemistry'],
-      followersCount: 18500,
-    },
-    {
-      id: 'res-neuro-3',
-      fullName: 'Eve Marder',
-      handle: 'marder_lab',
-      academicTitle: 'Professor of Neuroscience',
-      institution: 'Brandeis University',
-      avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
-      primaryField: 'Neuroscience',
-      secondaryFields: ['Neural Plasticity', 'Motor Circuits'],
-      researchInterests: ['Neural Plasticity', 'Motor Circuits', 'Stomatogastric Ganglion'],
-      followersCount: 12900,
-    },
-    {
-      id: 'res-neuro-4',
-      fullName: 'Ed Boyden',
-      handle: 'edboyden',
-      academicTitle: 'Professor of Neurotechnology',
-      institution: 'MIT',
-      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
-      primaryField: 'Neuroscience',
-      secondaryFields: ['Expansion Microscopy', 'Optogenetics'],
-      researchInterests: ['Expansion Microscopy', 'Neural Recording'],
-      followersCount: 15300,
-    },
-  ],
-  'ai in science': [
-    {
-      id: 'res-ai-1',
-      fullName: 'Demis Hassabis',
-      handle: 'demishassabis',
-      academicTitle: 'CEO & Research Director',
-      institution: 'Google DeepMind',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-      primaryField: 'AI in Science',
-      secondaryFields: ['AlphaFold', 'Structural Biology'],
-      researchInterests: ['AlphaFold', 'Reinforcement Learning', 'Protein Folding'],
-      followersCount: 32000,
-    },
-    {
-      id: 'res-ai-2',
-      fullName: 'John Jumper',
-      handle: 'johnjumper',
-      academicTitle: 'Senior Staff Research Scientist',
-      institution: 'DeepMind / Nobel Laureate',
-      avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&auto=format&fit=crop&q=80',
-      primaryField: 'AI in Science',
-      secondaryFields: ['Computational Biology', 'Protein Structure'],
-      researchInterests: ['AlphaFold2', 'Biophysics', 'Deep Learning'],
-      followersCount: 24000,
-    },
-    {
-      id: 'res-ai-3',
-      fullName: 'Fei-Fei Li',
-      handle: 'drfeifei',
-      academicTitle: 'Professor of Computer Science',
-      institution: 'Stanford University',
-      avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80',
-      primaryField: 'AI in Science',
-      secondaryFields: ['Computer Vision', 'Healthcare AI'],
-      researchInterests: ['Computer Vision', 'Medical Imaging', 'Embodied AI'],
-      followersCount: 29500,
-    },
-  ],
-};
+      name: string;
+      affiliation?: string;
+      papersCount: number;
+      totalCitations: number;
+      samplePaperTitle: string;
+    }
+  >();
+
+  // 1. Scan papers to aggregate author contributions and scientific impact
+  papers.forEach((paper) => {
+    if (!paper.authors) return;
+    paper.authors.forEach((author) => {
+      const cleanName = (author.name || '').trim();
+      if (!cleanName || cleanName.length < 3) return;
+
+      const key = cleanName.toLowerCase();
+      const existing = authorMap.get(key);
+      if (existing) {
+        existing.papersCount += 1;
+        existing.totalCitations += paper.citationCount || 0;
+        if (!existing.affiliation && (author.affiliation || paper.journal)) {
+          existing.affiliation = author.affiliation || paper.journal;
+        }
+      } else {
+        authorMap.set(key, {
+          name: cleanName,
+          affiliation: author.affiliation || paper.journal || 'Academic Research',
+          papersCount: 1,
+          totalCitations: paper.citationCount || 0,
+          samplePaperTitle: paper.title,
+        });
+      }
+    });
+  });
+
+  // 2. Query Supabase registered scholar profiles in this domain
+  try {
+    const { data: dbProfiles } = await supabase
+      .from('profiles')
+      .select(
+        'id, username, full_name, avatar_url, academic_title, institution, bio, orcid_id, is_orcid_verified, followers_count, following_count'
+      )
+      .order('followers_count', { ascending: false })
+      .limit(6);
+
+    if (dbProfiles && dbProfiles.length > 0) {
+      dbProfiles.forEach((row: any) => {
+        researchers.push({
+          id: row.id,
+          handle: row.username || 'scholar',
+          fullName: row.full_name || 'Verified Scholar',
+          avatarUrl: row.avatar_url,
+          academicTitle: row.academic_title || 'Lead Investigator',
+          institution: row.institution || 'Research University',
+          bio: row.bio || '',
+          orcidVerified: Boolean(row.is_orcid_verified),
+          orcidId: row.orcid_id,
+          followersCount: row.followers_count || 1200,
+          followingCount: row.following_count || 340,
+          postsCount: 12,
+          savedCount: 30,
+          joinedDate: '',
+          primaryField: domain,
+          researchInterests: [domain],
+        });
+      });
+    }
+  } catch {}
+
+  // 3. Convert paper authors into researcher cards
+  const sortedAuthors = Array.from(authorMap.values()).sort(
+    (a, b) => b.totalCitations - a.totalCitations || b.papersCount - a.papersCount
+  );
+
+  sortedAuthors.forEach((auth, idx) => {
+    const nameKey = auth.name.toLowerCase();
+    if (!researchers.some((r) => r.fullName.toLowerCase() === nameKey)) {
+      // Calculate realistic author HYPE based on real citation volume & paper count
+      const authorHype = Math.min(
+        5.0,
+        Math.max(3.5, 3.8 + Math.log10(1 + auth.totalCitations) * 0.35 + auth.papersCount * 0.1)
+      );
+
+      researchers.push({
+        id: `author-${nameKey.replace(/[^a-z0-9]/g, '-')}`,
+        handle: auth.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+        fullName: auth.name,
+        academicTitle: auth.papersCount > 1 ? 'Senior Author / PI' : 'Lead Author',
+        institution: auth.affiliation || 'Research Institution',
+        avatarUrl: undefined,
+        bio: `Author of "${auth.samplePaperTitle.slice(0, 80)}..."`,
+        orcidVerified: false,
+        followersCount: Math.max(10, Math.floor(auth.totalCitations * 0.4) + auth.papersCount * 50),
+        followingCount: 120,
+        postsCount: auth.papersCount,
+        savedCount: 15,
+        joinedDate: '',
+        primaryField: domain,
+        secondaryFields: [domain],
+        researchInterests: [domain],
+        isFollowing: false,
+      });
+    }
+  });
+
+  return researchers.slice(0, 6);
+}
 
 /**
  * Fetches domain-specific Hyped feed:
- * 1. Hyped papers ranked by BOOFFIN HYPE engine
- * 2. Leading researchers in the domain
+ * 1. Real papers read in the app (automatically updating whenever someone reads)
+ * 2. Augments with live verified scientific publications from EuropePMC/OpenAlex
+ * 3. Real researchers derived directly from paper authors & verified profiles
  */
 export async function getHypedDomainData(
   domain: string,
@@ -123,159 +185,73 @@ export async function getHypedDomainData(
     return cached.data;
   }
 
-  // 1. Fetch Papers for this domain
-  let domainPapers: Paper[] = [];
+  // 1. Fetch real read papers from persistent registry
+  let readPapers: Paper[] = [];
   try {
-    const rawPapers = await searchPapers(domain, 8);
-    domainPapers = rawPapers;
+    const allRead = await getReadPapersRegistry();
+    readPapers = allRead.filter((p) => isPaperInDomain(p, domain));
   } catch (err) {
-    console.warn('[getHypedDomainData] Failed to fetch live papers:', err);
+    console.warn('[getHypedDomainData] Error getting read papers:', err);
   }
 
-  // If live search returned fewer than 3, construct fallback domain papers with real biological data
-  if (domainPapers.length < 3) {
-    if (normDomain.includes('neuro')) {
-      domainPapers = [
-        {
-          id: 'hyped-neuro-1',
-          doi: '10.1038/s41586-021-03450-x',
-          title: 'A neural circuit for social behavior in the vertebrate brain',
-          abstract: 'We map the complete neural circuit governing social recognition and group dynamics in zebrafish, identifying the conserved subcortical nodes that drive schooling.',
-          authors: [{ name: 'Kishida' }, { name: 'Okuyama' }, { name: 'Mori' }],
-          journal: 'Nature',
-          publicationYear: 2021,
-          canonicalUrl: 'https://doi.org/10.1038/s41586-021-03450-x',
-          isOpenAccess: true,
-          topics: ['Social Behavior', 'Neural Circuits', 'Zebrafish'],
-          citationCount: 6420,
-          discussionCount: 1200,
-          likesCount: 3200,
-          savesCount: 1840,
-          figures: [
-            {
-              id: 'f1',
-              url: 'https://images.unsplash.com/photo-1559757175-5700dde675bc?w=500&auto=format&fit=crop&q=80',
-              isPrimary: true,
-            },
-          ],
-        },
-        {
-          id: 'hyped-neuro-2',
-          doi: '10.1038/nrn3738',
-          title: 'Zebrafish as a model for neurodevelopmental disorders',
-          abstract: 'Zebrafish are emerging as a powerful vertebrate model system for probing the genetic and environmental etiology of autism, schizophrenia, and other neurodevelopmental syndromes.',
-          authors: [{ name: 'Kalueff' }, { name: 'Stewart' }, { name: 'Gerlai' }],
-          journal: 'Nature Reviews Neuroscience',
-          publicationYear: 2014,
-          canonicalUrl: 'https://doi.org/10.1038/nrn3738',
-          isOpenAccess: true,
-          topics: ['Neurodevelopment', 'Zebrafish', 'Autism'],
-          citationCount: 4150,
-          discussionCount: 842,
-          likesCount: 2100,
-          savesCount: 920,
-          figures: [
-            {
-              id: 'f2',
-              url: 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=500&auto=format&fit=crop&q=80',
-              isPrimary: true,
-            },
-          ],
-        },
-        {
-          id: 'hyped-neuro-3',
-          doi: '10.1126/science.1235227',
-          title: 'The global connectome and its implications for brain function',
-          abstract: 'Comprehensive mapping of macroscale axonal pathways across the human cerebral cortex reveals structural hubs that coordinate multimodal information exchange.',
-          authors: [{ name: 'Van Essen' }, { name: 'Smith' }, { name: 'Barch' }],
-          journal: 'Science',
-          publicationYear: 2013,
-          canonicalUrl: 'https://doi.org/10.1126/science.1235227',
-          isOpenAccess: true,
-          topics: ['Connectomics', 'Brain Networks', 'Human Brain'],
-          citationCount: 3820,
-          discussionCount: 691,
-          likesCount: 1540,
-          savesCount: 810,
-          figures: [
-            {
-              id: 'f3',
-              url: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?w=500&auto=format&fit=crop&q=80',
-              isPrimary: true,
-            },
-          ],
-        },
-      ];
+  // Pre-load metrics for all read papers
+  const readPapersWithMetrics = await Promise.all(
+    readPapers.map(async (p) => {
+      const m = await getPaperMetrics(p.id);
+      return { paper: p, metrics: m };
+    })
+  );
+
+  // Sort read papers based on selected timeframe & real engagement
+  readPapersWithMetrics.sort((a, b) => {
+    if (timeframe === 'week') {
+      const velocityA = a.metrics.viewsLast24h * 5 + a.metrics.views;
+      const velocityB = b.metrics.viewsLast24h * 5 + b.metrics.views;
+      return velocityB - velocityA || b.metrics.hypeScore - a.metrics.hypeScore;
+    }
+    if (timeframe === 'month') {
+      return b.metrics.views - a.metrics.views || b.metrics.hypeScore - a.metrics.hypeScore;
+    }
+    return (
+      b.metrics.views * 3 +
+      b.metrics.hypeScore -
+      (a.metrics.views * 3 + a.metrics.hypeScore) ||
+      (b.paper.citationCount || 0) - (a.paper.citationCount || 0)
+    );
+  });
+
+  const rankedReadPapers = readPapersWithMetrics.map((item) => item.paper);
+
+  // 2. If fewer than 6 papers exist in this domain, fetch real academic papers to augment
+  let livePapers: Paper[] = [];
+  if (rankedReadPapers.length < 6) {
+    try {
+      const searchResults = await searchPapers(domain, 8);
+      // Exclude already ranked read papers
+      livePapers = searchResults.filter(
+        (sp) =>
+          !rankedReadPapers.some(
+            (rp) => rp.id === sp.id || (rp.doi && sp.doi && rp.doi.toLowerCase() === sp.doi.toLowerCase())
+          )
+      );
+      // Pre-load real metrics for live papers
+      await Promise.all(livePapers.map((p) => getPaperMetrics(p.id)));
+    } catch (err) {
+      console.warn('[getHypedDomainData] Error searching live papers:', err);
     }
   }
 
-  // Pre-load HYPE metrics for papers to guarantee synchronized metrics
-  await Promise.all(domainPapers.map((p) => getPaperMetrics(p.id)));
+  // Combine real read papers (which take priority because users in app read them) + live papers
+  const combinedPapers = [...rankedReadPapers, ...livePapers].slice(0, 10);
 
-  // 2. Fetch or assemble Top Researchers for this domain
-  let domainResearchers: UserProfile[] = [];
-
-  try {
-    const { data: dbProfiles } = await supabase
-      .from('profiles')
-      .select('id, username, full_name, avatar_url, academic_title, institution, bio, orcid_id, is_orcid_verified, followers_count, following_count')
-      .order('followers_count', { ascending: false })
-      .limit(6);
-
-    if (dbProfiles && dbProfiles.length > 0) {
-      domainResearchers = dbProfiles.map((row: any) => ({
-        id: row.id,
-        handle: row.username || 'scholar',
-        fullName: row.full_name || 'Leading Scholar',
-        avatarUrl: row.avatar_url,
-        academicTitle: row.academic_title || 'Lead Investigator',
-        institution: row.institution || 'Research University',
-        bio: row.bio || '',
-        orcidVerified: Boolean(row.is_orcid_verified),
-        orcidId: row.orcid_id,
-        followersCount: row.followers_count || 1200,
-        followingCount: row.following_count || 340,
-        postsCount: 15,
-        savedCount: 42,
-        joinedDate: '',
-        primaryField: domain,
-        researchInterests: [domain, 'Neural Circuits'],
-      }));
-    }
-  } catch {}
-
-  // Fill in curated domain experts if database has fewer than 3
-  const seedResearchers = CURATED_RESEARCHERS[normDomain] || CURATED_RESEARCHERS['neuroscience'];
-  if (seedResearchers) {
-    seedResearchers.forEach((seed, idx) => {
-      if (!domainResearchers.some((r) => r.fullName === seed.fullName)) {
-        domainResearchers.push({
-          id: seed.id || `curated-${idx}`,
-          handle: seed.handle || 'researcher',
-          fullName: seed.fullName || 'Researcher',
-          avatarUrl: seed.avatarUrl,
-          academicTitle: seed.academicTitle || 'Investigator',
-          institution: seed.institution || 'University',
-          bio: '',
-          orcidVerified: true,
-          followersCount: seed.followersCount || 2500,
-          followingCount: 350,
-          postsCount: 22,
-          savedCount: 50,
-          joinedDate: '',
-          primaryField: seed.primaryField || domain,
-          secondaryFields: seed.secondaryFields || [domain],
-          researchInterests: seed.researchInterests || [domain],
-        });
-      }
-    });
-  }
+  // 3. Derive real Top Researchers from the actual authors of these papers
+  const domainResearchers = await deriveTopResearchers(combinedPapers, domain);
 
   const result: HypedDomainData = {
     domain,
     timeframe,
-    papers: domainPapers,
-    researchers: domainResearchers.slice(0, 6),
+    papers: combinedPapers,
+    researchers: domainResearchers,
   };
 
   domainFeedCache.set(cacheKey, { timestamp: Date.now(), data: result });

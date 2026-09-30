@@ -38,6 +38,7 @@ import {
 } from 'lucide-react-native';
 import { FloatingRatingDock } from '../../components/paper/FloatingRatingDock';
 import { InAppPaperPdfViewer } from '../../components/paper/InAppPaperPdfViewer';
+import { ArticleStatsView } from '../../components/paper/ArticleStatsView';
 import { HypeScoreBadge } from '../../components/paper/HypeScoreBadge';
 import { getPaperMetrics, recordPaperView, PaperMetrics } from '../../api/hypeScoreService';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -101,7 +102,7 @@ export default function PaperDetailScreen() {
     url?: string;
     pdfUrl?: string;
     refId?: string;
-    mode?: 'article' | 'pdf';
+    mode?: 'article' | 'stats' | 'pdf';
   }>();
   const rawId = id ? decodeURIComponent(id) : '';
   const paperId = rawId || id || '';
@@ -111,36 +112,11 @@ export default function PaperDetailScreen() {
   const fetchPaperById = usePaperStore((s) => s.fetchPaperById);
   const toggleSavePaper = usePaperStore((s) => s.toggleSavePaper);
   const toggleLikePaper = usePaperStore((s) => s.toggleLikePaper);
+  const recordPaperRead = usePaperStore((s) => s.recordPaperRead);
   const currentUser = useAuthStore((s) => s.user);
 
   const scrollViewRef = React.useRef<ScrollView>(null);
   const [paperMetrics, setPaperMetrics] = useState<PaperMetrics | null>(null);
-
-  // Load verified metrics immediately; count as reader ONLY after 25+ seconds of reading
-  useEffect(() => {
-    let isMounted = true;
-    const targetId = paperId || doi;
-    if (!targetId) return;
-
-    // 1. Fetch current status immediately
-    getPaperMetrics(targetId).then((m) => {
-      if (isMounted) setPaperMetrics(m);
-    });
-
-    // 2. Count 1 verified reader only after spending > 25 seconds on the paper
-    const timer = setTimeout(() => {
-      recordPaperView(targetId, currentUser?.id)
-        .then((updated) => {
-          if (isMounted) setPaperMetrics(updated);
-        })
-        .catch(() => {});
-    }, 25000);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [paperId, doi, currentUser?.id]);
 
   // Stable Post & Comments Store Selectors
   const getCommentsForPost = usePostStore((s) => s.getCommentsForPost);
@@ -253,8 +229,42 @@ export default function PaperDetailScreen() {
   const [isLoading, setIsLoading] = useState(!initialPaper);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Reader View Mode: 'article' (Substack format) vs 'pdf' (Open Access Document)
-  const [viewMode, setViewMode] = useState<'article' | 'pdf'>(mode === 'pdf' ? 'pdf' : 'article');
+  // Automatically register and track paper read with live metrics
+  useEffect(() => {
+    let isMounted = true;
+    const targetId = paper?.id || paperId || doi;
+    if (!targetId) return;
+
+    // 1. Fetch current status immediately
+    getPaperMetrics(targetId).then((m) => {
+      if (isMounted) setPaperMetrics(m);
+    });
+
+    // 2. Register paper read and increment real reader count immediately
+    if (paper) {
+      recordPaperRead(paper, currentUser?.id);
+      recordPaperView(targetId, currentUser?.id, paper)
+        .then((updated) => {
+          if (isMounted) setPaperMetrics(updated);
+        })
+        .catch(() => {});
+    } else {
+      recordPaperView(targetId, currentUser?.id)
+        .then((updated) => {
+          if (isMounted) setPaperMetrics(updated);
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [paper, paperId, doi, currentUser?.id, recordPaperRead]);
+
+  // Reader View Mode: 'article' (Substack format) vs 'stats' (Article Analytics) vs 'pdf' (Open Access Document)
+  const [viewMode, setViewMode] = useState<'article' | 'stats' | 'pdf'>(
+    mode === 'stats' ? 'stats' : mode === 'pdf' ? 'pdf' : 'article'
+  );
 
   // Zoom State for PDF Reader (0.75x to 2.5x)
   const [pdfZoom, setPdfZoom] = useState(1.0);
@@ -910,7 +920,12 @@ export default function PaperDetailScreen() {
           <View style={styles.viewModeSwitcherContainer}>
             <View style={styles.viewModeSwitcher}>
               <TouchableOpacity
-                onPress={() => setViewMode('article')}
+                onPress={() => {
+                  try {
+                    Haptics.selectionAsync();
+                  } catch {}
+                  setViewMode('article');
+                }}
                 style={[
                   styles.viewModeTab,
                   viewMode === 'article' && styles.viewModeTabActive,
@@ -918,7 +933,7 @@ export default function PaperDetailScreen() {
                 activeOpacity={0.8}
               >
                 <BookOpen
-                  size={15}
+                  size={14}
                   color={viewMode === 'article' ? colors.white : colors.textSecondary}
                 />
                 <Text
@@ -926,13 +941,47 @@ export default function PaperDetailScreen() {
                     styles.viewModeTabText,
                     viewMode === 'article' && styles.viewModeTabTextActive,
                   ]}
+                  numberOfLines={1}
                 >
                   Article View
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => setViewMode('pdf')}
+                onPress={() => {
+                  try {
+                    Haptics.selectionAsync();
+                  } catch {}
+                  setViewMode('stats');
+                }}
+                style={[
+                  styles.viewModeTab,
+                  viewMode === 'stats' && styles.viewModeTabActive,
+                ]}
+                activeOpacity={0.8}
+              >
+                <TrendingUp
+                  size={14}
+                  color={viewMode === 'stats' ? colors.white : colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.viewModeTabText,
+                    viewMode === 'stats' && styles.viewModeTabTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  Article Stats
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  try {
+                    Haptics.selectionAsync();
+                  } catch {}
+                  setViewMode('pdf');
+                }}
                 style={[
                   styles.viewModeTab,
                   viewMode === 'pdf' && styles.viewModeTabActive,
@@ -940,7 +989,7 @@ export default function PaperDetailScreen() {
                 activeOpacity={0.8}
               >
                 <FileText
-                  size={15}
+                  size={14}
                   color={viewMode === 'pdf' ? colors.white : colors.textSecondary}
                 />
                 <Text
@@ -948,6 +997,7 @@ export default function PaperDetailScreen() {
                     styles.viewModeTabText,
                     viewMode === 'pdf' && styles.viewModeTabTextActive,
                   ]}
+                  numberOfLines={1}
                 >
                   {isDirectPdf ? 'Original PDF' : 'Publisher Portal'}
                 </Text>
@@ -971,9 +1021,21 @@ export default function PaperDetailScreen() {
           }
         >
           {/* ==================================================================== */}
-          {/* VIEW MODE 1: ORIGINAL OPEN ACCESS PDF DOCUMENT / PUBLISHER PORTAL    */}
+          {/* VIEW MODE 1: ARTICLE STATS PERFORMANCE & METRICS                    */}
           {/* ==================================================================== */}
-          {viewMode === 'pdf' && hasOpenAccessPdf ? (
+          {viewMode === 'stats' ? (
+            <ArticleStatsView
+              paper={paper}
+              metrics={paperMetrics}
+              isSaved={isPaperSaved}
+              onToggleSave={handleSave}
+              onSwitchToArticleView={() => setViewMode('article')}
+              onOpenPdf={() => setViewMode('pdf')}
+            />
+          ) : viewMode === 'pdf' && hasOpenAccessPdf ? (
+            /* ==================================================================== */
+            /* VIEW MODE 2: ORIGINAL OPEN ACCESS PDF DOCUMENT / PUBLISHER PORTAL    */
+            /* ==================================================================== */
             <View style={styles.pdfViewWrapper}>
               <InAppPaperPdfViewer
                 paper={paper}
@@ -986,9 +1048,10 @@ export default function PaperDetailScreen() {
             </View>
           ) : (
             /* ==================================================================== */
-            /* VIEW MODE 2: SUBSTACK-STYLE ARTICLE FORMAT                          */
+            /* VIEW MODE 3: SUBSTACK-STYLE ARTICLE FORMAT                          */
             /* ==================================================================== */
-            <View style={styles.articleBody}>
+            <>
+              <View style={styles.articleBody}>
               {/* Publication Pill & Date Bar */}
               <View style={styles.editorialMetaRow}>
                 <Badge
@@ -1167,7 +1230,6 @@ export default function PaperDetailScreen() {
                 />
               </View>
             </View>
-          )}
 
           {/* ==================================================================== */}
           {/* PARTICIPATING RESEARCHERS BANNER                                    */}
@@ -1274,7 +1336,9 @@ export default function PaperDetailScreen() {
 
           {/* People Interested Recommendations */}
           <PeopleInterestedSection people={interestedPeople} />
-        </ScrollView>
+        </>
+      )}
+    </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

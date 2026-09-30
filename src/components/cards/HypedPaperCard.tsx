@@ -11,13 +11,13 @@ import { router } from 'expo-router';
 import { TrendingUp, Share2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Paper } from '../../types';
-import { colors, radii, spacing, typography } from '../../theme';
+import { radii, typography } from '../../theme';
 import { SaveButton } from '../core/SaveButton';
 import { DiscussionIcon } from '../core/DiscussionIcon';
 import { ReadBookIcon } from '../core/ReadBookIcon';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { getPaperMetrics, PaperMetrics } from '../../api/hypeScoreService';
+import { getPaperMetrics, subscribeToPaperRead, PaperMetrics } from '../../api/hypeScoreService';
 
 export interface HypedPaperCardProps {
   paper: Paper;
@@ -59,10 +59,19 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
     getPaperMetrics(paper.id).then((m) => {
       if (isMounted) setMetrics(m);
     });
+
+    const unsubscribe = subscribeToPaperRead((readPaperId, updatedMetrics) => {
+      if (!isMounted) return;
+      if (readPaperId === paper.id || (paper.doi && readPaperId === paper.doi)) {
+        setMetrics(updatedMetrics);
+      }
+    });
+
     return () => {
       isMounted = false;
+      unsubscribe();
     };
-  }, [paper.id]);
+  }, [paper.id, paper.doi]);
 
   const handleCardPress = () => {
     try {
@@ -90,24 +99,26 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
     // Share action
   };
 
-  // Synchronized counts across card and article viewer
-  const readCount = metrics?.views ?? (paper as any).viewsCount ?? 1240;
+  // Real synchronized counts across card and article viewer
+  const readCount = metrics?.views ?? (paper as any).viewsCount ?? 0;
   const discussionCount = paper.discussionCount ?? 0;
-  const citationCount = paper.citationCount ?? 18;
-  const shareCount = (paper as any).sharesCount ?? Math.max(12, Math.floor(readCount * 0.04));
+  const citationCount = paper.citationCount ?? 0;
+  const shareCount = (paper as any).sharesCount ?? (readCount > 0 ? Math.floor(readCount * 0.05) : 0);
 
-  // Compute HYPE score (formatted to 1-5 decimal scale like screenshot 4.8)
+  // Compute realistic HYPE score (1.0 - 5.0) from verified ratings, citations, and reader velocity
   const hypeScoreFormatted = React.useMemo(() => {
     if (metrics?.communityRating && metrics.communityRating > 0) {
       return metrics.communityRating.toFixed(1);
     }
     if (metrics?.hypeScore && metrics.hypeScore > 0) {
-      return (metrics.hypeScore / 20).toFixed(1);
+      return Math.min(5.0, metrics.hypeScore / 20).toFixed(1);
     }
-    // High-ranking default based on rank
-    const baseRankScore = Math.max(4.2, 5.0 - (rank - 1) * 0.15);
-    return baseRankScore.toFixed(1);
-  }, [metrics, rank]);
+    if (citationCount > 0) {
+      const citationScore = Math.min(5.0, Math.max(3.2, 3.2 + Math.log10(1 + citationCount) * 0.45));
+      return citationScore.toFixed(1);
+    }
+    return readCount > 0 ? '3.8' : '3.5';
+  }, [metrics, citationCount, readCount]);
 
   const scoreValue = parseFloat(hypeScoreFormatted);
   const progressPercent = Math.min(100, Math.max(10, (scoreValue / 5.0) * 100));
