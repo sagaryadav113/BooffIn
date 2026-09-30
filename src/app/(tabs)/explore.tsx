@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,25 +11,33 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Compass, Sparkles, ArrowRight, Search, FileText, Users, Award, ExternalLink } from 'lucide-react-native';
+import {
+  TrendingUp,
+  Sparkles,
+  ArrowRight,
+  SlidersHorizontal,
+  Plus,
+  Users,
+} from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { SearchBar } from '../../components/core/SearchBar';
-import { PaperCard } from '../../components/cards/PaperCard';
-import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
-import { TrendingDiscussionCard } from '../../components/cards/TrendingDiscussionCard';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { ExploreFilterTabs } from '../../components/explore/ExploreFilterTabs';
 import { RecentSearchesList } from '../../components/explore/RecentSearchesList';
 import { ResearcherResultCard } from '../../components/explore/ResearcherResultCard';
+import { PaperCard } from '../../components/cards/PaperCard';
+import { HypedPaperCard } from '../../components/cards/HypedPaperCard';
+import { TopResearcherCard } from '../../components/cards/TopResearcherCard';
+import { AddInterestsModal } from '../../components/modals/AddInterestsModal';
 import { useExploreSearchStore } from '../../store/useExploreSearchStore';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useTopicStore } from '../../store/useTopicStore';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { supabase } from '../../api/client';
-import { UserProfile } from '../../types';
+import { getHypedDomainData, HypedDomainData } from '../../api/hypedFeedService';
+import { Paper, UserProfile } from '../../types';
 
 export default function ExploreScreen() {
   const {
@@ -57,8 +65,64 @@ export default function ExploreScreen() {
   const fetchFeed = usePostStore((s) => s.fetchFeed);
   const currentUser = useAuthStore((s) => s.user);
 
-  const [researchersList, setResearchersList] = React.useState<UserProfile[]>([]);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  // Dynamic user interests for top tab navigation
+  const userInterests = useMemo(() => {
+    const list = [
+      ...(currentUser?.researchInterests || []),
+      ...(currentUser?.secondaryFields || []),
+    ];
+    if (currentUser?.primaryField && !list.includes(currentUser.primaryField)) {
+      list.unshift(currentUser.primaryField);
+    }
+    if (list.length === 0) {
+      return ['Neuroscience', 'AI in Science', 'Biotech'];
+    }
+    return Array.from(new Set(list));
+  }, [currentUser]);
+
+  // Active top navigation tab
+  const [activeTab, setActiveTab] = useState<string>('Neuroscience');
+
+  // Timeframe filter state
+  const [timeframe, setTimeframe] = useState<'week' | 'month' | 'all'>('week');
+
+  // Add Interests modal state
+  const [isAddInterestsVisible, setIsAddInterestsVisible] = useState(false);
+
+  // Hyped feed data state
+  const [hypedData, setHypedData] = useState<HypedDomainData | null>(null);
+  const [isLoadingHyped, setIsLoadingHyped] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Synchronize initial activeTab with user interests
+  useEffect(() => {
+    if (userInterests.length > 0 && activeTab !== 'For You' && activeTab !== 'Following') {
+      if (!userInterests.includes(activeTab)) {
+        setActiveTab(userInterests[0]);
+      }
+    }
+  }, [userInterests, activeTab]);
+
+  // Load domain-specific hyped feed
+  const loadHypedFeed = useCallback(async (domain: string, tf: 'week' | 'month' | 'all') => {
+    if (domain === 'For You' || domain === 'Following') return;
+
+    setIsLoadingHyped(true);
+    try {
+      const data = await getHypedDomainData(domain, tf);
+      setHypedData(data);
+    } catch (e) {
+      console.warn('[ExploreScreen] Error loading hyped domain data:', e);
+    } finally {
+      setIsLoadingHyped(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'For You' && activeTab !== 'Following') {
+      loadHypedFeed(activeTab, timeframe);
+    }
+  }, [activeTab, timeframe, loadHypedFeed]);
 
   const loadInitialData = useCallback(async () => {
     try {
@@ -66,35 +130,12 @@ export default function ExploreScreen() {
         fetchPapers(),
         fetchTopics(currentUser?.id),
         fetchFeed('For You', currentUser?.id),
+        activeTab !== 'For You' && activeTab !== 'Following'
+          ? loadHypedFeed(activeTab, timeframe)
+          : Promise.resolve(),
       ]);
-
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, avatar_url, academic_title, institution, bio, orcid_id, is_orcid_verified, followers_count, following_count')
-        .order('followers_count', { ascending: false })
-        .limit(10);
-
-      if (data) {
-        const mapped: UserProfile[] = data.map((row: any) => ({
-          id: row.id,
-          handle: row.username || 'researcher',
-          fullName: row.full_name || 'Researcher',
-          avatarUrl: row.avatar_url,
-          academicTitle: row.academic_title || 'Researcher',
-          institution: row.institution || '',
-          bio: row.bio || '',
-          orcidVerified: Boolean(row.is_orcid_verified),
-          orcidId: row.orcid_id,
-          followersCount: row.followers_count || 0,
-          followingCount: row.following_count || 0,
-          postsCount: 0,
-          savedCount: 0,
-          joinedDate: '',
-        }));
-        setResearchersList(mapped);
-      }
     } catch {}
-  }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed]);
+  }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed, activeTab, timeframe, loadHypedFeed]);
 
   useEffect(() => {
     loadInitialData();
@@ -107,6 +148,20 @@ export default function ExploreScreen() {
     } catch {}
     await loadInitialData();
     setIsRefreshing(false);
+  };
+
+  const handleTabSelect = (tab: string) => {
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+    setActiveTab(tab);
+  };
+
+  const handleTimeframeSelect = (tf: 'week' | 'month' | 'all') => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setTimeframe(tf);
   };
 
   const handleSearchSubmit = (term?: string) => {
@@ -124,58 +179,46 @@ export default function ExploreScreen() {
     executeSearch(term);
   };
 
-  const trendingPapers = useMemo(() => {
-    return [...papers].sort(
-      (a, b) => b.discussionCount + b.citationCount - (a.discussionCount + a.citationCount)
-    );
-  }, [papers]);
-
-  const trendingDiscussions = useMemo(() => {
-    return [...posts].filter((p) => p.commentsCount > 0);
-  }, [posts]);
-
   const hasQuery = Boolean(searchQuery.trim());
-  const hasResults = Boolean(results && (results.papers.length > 0 || results.researchers.length > 0));
+  const hasResults = Boolean(
+    results && (results.papers.length > 0 || results.researchers.length > 0)
+  );
 
   const detectedBadgeText = useMemo(() => {
-    if (!results?.detectedInputType || results.detectedInputType === 'keyword') return null;
+    if (!results?.detectedInputType) return null;
     switch (results.detectedInputType) {
       case 'doi':
-        return 'DOI Reference Detected';
+        return 'DOI detected — Resolved canonical publication';
       case 'arxiv':
-        return 'arXiv Preprint Detected';
+        return 'arXiv ID detected — Pre-print matched';
       case 'orcid':
-        return '16-Digit ORCID ID Detected';
-      case 'url':
-        return 'Publisher Article URL Detected';
+        return 'ORCID detected — Matched verified researcher';
       case 'user':
-        return 'Scholar Handle Detected';
+        return 'Scholar query — Surfacing author publications & profile';
       default:
         return null;
     }
   }, [results?.detectedInputType]);
 
   const showResearchersFirst = useMemo(() => {
-    if (activeCategory === 'researchers') return true;
-    if (activeCategory === 'papers') return false;
-    if (!searchQuery.trim()) return false;
-    const parts = searchQuery.trim().split(/\s+/);
-    const looksLikeName =
-      parts.length >= 2 &&
-      parts.length <= 4 &&
-      parts.every((p) => /^[a-zA-ZÀ-ÖØ-öø-ÿ'\-\.]{2,}$/.test(p));
-    return looksLikeName || results?.detectedInputType === 'user' || results?.detectedInputType === 'orcid';
-  }, [activeCategory, searchQuery, results?.detectedInputType]);
+    if (!results) return false;
+    return (
+      results.detectedInputType === 'orcid' ||
+      results.detectedInputType === 'user' ||
+      (results.researchers.length > 0 && results.papers.length === 0)
+    );
+  }, [results]);
 
+  // -------------------------------------------------------------
+  // Render: Search Results Section for Papers
+  // -------------------------------------------------------------
   const renderPapersSection = () => {
     if (!results || results.papers.length === 0) return null;
-    if (activeCategory !== 'all' && activeCategory !== 'papers') return null;
-
     return (
       <View style={styles.sectionWrap}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeaderTitle}>
-            RESEARCH ARTICLES ({results.papers.length})
+          <Text style={styles.sectionTitle}>
+            PAPERS ({results.papers.length})
           </Text>
         </View>
         {results.papers.map((paper) => (
@@ -187,22 +230,26 @@ export default function ExploreScreen() {
     );
   };
 
+  // -------------------------------------------------------------
+  // Render: Search Results Section for Researchers
+  // -------------------------------------------------------------
   const renderResearchersSection = () => {
     if (!results || results.researchers.length === 0) return null;
-    if (activeCategory !== 'all' && activeCategory !== 'researchers') return null;
-
     return (
       <View style={styles.sectionWrap}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeaderTitle}>
-            SCHOLARS & RESEARCHERS ({results.researchers.length})
+          <Text style={styles.sectionTitle}>
+            RESEARCHERS ({results.researchers.length})
           </Text>
         </View>
         {results.researchers.map((researcher) => (
-          <ResearcherResultCard key={researcher.id} researcher={researcher} />
+          <ResearcherResultCard
+            key={researcher.id}
+            researcher={researcher}
+            style={styles.researcherCardWrap}
+          />
         ))}
 
-        {/* Load More Scholars button */}
         {hasMoreResearchers && (
           <TouchableOpacity
             style={styles.loadMoreBtn}
@@ -211,12 +258,9 @@ export default function ExploreScreen() {
             activeOpacity={0.8}
           >
             {isLoadingMoreResearchers ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
+              <ActivityIndicator size="small" color={colors.black} />
             ) : (
-              <>
-                <Users size={14} color={colors.textPrimary} />
-                <Text style={styles.loadMoreBtnText}>Load more scholars</Text>
-              </>
+              <Text style={styles.loadMoreText}>Load More Researchers</Text>
             )}
           </TouchableOpacity>
         )}
@@ -224,14 +268,145 @@ export default function ExploreScreen() {
     );
   };
 
+  // -------------------------------------------------------------
+  // Render: Domain Hyped Papers & Researchers (Exact Screenshot Match)
+  // -------------------------------------------------------------
+  const renderHypedDomainContent = () => {
+    const isDomainActive = activeTab !== 'For You' && activeTab !== 'Following';
+    const displayPapers = hypedData?.papers || [];
+    const displayResearchers = hypedData?.researchers || [];
+
+    return (
+      <View style={styles.hypedContainer}>
+        {/* Section 1: Most Hyped Papers */}
+        <View style={styles.hypedSectionHeader}>
+          <View style={styles.sectionTitleRow}>
+            <View style={styles.sectionTitleLeft}>
+              <TrendingUp size={22} color="#1B4D3E" strokeWidth={2.5} />
+              <Text style={styles.hypedMainTitle}>Most Hyped Papers</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => handleSearchSubmit(activeTab)}
+              style={styles.seeAllAction}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.seeAllActionText}>See all</Text>
+              <ArrowRight size={14} color="#0F172A" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.hypedSubtitle}>
+            Top papers in {activeTab} {timeframe === 'week' ? 'this week' : timeframe === 'month' ? 'this month' : 'of all time'}, ranked by HYPE
+          </Text>
+
+          {/* Timeframe Filter Selector */}
+          <View style={styles.timeframeRow}>
+            <View style={styles.timeframePills}>
+              {(['week', 'month', 'all'] as const).map((tf) => {
+                const isSelected = timeframe === tf;
+                const label =
+                  tf === 'week' ? 'This Week' : tf === 'month' ? 'This Month' : 'All Time';
+                return (
+                  <TouchableOpacity
+                    key={tf}
+                    activeOpacity={0.8}
+                    onPress={() => handleTimeframeSelect(tf)}
+                    style={[
+                      styles.timeframePill,
+                      isSelected && styles.timeframePillActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.timeframePillText,
+                        isSelected && styles.timeframePillTextActive,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.filterButton}
+              onPress={() => setIsAddInterestsVisible(true)}
+            >
+              <SlidersHorizontal size={13} color="#334155" />
+              <Text style={styles.filterButtonText}>Filter</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Papers List */}
+        {isLoadingHyped && displayPapers.length === 0 ? (
+          <View style={styles.inlineLoading}>
+            <ActivityIndicator size="small" color="#1B4D3E" />
+            <Text style={styles.inlineLoadingText}>Ranking {activeTab} papers by HYPE...</Text>
+          </View>
+        ) : (
+          <View style={styles.papersListContainer}>
+            {displayPapers.slice(0, 5).map((paper, index) => (
+              <HypedPaperCard
+                key={paper.id}
+                paper={paper}
+                rank={index + 1}
+                timeframe={timeframe}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Section 2: Top Researchers */}
+        <View style={styles.researchersSectionHeader}>
+          <View style={styles.sectionTitleRow}>
+            <View style={styles.sectionTitleLeft}>
+              <Users size={22} color="#1B4D3E" strokeWidth={2.4} />
+              <Text style={styles.hypedMainTitle}>Top Researchers</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => handleSearchSubmit(`${activeTab} researcher`)}
+              style={styles.seeAllAction}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.seeAllActionText}>See all</Text>
+              <ArrowRight size={14} color="#0F172A" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.hypedSubtitle}>
+            Most hyped researchers in {activeTab} this week
+          </Text>
+
+          {/* Horizontal Researcher Carousel */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.researcherCarouselContent}
+            style={styles.researcherCarousel}
+          >
+            {displayResearchers.map((researcher, idx) => (
+              <TopResearcherCard
+                key={researcher.id}
+                researcher={researcher}
+                rank={idx + 1}
+                hypeScore={4.9 - idx * 0.1}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
-      <AppHeader
-        title="Explore"
-      />
+      {/* Main App Header */}
+      <AppHeader title="Explore" />
 
       {/* Universal Search Bar */}
       <View style={styles.searchBarContainer}>
@@ -244,21 +419,90 @@ export default function ExploreScreen() {
         />
       </View>
 
-      {/* Filter Tabs */}
-      <ExploreFilterTabs
-        activeCategory={activeCategory}
-        onSelectCategory={setActiveCategory}
-        counts={
-          results
-            ? {
-                papers: results.papers.length,
-                researchers: results.researchers.length,
-              }
-            : undefined
-        }
-      />
+      {/* When searching, show category tabs (All, Papers, Researchers) */}
+      {hasQuery && (
+        <ExploreFilterTabs
+          activeCategory={activeCategory}
+          onSelectCategory={setActiveCategory}
+          counts={
+            results
+              ? {
+                  papers: results.papers.length,
+                  researchers: results.researchers.length,
+                }
+              : undefined
+          }
+        />
+      )}
 
-      {/* Main Content Area */}
+      {/* When not searching, show Dynamic Domain Navigation Tabs (Exact Screenshot Match) */}
+      {!hasQuery && (
+        <View style={styles.topTabsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.topTabsContent}
+          >
+            {/* Standard Feeds */}
+            {['For You', 'Following'].map((tab) => {
+              const isActive = activeTab === tab;
+              return (
+                <TouchableOpacity
+                  key={tab}
+                  activeOpacity={0.8}
+                  onPress={() => handleTabSelect(tab)}
+                  style={[styles.topTabItem, isActive && styles.topTabItemActive]}
+                >
+                  <Text
+                    style={[
+                      styles.topTabText,
+                      isActive && styles.topTabTextActive,
+                    ]}
+                  >
+                    {tab}
+                  </Text>
+                  {isActive && <View style={styles.topTabIndicator} />}
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Dynamic User Interests Tabs */}
+            {userInterests.map((interest) => {
+              const isActive = activeTab === interest;
+              return (
+                <TouchableOpacity
+                  key={interest}
+                  activeOpacity={0.8}
+                  onPress={() => handleTabSelect(interest)}
+                  style={[styles.topTabItem, isActive && styles.topTabItemActive]}
+                >
+                  <Text
+                    style={[
+                      styles.topTabText,
+                      isActive && styles.topTabTextActive,
+                    ]}
+                  >
+                    {interest}
+                  </Text>
+                  {isActive && <View style={styles.topTabIndicator} />}
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Add Interests Action Button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setIsAddInterestsVisible(true)}
+              style={styles.addInterestsTabBtn}
+            >
+              <Plus size={14} color="#1B4D3E" strokeWidth={2.5} />
+              <Text style={styles.addInterestsTabText}>Add</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Main Scrollable Content Area */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -268,16 +512,18 @@ export default function ExploreScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={colors.black}
-            colors={[colors.black]}
+            tintColor="#1B4D3E"
+            colors={['#1B4D3E']}
           />
         }
       >
         {/* State A: Active Search Loading */}
         {isSearching && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.black} />
-            <Text style={styles.loadingText}>Searching global academic literature & registries...</Text>
+            <ActivityIndicator size="large" color="#1B4D3E" />
+            <Text style={styles.loadingText}>
+              Searching global academic literature & registries...
+            </Text>
           </View>
         )}
 
@@ -287,7 +533,7 @@ export default function ExploreScreen() {
             {/* Detected Intent Badge */}
             {detectedBadgeText && (
               <View style={styles.detectedPill}>
-                <Sparkles size={12} color={colors.accentLink} />
+                <Sparkles size={12} color="#1B4D3E" />
                 <Text style={styles.detectedPillText}>{detectedBadgeText}</Text>
               </View>
             )}
@@ -318,76 +564,35 @@ export default function ExploreScreen() {
           </View>
         )}
 
-        {/* State C: Default Discovery Feed (When not searching) */}
+        {/* State C: Discovery Feed (HYPED Section Matching Screenshot) */}
         {!hasQuery && (
           <>
-            {/* Recent Searches */}
-            <RecentSearchesList
-              searches={recentSearches}
-              onSelectSearch={handleSelectRecentOrTopic}
-              onRemoveSearch={removeRecentSearch}
-              onClearAll={clearRecentSearches}
-            />
-
-            {/* Featured Trending Papers */}
-            {trendingPapers.length > 0 && (
-              <View style={styles.discoverySection}>
-                <View style={styles.sectionHeaderRow}>
-                  <View style={styles.sectionTitleLeft}>
-                    <FileText size={16} color={colors.textPrimary} />
-                    <Text style={styles.discoverySectionTitle}>FEATURED RESEARCH PAPERS</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setActiveCategory('papers')}
-                    style={styles.seeAllBtn}
-                  >
-                    <Text style={styles.seeAllText}>Explore all</Text>
-                    <ArrowRight size={13} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                {trendingPapers.slice(0, 4).map((paper) => (
-                  <View key={paper.id} style={styles.paperCardWrap}>
-                    <PaperCard paper={paper} />
-                  </View>
-                ))}
-              </View>
+            {/* Show Recent Searches if any */}
+            {recentSearches.length > 0 && (
+              <RecentSearchesList
+                searches={recentSearches}
+                onSelectSearch={handleSelectRecentOrTopic}
+                onRemoveSearch={removeRecentSearch}
+                onClearAll={clearRecentSearches}
+              />
             )}
 
-            {/* Recommended Scholars */}
-            {researchersList.length > 0 && (
-              <View style={styles.discoverySection}>
-                <View style={styles.sectionHeaderRow}>
-                  <View style={styles.sectionTitleLeft}>
-                    <Users size={16} color={colors.textPrimary} />
-                    <Text style={styles.discoverySectionTitle}>ACTIVE SCHOLARS & PEERS</Text>
-                  </View>
-                </View>
-
-                {researchersList.slice(0, 5).map((researcher) => (
-                  <ResearcherResultCard
-                    key={researcher.id}
-                    researcher={{
-                      id: researcher.id,
-                      fullName: researcher.fullName,
-                      handle: researcher.handle,
-                      avatarUrl: researcher.avatarUrl,
-                      academicTitle: researcher.academicTitle,
-                      institution: researcher.institution,
-                      bio: researcher.bio,
-                      orcidId: researcher.orcidId,
-                      orcidVerified: researcher.orcidVerified,
-                      followersCount: researcher.followersCount,
-                      followingCount: researcher.followingCount,
-                      isRegisteredUser: true,
-                    }}
-                  />
-                ))}
-              </View>
-            )}
+            {/* Render Domain Hyped Section */}
+            {renderHypedDomainContent()}
           </>
         )}
       </ScrollView>
+
+      {/* Add / Customize Interests Modal */}
+      <AddInterestsModal
+        visible={isAddInterestsVisible}
+        onClose={() => setIsAddInterestsVisible(false)}
+        onSaved={(newInterests) => {
+          if (newInterests.length > 0) {
+            setActiveTab(newInterests[0]);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -395,109 +600,248 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
   },
   searchBarContainer: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  topTabsWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  topTabsContent: {
+    paddingHorizontal: 16,
+    gap: 22,
+    alignItems: 'center',
+  },
+  topTabItem: {
+    paddingVertical: 10,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topTabItemActive: {
+    // Active container
+  },
+  topTabText: {
+    ...typography.body,
+    fontSize: 15,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  topTabTextActive: {
+    color: '#0F172A',
+    fontWeight: '800',
+  },
+  topTabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2.5,
+    backgroundColor: '#0F172A',
+    borderRadius: radii.full,
+  },
+  addInterestsTabBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EAF3EE',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radii.full,
+    marginLeft: 4,
+  },
+  addInterestsTabText: {
+    ...typography.captionBold,
+    fontSize: 12,
+    color: '#1B4D3E',
   },
   scrollView: {
     flex: 1,
+    backgroundColor: '#FAFAFA',
   },
   scrollContent: {
-    paddingBottom: spacing.xxl + 20,
+    paddingBottom: 48,
   },
   loadingContainer: {
-    paddingVertical: spacing.xxl,
+    padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.md,
   },
   loadingText: {
     ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 13.5,
+    color: '#64748B',
+    marginTop: 12,
+    textAlign: 'center',
   },
   resultsContainer: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
   detectedPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#EFF6FF',
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
+    backgroundColor: '#EAF3EE',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    marginBottom: spacing.md,
+    alignSelf: 'flex-start',
+    marginBottom: 16,
   },
   detectedPillText: {
-    ...typography.microBold,
-    color: '#1D4ED8',
-    fontSize: 11.5,
+    ...typography.captionBold,
+    fontSize: 12,
+    color: '#1B4D3E',
   },
   sectionWrap: {
-    marginBottom: spacing.lg,
+    marginBottom: 24,
   },
   sectionHeaderRow: {
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    ...typography.captionBold,
+    fontSize: 12,
+    letterSpacing: 0.8,
+    color: '#64748B',
+  },
+  paperCardWrap: {
+    marginBottom: 12,
+  },
+  researcherCardWrap: {
+    marginBottom: 10,
+  },
+  loadMoreBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: radii.md,
+    marginTop: 8,
+  },
+  loadMoreText: {
+    ...typography.captionBold,
+    color: '#1E293B',
+  },
+  hypedContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+  },
+  hypedSectionHeader: {
+    marginBottom: 14,
+  },
+  sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  sectionHeaderTitle: {
-    ...typography.microBold,
-    color: colors.textSecondary,
-    letterSpacing: 0.5,
-  },
-  paperCardWrap: {
-    marginBottom: spacing.md,
-  },
-  discoverySection: {
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
+    marginBottom: 4,
   },
   sectionTitleLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs + 2,
+    gap: 8,
   },
-  discoverySectionTitle: {
-    ...typography.microBold,
-    color: colors.textPrimary,
-    letterSpacing: 0.5,
+  hypedMainTitle: {
+    ...typography.h2,
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.3,
   },
-  seeAllBtn: {
+  seeAllAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
   },
-  seeAllText: {
+  seeAllActionText: {
+    ...typography.captionBold,
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '600',
+  },
+  hypedSubtitle: {
     ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 12.5,
+    color: '#64748B',
+    marginBottom: 12,
   },
-  loadMoreBtn: {
+  timeframeRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  timeframePills: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timeframePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radii.full,
+    backgroundColor: '#F1F5F9',
+  },
+  timeframePillActive: {
+    backgroundColor: '#1B4D3E',
+  },
+  timeframePillText: {
+    ...typography.captionMedium,
+    fontSize: 12,
+    color: '#475569',
+  },
+  timeframePillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  filterButtonText: {
+    ...typography.captionMedium,
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  inlineLoading: {
+    paddingVertical: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs + 2,
-    paddingVertical: spacing.sm + 4,
-    backgroundColor: colors.cardBackground,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    marginTop: spacing.xs,
+    gap: 8,
   },
-  loadMoreBtnText: {
-    ...typography.captionBold,
-    color: colors.textPrimary,
-    fontSize: 13,
+  inlineLoadingText: {
+    ...typography.caption,
+    color: '#64748B',
+    fontSize: 12,
+  },
+  papersListContainer: {
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  researchersSectionHeader: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  researcherCarousel: {
+    marginTop: 6,
+    marginHorizontal: -16,
+  },
+  researcherCarouselContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
 });

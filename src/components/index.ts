@@ -22,6 +22,7 @@ export * from './core/LikeIcon';
 export * from './core/LikeButton';
 export * from './core/SaveIcon';
 export * from './core/SaveButton';
+export * from './core/ReadBookIcon';
 export * from './profile/ProfileAnalyticsBar';
 export * from './profile/ProfileAnalyticsModal';
 export * from './profile/AnalyticsChart';
@@ -38,6 +39,8 @@ export * from './cards/TopicCard';
 export * from './cards/TopicCategoryCard';
 export * from './cards/TrendingDiscussionCard';
 export * from './cards/TrendingPaperCard';
+export * from './cards/HypedPaperCard';
+export * from './cards/TopResearcherCard';
 
 // Layout Components
 export * from './layout/AppHeader';
@@ -62,6 +65,7 @@ export * from './modals/InstallAppModal';
 export * from './modals/ConnectModal';
 export * from './modals/QuickOAuthModal';
 export * from './modals/FollowListModal';
+export * from './modals/AddInterestsModal';
 export * from './modals/ImageViewerModal';
 export * from './modals/PostOptionsModal';
 export * from './modals/EditPostModal';
