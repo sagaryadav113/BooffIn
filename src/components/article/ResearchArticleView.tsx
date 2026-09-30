@@ -59,7 +59,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
     } catch {}
   };
 
-  const handleOpenReferenceInApp = (ref: ArticleReference) => {
+  const handleOpenReferenceInApp = (ref: ArticleReference, asPdf: boolean = false) => {
     try {
       Haptics.selectionAsync();
     } catch {}
@@ -71,6 +71,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
         id: targetId,
         fromPostId: post.id,
         refId: ref.id,
+        ...(asPdf ? { mode: 'pdf' } : {}),
         ...(ref.doi ? { doi: ref.doi } : {}),
         ...(ref.title ? { title: ref.title } : {}),
         ...(ref.url ? { url: ref.url } : {}),
@@ -156,7 +157,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
       </View>
 
       {/* Reader View Mode Switcher (Matching Screenshot 2) */}
-      {post.paper?.openAccessUrl && (
+      {(Boolean(post.paper?.openAccessUrl) || Boolean(article.references?.find((r) => r.openAccessPdfUrl))) && (
         <View style={styles.tabSwitcher}>
           <TouchableOpacity
             style={[styles.tabButton, viewMode === 'article' && styles.tabButtonActive]}
@@ -180,8 +181,11 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
           <TouchableOpacity
             style={[styles.tabButton, viewMode === 'pdf' && styles.tabButtonActive]}
             onPress={() => {
-              if (post.paper?.id) {
-                router.push(`/paper/${post.paper.id}`);
+              const primaryPdfRef = post.paper?.openAccessUrl
+                ? { paperId: post.paper.id, doi: post.paper.doi, title: post.paper.title, openAccessPdfUrl: post.paper.openAccessUrl }
+                : article.references?.find((r) => r.openAccessPdfUrl);
+              if (primaryPdfRef) {
+                handleOpenReferenceInApp(primaryPdfRef as any, true);
               }
             }}
           >
@@ -293,7 +297,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
               <TouchableOpacity
                 key={ref.id}
                 style={styles.referenceItem}
-                onPress={() => handleOpenReferenceInApp(ref)}
+                onPress={() => handleOpenReferenceInApp(ref, true)}
                 activeOpacity={0.7}
               >
                 <View style={styles.referenceIndexCircle}>

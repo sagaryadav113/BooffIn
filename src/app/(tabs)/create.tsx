@@ -49,6 +49,7 @@ import {
 } from '../../api/storageService';
 import { extractPaperLinkOrDoi, resolvePaperWithDetails } from '../../api/paperResolver';
 import * as Haptics from 'expo-haptics';
+import * as SecureStore from 'expo-secure-store';
 import { MentionSuggestions } from '../../components/composer/MentionSuggestions';
 import { useMentionAutocomplete } from '../../hooks/useMentionAutocomplete';
 
@@ -383,6 +384,7 @@ export default function CreatePostScreen() {
         },
         user.id
       );
+      await SecureStore.deleteItemAsync('booffin_article_draft_v1').catch(() => {});
       router.replace('/(tabs)');
     } catch (err) {
       console.error('[CreatePost] Error publishing article:', err);

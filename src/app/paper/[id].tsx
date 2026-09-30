@@ -87,7 +87,7 @@ function createPaperFromReference(ref: any): Paper {
 }
 
 export default function PaperDetailScreen() {
-  const { id, fromPostId, doi, title, url, pdfUrl, refId } = useLocalSearchParams<{
+  const { id, fromPostId, doi, title, url, pdfUrl, refId, mode } = useLocalSearchParams<{
     id: string;
     fromPostId?: string;
     doi?: string;
@@ -95,6 +95,7 @@ export default function PaperDetailScreen() {
     url?: string;
     pdfUrl?: string;
     refId?: string;
+    mode?: 'article' | 'pdf';
   }>();
   const rawId = id ? decodeURIComponent(id) : '';
   const paperId = rawId || id || '';
@@ -218,7 +219,7 @@ export default function PaperDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Reader View Mode: 'article' (Substack format) vs 'pdf' (Open Access Document)
-  const [viewMode, setViewMode] = useState<'article' | 'pdf'>('article');
+  const [viewMode, setViewMode] = useState<'article' | 'pdf'>(mode === 'pdf' ? 'pdf' : 'article');
 
   // Zoom State for PDF Reader (0.75x to 2.5x)
   const [pdfZoom, setPdfZoom] = useState(1.0);
