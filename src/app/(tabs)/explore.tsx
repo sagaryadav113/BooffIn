@@ -155,6 +155,75 @@ export default function ExploreScreen() {
     }
   }, [results?.detectedInputType]);
 
+  const showResearchersFirst = useMemo(() => {
+    if (activeCategory === 'researchers') return true;
+    if (activeCategory === 'papers') return false;
+    if (!searchQuery.trim()) return false;
+    const parts = searchQuery.trim().split(/\s+/);
+    const looksLikeName =
+      parts.length >= 2 &&
+      parts.length <= 4 &&
+      parts.every((p) => /^[a-zA-ZÀ-ÖØ-öø-ÿ'\-\.]{2,}$/.test(p));
+    return looksLikeName || results?.detectedInputType === 'user' || results?.detectedInputType === 'orcid';
+  }, [activeCategory, searchQuery, results?.detectedInputType]);
+
+  const renderPapersSection = () => {
+    if (!results || results.papers.length === 0) return null;
+    if (activeCategory !== 'all' && activeCategory !== 'papers') return null;
+
+    return (
+      <View style={styles.sectionWrap}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeaderTitle}>
+            RESEARCH ARTICLES ({results.papers.length})
+          </Text>
+        </View>
+        {results.papers.map((paper) => (
+          <View key={paper.id} style={styles.paperCardWrap}>
+            <PaperCard paper={paper} />
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderResearchersSection = () => {
+    if (!results || results.researchers.length === 0) return null;
+    if (activeCategory !== 'all' && activeCategory !== 'researchers') return null;
+
+    return (
+      <View style={styles.sectionWrap}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeaderTitle}>
+            SCHOLARS & RESEARCHERS ({results.researchers.length})
+          </Text>
+        </View>
+        {results.researchers.map((researcher) => (
+          <ResearcherResultCard key={researcher.id} researcher={researcher} />
+        ))}
+
+        {/* Load More Scholars button */}
+        {hasMoreResearchers && (
+          <TouchableOpacity
+            style={styles.loadMoreBtn}
+            onPress={loadMoreResearchers}
+            disabled={isLoadingMoreResearchers}
+            activeOpacity={0.8}
+          >
+            {isLoadingMoreResearchers ? (
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+            ) : (
+              <>
+                <Users size={14} color={colors.textPrimary} />
+                <Text style={styles.loadMoreBtnText}>Load more scholars</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
@@ -223,53 +292,17 @@ export default function ExploreScreen() {
               </View>
             )}
 
-            {/* Papers Section */}
-            {(activeCategory === 'all' || activeCategory === 'papers') && results.papers.length > 0 && (
-              <View style={styles.sectionWrap}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionHeaderTitle}>
-                    RESEARCH ARTICLES ({results.papers.length})
-                  </Text>
-                </View>
-                {results.papers.map((paper) => (
-                  <View key={paper.id} style={styles.paperCardWrap}>
-                    <PaperCard paper={paper} />
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Researchers Section */}
-            {(activeCategory === 'all' || activeCategory === 'researchers') && results.researchers.length > 0 && (
-              <View style={styles.sectionWrap}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionHeaderTitle}>
-                    SCHOLARS & RESEARCHERS ({results.researchers.length})
-                  </Text>
-                </View>
-                {results.researchers.map((researcher) => (
-                  <ResearcherResultCard key={researcher.id} researcher={researcher} />
-                ))}
-
-                {/* Load More Scholars button */}
-                {hasMoreResearchers && (
-                  <TouchableOpacity
-                    style={styles.loadMoreBtn}
-                    onPress={loadMoreResearchers}
-                    disabled={isLoadingMoreResearchers}
-                    activeOpacity={0.8}
-                  >
-                    {isLoadingMoreResearchers ? (
-                      <ActivityIndicator size="small" color={colors.textPrimary} />
-                    ) : (
-                      <>
-                        <Users size={14} color={colors.textPrimary} />
-                        <Text style={styles.loadMoreBtnText}>Load more scholars</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-              </View>
+            {/* Sections (ordered dynamically based on query intent) */}
+            {showResearchersFirst ? (
+              <>
+                {renderResearchersSection()}
+                {renderPapersSection()}
+              </>
+            ) : (
+              <>
+                {renderPapersSection()}
+                {renderResearchersSection()}
+              </>
             )}
 
             {/* Empty State when no results found */}
