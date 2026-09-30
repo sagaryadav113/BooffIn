@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { Image } from 'expo-image';
 import {
   ZoomIn,
   ZoomOut,
@@ -18,7 +17,7 @@ import {
   Globe,
   Maximize2,
   FileCheck,
-  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
@@ -41,69 +40,61 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   isArxivPdf,
   onSwitchToArticleView,
 }) => {
-  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [hasFrameError, setHasFrameError] = useState<boolean>(false);
+  const [hasError, setHasError] = useState<boolean>(false);
 
-  const handleZoomIn = () => {
-    try {
-      Haptics.selectionAsync();
-    } catch {}
-    setZoomLevel((z) => Math.min(1.8, parseFloat((z + 0.15).toFixed(2))));
-  };
+  // Derive the cleanest, most embeddable full PDF stream URL
+  const effectiveStreamUrl = useMemo(() => {
+    const raw = (pdfUrl || paper.openAccessUrl || paper.canonicalUrl || '').trim();
 
-  const handleZoomOut = () => {
-    try {
-      Haptics.selectionAsync();
-    } catch {}
-    setZoomLevel((z) => Math.max(0.75, parseFloat((z - 0.15).toFixed(2))));
-  };
+    // 1. arXiv: direct unblocked PDF stream
+    const arxivMatch = raw.match(/arxiv\.org\/(?:abs|pdf)\/([\w.-]+)/i);
+    if (arxivMatch) {
+      const id = arxivMatch[1].replace(/\.pdf$/i, '');
+      return `https://arxiv.org/pdf/${id}.pdf`;
+    }
+    if (paper.doi) {
+      const doiArxiv = paper.doi.match(/arxiv\.org\/(?:abs|pdf)\/([\w.-]+)/i);
+      if (doiArxiv) {
+        return `https://arxiv.org/pdf/${doiArxiv[1].replace(/\.pdf$/i, '')}.pdf`;
+      }
+    }
 
-  const handleResetZoom = () => {
-    try {
-      Haptics.selectionAsync();
-    } catch {}
-    setZoomLevel(1.0);
-  };
+    // 2. PubMed Central (PMC): NIH PMC allows inline browser PDF embedding without X-Frame-Options blocks
+    const pmcMatch = raw.match(/PMC(\d+)/i) || (paper.doi && paper.doi.match(/PMC(\d+)/i));
+    if (pmcMatch) {
+      return `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcMatch[1]}/pdf/`;
+    }
+
+    // 3. EuropePMC ptpmcrender URL -> convert to NIH PMC to avoid EuropePMC's X-Frame-Options block
+    if (raw.includes('ptpmcrender.fcgi') || raw.includes('accid=')) {
+      const accMatch = raw.match(/accid=(?:PMC)?(\d+)/i);
+      if (accMatch) {
+        return `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${accMatch[1]}/pdf/`;
+      }
+    }
+
+    // 4. Any direct PDF link
+    return raw;
+  }, [pdfUrl, paper.openAccessUrl, paper.canonicalUrl, paper.doi]);
 
   const handleOpenExternal = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    const targetUrl = pdfUrl || paper.canonicalUrl || (paper.doi ? `https://doi.org/${paper.doi}` : '');
-    if (!targetUrl) return;
+    const target = effectiveStreamUrl || paper.canonicalUrl || (paper.doi ? `https://doi.org/${paper.doi}` : '');
+    if (!target) return;
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      window.open(target, '_blank', 'noopener,noreferrer');
     } else {
-      await WebBrowser.openBrowserAsync(targetUrl);
+      await WebBrowser.openBrowserAsync(target);
     }
   };
 
-  const authorsString = paper.authors && paper.authors.length > 0
-    ? paper.authors.map((a) => a.name).join(', ')
-    : 'Research Contributors';
-
-  // Format abstract into realistic readable academic paragraphs if dense
-  const abstractParagraphs = React.useMemo(() => {
-    if (!paper.abstract) {
-      return [
-        'Full scientific manuscript published and peer-reviewed in ' +
-          (paper.journal || 'academic literature') +
-          '. You can read the complete publication or open the high-fidelity PDF directly.',
-      ];
-    }
-    const raw = paper.abstract.trim();
-    // Split on double newlines or long sentences if unformatted
-    if (raw.includes('\n\n')) {
-      return raw.split('\n\n').filter(Boolean);
-    }
-    return [raw];
-  }, [paper.abstract, paper.journal]);
-
   return (
     <View style={styles.container}>
-      {/* ── TOP ACADEMIC CONTROLS TOOLBAR ── */}
+      {/* ── PDF DOCUMENT CONTROL HEADER ── */}
       <View style={styles.controlsBar}>
         <View style={styles.controlsLeft}>
           <Badge
@@ -111,243 +102,135 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             variant={isDirectPdf ? 'oa' : 'generic'}
           />
           <Text style={styles.controlsSubtext} numberOfLines={1}>
-            {isArxivPdf ? 'arXiv Open Access Stream' : 'Academic Manuscript Sheet'}
+            Full PDF Manuscript
           </Text>
         </View>
 
         <View style={styles.controlsRight}>
-          {/* Zoom controls */}
-          <View style={styles.zoomGroup}>
+          {/* Switch to Formatted Article View */}
+          {onSwitchToArticleView && (
             <TouchableOpacity
-              onPress={handleZoomOut}
-              disabled={zoomLevel <= 0.75}
-              style={[styles.zoomBtn, zoomLevel <= 0.75 && styles.zoomBtnDisabled]}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              onPress={onSwitchToArticleView}
+              style={styles.controlSecondaryBtn}
+              activeOpacity={0.75}
             >
-              <ZoomOut size={12} color={zoomLevel <= 0.75 ? colors.textMuted : colors.textPrimary} />
+              <BookOpen size={13} color={colors.textPrimary} />
+              <Text style={styles.controlSecondaryBtnText}>Article View</Text>
             </TouchableOpacity>
+          )}
 
-            <TouchableOpacity
-              onPress={handleResetZoom}
-              style={styles.zoomResetBtn}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            >
-              <Text style={styles.zoomResetText}>{Math.round(zoomLevel * 100)}%</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleZoomIn}
-              disabled={zoomLevel >= 1.8}
-              style={[styles.zoomBtn, zoomLevel >= 1.8 && styles.zoomBtnDisabled]}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            >
-              <ZoomIn size={12} color={zoomLevel >= 1.8 ? colors.textMuted : colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Open Full PDF Button */}
+          {/* Open Full Screen / External Tab */}
           <TouchableOpacity
             onPress={handleOpenExternal}
-            style={styles.controlPillBtn}
+            style={styles.controlPrimaryBtn}
             activeOpacity={0.75}
           >
-            <ExternalLink size={12} color="#FFFFFF" />
-            <Text style={styles.controlPillBtnText}>Original PDF</Text>
+            <Maximize2 size={13} color="#FFFFFF" />
+            <Text style={styles.controlPrimaryBtnText}>Full View</Text>
+            <ExternalLink size={11} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── MAIN DOCUMENT READER ── */}
-      {/* 
-        Case 1: arXiv PDFs allow direct inline iframe embedding without CORS/X-Frame-Options 
-      */}
-      {Platform.OS === 'web' && isArxivPdf && !hasFrameError ? (
-        <View style={styles.webPdfContainer}>
-          <iframe
-            src={pdfUrl}
-            style={{
-              width: '100%',
-              height: 840,
-              border: 'none',
-              backgroundColor: '#F9FAFB',
-              display: 'block',
-              transform: `scale(${zoomLevel})`,
-              transformOrigin: 'top left',
-              marginBottom: zoomLevel !== 1 ? `${(zoomLevel - 1) * 840}px` : undefined,
-            }}
-            title={paper.title}
-            allow="fullscreen"
-            loading="lazy"
-            onLoad={() => setIsLoading(false)}
-            onError={() => setHasFrameError(true)}
-          />
-        </View>
-      ) : (
-        /* 
-          Case 2: Authentic Academic Manuscript Sheet
-          Matches the clean scientific layout (PLOS ONE / Nature / Frontiers style)
-          Prevents third-party reCAPTCHAs or broken iframe errors.
-        */
-        <View style={styles.manuscriptSheet}>
-          {/* Running Top Academic Header (PLOS ONE / Frontiers style) */}
-          <View style={styles.runningHeaderRow}>
-            <Text style={styles.runningJournalText}>
-              {paper.journal ? paper.journal.toUpperCase() : 'RESEARCH MANUSCRIPT'}
-            </Text>
-            <Text style={styles.runningPaperTitle} numberOfLines={1}>
-              {paper.title}
-            </Text>
-          </View>
-          <View style={styles.headerRule} />
+      {/* ── IN-APP FULL PDF VIEWER ── */}
+      {Platform.OS === 'web' ? (
+        <View style={styles.webPdfWrapper}>
+          {effectiveStreamUrl ? (
+            <>
+              <iframe
+                src={effectiveStreamUrl}
+                style={{
+                  width: '100%',
+                  height: 980,
+                  border: 'none',
+                  backgroundColor: '#525659',
+                  display: 'block',
+                }}
+                title={paper.title}
+                allow="fullscreen"
+                loading="eager"
+                onLoad={() => setIsLoading(false)}
+                onError={() => {
+                  setIsLoading(false);
+                  setHasError(true);
+                }}
+              />
 
-          {/* Publisher & Open Access Banner */}
-          <View style={styles.publisherBanner}>
-            <View style={styles.publisherBannerLeft}>
-              <View style={styles.verifiedCheckBadge}>
-                <CheckCircle2 size={13} color="#1B4D3E" />
+              {/* Publisher Framing Notice & High-Res Quick Action */}
+              <View style={styles.pdfHelperBanner}>
+                <View style={styles.helperLeft}>
+                  <Globe size={13} color="#6B7280" />
+                  <Text style={styles.helperText} numberOfLines={1}>
+                    Rendering original manuscript from {paper.journal || 'Publisher Repository'}.
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleOpenExternal}
+                  style={styles.helperActionLink}
+                  activeOpacity={0.7}
+                >
+                  <ExternalLink size={12} color="#1B4D3E" />
+                  <Text style={styles.helperActionText}>Open in Dedicated Window</Text>
+                </TouchableOpacity>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.publisherBannerTitle}>
-                  Peer-Reviewed Research Publication
-                </Text>
-                <Text style={styles.publisherBannerSubtitle}>
-                  Published in {paper.journal || 'Academic Journal'} ({paper.publicationYear})
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              onPress={handleOpenExternal}
-              style={styles.openPdfActionBtn}
-              activeOpacity={0.85}
-            >
-              <FileText size={13} color="#FFFFFF" />
-              <Text style={styles.openPdfActionBtnText}>High-Res PDF</Text>
-              <ExternalLink size={11} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Manuscript Main Content */}
-          <View
-            style={[
-              styles.manuscriptBody,
-              {
-                paddingHorizontal: Math.round(spacing.lg * zoomLevel),
-                paddingVertical: Math.round(spacing.md * zoomLevel),
-              },
-            ]}
-          >
-            {/* Title */}
-            <Text
-              style={[
-                styles.manuscriptTitle,
-                {
-                  fontSize: Math.round(21 * zoomLevel),
-                  lineHeight: Math.round(29 * zoomLevel),
-                },
-              ]}
-            >
-              {paper.title}
-            </Text>
-
-            {/* Authors & Affiliation */}
-            <Text
-              style={[
-                styles.manuscriptAuthors,
-                {
-                  fontSize: Math.round(13.5 * zoomLevel),
-                  lineHeight: Math.round(20 * zoomLevel),
-                },
-              ]}
-            >
-              {authorsString}
-            </Text>
-
-            {/* Citation Meta Bar */}
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText}>
-                {paper.journal || 'Peer-Reviewed Literature'} · {paper.publicationYear}
-              </Text>
-              {paper.doi && (
-                <Text style={styles.metaDoi} numberOfLines={1}>
-                  DOI: {paper.doi}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.sectionDivider} />
-
-            {/* Abstract Section Header */}
-            <View style={styles.abstractHeadingRow}>
-              <Text
-                style={[
-                  styles.abstractHeadingText,
-                  { fontSize: Math.round(12 * zoomLevel) },
-                ]}
-              >
-                ABSTRACT & KEY FINDINGS
-              </Text>
-            </View>
-
-            {/* Academic Formatted Text Paragraphs */}
-            {abstractParagraphs.map((para, idx) => (
-              <Text
-                key={idx}
-                style={[
-                  styles.manuscriptParagraph,
-                  {
-                    fontSize: Math.round(15 * zoomLevel),
-                    lineHeight: Math.round(25 * zoomLevel),
-                    marginBottom: Math.round(16 * zoomLevel),
-                  },
-                ]}
-              >
-                {para}
-              </Text>
-            ))}
-
-            {/* Figures Gallery (if available) */}
-            {paper.figures && paper.figures.length > 0 && (
-              <View style={styles.figuresContainer}>
-                <Text style={styles.figureSectionTitle}>FIGURES & SCHEMATICS</Text>
-                {paper.figures.map((fig) => (
-                  <View key={fig.id} style={styles.figureItem}>
-                    <Image
-                      source={{ uri: fig.url }}
-                      style={styles.figureImage}
-                      contentFit="contain"
-                      transition={200}
-                    />
-                    {fig.caption && (
-                      <Text style={styles.figureCaption}>{fig.caption}</Text>
-                    )}
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* In-Depth Academic Reading Footnote */}
-            <View style={styles.manuscriptFooter}>
-              <Text style={styles.manuscriptFooterText}>
-                Indexed on BOOFFIN · Evaluated by scientific community
+            </>
+          ) : (
+            <View style={styles.noPdfFallbackCard}>
+              <AlertCircle size={28} color="#D97706" />
+              <Text style={styles.noPdfTitle}>Full PDF Stream Unavailable</Text>
+              <Text style={styles.noPdfDesc}>
+                This paper does not provide an open access PDF link. You can open the canonical publication at {paper.journal} or read the formatted view.
               </Text>
               <TouchableOpacity
                 onPress={handleOpenExternal}
-                style={styles.footerPdfLink}
-                activeOpacity={0.7}
+                style={styles.controlPrimaryBtn}
+                activeOpacity={0.8}
               >
-                <ExternalLink size={12} color="#1B4D3E" />
-                <Text style={styles.footerPdfLinkText}>
-                  Download original publisher PDF
-                </Text>
+                <Globe size={14} color="#FFFFFF" />
+                <Text style={styles.controlPrimaryBtnText}>Open at Publisher</Text>
               </TouchableOpacity>
             </View>
+          )}
+        </View>
+      ) : (
+        /* Mobile Native Android APK / iOS Presentation Card */
+        <View style={styles.nativePdfCard}>
+          <View style={styles.nativePdfIconWrap}>
+            <FileText size={36} color="#1B4D3E" />
+          </View>
+          <Text style={styles.nativePdfTitle}>{paper.title}</Text>
+          <Text style={styles.nativePdfJournal}>
+            {paper.journal || 'Academic Literature'} · {paper.publicationYear}
+          </Text>
+
+          <View style={styles.nativePdfActionsRow}>
+            <TouchableOpacity
+              style={styles.nativePrimaryBtn}
+              onPress={handleOpenExternal}
+              activeOpacity={0.85}
+            >
+              <FileText size={16} color="#FFFFFF" />
+              <Text style={styles.nativePrimaryBtnText}>Open Full Multi-Page PDF</Text>
+              <ExternalLink size={14} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            {onSwitchToArticleView && (
+              <TouchableOpacity
+                style={styles.nativeSecondaryBtn}
+                onPress={onSwitchToArticleView}
+                activeOpacity={0.85}
+              >
+                <BookOpen size={16} color={colors.textPrimary} />
+                <Text style={styles.nativeSecondaryBtnText}>Formatted Article View</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
 
-      {/* ── BOTTOM DOCK FOOTER SPACER ── */}
-      <View style={styles.bottomDockSpacer} />
+      {/* Dock spacer so paper scroll content is never clipped by the floating rating dock */}
+      <View style={styles.dockBottomSpacer} />
     </View>
   );
 };
@@ -371,10 +254,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: 9,
+    paddingVertical: 10,
     backgroundColor: '#F9FAFB',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    gap: spacing.sm,
   },
   controlsLeft: {
     flexDirection: 'row',
@@ -383,7 +267,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   controlsSubtext: {
-    fontSize: 11.5,
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.textSecondary,
     fontFamily: typography.caption.fontFamily,
   },
@@ -392,266 +277,158 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  zoomGroup: {
+  controlSecondaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
     backgroundColor: '#FFFFFF',
-    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    gap: 2,
+    borderColor: '#D1D5DB',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 6,
+    borderRadius: radii.sm,
   },
-  zoomBtn: {
-    padding: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  zoomBtnDisabled: {
-    opacity: 0.35,
-  },
-  zoomResetBtn: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  zoomResetText: {
-    fontSize: 10.5,
-    fontWeight: '700',
+  controlSecondaryBtnText: {
+    fontSize: 11.5,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
-  controlPillBtn: {
+  controlPrimaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     backgroundColor: '#1B4D3E',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 5,
+    paddingHorizontal: spacing.sm + 4,
+    paddingVertical: 6,
     borderRadius: radii.sm,
   },
-  controlPillBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
+  controlPrimaryBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
-  webPdfContainer: {
+  webPdfWrapper: {
     width: '100%',
+    backgroundColor: '#525659',
+  },
+  pdfHelperBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#F9FAFB',
-  },
-
-  /* ── ACADEMIC MANUSCRIPT SHEET STYLES ── */
-  manuscriptSheet: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  runningHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 6,
-    gap: spacing.md,
-  },
-  runningJournalText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#111827',
-    letterSpacing: 0.8,
-    fontFamily: Platform.select({
-      web: "'Georgia', 'Times New Roman', serif",
-      default: 'serif',
-    }),
-  },
-  runningPaperTitle: {
-    fontSize: 11.5,
-    color: '#6B7280',
-    flex: 1,
-    textAlign: 'right',
-    fontStyle: 'italic',
-  },
-  headerRule: {
-    height: 1.5,
-    backgroundColor: '#111827',
-    marginBottom: spacing.md,
-  },
-  publisherBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
-    borderRadius: radii.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
     paddingHorizontal: spacing.md,
     paddingVertical: 9,
-    marginBottom: spacing.lg,
-    gap: spacing.sm,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  publisherBannerLeft: {
+  helperLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     flex: 1,
   },
-  verifiedCheckBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: radii.full,
-    backgroundColor: '#DCFCE7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  publisherBannerTitle: {
+  helperText: {
     fontSize: 11.5,
-    fontWeight: '700',
-    color: '#166534',
+    color: '#6B7280',
   },
-  publisherBannerSubtitle: {
-    fontSize: 10.5,
-    color: '#15803D',
-  },
-  openPdfActionBtn: {
+  helperActionLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#1B4D3E',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 5,
-    borderRadius: radii.sm,
   },
-  openPdfActionBtnText: {
-    fontSize: 11,
+  helperActionText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#1B4D3E',
+  },
+  noPdfFallbackCard: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFBEB',
+    gap: spacing.sm,
+  },
+  noPdfTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  noPdfDesc: {
+    fontSize: 13,
+    color: '#78350F',
+    textAlign: 'center',
+    maxWidth: 400,
+    lineHeight: 18,
+    marginBottom: spacing.xs,
+  },
+  nativePdfCard: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  nativePdfIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: radii.full,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  nativePdfTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+    lineHeight: 22,
+  },
+  nativePdfJournal: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
+  nativePdfActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    width: '100%',
+    maxWidth: 420,
+  },
+  nativePrimaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#1B4D3E',
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+  },
+  nativePrimaryBtnText: {
+    fontSize: 13.5,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  manuscriptBody: {
-    backgroundColor: '#FFFFFF',
-  },
-  manuscriptTitle: {
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: spacing.xs,
-    fontFamily: Platform.select({
-      web: "'Georgia', 'Times New Roman', serif",
-      default: 'serif',
-    }),
-  },
-  manuscriptAuthors: {
-    color: '#374151',
-    marginBottom: spacing.xs,
-    fontStyle: 'italic',
-    fontFamily: Platform.select({
-      web: "'Georgia', 'Times New Roman', serif",
-      default: 'serif',
-    }),
-  },
-  metaRow: {
+  nativeSecondaryBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
   },
-  metaText: {
-    fontSize: 11.5,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  metaDoi: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    fontFamily: Platform.select({
-      web: 'monospace',
-      default: undefined,
-    }),
-  },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: spacing.md,
-  },
-  abstractHeadingRow: {
-    marginBottom: spacing.sm,
-  },
-  abstractHeadingText: {
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    color: '#111827',
-    fontFamily: Platform.select({
-      web: "'Georgia', 'Times New Roman', serif",
-      default: 'serif',
-    }),
-  },
-  manuscriptParagraph: {
-    color: '#1F2937',
-    textAlign: Platform.select({ web: 'justify', default: 'left' }),
-    fontFamily: Platform.select({
-      web: "'Georgia', 'Times New Roman', 'Cambria', serif",
-      default: 'serif',
-    }),
-    letterSpacing: 0.15,
-  },
-  figuresContainer: {
-    marginTop: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  figureSectionTitle: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    color: '#4B5563',
-    marginBottom: spacing.sm,
-  },
-  figureItem: {
-    marginBottom: spacing.md,
-    backgroundColor: '#F9FAFB',
-    borderRadius: radii.sm,
-    padding: spacing.sm,
-    alignItems: 'center',
-  },
-  figureImage: {
-    width: '100%',
-    height: 240,
-    borderRadius: radii.xs,
-  },
-  figureCaption: {
-    fontSize: 11.5,
-    color: '#6B7280',
-    marginTop: 6,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  manuscriptFooter: {
-    marginTop: spacing.xl,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  manuscriptFooterText: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    fontStyle: 'italic',
-  },
-  footerPdfLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  footerPdfLinkText: {
-    fontSize: 11.5,
-    color: '#1B4D3E',
+  nativeSecondaryBtnText: {
+    fontSize: 13.5,
     fontWeight: '600',
+    color: colors.textPrimary,
   },
-  bottomDockSpacer: {
-    height: 70,
+  dockBottomSpacer: {
+    height: 80,
   },
 });

@@ -317,7 +317,8 @@ export async function fetchDirectOpenAccessPdf(doi: string): Promise<string | nu
         const directPdf = item.fullTextUrlList?.fullTextUrl?.find((u: any) => u.documentStyle === 'pdf')?.url;
         if (directPdf) return directPdf;
         if (item.pmcid) {
-          return `https://europepmc.org/backend/ptpmcrender.fcgi?accid=${item.pmcid}&blobtype=pdf`;
+          const pmcNum = item.pmcid.replace(/^PMC/i, '');
+          return `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcNum}/pdf/`;
         }
       }
     }

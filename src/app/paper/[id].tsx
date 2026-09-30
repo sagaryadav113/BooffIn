@@ -956,9 +956,9 @@ export default function PaperDetailScreen() {
             <View style={styles.pdfViewWrapper}>
               <InAppPaperPdfViewer
                 paper={paper}
-                pdfUrl={resolvedPdfUrl}
-                isDirectPdf={isDirectPdf}
-                isArxivPdf={isArxivPdf}
+                pdfUrl={resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl || paper.canonicalUrl || ''}
+                isDirectPdf={Boolean(resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl)}
+                isArxivPdf={isArxivPdf || (paper.doi ? paper.doi.includes('arxiv') : false) || Boolean(bestOpenUrl && bestOpenUrl.includes('arxiv.org'))}
                 onSwitchToArticleView={() => setViewMode('article')}
               />
             </View>
