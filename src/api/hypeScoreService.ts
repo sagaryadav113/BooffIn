@@ -110,16 +110,11 @@ export function calculateFinalHypeScore(ratingScore: number, popularityScore: nu
 /**
  * Generates initial baseline metrics for a paper based on its view/citation seed
  */
-export function createDefaultPaperMetrics(paperId: string, initialViews: number = 24): PaperMetrics {
-  const views = Math.max(initialViews, 1);
-  const uniqueReaders = Math.round(views * 0.75);
-  const viewsLastHour = Math.max(1, Math.round(views * 0.05));
-  const viewsLast24h = Math.max(2, Math.round(views * 0.2));
-
+export function createDefaultPaperMetrics(paperId: string): PaperMetrics {
   return {
     paperId,
-    views,
-    uniqueReaders,
+    views: 0,
+    uniqueReaders: 0,
     impactSum: 0,
     impactCount: 0,
     claritySum: 0,
@@ -131,10 +126,10 @@ export function createDefaultPaperMetrics(paperId: string, initialViews: number 
     visualsAvg: 0,
     communityRating: 0,
     ratingScore: 0,
-    popularityScore: calculatePopularityScore(views),
+    popularityScore: 0,
     hypeScore: 0, // 0 signifies UNRATED until first community vote!
-    viewsLastHour,
-    viewsLast24h,
+    viewsLastHour: 0,
+    viewsLast24h: 0,
     trendScore: 0,
   };
 }
@@ -148,7 +143,7 @@ const inMemoryUserRatingsCache = new Map<string, UserPaperRating>();
 /**
  * Retrieves metrics for a given paper ID
  */
-export async function getPaperMetrics(paperId: string, seedViews?: number): Promise<PaperMetrics> {
+export async function getPaperMetrics(paperId: string): Promise<PaperMetrics> {
   const normalizedId = paperId.trim();
   if (inMemoryMetricsCache.has(normalizedId)) {
     return inMemoryMetricsCache.get(normalizedId)!;
@@ -160,11 +155,11 @@ export async function getPaperMetrics(paperId: string, seedViews?: number): Prom
     if (raw) {
       const parsed = JSON.parse(raw);
       // Cleanse legacy mock data
-      if (parsed.impactCount === 6 || parsed.views >= 120 && parsed.impactCount === 0) {
-        parsed.views = 1;
-        parsed.uniqueReaders = 1;
-        parsed.viewsLast24h = 1;
-        parsed.viewsLastHour = 1;
+      if (parsed.impactCount === 6 || (parsed.views >= 24 && parsed.impactCount === 0)) {
+        parsed.views = 0;
+        parsed.uniqueReaders = 0;
+        parsed.viewsLast24h = 0;
+        parsed.viewsLastHour = 0;
         parsed.impactSum = 0;
         parsed.impactCount = 0;
         parsed.claritySum = 0;
@@ -215,7 +210,7 @@ export async function getPaperMetrics(paperId: string, seedViews?: number): Prom
   } catch {}
 
   // 3. Fallback: Initialize baseline metrics
-  const defaultMetrics = createDefaultPaperMetrics(normalizedId, seedViews);
+  const defaultMetrics = createDefaultPaperMetrics(normalizedId);
   inMemoryMetricsCache.set(normalizedId, defaultMetrics);
   try {
     await appStorage.setItem(

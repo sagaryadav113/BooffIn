@@ -115,17 +115,29 @@ export default function PaperDetailScreen() {
   const scrollViewRef = React.useRef<ScrollView>(null);
   const [paperMetrics, setPaperMetrics] = useState<PaperMetrics | null>(null);
 
-  // Initialize HYPE score and record paper view on open
+  // Load verified metrics immediately; count as reader ONLY after 25+ seconds of reading
   useEffect(() => {
     let isMounted = true;
     const targetId = paperId || doi;
-    if (targetId) {
-      recordPaperView(targetId, currentUser?.id).then((m) => {
-        if (isMounted) setPaperMetrics(m);
-      });
-    }
+    if (!targetId) return;
+
+    // 1. Fetch current status immediately
+    getPaperMetrics(targetId).then((m) => {
+      if (isMounted) setPaperMetrics(m);
+    });
+
+    // 2. Count 1 verified reader only after spending > 25 seconds on the paper
+    const timer = setTimeout(() => {
+      recordPaperView(targetId, currentUser?.id)
+        .then((updated) => {
+          if (isMounted) setPaperMetrics(updated);
+        })
+        .catch(() => {});
+    }, 25000);
+
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [paperId, doi, currentUser?.id]);
 
@@ -1007,7 +1019,9 @@ export default function PaperDetailScreen() {
                 <View style={styles.liveVelocityRow}>
                   <Flame size={13} color="#D97706" />
                   <Text style={styles.liveVelocityText}>
-                    {paperMetrics.views === 1
+                    {paperMetrics.views === 0
+                      ? 'Be first verified reader · Reading now'
+                      : paperMetrics.views === 1
                       ? '1 reader · 1 today'
                       : `${paperMetrics.views.toLocaleString()} readers · ↑ ${paperMetrics.viewsLast24h} today`}
                   </Text>
