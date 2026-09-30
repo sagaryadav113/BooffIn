@@ -120,14 +120,14 @@ export default function PaperDetailScreen() {
     let isMounted = true;
     const targetId = paperId || doi;
     if (targetId) {
-      recordPaperView(targetId).then((m) => {
+      recordPaperView(targetId, currentUser?.id).then((m) => {
         if (isMounted) setPaperMetrics(m);
       });
     }
     return () => {
       isMounted = false;
     };
-  }, [paperId, doi]);
+  }, [paperId, doi, currentUser?.id]);
 
   // Stable Post & Comments Store Selectors
   const getCommentsForPost = usePostStore((s) => s.getCommentsForPost);
@@ -978,7 +978,7 @@ export default function PaperDetailScreen() {
 
                 {/* BOOFFIN HYPE SCORE BADGE */}
                 <HypeScoreBadge
-                  score={paperMetrics?.hypeScore || 82}
+                  score={paperMetrics ? paperMetrics.hypeScore : 0}
                   metrics={paperMetrics || undefined}
                 />
 
@@ -1007,7 +1007,9 @@ export default function PaperDetailScreen() {
                 <View style={styles.liveVelocityRow}>
                   <Flame size={13} color="#D97706" />
                   <Text style={styles.liveVelocityText}>
-                    {paperMetrics.views.toLocaleString()} readers · ↑ {paperMetrics.viewsLast24h} today
+                    {paperMetrics.views === 1
+                      ? '1 reader · 1 today'
+                      : `${paperMetrics.views.toLocaleString()} readers · ↑ ${paperMetrics.viewsLast24h} today`}
                   </Text>
                 </View>
               )}

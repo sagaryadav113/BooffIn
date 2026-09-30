@@ -159,6 +159,21 @@ export async function getPaperMetrics(paperId: string, seedViews?: number): Prom
     const raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${normalizedId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
+      // Cleanse legacy mock data
+      if (parsed.impactCount === 6 || parsed.views >= 120 && parsed.impactCount === 0) {
+        parsed.views = 1;
+        parsed.uniqueReaders = 1;
+        parsed.viewsLast24h = 1;
+        parsed.viewsLastHour = 1;
+        parsed.impactSum = 0;
+        parsed.impactCount = 0;
+        parsed.claritySum = 0;
+        parsed.clarityCount = 0;
+        parsed.visualsSum = 0;
+        parsed.visualsCount = 0;
+        parsed.hypeScore = 0;
+        parsed.communityRating = 0;
+      }
       inMemoryMetricsCache.set(normalizedId, parsed);
       return parsed;
     }
@@ -175,8 +190,8 @@ export async function getPaperMetrics(paperId: string, seedViews?: number): Prom
     if (data) {
       const metrics: PaperMetrics = {
         paperId: data.paper_id,
-        views: data.views || 0,
-        uniqueReaders: data.unique_readers || 0,
+        views: data.views || 1,
+        uniqueReaders: data.unique_readers || 1,
         impactSum: data.impact_sum || 0,
         impactCount: data.impact_count || 0,
         claritySum: data.clarity_sum || 0,
@@ -190,8 +205,8 @@ export async function getPaperMetrics(paperId: string, seedViews?: number): Prom
         ratingScore: data.rating_score || 0,
         popularityScore: data.popularity_score || 0,
         hypeScore: data.hype_score || 0,
-        viewsLastHour: data.views_last_hour || 0,
-        viewsLast24h: data.views_last_24h || 0,
+        viewsLastHour: data.views_last_hour || 1,
+        viewsLast24h: data.views_last_24h || 1,
         trendScore: data.trend_score || 0,
       };
       inMemoryMetricsCache.set(normalizedId, metrics);
@@ -210,6 +225,86 @@ export async function getPaperMetrics(paperId: string, seedViews?: number): Prom
   } catch {}
 
   return defaultMetrics;
+}
+
+const STORAGE_KEY_PREFIX_VIEWS = 'booffin_paper_real_views_';
+
+interface StoredViewEntry {
+  timestamp: number;
+  userId: string;
+}
+
+/**
+ * Records a real in-app view event whenever a user views a paper.
+ * Tracks actual reader count and real 24-hour reading velocity.
+ */
+export async function recordPaperView(
+  paperId: string,
+  userId?: string
+): Promise<PaperMetrics> {
+  const normalizedId = paperId.trim();
+  const effectiveUserId = userId || 'anonymous_reader';
+  const now = Date.now();
+  const oneDayAgo = now - 24 * 60 * 60 * 1000;
+  const oneHourAgo = now - 60 * 60 * 1000;
+
+  let viewLogs: StoredViewEntry[] = [];
+
+  try {
+    const rawLogs = await appStorage.getItem(`${STORAGE_KEY_PREFIX_VIEWS}${normalizedId}`);
+    if (rawLogs) {
+      viewLogs = JSON.parse(rawLogs);
+    }
+  } catch {}
+
+  // Append real view event
+  viewLogs.push({ timestamp: now, userId: effectiveUserId });
+
+  // Calculate real metrics from actual log
+  const realViews = viewLogs.length;
+  const realUniqueReaders = new Set(viewLogs.map((v) => v.userId)).size;
+  const realViewsLast24h = viewLogs.filter((v) => v.timestamp >= oneDayAgo).length;
+  const realViewsLastHour = viewLogs.filter((v) => v.timestamp >= oneHourAgo).length;
+
+  // Persist the real view log
+  try {
+    await appStorage.setItem(
+      `${STORAGE_KEY_PREFIX_VIEWS}${normalizedId}`,
+      JSON.stringify(viewLogs.slice(-1000))
+    );
+  } catch {}
+
+  // Update paper metrics with the real view counts
+  const currentMetrics = await getPaperMetrics(normalizedId);
+  const popularityScore = calculatePopularityScore(realViews);
+
+  let finalHypeScore = 0;
+  const totalVotes = currentMetrics.impactCount + currentMetrics.clarityCount + currentMetrics.visualsCount;
+  if (totalVotes > 0) {
+    const bayesianRating = applyBayesianShrinkage(currentMetrics.communityRating, totalVotes);
+    const ratingScore = calculateRatingScore(bayesianRating);
+    finalHypeScore = calculateFinalHypeScore(ratingScore, popularityScore);
+  }
+
+  const updatedMetrics: PaperMetrics = {
+    ...currentMetrics,
+    views: realViews,
+    uniqueReaders: realUniqueReaders,
+    viewsLast24h: realViewsLast24h,
+    viewsLastHour: realViewsLastHour,
+    popularityScore,
+    hypeScore: finalHypeScore,
+  };
+
+  inMemoryMetricsCache.set(normalizedId, updatedMetrics);
+  try {
+    await appStorage.setItem(
+      `${STORAGE_KEY_PREFIX_METRICS}${normalizedId}`,
+      JSON.stringify(updatedMetrics)
+    );
+  } catch {}
+
+  return updatedMetrics;
 }
 
 /**
@@ -434,37 +529,4 @@ export async function submitPaperRating(params: {
     metrics: updatedMetrics,
     userRating: updatedUserRating,
   };
-}
-
-/**
- * Increments view and live popularity counters when a paper is opened
- */
-export async function recordPaperView(paperId: string): Promise<PaperMetrics> {
-  const current = await getPaperMetrics(paperId);
-  const nextViews = current.views + 1;
-  const nextViewsLastHour = current.viewsLastHour + 1;
-  const nextViewsLast24h = current.viewsLast24h + 1;
-
-  const popularityScore = calculatePopularityScore(nextViews);
-  const hypeScore = calculateFinalHypeScore(current.ratingScore, popularityScore);
-
-  const updated: PaperMetrics = {
-    ...current,
-    views: nextViews,
-    viewsLastHour: nextViewsLastHour,
-    viewsLast24h: nextViewsLast24h,
-    popularityScore,
-    hypeScore,
-    trendScore: Math.round((nextViewsLast24h / Math.max(1, nextViews)) * 100),
-  };
-
-  inMemoryMetricsCache.set(paperId, updated);
-  try {
-    await appStorage.setItem(
-      `${STORAGE_KEY_PREFIX_METRICS}${paperId}`,
-      JSON.stringify(updated)
-    );
-  } catch {}
-
-  return updated;
 }
