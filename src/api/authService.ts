@@ -309,6 +309,11 @@ export async function signUpWithEmail(
       return { user: null, error: 'Email and password are required.' };
     }
 
+    const pwdVal = validatePassword(params.password);
+    if (!pwdVal.isValid) {
+      return { user: null, error: pwdVal.error };
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password: params.password,
@@ -422,6 +427,40 @@ export function normalizeHandle(handle: string): string {
   return handle.trim().replace(/^@+/, '').toLowerCase();
 }
 
+export interface PasswordValidationResult {
+  isValid: boolean;
+  error: string | null;
+}
+
+/**
+ * Validates password using modern professional social media standards (like Instagram):
+ * - Minimum 6 characters (up to 128)
+ * - Must contain letters and numbers (combination of letters & digits)
+ * - No spaces allowed
+ * - Does not require complex special characters
+ */
+export function validatePassword(password: string): PasswordValidationResult {
+  if (!password) {
+    return { isValid: false, error: 'Password is required.' };
+  }
+  if (password.length < 6) {
+    return { isValid: false, error: 'Password must be at least 6 characters long.' };
+  }
+  if (password.length > 128) {
+    return { isValid: false, error: 'Password cannot exceed 128 characters.' };
+  }
+  if (/\s/.test(password)) {
+    return { isValid: false, error: 'Password cannot contain spaces.' };
+  }
+  if (!/[a-zA-Z]/.test(password)) {
+    return { isValid: false, error: 'Password must contain at least one letter.' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { isValid: false, error: 'Password must contain at least one number.' };
+  }
+  return { isValid: true, error: null };
+}
+
 export interface UsernameValidationResult {
   isValid: boolean;
   normalized: string;
@@ -429,31 +468,65 @@ export interface UsernameValidationResult {
 }
 
 /**
- * Validates handle format, length, and reserved list
+ * Validates username using professional social media standards (like Instagram):
+ * - Length: between 3 and 16 characters (16-character limit)
+ * - No spaces allowed anywhere in username
+ * - Allowed characters: lowercase letters, numbers, underscores (_), and periods (.)
+ * - Cannot start or end with a period or underscore
+ * - Cannot have consecutive periods or underscores (e.g. '..' or '__')
+ * - Protected against reserved system usernames
  */
 export function validateUsername(handle: string): UsernameValidationResult {
+  if (!handle || handle.trim() === '') {
+    return { isValid: false, normalized: '', error: 'Please enter a username.' };
+  }
+  if (/\s/.test(handle)) {
+    return {
+      isValid: false,
+      normalized: handle.trim().toLowerCase().replace(/\s+/g, ''),
+      error: 'Username cannot contain spaces.',
+    };
+  }
   const normalized = normalizeHandle(handle);
-  if (!normalized) {
-    return { isValid: false, normalized: '', error: 'Please enter a handle.' };
-  }
   if (normalized.length < 3) {
-    return { isValid: false, normalized, error: 'Handle must be at least 3 characters.' };
+    return { isValid: false, normalized, error: 'Username must be at least 3 characters.' };
   }
-  if (normalized.length > 30) {
-    return { isValid: false, normalized, error: 'Handle cannot exceed 30 characters.' };
+  if (normalized.length > 16) {
+    return { isValid: false, normalized, error: 'Username cannot exceed 16 characters.' };
   }
-  if (!/^[a-z0-9_]+$/.test(normalized)) {
+  if (!/^[a-z0-9_.]+$/.test(normalized)) {
     return {
       isValid: false,
       normalized,
-      error: 'Handle can only contain letters, numbers, and underscores.',
+      error: 'Username can only contain letters, numbers, underscores, and periods.',
+    };
+  }
+  if (/^[._]/.test(normalized)) {
+    return {
+      isValid: false,
+      normalized,
+      error: 'Username cannot start with a period or underscore.',
+    };
+  }
+  if (/[._]$/.test(normalized)) {
+    return {
+      isValid: false,
+      normalized,
+      error: 'Username cannot end with a period or underscore.',
+    };
+  }
+  if (/\.\./.test(normalized) || /__/.test(normalized) || /\._|\_\./.test(normalized)) {
+    return {
+      isValid: false,
+      normalized,
+      error: 'Username cannot contain consecutive symbols.',
     };
   }
   if (RESERVED_USERNAMES.has(normalized)) {
     return {
       isValid: false,
       normalized,
-      error: 'This handle is reserved by BooffIn.',
+      error: 'This username is reserved by BooffIn.',
     };
   }
   return { isValid: true, normalized, error: null };

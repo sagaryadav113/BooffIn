@@ -479,12 +479,19 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.fieldInputClean}
                   value={handle}
-                  onChangeText={setHandle}
+                  onChangeText={(text) => {
+                    const clean = text.replace(/\s+/g, '');
+                    setHandle(clean);
+                  }}
+                  maxLength={16}
                   placeholder="username"
                   placeholderTextColor={colors.textMuted}
                   autoCapitalize="none"
                 />
               </View>
+              <Text style={styles.fieldHint}>
+                3–16 characters (letters, numbers, _ and .). No spaces.
+              </Text>
 
               {/* Real-time availability indicator */}
               {handle.trim().length > 0 && (

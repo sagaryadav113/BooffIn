@@ -427,12 +427,14 @@ export default function ProfileSettingsScreen() {
             label="Username / Handle *"
             value={handle}
             onChangeText={(text) => {
-              setHandle(text);
+              const clean = text.replace(/\s+/g, '');
+              setHandle(clean);
               if (errorMessage) setErrorMessage(null);
             }}
+            maxLength={16}
             placeholder="e.g. aris_thorne"
             autoCapitalize="none"
-            hint="Your unique @handle for mentions and direct links."
+            hint="3–16 characters (letters, numbers, _ and .). No spaces."
           />
 
           {handle.trim().length > 0 && (

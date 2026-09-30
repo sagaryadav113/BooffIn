@@ -340,12 +340,14 @@ export default function OnboardingScreen() {
                       placeholder="e.g. sagaryadav"
                       value={handle}
                       onChangeText={(text) => {
-                        setHandle(text);
+                        const clean = text.replace(/\s+/g, '');
+                        setHandle(clean);
                         if (step1Error) setStep1Error(null);
                       }}
                       autoCapitalize="none"
+                      maxLength={16}
                       leftIcon="Tag"
-                      hint="Your unique @handle used in mentions and paper discussions"
+                      hint="3–16 characters (letters, numbers, _ and .). No spaces."
                     />
 
                     {/* Real-time Availability Badge */}

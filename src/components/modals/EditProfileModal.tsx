@@ -219,13 +219,18 @@ const EditProfileForm: React.FC<{
                 style={[styles.input, styles.inputClean]}
                 value={handle}
                 onChangeText={(text) => {
-                  setHandle(text);
+                  const clean = text.replace(/\s+/g, '');
+                  setHandle(clean);
                   if (errorMessage) setErrorMessage(null);
                 }}
+                maxLength={16}
                 placeholder="username"
                 autoCapitalize="none"
               />
             </View>
+            <Text style={{ ...typography.micro, color: colors.textSecondary, marginTop: 4 }}>
+              3–16 characters (letters, numbers, _ and .). No spaces.
+            </Text>
 
             {/* Real-time availability indicator */}
             {handle.trim().length > 0 && (

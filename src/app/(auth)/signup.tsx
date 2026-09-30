@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Input } from '../../components/core/Input';
 import { useAuthStore } from '../../store/useAuthStore';
+import { validatePassword } from '../../api/authService';
 
 export default function SignupScreen() {
   const params = useLocalSearchParams<{ email?: string }>();
@@ -34,7 +35,8 @@ export default function SignupScreen() {
 
   const cleanEmail = email.trim().toLowerCase();
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail);
-  const isPasswordValid = password.length >= 6;
+  const passwordValidation = validatePassword(password);
+  const isPasswordValid = passwordValidation.isValid;
 
   const handleBack = () => {
     try {
@@ -52,8 +54,9 @@ export default function SignupScreen() {
       return;
     }
 
-    if (!isPasswordValid) {
-      setValidationError('Password must be at least 6 characters.');
+    const pwdVal = validatePassword(password);
+    if (!pwdVal.isValid) {
+      setValidationError(pwdVal.error || 'Password must be at least 6 characters.');
       return;
     }
 
@@ -153,7 +156,7 @@ export default function SignupScreen() {
                   leftIcon="Shield"
                   rightIcon={showPassword ? 'EyeOff' : 'Eye'}
                   onRightIconPress={() => setShowPassword(!showPassword)}
-                  hint="At least 6 characters with mixed characters recommended"
+                  hint="At least 6 characters with letters and numbers (no spaces)"
                 />
               </View>
 
