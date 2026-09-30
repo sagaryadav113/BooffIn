@@ -64,16 +64,19 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
       Haptics.selectionAsync();
     } catch {}
 
-    // Navigate to in-app paper PDF reader screen!
-    if (ref.paperId) {
-      router.push(`/paper/${encodeURIComponent(ref.paperId)}`);
-    } else if (ref.doi) {
-      router.push(`/paper/${encodeURIComponent(ref.doi)}`);
-    } else if (ref.url) {
-      router.push(`/paper/${encodeURIComponent(ref.url)}`);
-    } else {
-      router.push(`/search?q=${encodeURIComponent(ref.title)}`);
-    }
+    const targetId = ref.doi || ref.paperId || ref.id;
+    router.push({
+      pathname: '/paper/[id]',
+      params: {
+        id: targetId,
+        fromPostId: post.id,
+        refId: ref.id,
+        ...(ref.doi ? { doi: ref.doi } : {}),
+        ...(ref.title ? { title: ref.title } : {}),
+        ...(ref.url ? { url: ref.url } : {}),
+        ...(ref.openAccessPdfUrl ? { pdfUrl: ref.openAccessPdfUrl } : {}),
+      },
+    });
   };
 
   // Helper to render text with interactive in-text citations

@@ -61,10 +61,43 @@ import { Comment, DiscussionType, Paper } from '../../types';
 
 import { usePaperFigures } from '../../hooks/usePaperFigures';
 import { fetchDirectOpenAccessPdf } from '../../api/paper/metadataResolver';
+import { resolvePaperWithDetails } from '../../api/paperResolver';
+
+function createPaperFromReference(ref: any): Paper {
+  return {
+    id: ref.paperId || ref.id,
+    doi: ref.doi,
+    title: ref.title || 'Research Publication',
+    abstract: ref.abstract || '',
+    authors: (ref.authors || []).map((name: any, i: number) => ({
+      name: typeof name === 'string' ? name : name?.name || 'Researcher',
+      authorOrder: i + 1,
+    })),
+    journal: ref.journal || ref.journalOrConference || 'Academic Literature',
+    publicationYear: ref.publicationYear || new Date().getFullYear(),
+    canonicalUrl: ref.url || (ref.doi ? `https://doi.org/${ref.doi}` : ''),
+    openAccessUrl: ref.openAccessPdfUrl || (ref.url && ref.url.toLowerCase().endsWith('.pdf') ? ref.url : undefined),
+    isOpenAccess: !!ref.openAccessPdfUrl || !!(ref.url && ref.url.toLowerCase().endsWith('.pdf')),
+    topics: [],
+    citationCount: 0,
+    discussionCount: 0,
+    likesCount: 0,
+    savesCount: 0,
+  };
+}
 
 export default function PaperDetailScreen() {
-  const { id, fromPostId } = useLocalSearchParams<{ id: string; fromPostId?: string }>();
-  const paperId = id || '';
+  const { id, fromPostId, doi, title, url, pdfUrl, refId } = useLocalSearchParams<{
+    id: string;
+    fromPostId?: string;
+    doi?: string;
+    title?: string;
+    url?: string;
+    pdfUrl?: string;
+    refId?: string;
+  }>();
+  const rawId = id ? decodeURIComponent(id) : '';
+  const paperId = rawId || id || '';
   const activePostId = fromPostId || '';
 
   const getPaperById = usePaperStore((s) => s.getPaperById);
@@ -93,20 +126,91 @@ export default function PaperDetailScreen() {
   const getParticipatingResearchers = useDiscussionStore((s) => s.getParticipatingResearchers);
   const getInterestedPeople = useDiscussionStore((s) => s.getInterestedPeople);
 
-  // Derive initial paper object from local state or post
+  // Derive initial paper object from local state, post, or article references
   const initialPaper = useMemo(() => {
-    let p = getPaperById(paperId);
+    let p = getPaperById(paperId) || (doi ? getPaperById(doi) : undefined);
+
+    // 1. Check activePost first
     if (!p && activePostId) {
-      p = usePostStore.getState().getPostById(activePostId)?.paper || undefined;
+      const activePost = usePostStore.getState().getPostById(activePostId);
+      if (
+        activePost?.paper &&
+        (activePost.paper.id === paperId ||
+          activePost.paper.doi === paperId ||
+          (doi && activePost.paper.doi === doi))
+      ) {
+        p = activePost.paper;
+      }
+      if (!p && activePost?.article?.references) {
+        const foundRef = activePost.article.references.find(
+          (r) =>
+            r.id === refId ||
+            r.id === paperId ||
+            r.paperId === paperId ||
+            (r.doi && (r.doi === paperId || (doi && r.doi === doi))) ||
+            (r.url && (r.url === paperId || (url && r.url === url))) ||
+            (title && r.title.toLowerCase() === title.toLowerCase())
+        );
+        if (foundRef) {
+          p = createPaperFromReference(foundRef);
+        }
+      }
     }
+
+    // 2. Check all posts in postStore
     if (!p) {
-      const match = usePostStore.getState().posts.find(
-        (item) => item.paper && (item.paper.id === paperId || item.paper.doi === paperId)
-      );
-      if (match?.paper) p = match.paper;
+      const allPosts = usePostStore.getState().posts;
+      for (const item of allPosts) {
+        if (
+          item.paper &&
+          (item.paper.id === paperId ||
+            item.paper.doi === paperId ||
+            (doi && item.paper.doi === doi))
+        ) {
+          p = item.paper;
+          break;
+        }
+        if (item.article?.references) {
+          const foundRef = item.article.references.find(
+            (r) =>
+              r.id === refId ||
+              r.id === paperId ||
+              r.paperId === paperId ||
+              (r.doi && (r.doi === paperId || (doi && r.doi === doi))) ||
+              (r.url && (r.url === paperId || (url && r.url === url))) ||
+              (title && r.title.toLowerCase() === title.toLowerCase())
+          );
+          if (foundRef) {
+            p = createPaperFromReference(foundRef);
+            break;
+          }
+        }
+      }
     }
+
+    // 3. Fallback from query params if available
+    if (!p && (title || doi || url || pdfUrl)) {
+      p = {
+        id: paperId || `paper_${Date.now()}`,
+        doi: doi || (paperId.startsWith('10.') ? paperId : undefined),
+        title: title ? decodeURIComponent(title) : 'Research Publication',
+        abstract: '',
+        authors: [],
+        journal: 'Academic Literature',
+        publicationYear: new Date().getFullYear(),
+        canonicalUrl: url || (doi ? `https://doi.org/${doi}` : ''),
+        openAccessUrl: pdfUrl || (url && url.toLowerCase().endsWith('.pdf') ? url : undefined),
+        isOpenAccess: !!pdfUrl || !!(url && url.toLowerCase().endsWith('.pdf')),
+        topics: [],
+        citationCount: 0,
+        discussionCount: 0,
+        likesCount: 0,
+        savesCount: 0,
+      };
+    }
+
     return p || null;
-  }, [paperId, activePostId, getPaperById]);
+  }, [paperId, activePostId, getPaperById, doi, title, url, pdfUrl, refId]);
 
   const [paper, setPaper] = useState<Paper | null>(initialPaper);
   const resolvedFigures = usePaperFigures(paper);
@@ -155,22 +259,47 @@ export default function PaperDetailScreen() {
   }, [paperId, discussionsMap]);
 
   const loadData = useCallback(async (isRefresh = false) => {
-    if (!paperId) {
+    if (!paperId && !doi && !url && !title) {
       setIsLoading(false);
       return;
     }
 
-    // Try finding paper in paperStore or postStore first
-    let currentPaper = getPaperById(paperId);
+    // Try finding paper in paperStore, postStore, or article references
+    let currentPaper = initialPaper || getPaperById(paperId) || (doi ? getPaperById(doi) : undefined);
     if (!currentPaper && activePostId) {
-      currentPaper = usePostStore.getState().getPostById(activePostId)?.paper || undefined;
+      const activePost = usePostStore.getState().getPostById(activePostId);
+      if (activePost?.paper) currentPaper = activePost.paper;
+      if (!currentPaper && activePost?.article?.references) {
+        const foundRef = activePost.article.references.find(
+          (r) =>
+            r.id === refId ||
+            r.id === paperId ||
+            r.paperId === paperId ||
+            (r.doi && (r.doi === paperId || (doi && r.doi === doi)))
+        );
+        if (foundRef) currentPaper = createPaperFromReference(foundRef);
+      }
     }
     if (!currentPaper) {
-      const matchingPost = usePostStore.getState().posts.find(
-        (p) => p.paper && (p.paper.id === paperId || p.paper.doi === paperId)
-      );
-      if (matchingPost?.paper) {
-        currentPaper = matchingPost.paper;
+      const allPosts = usePostStore.getState().posts;
+      for (const item of allPosts) {
+        if (item.paper && (item.paper.id === paperId || item.paper.doi === paperId)) {
+          currentPaper = item.paper;
+          break;
+        }
+        if (item.article?.references) {
+          const foundRef = item.article.references.find(
+            (r) =>
+              r.id === refId ||
+              r.id === paperId ||
+              r.paperId === paperId ||
+              (r.doi && (r.doi === paperId || (doi && r.doi === doi)))
+          );
+          if (foundRef) {
+            currentPaper = createPaperFromReference(foundRef);
+            break;
+          }
+        }
       }
     }
 
@@ -181,24 +310,57 @@ export default function PaperDetailScreen() {
       setIsLoading(true);
     }
 
+    // Try fetching from Supabase database
     try {
       const fetched = await fetchPaperById(paperId);
       if (fetched) {
+        currentPaper = fetched;
         setPaper(fetched);
       }
     } catch (e) {}
 
+    // Online resolver fallback:
+    // If paper still missing, or missing abstract or openAccessUrl, resolve online
+    const lookupKey =
+      currentPaper?.doi ||
+      doi ||
+      (paperId.includes('/') || paperId.includes('10.') || paperId.startsWith('http') ? paperId : null) ||
+      currentPaper?.canonicalUrl ||
+      url ||
+      currentPaper?.title ||
+      title;
+
+    if (lookupKey && (!currentPaper || !currentPaper.abstract || !currentPaper.openAccessUrl)) {
+      try {
+        const res = await resolvePaperWithDetails(lookupKey);
+        if (res.paper) {
+          const enriched: Paper = {
+            ...(currentPaper || res.paper),
+            ...res.paper,
+            id: currentPaper?.id || res.paper.id,
+            openAccessUrl: res.paper.openAccessUrl || currentPaper?.openAccessUrl,
+            canonicalUrl: res.paper.canonicalUrl || currentPaper?.canonicalUrl || '',
+          };
+          setPaper(enriched);
+          usePaperStore.getState().addPaper(enriched);
+          currentPaper = enriched;
+        }
+      } catch (err) {
+        console.warn('Paper resolver fallback warning:', err);
+      }
+    }
+
     try {
       if (activePostId) {
         await fetchCommentsForPost(activePostId, currentUser?.id);
-      } else {
+      } else if (paperId) {
         await fetchDiscussionsForPaper(paperId, currentUser?.id);
       }
     } catch (e) {}
 
     setIsLoading(false);
     if (isRefresh) setIsRefreshing(false);
-  }, [paperId, activePostId, currentUser?.id, getPaperById, fetchPaperById, fetchCommentsForPost, fetchDiscussionsForPaper]);
+  }, [paperId, activePostId, currentUser?.id, getPaperById, fetchPaperById, fetchCommentsForPost, fetchDiscussionsForPaper, doi, title, url, refId, initialPaper]);
 
   useEffect(() => {
     loadData();

@@ -17,6 +17,7 @@ import { resolvePaperWithDetails } from '../../api/paperResolver';
 import { createArticleReferenceFromPaper } from '../../utils/apaFormatter';
 import { ArticleReference } from '../../types/post';
 import { Paper } from '../../types/paper';
+import { usePaperStore } from '../../store/usePaperStore';
 
 interface AddReferenceModalProps {
   visible: boolean;
@@ -65,6 +66,9 @@ export const AddReferenceModal: React.FC<AddReferenceModalProps> = ({
 
   const handleConfirmInsert = () => {
     if (!previewReference) return;
+    if (resolvedPaper) {
+      usePaperStore.getState().addPaper(resolvedPaper);
+    }
     onInsertReference(previewReference);
     handleReset();
     onClose();
