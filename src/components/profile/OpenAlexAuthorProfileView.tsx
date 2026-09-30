@@ -42,6 +42,7 @@ import {
 import { Paper } from '../../types';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { ClaimProfileModal } from '../modals/ClaimProfileModal';
 
 interface OpenAlexAuthorProfileViewProps {
   authorId: string;
@@ -72,50 +73,13 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
 
   const addPaperToStore = usePaperStore((s) => s.addPaper);
   const currentUser = useAuthStore((s) => s.user);
+  const [claimModalVisible, setClaimModalVisible] = useState(false);
 
   const handleClaimProfile = () => {
-    if (!profile) return;
     try {
       Haptics.selectionAsync();
     } catch {}
-
-    if (!currentUser?.id) {
-      Alert.alert(
-        'Sign in to Claim Profile',
-        `Please sign in to your BooffIn account to claim and verify authorship of ${profile.displayName}'s profile via ORCID.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/(auth)/welcome') },
-        ]
-      );
-      return;
-    }
-
-    if (currentUser.orcidId && profile.orcid) {
-      const cleanUserOrcid = currentUser.orcidId.replace(/^https?:\/\/orcid\.org\//i, '').trim();
-      const cleanProfileOrcid = profile.orcid.replace(/^https?:\/\/orcid\.org\//i, '').trim();
-
-      if (cleanUserOrcid === cleanProfileOrcid) {
-        Alert.alert(
-          'Profile Verified & Linked! 🎉',
-          `Your account is verified with ORCID ${cleanUserOrcid}. This scholarly profile and its ${profile.worksCount} publications are linked to your BooffIn profile!`
-        );
-      } else {
-        Alert.alert(
-          'ORCID Mismatch',
-          `Your BooffIn account is verified with ORCID ${cleanUserOrcid}, which does not match this researcher's ORCID (${cleanProfileOrcid}).`
-        );
-      }
-    } else {
-      Alert.alert(
-        'Verify with ORCID',
-        `To claim ${profile.displayName}'s profile, verify your ORCID identity in your Profile settings. Once linked, you can manage and highlight your publications on BooffIn.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Go to Profile', onPress: () => router.push('/(tabs)/profile') },
-        ]
-      );
-    }
+    setClaimModalVisible(true);
   };
 
   // 1. Fetch Author Profile
@@ -757,6 +721,15 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
           </View>
         )}
       </View>
+
+      {/* Claim Profile Interactive Modal */}
+      {profile && (
+        <ClaimProfileModal
+          visible={claimModalVisible}
+          onClose={() => setClaimModalVisible(false)}
+          profile={profile}
+        />
+      )}
     </ScrollView>
   );
 };
