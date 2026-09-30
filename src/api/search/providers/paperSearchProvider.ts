@@ -148,7 +148,9 @@ async function searchEuropePmc(query: string, limit: number): Promise<Paper[]> {
         canonicalUrl,
         openAccessUrl,
         isOpenAccess,
-        topics: item.keywordList?.keyword || [journalName],
+        topics: item.keywordList?.keyword?.filter(Boolean)?.length
+          ? item.keywordList.keyword.filter(Boolean)
+          : [journalName.split(':')[0].trim().slice(0, 30)],
         citationCount: item.citedByCount || 0,
         discussionCount: 0,
         likesCount: 0,
@@ -217,7 +219,7 @@ async function searchSemanticScholar(query: string, limit: number): Promise<Pape
         canonicalUrl,
         openAccessUrl,
         isOpenAccess,
-        topics: [journalName],
+        topics: [journalName.split(':')[0].trim().slice(0, 30)],
         citationCount: item.citationCount || 0,
         discussionCount: 0,
         likesCount: 0,

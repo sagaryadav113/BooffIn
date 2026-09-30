@@ -133,6 +133,30 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
 
   const figureUrl = paper.figures?.[0]?.url;
 
+  // Clean and constrain topic tags so they never exceed the designated card bounds
+  const cleanedTopics = React.useMemo(() => {
+    const rawList =
+      paper.topics && paper.topics.length > 0
+        ? paper.topics
+        : ['Scientific Research'];
+
+    return rawList
+      .slice(0, 2)
+      .map((t) => {
+        let clean = (t || '').trim();
+        // Remove subtitles like "Journal : journal of..."
+        if (clean.includes(':')) {
+          clean = clean.split(':')[0].trim();
+        }
+        // Limit maximum character length
+        if (clean.length > 26) {
+          clean = clean.slice(0, 25).trim() + '…';
+        }
+        return clean;
+      })
+      .filter((t) => t.length > 0);
+  }, [paper.topics]);
+
   return (
     <TouchableOpacity
       activeOpacity={0.88}
@@ -181,12 +205,15 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
 
           {/* Topic Tags */}
           <View style={styles.tagsRow}>
-            {(paper.topics && paper.topics.length > 0
-              ? paper.topics.slice(0, 3)
-              : ['Scientific Research', 'Peer Reviewed']
-            ).map((topic, i) => (
+            {cleanedTopics.map((topic, i) => (
               <View key={`${topic}-${i}`} style={styles.tagChip}>
-                <Text style={styles.tagText}>{topic}</Text>
+                <Text
+                  style={styles.tagText}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {topic}
+                </Text>
               </View>
             ))}
           </View>
@@ -326,6 +353,8 @@ const styles = StyleSheet.create({
   },
   centerDetails: {
     flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
     justifyContent: 'space-between',
   },
   titleText: {
@@ -348,18 +377,23 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 5,
     marginBottom: 8,
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   tagChip: {
     backgroundColor: '#EAF3EE',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radii.full,
+    maxWidth: '100%',
+    flexShrink: 1,
   },
   tagText: {
     ...typography.micro,
     fontSize: 10.5,
     color: '#1B4D3E',
     fontWeight: '600',
+    flexShrink: 1,
   },
   metricsRow: {
     flexDirection: 'row',
