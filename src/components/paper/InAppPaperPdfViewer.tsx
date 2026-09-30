@@ -18,6 +18,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Badge } from '../core/Badge';
 import { Paper } from '../../types';
+import { FloatingRatingDock } from './FloatingRatingDock';
+import { PaperMetrics, UserPaperRating } from '../../api/hypeScoreService';
 
 export interface InAppPaperPdfViewerProps {
   paper: Paper;
@@ -25,6 +27,7 @@ export interface InAppPaperPdfViewerProps {
   isDirectPdf: boolean;
   isArxivPdf: boolean;
   onSwitchToArticleView?: () => void;
+  onRatingUpdated?: (newMetrics: PaperMetrics, userRating: UserPaperRating) => void;
 }
 
 export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
@@ -33,6 +36,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   isDirectPdf,
   isArxivPdf,
   onSwitchToArticleView,
+  onRatingUpdated,
 }) => {
   // Derive the direct PDF stream URL
   const effectiveStreamUrl = useMemo(() => {
@@ -129,7 +133,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
         </View>
       </View>
 
-      {/* ── IN-APP PDF VIEWER (ALWAYS RENDERS DIRECTLY) ── */}
+      {/* ── IN-APP PDF VIEWER WITH EMBEDDED FLOATING RATING DOCK ── */}
       {Platform.OS === 'web' ? (
         <View style={styles.webPdfWrapper}>
           <iframe
@@ -144,6 +148,14 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             title={paper.title}
             allow="fullscreen"
             loading="eager"
+          />
+
+          {/* Floating Rating Dock anchored directly INSIDE the PDF viewer */}
+          <FloatingRatingDock
+            paperId={paper.id}
+            paperTitle={paper.title}
+            onRatingUpdated={onRatingUpdated}
+            style={styles.floatingDockInPdf}
           />
 
           {/* Quick Toolbar Footer */}
@@ -198,11 +210,17 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Embedded Rating Dock on Native Mobile Card */}
+          <View style={{ marginTop: spacing.xl, width: '100%', alignItems: 'center' }}>
+            <FloatingRatingDock
+              paperId={paper.id}
+              paperTitle={paper.title}
+              onRatingUpdated={onRatingUpdated}
+            />
+          </View>
         </View>
       )}
-
-      {/* Dock spacer so paper scroll content is never clipped by the floating rating dock */}
-      <View style={styles.dockBottomSpacer} />
     </View>
   );
 };
@@ -282,6 +300,15 @@ const styles = StyleSheet.create({
   webPdfWrapper: {
     width: '100%',
     backgroundColor: '#525659',
+    position: 'relative',
+  },
+  floatingDockInPdf: {
+    position: 'absolute',
+    bottom: 52,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 50,
   },
   pdfHelperBanner: {
     flexDirection: 'row',
@@ -379,8 +406,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginBottom: spacing.lg,
-  },
-  dockBottomSpacer: {
-    height: 80,
   },
 });

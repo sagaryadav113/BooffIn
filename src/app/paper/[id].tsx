@@ -960,6 +960,7 @@ export default function PaperDetailScreen() {
                 isDirectPdf={Boolean(resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl)}
                 isArxivPdf={isArxivPdf || (paper.doi ? paper.doi.includes('arxiv') : false) || Boolean(bestOpenUrl && bestOpenUrl.includes('arxiv.org'))}
                 onSwitchToArticleView={() => setViewMode('article')}
+                onRatingUpdated={(newMetrics) => setPaperMetrics(newMetrics)}
               />
             </View>
           ) : (
@@ -1131,6 +1132,15 @@ export default function PaperDetailScreen() {
                   <Share2 size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
+
+              {/* 3-Pill Live HYPE Rating Dock for Article Reader */}
+              <View style={{ marginTop: spacing.md, alignItems: 'center' }}>
+                <FloatingRatingDock
+                  paperId={paper.id}
+                  paperTitle={paper.title}
+                  onRatingUpdated={(newMetrics) => setPaperMetrics(newMetrics)}
+                />
+              </View>
             </View>
           )}
 
@@ -1241,20 +1251,6 @@ export default function PaperDetailScreen() {
           <PeopleInterestedSection people={interestedPeople} />
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* ── FLOATING LIVE HYPE RATING DOCK ── */}
-      <FloatingRatingDock
-        paperId={paper.id}
-        paperTitle={paper.title}
-        onRatingUpdated={(newMetrics) => {
-          setPaperMetrics(newMetrics);
-        }}
-        onOpenDiscussion={() => {
-          if (scrollViewRef.current) {
-            scrollViewRef.current.scrollToEnd({ animated: true });
-          }
-        }}
-      />
     </SafeAreaView>
   );
 }
