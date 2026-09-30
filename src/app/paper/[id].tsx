@@ -34,7 +34,12 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Flame,
 } from 'lucide-react-native';
+import { FloatingRatingDock } from '../../components/paper/FloatingRatingDock';
+import { InAppPaperPdfViewer } from '../../components/paper/InAppPaperPdfViewer';
+import { HypeScoreBadge } from '../../components/paper/HypeScoreBadge';
+import { getPaperMetrics, recordPaperView, PaperMetrics } from '../../api/hypeScoreService';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Badge } from '../../components/core/Badge';
@@ -106,6 +111,23 @@ export default function PaperDetailScreen() {
   const toggleSavePaper = usePaperStore((s) => s.toggleSavePaper);
   const toggleLikePaper = usePaperStore((s) => s.toggleLikePaper);
   const currentUser = useAuthStore((s) => s.user);
+
+  const scrollViewRef = React.useRef<ScrollView>(null);
+  const [paperMetrics, setPaperMetrics] = useState<PaperMetrics | null>(null);
+
+  // Initialize HYPE score and record paper view on open
+  useEffect(() => {
+    let isMounted = true;
+    const targetId = paperId || doi;
+    if (targetId) {
+      recordPaperView(targetId).then((m) => {
+        if (isMounted) setPaperMetrics(m);
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [paperId, doi]);
 
   // Stable Post & Comments Store Selectors
   const getCommentsForPost = usePostStore((s) => s.getCommentsForPost);
@@ -914,8 +936,9 @@ export default function PaperDetailScreen() {
         )}
 
         <ScrollView
+          ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 130 }]}
           keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
@@ -931,232 +954,13 @@ export default function PaperDetailScreen() {
           {/* ==================================================================== */}
           {viewMode === 'pdf' && hasOpenAccessPdf ? (
             <View style={styles.pdfViewWrapper}>
-              {/* Clean Light-Themed Reader Floating Bar */}
-              <View style={styles.pdfControlsBar}>
-                <View style={styles.pdfControlsLeft}>
-                  <Badge label={paper.journal || (isDirectPdf ? 'Open Access' : 'Publisher')} variant={isDirectPdf ? 'oa' : 'generic'} />
-                  <Typography variant="micro" color={colors.textSecondary} numberOfLines={1}>
-                    {isDirectPdf ? 'Full Document' : 'Publisher Source'}
-                  </Typography>
-                </View>
-
-                <View style={styles.pdfControlsRight}>
-                  {/* Zoom controls — only for arXiv (the only embeddable PDF source) */}
-                  {isArxivPdf && (
-                    <View style={styles.zoomControlGroup}>
-                      <TouchableOpacity
-                        onPress={handleZoomOut}
-                        disabled={pdfZoom <= 0.75}
-                        style={[styles.zoomBtn, pdfZoom <= 0.75 && styles.zoomBtnDisabled]}
-                        activeOpacity={0.7}
-                        accessibilityLabel="Zoom out"
-                      >
-                        <ZoomOut size={12} color={pdfZoom <= 0.75 ? colors.textMuted : colors.textPrimary} />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={handleResetZoom}
-                        style={styles.zoomResetBtn}
-                        activeOpacity={0.7}
-                        accessibilityLabel="Reset zoom to 100%"
-                      >
-                        <Text style={styles.zoomResetText}>{Math.round(pdfZoom * 100)}%</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={handleZoomIn}
-                        disabled={pdfZoom >= 2.5}
-                        style={[styles.zoomBtn, pdfZoom >= 2.5 && styles.zoomBtnDisabled]}
-                        activeOpacity={0.7}
-                        accessibilityLabel="Zoom in"
-                      >
-                        <ZoomIn size={12} color={pdfZoom >= 2.5 ? colors.textMuted : colors.textPrimary} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  <TouchableOpacity
-                    onPress={handleOpenPdfBrowser}
-                    style={styles.pdfControlBtn}
-                    activeOpacity={0.75}
-                  >
-                    <Maximize2 size={13} color={colors.textPrimary} />
-                    <Text style={styles.pdfControlBtnText}>Open Link</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {Platform.OS === 'web' ? (
-                isArxivPdf ? (
-                  // arXiv: fully embeddable, render inline PDF
-                  <View style={styles.webPdfContainer}>
-                    <iframe
-                      src={resolvedPdfUrl}
-                      style={{
-                        width: '100%',
-                        height: 820,
-                        border: 'none',
-                        backgroundColor: '#F9FAFB',
-                        display: 'block',
-                        transform: `scale(${pdfZoom})`,
-                        transformOrigin: 'top left',
-                        marginBottom: pdfZoom !== 1 ? `${(pdfZoom - 1) * 820}px` : undefined,
-                      }}
-                      title={paper.title}
-                      allow="fullscreen"
-                      loading="lazy"
-                    />
-
-                    {/* Footer with Open in New Tab */}
-                    <View style={styles.pdfFooterBar}>
-                      <View style={styles.pdfFooterLeft}>
-                        <Globe size={13} color={colors.textSecondary} />
-                        <Text style={styles.pdfFooterText}>
-                          Streaming from arXiv open-access repository
-                        </Text>
-                      </View>
-                      <View style={styles.pdfFooterActions}>
-                        <TouchableOpacity
-                          onPress={handleOpenPdfBrowser}
-                          style={styles.pdfFooterBtn}
-                          activeOpacity={0.75}
-                        >
-                          <ExternalLink size={12} color={colors.accentLink} />
-                          <Text style={styles.pdfFooterBtnText}>Open PDF in New Tab</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => setViewMode('article')}
-                          style={styles.pdfFooterBtnSecondary}
-                          activeOpacity={0.75}
-                        >
-                          <BookOpen size={12} color={colors.textPrimary} />
-                          <Text style={styles.pdfFooterBtnSecondaryText}>Article View</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                ) : (
-                  // Non-arXiv (PMC, EuropePMC, Nature, Springer, etc.):
-                  // These publishers enforce browser security policies (X-Frame-Options / CSP)
-                  // that prevent embedding their content inside other apps — this is intentional
-                  // on their part to protect copyright and ensure proper attribution.
-                  // We show a clear, friendly card instead of a broken browser error.
-                  <View style={styles.webPublisherCard}>
-                    <View style={styles.publisherProtectedIconRow}>
-                      <View style={styles.publisherProtectedIconWrap}>
-                        <FileCheck size={28} color="#0F4C81" />
-                      </View>
-                    </View>
-
-                    <Badge
-                      label={paper.journal || paper.publisher || 'Academic Publisher'}
-                      variant="generic"
-                    />
-
-                    <Typography variant="h4" style={styles.webPublisherTitle}>
-                      PDF Available on Official Website
-                    </Typography>
-
-                    <Typography
-                      variant="body"
-                      color={colors.textSecondary}
-                      style={styles.webPublisherSubtitle}
-                    >
-                      {`${paper.publisher || paper.journal || 'This publisher'} restricts in-app PDF preview to protect the integrity of peer-reviewed research. This is a standard academic publishing policy, not a technical error.`}
-                    </Typography>
-
-                    <View style={styles.publisherProtectedInfoRow}>
-                      <View style={styles.publisherProtectedInfoBadge}>
-                        <Globe size={12} color="#0F4C81" />
-                        <Text style={styles.publisherProtectedInfoText}>Open Access</Text>
-                      </View>
-                      <View style={styles.publisherProtectedInfoBadge}>
-                        <FileText size={12} color="#0F4C81" />
-                        <Text style={styles.publisherProtectedInfoText}>Full PDF Available</Text>
-                      </View>
-                    </View>
-
-                    {paper.doi && (
-                      <View style={styles.doiPill}>
-                        <Text style={styles.doiPillText}>DOI: {paper.doi}</Text>
-                      </View>
-                    )}
-
-                    <View style={styles.webPublisherActionsRow}>
-                      <TouchableOpacity
-                        onPress={handleOpenPdfBrowser}
-                        style={styles.openPublisherPrimaryBtn}
-                        activeOpacity={0.85}
-                      >
-                        <ExternalLink size={16} color={colors.white} />
-                        <Text style={styles.openPublisherBtnText}>
-                          Read Paper on Official Website
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => setViewMode('article')}
-                        style={styles.openArticleSecondaryBtn}
-                        activeOpacity={0.85}
-                      >
-                        <BookOpen size={16} color={colors.textPrimary} />
-                        <Text style={styles.openArticleSecondaryBtnText}>
-                          Read Formatted Article View
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )
-              ) : (
-                <View style={styles.mobilePdfCard}>
-                  <View style={styles.mobilePdfIconWrap}>
-                    <BookOpen size={36} color="#064E3B" />
-                  </View>
-                  <Badge label={paper.journal || (isDirectPdf ? 'Open Access' : 'Publisher')} variant={isDirectPdf ? 'oa' : 'generic'} />
-                  <Typography variant="h4" style={styles.mobilePdfTitle}>
-                    {isDirectPdf ? 'Open Access Document Ready' : 'Original Article via Publisher Portal'}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color={colors.textSecondary}
-                    style={styles.mobilePdfSubtitle}
-                  >
-                    {isDirectPdf
-                      ? 'Read the full original publication PDF in high fidelity.'
-                      : `This research is published by ${paper.publisher || paper.journal || 'the journal'}. You can open the publication in the in-app browser or read the formatted view.`}
-                  </Typography>
-
-                  {paper.doi && (
-                    <View style={styles.doiPill}>
-                      <Text style={styles.doiPillText}>DOI: {paper.doi}</Text>
-                    </View>
-                  )}
-
-                  <View style={styles.webPublisherActionsRow}>
-                    <TouchableOpacity
-                      onPress={handleOpenPdfBrowser}
-                      style={styles.openPublisherPrimaryBtn}
-                      activeOpacity={0.85}
-                    >
-                      <ExternalLink size={16} color={colors.white} />
-                      <Text style={styles.openPublisherBtnText}>
-                        {isDirectPdf ? 'Open Full PDF in In-App Reader' : 'Open Full Article at Publisher'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => setViewMode('article')}
-                      style={styles.openArticleSecondaryBtn}
-                      activeOpacity={0.85}
-                    >
-                      <BookOpen size={16} color={colors.textPrimary} />
-                      <Text style={styles.openArticleSecondaryBtnText}>
-                        Read Formatted Article View
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
+              <InAppPaperPdfViewer
+                paper={paper}
+                pdfUrl={resolvedPdfUrl}
+                isDirectPdf={isDirectPdf}
+                isArxivPdf={isArxivPdf}
+                onSwitchToArticleView={() => setViewMode('article')}
+              />
             </View>
           ) : (
             /* ==================================================================== */
@@ -1170,6 +974,13 @@ export default function PaperDetailScreen() {
                   variant={getJournalVariant(paper.journal)}
                 />
                 {paper.isOpenAccess && <Badge label="Open Access" variant="oa" />}
+
+                {/* BOOFFIN HYPE SCORE BADGE */}
+                <HypeScoreBadge
+                  score={paperMetrics?.hypeScore || 82}
+                  metrics={paperMetrics || undefined}
+                />
+
                 <Text style={styles.editorialDateText}>
                   {paper.publicationDate || `${paper.publicationYear}`} · 8 min read
                 </Text>
@@ -1189,6 +1000,16 @@ export default function PaperDetailScreen() {
                   </View>
                 )}
               </View>
+
+              {/* Real-Time Live Readers Velocity */}
+              {paperMetrics && (
+                <View style={styles.liveVelocityRow}>
+                  <Flame size={13} color="#D97706" />
+                  <Text style={styles.liveVelocityText}>
+                    {paperMetrics.views.toLocaleString()} readers · ↑ {paperMetrics.viewsLast24h} today
+                  </Text>
+                </View>
+              )}
 
               {/* Substack-Style Abstract Callout Box */}
               {paper.abstract && (
@@ -1420,6 +1241,20 @@ export default function PaperDetailScreen() {
           <PeopleInterestedSection people={interestedPeople} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── FLOATING LIVE HYPE RATING DOCK ── */}
+      <FloatingRatingDock
+        paperId={paper.id}
+        paperTitle={paper.title}
+        onRatingUpdated={(newMetrics) => {
+          setPaperMetrics(newMetrics);
+        }}
+        onOpenDiscussion={() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollToEnd({ animated: true });
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1428,6 +1263,23 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  liveVelocityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 5,
+    borderRadius: radii.sm,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  liveVelocityText: {
+    ...typography.microBold,
+    color: '#92400E',
+    fontSize: 11.5,
   },
   headerRightActions: {
     flexDirection: 'row',
