@@ -297,7 +297,16 @@ export async function fetchDirectOpenAccessPdf(doi: string): Promise<string | nu
   if (!doi) return null;
   const cleanDoi = doi.replace(/^https?:\/\/doi\.org\//i, '').trim();
 
-  // 1. Try Europe PMC (covers vast majority of life sciences, biochemistry, computational biology, medicine)
+  // 1. Direct preprint fast-path (bioRxiv, medRxiv, arXiv)
+  if (cleanDoi.startsWith('10.1101/')) {
+    return `https://www.biorxiv.org/content/${cleanDoi}.full.pdf`;
+  }
+  if (cleanDoi.toLowerCase().startsWith('10.48550/arxiv.')) {
+    const arxivId = cleanDoi.replace(/^10\.48550\/arxiv\./i, '');
+    return `https://arxiv.org/pdf/${arxivId}.pdf`;
+  }
+
+  // 2. Try Europe PMC (covers vast majority of life sciences, biochemistry, computational biology, medicine)
   try {
     const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=doi:${encodeURIComponent(cleanDoi)}&format=json&resultType=core`;
     const controller = new AbortController();
@@ -324,7 +333,7 @@ export async function fetchDirectOpenAccessPdf(doi: string): Promise<string | nu
     }
   } catch {}
 
-  // 2. Try OpenAlex
+  // 3. Try OpenAlex (covers all scientific disciplines: Physics, Computer Science, Biology, Chemistry)
   try {
     const url = `https://api.openalex.org/works/https://doi.org/${encodeURIComponent(cleanDoi)}`;
     const controller = new AbortController();
@@ -343,6 +352,22 @@ export async function fetchDirectOpenAccessPdf(doi: string): Promise<string | nu
         data.best_oa_location?.pdf_url ||
         data.primary_location?.pdf_url ||
         data.locations?.find((loc: any) => loc.pdf_url)?.pdf_url;
+      if (pdf) return pdf;
+    }
+  } catch {}
+
+  // 4. Try Unpaywall (covers 50,000+ publishers: Nature, Springer, Elsevier, Frontiers, PLOS, Wiley, IEEE, MDPI)
+  try {
+    const url = `https://api.unpaywall.org/v2/${encodeURIComponent(cleanDoi)}?email=academic@booffin.science`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4500);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const data = await res.json();
+      const pdf =
+        data.best_oa_location?.url_for_pdf ||
+        data.oa_locations?.find((l: any) => l.url_for_pdf)?.url_for_pdf;
       if (pdf) return pdf;
     }
   } catch {}
