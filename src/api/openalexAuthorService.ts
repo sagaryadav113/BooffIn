@@ -52,6 +52,7 @@ export function normalizeOpenAlexAuthorId(rawId: string): string {
   if (!rawId) return '';
   return rawId
     .replace(/^openalex_author_/i, '')
+    .replace(/^orcid_/i, '')
     .replace(/^https?:\/\/openalex\.org\//i, '')
     .trim();
 }
@@ -79,23 +80,99 @@ function decodeOpenAlexAbstract(invertedIndex: Record<string, number[]> | undefi
 
 /**
  * Fetches comprehensive researcher details from OpenAlex Authors API
+ * Supports OpenAlex author ID (e.g. "A5002146542") OR 16-digit ORCID ID
  */
 export async function fetchOpenAlexAuthorDetails(authorId: string): Promise<OpenAlexAuthorDetails | null> {
   const cleanId = normalizeOpenAlexAuthorId(authorId);
   if (!cleanId) return null;
 
   try {
-    const url = `${OPENALEX_API_BASE}/authors/${encodeURIComponent(cleanId)}?mailto=${OPENALEX_MAILTO}`;
-    const res = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': `BooffIn/1.0 (${OPENALEX_MAILTO})`,
-      },
-    });
+    let data: any = null;
+    const isOrcid = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(cleanId) || cleanId.startsWith('https://orcid.org/');
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data || !data.id) return null;
+    if (isOrcid) {
+      const rawOrcid = cleanId.replace(/^https?:\/\/orcid\.org\//i, '');
+      const orcidUrl = `${OPENALEX_API_BASE}/authors/https://orcid.org/${encodeURIComponent(rawOrcid)}?mailto=${OPENALEX_MAILTO}`;
+      let res = await fetch(orcidUrl, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': `BooffIn/1.0 (${OPENALEX_MAILTO})`,
+        },
+      });
+      if (res.ok) {
+        data = await res.json();
+      } else {
+        const filterUrl = `${OPENALEX_API_BASE}/authors?filter=orcid:https://orcid.org/${encodeURIComponent(rawOrcid)}&mailto=${OPENALEX_MAILTO}`;
+        const filterRes = await fetch(filterUrl, {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': `BooffIn/1.0 (${OPENALEX_MAILTO})`,
+          },
+        });
+        if (filterRes.ok) {
+          const filterData = await filterRes.json();
+          if (filterData.results && filterData.results.length > 0) {
+            data = filterData.results[0];
+          }
+        }
+      }
+    } else {
+      const url = `${OPENALEX_API_BASE}/authors/${encodeURIComponent(cleanId)}?mailto=${OPENALEX_MAILTO}`;
+      const res = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': `BooffIn/1.0 (${OPENALEX_MAILTO})`,
+        },
+      });
+      if (res.ok) {
+        data = await res.json();
+      }
+    }
+
+    if (!data || !data.id) {
+      // Fallback: If authorId was an ORCID and not in OpenAlex, fetch basic info from ORCID Public API
+      if (isOrcid) {
+        const rawOrcid = cleanId.replace(/^https?:\/\/orcid\.org\//i, '');
+        try {
+          const orcidRes = await fetch(`https://pub.orcid.org/v3.0/${rawOrcid}/record`, {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'BooffIn/1.0 (scholar-profile; dev@booffin.science)',
+            },
+          });
+          if (orcidRes.ok) {
+            const orcidData = await orcidRes.json();
+            const givenNames = orcidData['person']?.['name']?.['given-names']?.['value'] || '';
+            const familyName = orcidData['person']?.['name']?.['family-name']?.['value'] || '';
+            const fullName = `${givenNames} ${familyName}`.trim() || 'Verified Researcher';
+            const employments = (orcidData['activities-summary']?.['employments']?.['affiliation-group'] || [])
+              .map((g: any) => g?.['summaries']?.[0]?.['employment-summary']?.['organization']?.['name'])
+              .filter(Boolean);
+            const worksCount = orcidData['activities-summary']?.['works']?.['group']?.length || 0;
+
+            return {
+              id: `orcid_${rawOrcid}`,
+              openAlexId: rawOrcid,
+              openAlexUrl: `https://orcid.org/${rawOrcid}`,
+              displayName: fullName,
+              alternativeNames: [],
+              institutions: employments,
+              observedInstitutions: [],
+              orcid: rawOrcid,
+              orcidUrl: `https://orcid.org/${rawOrcid}`,
+              worksCount,
+              citationCount: 0,
+              hIndex: 0,
+              i10Index: 0,
+              countsByYear: [],
+              topics: [],
+              typeBreakdown: [],
+            };
+          }
+        } catch {}
+      }
+      return null;
+    }
 
     // 1. Observed names (alternatives)
     const alternatives: string[] = Array.isArray(data.display_name_alternatives)
@@ -236,7 +313,10 @@ export async function fetchOpenAlexAuthorWorks(
   }
 
   try {
-    let filterQuery = `author.id:${cleanId}`;
+    const isOrcid = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(cleanId) || cleanId.startsWith('https://orcid.org/');
+    const rawOrcid = cleanId.replace(/^https?:\/\/orcid\.org\//i, '');
+    let filterQuery = isOrcid ? `author.orcid:https://orcid.org/${rawOrcid}` : `author.id:${cleanId}`;
+
     if (accessFilter === 'oa') {
       filterQuery += `,is_oa:true`;
     } else if (accessFilter === 'closed') {

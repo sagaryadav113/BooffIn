@@ -9,6 +9,7 @@ import {
   Linking,
   Share,
   Clipboard,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -40,6 +41,7 @@ import {
 } from '../../api/openalexAuthorService';
 import { Paper } from '../../types';
 import { usePaperStore } from '../../store/usePaperStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 interface OpenAlexAuthorProfileViewProps {
   authorId: string;
@@ -69,6 +71,52 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
   const [expandedAbstracts, setExpandedAbstracts] = useState<Record<string, boolean>>({});
 
   const addPaperToStore = usePaperStore((s) => s.addPaper);
+  const currentUser = useAuthStore((s) => s.user);
+
+  const handleClaimProfile = () => {
+    if (!profile) return;
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+
+    if (!currentUser?.id) {
+      Alert.alert(
+        'Sign in to Claim Profile',
+        `Please sign in to your BooffIn account to claim and verify authorship of ${profile.displayName}'s profile via ORCID.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/(auth)/welcome') },
+        ]
+      );
+      return;
+    }
+
+    if (currentUser.orcidId && profile.orcid) {
+      const cleanUserOrcid = currentUser.orcidId.replace(/^https?:\/\/orcid\.org\//i, '').trim();
+      const cleanProfileOrcid = profile.orcid.replace(/^https?:\/\/orcid\.org\//i, '').trim();
+
+      if (cleanUserOrcid === cleanProfileOrcid) {
+        Alert.alert(
+          'Profile Verified & Linked! 🎉',
+          `Your account is verified with ORCID ${cleanUserOrcid}. This scholarly profile and its ${profile.worksCount} publications are linked to your BooffIn profile!`
+        );
+      } else {
+        Alert.alert(
+          'ORCID Mismatch',
+          `Your BooffIn account is verified with ORCID ${cleanUserOrcid}, which does not match this researcher's ORCID (${cleanProfileOrcid}).`
+        );
+      }
+    } else {
+      Alert.alert(
+        'Verify with ORCID',
+        `To claim ${profile.displayName}'s profile, verify your ORCID identity in your Profile settings. Once linked, you can manage and highlight your publications on BooffIn.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Go to Profile', onPress: () => router.push('/(tabs)/profile') },
+        ]
+      );
+    }
+  };
 
   // 1. Fetch Author Profile
   useEffect(() => {
@@ -373,6 +421,26 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
             ) : (
               <Copy size={12} color={colors.textSecondary} />
             )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Claim Profile Banner */}
+        <View style={styles.claimBanner}>
+          <View style={styles.claimBannerTextCol}>
+            <View style={styles.claimBadgeRow}>
+              <Award size={13} color="#4D6B18" />
+              <Text style={styles.claimBadgeTitle}>Unclaimed Scholar Profile</Text>
+            </View>
+            <Text style={styles.claimDesc}>
+              Are you {profile.displayName}? Claim this profile with your ORCID to link and highlight your publications on BooffIn.
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.claimBtn}
+            onPress={handleClaimProfile}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.claimBtnText}>Claim Profile</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1333,5 +1401,48 @@ const styles = StyleSheet.create({
     ...typography.captionBold,
     color: colors.textPrimary,
     fontSize: 13,
+  },
+  claimBanner: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: '#F7FEE7',
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: '#D9F99D',
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  claimBannerTextCol: {
+    gap: 4,
+  },
+  claimBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  claimBadgeTitle: {
+    ...typography.captionBold,
+    color: '#3F6212',
+    fontSize: 12.5,
+  },
+  claimDesc: {
+    ...typography.caption,
+    color: '#4D7C0F',
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  claimBtn: {
+    backgroundColor: '#4D7C0F',
+    paddingVertical: 7,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  claimBtnText: {
+    ...typography.captionBold,
+    color: '#FFFFFF',
+    fontSize: 12,
   },
 });

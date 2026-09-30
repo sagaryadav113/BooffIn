@@ -89,7 +89,14 @@ export default function OtherResearcherProfileScreen() {
     async function loadProfile() {
       const isExplicitOpenAlex =
         Boolean(openAlexId) ||
-        Boolean(id && (id.startsWith('openalex_author_') || /^A\d+$/i.test(id)));
+        Boolean(orcidId) ||
+        Boolean(
+          id &&
+            (id.startsWith('openalex_author_') ||
+              id.startsWith('orcid_') ||
+              /^A\d+$/i.test(id) ||
+              /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(id))
+        );
 
       if (!id || isExplicitOpenAlex) {
         setIsLoading(false);
@@ -212,10 +219,25 @@ export default function OtherResearcherProfileScreen() {
 
   const isExplicitOpenAlex =
     Boolean(openAlexId) ||
-    Boolean(id && (id.startsWith('openalex_author_') || /^A\d+$/i.test(id)));
+    Boolean(orcidId) ||
+    Boolean(
+      id &&
+        (id.startsWith('openalex_author_') ||
+          id.startsWith('orcid_') ||
+          /^A\d+$/i.test(id) ||
+          /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(id))
+    );
 
   if (isExplicitOpenAlex) {
-    const cleanOaId = openAlexId || (id ? id.replace(/^openalex_author_/i, '') : '');
+    const cleanOaId =
+      openAlexId ||
+      orcidId ||
+      (id
+        ? id
+            .replace(/^openalex_author_/i, '')
+            .replace(/^orcid_/i, '')
+        : '');
+
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
@@ -241,13 +263,27 @@ export default function OtherResearcherProfileScreen() {
   }
 
   if (!researcher) {
-    if (id?.startsWith('openalex_author_') || (id && /^A\d+$/i.test(id))) {
-      const cleanOaId = id.replace(/^openalex_author_/i, '');
+    const fallbackAuthorId =
+      openAlexId ||
+      orcidId ||
+      (id
+        ? id
+            .replace(/^openalex_author_/i, '')
+            .replace(/^orcid_/i, '')
+        : '');
+
+    if (
+      fallbackAuthorId &&
+      (isExplicitOpenAlex ||
+        id?.startsWith('openalex_') ||
+        id?.startsWith('orcid_') ||
+        id?.length > 8)
+    ) {
       return (
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
           <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
           <OpenAlexAuthorProfileView
-            authorId={cleanOaId}
+            authorId={fallbackAuthorId}
             initialOrcid={orcidId}
             onBack={() => router.back()}
           />
