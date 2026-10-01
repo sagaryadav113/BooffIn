@@ -70,31 +70,49 @@ export default function AuthCallbackScreen() {
           return;
         }
 
-        // In PKCE flow: if code is present in query parameters, exchange for session
-        if (code) {
+        // 1. Check if session is already active (e.g. exchanged immediately by signInWithGoogle)
+        let activeSession = (await supabase.auth.getSession()).data.session;
+
+        // 2. In PKCE flow: if code is present in query parameters and no active session yet, exchange for session
+        if (!activeSession?.user && code) {
           if (isMounted) setStatusText('Exchanging authorization code...');
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) {
-            console.warn('exchangeCodeForSession warning:', exchangeError.message);
+          const { data: exData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exData?.session) {
+            activeSession = exData.session;
           }
-        } else if (accessToken && refreshToken) {
+          if (exchangeError) {
+            console.warn('exchangeCodeForSession in callback warning:', exchangeError.message);
+          }
+        } else if (!activeSession?.user && accessToken && refreshToken) {
           if (isMounted) setStatusText('Saving authenticated session...');
-          await supabase.auth.setSession({
+          const { data: setSessionData } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
+          if (setSessionData?.session) {
+            activeSession = setSessionData.session;
+          }
         }
 
-        // Wait a short tick for session state to register
-        await new Promise((resolve) => setTimeout(resolve, 400));
-
-        let activeSession = (await supabase.auth.getSession()).data.session;
+        // 3. Retry loop if session is still settling
         if (!activeSession?.user) {
-          // Retry up to 3 times
-          for (let attempt = 0; attempt < 3; attempt++) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
+          for (let attempt = 0; attempt < 4; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 400));
             activeSession = (await supabase.auth.getSession()).data.session;
             if (activeSession?.user) break;
+
+            const initialUser = await getInitialAuthSession();
+            if (initialUser?.id) {
+              useAuthStore.setState({
+                user: initialUser,
+                authStatus: 'authenticated',
+                isAuthenticated: true,
+                isLoading: false,
+                authError: null,
+              });
+              router.replace('/(tabs)');
+              return;
+            }
           }
         }
 
@@ -103,20 +121,6 @@ export default function AuthCallbackScreen() {
           const storeUser = useAuthStore.getState().user;
           const storedProfile = getStoredLocalSession();
           if (storeUser?.id || storedProfile?.id) {
-            router.replace('/(tabs)');
-            return;
-          }
-
-          // Fallback check via getInitialAuthSession
-          const initialUser = await getInitialAuthSession();
-          if (initialUser?.id) {
-            useAuthStore.setState({
-              user: initialUser,
-              authStatus: 'authenticated',
-              isAuthenticated: true,
-              isLoading: false,
-              authError: null,
-            });
             router.replace('/(tabs)');
             return;
           }

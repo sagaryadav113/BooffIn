@@ -671,6 +671,20 @@ export function isProfileComplete(user: UserProfile | null): boolean {
   return hasInterests && hasValidName;
 }
 
+function extractOAuthParams(rawUrl: string) {
+  const codeMatch = rawUrl.match(/[?&]code=([^&#]+)/);
+  const tokenMatch = rawUrl.match(/[#?&]access_token=([^&#]+)/);
+  const refreshMatch = rawUrl.match(/[#?&]refresh_token=([^&#]+)/);
+  const errorMatch = rawUrl.match(/[#?&](?:error_description|error)=([^&#]+)/);
+
+  return {
+    code: codeMatch ? decodeURIComponent(codeMatch[1]) : null,
+    accessToken: tokenMatch ? decodeURIComponent(tokenMatch[1]) : null,
+    refreshToken: refreshMatch ? decodeURIComponent(refreshMatch[1]) : null,
+    errorDesc: errorMatch ? decodeURIComponent(errorMatch[1]) : null,
+  };
+}
+
 /**
  * Sign In with Google OAuth
  */
@@ -704,41 +718,50 @@ export async function signInWithGoogle(): Promise<AuthResponse> {
     if (data?.url && !isWeb) {
       const res = await openAuthSession(data.url, redirectUrl);
       if (res.type === 'success' && res.url) {
-        try {
-          const urlObj = new URL(res.url);
-          const code = urlObj.searchParams.get('code');
-          const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
-          const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
-          const errorDesc = urlObj.searchParams.get('error_description') || urlObj.searchParams.get('error');
+        const { code, accessToken, refreshToken, errorDesc } = extractOAuthParams(res.url);
 
-          if (errorDesc) {
-            return { user: null, error: decodeURIComponent(errorDesc) };
+        if (errorDesc) {
+          return { user: null, error: errorDesc };
+        }
+
+        if (code) {
+          const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            console.warn('[authService] exchangeCodeForSession info:', exchangeError.message);
           }
-
-          if (code) {
-            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-            if (exchangeError) {
-              console.warn('exchangeCodeForSession in signInWithGoogle:', exchangeError.message);
+          if (exchangeData?.session?.user) {
+            const profile = (await fetchUserProfile(exchangeData.session.user.id)) || (await getInitialAuthSession());
+            if (profile) {
+              setStoredLocalSession(profile);
+              return { user: profile, error: null };
             }
-          } else if (accessToken && refreshToken) {
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
           }
-        } catch (parseErr) {
-          console.warn('Error parsing auth redirect URL:', parseErr);
+        } else if (accessToken && refreshToken) {
+          const { data: setSessionData, error: setSessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (setSessionData?.session?.user) {
+            const profile = (await fetchUserProfile(setSessionData.session.user.id)) || (await getInitialAuthSession());
+            if (profile) {
+              setStoredLocalSession(profile);
+              return { user: profile, error: null };
+            }
+          }
         }
       }
 
-      // Check if session is now active (exchanged directly or via deep link)
-      const { data: { session: activeSession } } = await supabase.auth.getSession();
-      if (activeSession?.user) {
-        const session = await getInitialAuthSession();
-        if (session) {
-          setStoredLocalSession(session);
-          return { user: session, error: null };
+      // Check if session is already active (exchanged directly or by onAuthStateChange listener)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession?.user) {
+          const session = await getInitialAuthSession();
+          if (session) {
+            setStoredLocalSession(session);
+            return { user: session, error: null };
+          }
         }
+        await new Promise((r) => setTimeout(r, 200));
       }
 
       if (res.type === 'cancel' || res.type === 'dismiss') {
@@ -786,41 +809,50 @@ export async function signInWithORCID(): Promise<AuthResponse> {
     if (data?.url && !isWeb) {
       const res = await openAuthSession(data.url, redirectUrl);
       if (res.type === 'success' && res.url) {
-        try {
-          const urlObj = new URL(res.url);
-          const code = urlObj.searchParams.get('code');
-          const accessToken = urlObj.searchParams.get('access_token') || urlObj.hash.match(/access_token=([^&]*)/)?.[1];
-          const refreshToken = urlObj.searchParams.get('refresh_token') || urlObj.hash.match(/refresh_token=([^&]*)/)?.[1];
-          const errorDesc = urlObj.searchParams.get('error_description') || urlObj.searchParams.get('error');
+        const { code, accessToken, refreshToken, errorDesc } = extractOAuthParams(res.url);
 
-          if (errorDesc) {
-            return { user: null, error: decodeURIComponent(errorDesc) };
+        if (errorDesc) {
+          return { user: null, error: errorDesc };
+        }
+
+        if (code) {
+          const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            console.warn('[authService] exchangeCodeForSession ORCID info:', exchangeError.message);
           }
-
-          if (code) {
-            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-            if (exchangeError) {
-              console.warn('exchangeCodeForSession in signInWithORCID:', exchangeError.message);
+          if (exchangeData?.session?.user) {
+            const profile = (await fetchUserProfile(exchangeData.session.user.id)) || (await getInitialAuthSession());
+            if (profile) {
+              setStoredLocalSession(profile);
+              return { user: profile, error: null };
             }
-          } else if (accessToken && refreshToken) {
-            await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
           }
-        } catch (parseErr) {
-          console.warn('Error parsing ORCID auth redirect URL:', parseErr);
+        } else if (accessToken && refreshToken) {
+          const { data: setSessionData } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (setSessionData?.session?.user) {
+            const profile = (await fetchUserProfile(setSessionData.session.user.id)) || (await getInitialAuthSession());
+            if (profile) {
+              setStoredLocalSession(profile);
+              return { user: profile, error: null };
+            }
+          }
         }
       }
 
-      // Check if session is now active
-      const { data: { session: activeSession } } = await supabase.auth.getSession();
-      if (activeSession?.user) {
-        const session = await getInitialAuthSession();
-        if (session) {
-          setStoredLocalSession(session);
-          return { user: session, error: null };
+      // Check if session is already active
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession?.user) {
+          const session = await getInitialAuthSession();
+          if (session) {
+            setStoredLocalSession(session);
+            return { user: session, error: null };
+          }
         }
+        await new Promise((r) => setTimeout(r, 200));
       }
 
       if (res.type === 'cancel' || res.type === 'dismiss') {

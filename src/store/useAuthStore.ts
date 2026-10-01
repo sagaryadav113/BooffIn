@@ -274,6 +274,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         authError: null,
       });
+      get().loadFollowingIds(user.id);
       return true;
     }
     // Browser is actively navigating to Google OAuth consent page; keep loading active
@@ -300,6 +301,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         authError: null,
       });
+      get().loadFollowingIds(user.id);
       return true;
     }
     // Browser is actively navigating to ORCID OAuth consent page; keep loading active
