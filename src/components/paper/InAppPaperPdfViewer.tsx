@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,14 +13,20 @@ import {
   FileText,
   RotateCw,
   AlertCircle,
+  ShieldAlert,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { WebView } from 'react-native-webview';
-import { colors, radii, spacing } from '../../theme';
+import { colors, radii, spacing, typography } from '../../theme';
 import { Paper } from '../../types';
 import { FloatingRatingDock } from './FloatingRatingDock';
 import { PaperMetrics, UserPaperRating } from '../../api/hypeScoreService';
+import {
+  downloadAndCachePdf,
+  getCachedPdf,
+  clearPdfCache,
+} from '../../utils/pdfCacheManager';
 
 export interface InAppPaperPdfViewerProps {
   paper: Paper;
@@ -31,6 +37,218 @@ export interface InAppPaperPdfViewerProps {
   onRatingUpdated?: (newMetrics: PaperMetrics, userRating: UserPaperRating) => void;
 }
 
+// Lightweight HTML viewer powered by Mozilla PDF.js
+const PDFJS_VIEWER_HTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=4.0, user-scalable=yes">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background-color: #525659;
+      width: 100%;
+      min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 8px 70px;
+    }
+    #status-bar {
+      color: #F3F4F6;
+      font-size: 13px;
+      text-align: center;
+      padding: 30px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #34D399;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    #pages-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .page-wrapper {
+      background: #FFFFFF;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      border-radius: 3px;
+      overflow: hidden;
+      width: 100%;
+      max-width: 860px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    canvas {
+      width: 100% !important;
+      height: auto !important;
+      display: block;
+    }
+    .page-tag {
+      font-size: 11px;
+      color: #9CA3AF;
+      padding: 5px 0 6px;
+      text-align: center;
+      background: #FAFAFA;
+      width: 100%;
+      border-top: 1px solid #F3F4F6;
+    }
+  </style>
+</head>
+<body>
+  <div id="status-bar">
+    <div class="spinner"></div>
+    <div id="status-text">Preparing manuscript pages...</div>
+  </div>
+  <div id="pages-container"></div>
+
+  <script>
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    } catch(e) {}
+
+    function updateStatus(text, hideSpinner) {
+      var sText = document.getElementById('status-text');
+      if (sText) sText.innerText = text;
+      if (hideSpinner) {
+        var sp = document.querySelector('.spinner');
+        if (sp) sp.style.display = 'none';
+      }
+    }
+
+    function base64ToUint8(base64) {
+      var bin = atob(base64);
+      var len = bin.length;
+      var bytes = new Uint8Array(len);
+      for (var i = 0; i < len; i++) {
+        bytes[i] = bin.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function renderPdfData(base64String) {
+      try {
+        updateStatus('Rendering PDF pages...', false);
+        var bytes = base64ToUint8(base64String);
+
+        pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdfDoc) {
+          var container = document.getElementById('pages-container');
+          var statusBar = document.getElementById('status-bar');
+          if (statusBar) statusBar.style.display = 'none';
+
+          var totalPages = pdfDoc.numPages;
+
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'PAGES_LOADED',
+              totalPages: totalPages
+            }));
+          }
+
+          function loadPage(pageNumber) {
+            pdfDoc.getPage(pageNumber).then(function(page) {
+              var scale = 2.0; // Sharp rendering
+              var viewport = page.getViewport({ scale: scale });
+
+              var pageWrap = document.createElement('div');
+              pageWrap.className = 'page-wrapper';
+
+              var canvas = document.createElement('canvas');
+              var ctx = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+
+              var tag = document.createElement('div');
+              tag.className = 'page-tag';
+              tag.innerText = 'Page ' + pageNumber + ' of ' + totalPages;
+
+              pageWrap.appendChild(canvas);
+              pageWrap.appendChild(tag);
+              container.appendChild(pageWrap);
+
+              var renderTask = page.render({
+                canvasContext: ctx,
+                viewport: viewport
+              });
+
+              renderTask.promise.then(function() {
+                if (pageNumber < totalPages) {
+                  setTimeout(function() {
+                    loadPage(pageNumber + 1);
+                  }, 20);
+                } else {
+                  if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'ALL_PAGES_RENDERED'
+                    }));
+                  }
+                }
+              });
+            }).catch(function(pageErr) {
+              console.error('Page render error:', pageErr);
+            });
+          }
+
+          loadPage(1);
+        }).catch(function(docErr) {
+          updateStatus('Could not render document. Please tap Browser above.', true);
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'RENDER_ERROR',
+              error: docErr.message || 'Parse error'
+            }));
+          }
+        });
+      } catch (err) {
+        updateStatus('Error rendering document. Tap Browser to view online.', true);
+      }
+    }
+
+    // Listen for data from React Native
+    window.addEventListener('message', function(event) {
+      try {
+        var data = JSON.parse(event.data);
+        if (data && data.type === 'LOAD_PDF' && data.base64) {
+          renderPdfData(data.base64);
+        }
+      } catch (e) {}
+    });
+
+    document.addEventListener('message', function(event) {
+      try {
+        var data = JSON.parse(event.data);
+        if (data && data.type === 'LOAD_PDF' && data.base64) {
+          renderPdfData(data.base64);
+        }
+      } catch (e) {}
+    });
+
+    // Notify React Native that viewer shell is ready
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIEWER_READY' }));
+    }
+  </script>
+</body>
+</html>`;
+
 export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   paper,
   pdfUrl,
@@ -40,13 +258,21 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   onRatingUpdated,
 }) => {
   const webViewRef = useRef<WebView>(null);
-  const [loadKey, setLoadKey] = useState(0);
+
+  // States
+  const [isLoadingPdf, setIsLoadingPdf] = useState(true);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [totalPages, setTotalPages] = useState<number | null>(null);
+  const [isViewerReady, setIsViewerReady] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
 
   // Derive the direct PDF stream URL
   const effectiveStreamUrl = useMemo(() => {
     const raw = (pdfUrl || paper.openAccessUrl || paper.canonicalUrl || '').trim();
 
-    // 1. Direct PDF already present (e.g. Nature .pdf, Frontiers .pdf, ScienceDirect .pdf)
+    // 1. Direct PDF already present
     if (raw.toLowerCase().endsWith('.pdf') || raw.toLowerCase().includes('.pdf')) {
       return raw;
     }
@@ -78,33 +304,107 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
     return raw;
   }, [pdfUrl, paper.openAccessUrl, paper.canonicalUrl, paper.doi]);
 
-  // Construct in-app viewer URI:
-  // On Android, loading raw .pdf URLs directly causes Android's OS DownloadManager
-  // to intercept and download duplicate files into the device Downloads folder, leaving WebView blank.
-  // Google Docs Viewer embeds the PDF pages seamlessly inside the WebView without triggering device downloads.
-  const viewerUri = useMemo(() => {
-    if (!effectiveStreamUrl) return '';
-
-    if (Platform.OS === 'android') {
-      const isDirectPdfLike =
-        effectiveStreamUrl.toLowerCase().includes('.pdf') ||
-        effectiveStreamUrl.toLowerCase().includes('format=pdf') ||
-        effectiveStreamUrl.toLowerCase().includes('arxiv.org') ||
-        effectiveStreamUrl.toLowerCase().includes('biorxiv.org') ||
-        effectiveStreamUrl.toLowerCase().includes('nature.com/articles');
-      if (isDirectPdfLike) {
-        return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(effectiveStreamUrl)}`;
-      }
+  // Load and cache PDF on mount or reload
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      setIsLoadingPdf(false);
+      return;
     }
 
-    return effectiveStreamUrl;
-  }, [effectiveStreamUrl]);
+    let isMounted = true;
+    setIsLoadingPdf(true);
+    setErrorMessage(null);
+    setDownloadProgress(0);
+
+    const initPdf = async () => {
+      try {
+        // 1. Check local cache first (instant return, 0 downloads)
+        const cached = await getCachedPdf(paper.id);
+        if (cached && cached.isPdf && cached.base64) {
+          if (isMounted) {
+            setPdfBase64(cached.base64);
+            setIsLoadingPdf(false);
+          }
+          return;
+        }
+
+        if (!effectiveStreamUrl) {
+          if (isMounted) {
+            setErrorMessage('No open access PDF link available for this manuscript.');
+            setIsLoadingPdf(false);
+          }
+          return;
+        }
+
+        // 2. Download into app private cache
+        const result = await downloadAndCachePdf(
+          effectiveStreamUrl,
+          paper.id,
+          (progress) => {
+            if (isMounted) setDownloadProgress(progress);
+          }
+        );
+
+        if (!isMounted) return;
+
+        if (result.isPdf && result.base64) {
+          setPdfBase64(result.base64);
+          setIsLoadingPdf(false);
+        } else {
+          setErrorMessage(
+            result.error ||
+              'This publisher restricts direct PDF downloads. You can view the full manuscript directly in the browser.'
+          );
+          setIsLoadingPdf(false);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setErrorMessage(err?.message || 'Could not load PDF document.');
+          setIsLoadingPdf(false);
+        }
+      }
+    };
+
+    initPdf();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [paper.id, effectiveStreamUrl, reloadTrigger]);
+
+  // Send PDF base64 to WebView once both are ready
+  useEffect(() => {
+    if (isViewerReady && pdfBase64 && webViewRef.current) {
+      webViewRef.current.postMessage(
+        JSON.stringify({
+          type: 'LOAD_PDF',
+          base64: pdfBase64,
+        })
+      );
+    }
+  }, [isViewerReady, pdfBase64]);
+
+  const handleWebViewMessage = useCallback((event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'VIEWER_READY') {
+        setIsViewerReady(true);
+      } else if (data.type === 'PAGES_LOADED') {
+        setTotalPages(data.totalPages);
+      } else if (data.type === 'RENDER_ERROR') {
+        setErrorMessage('Could not render PDF manuscript. Open in Browser below.');
+      }
+    } catch {}
+  }, []);
 
   const handleOpenExternal = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    const target = effectiveStreamUrl || paper.canonicalUrl || (paper.doi ? `https://doi.org/${paper.doi}` : '');
+    const target =
+      effectiveStreamUrl ||
+      paper.canonicalUrl ||
+      (paper.doi ? `https://doi.org/${paper.doi}` : '');
     if (!target) return;
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -121,19 +421,20 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
     }
   };
 
-  const handleReload = () => {
+  const handleReload = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    setLoadKey((prev) => prev + 1);
-    if (webViewRef.current) {
-      webViewRef.current.reload();
-    }
+    await clearPdfCache(paper.id);
+    setPdfBase64(null);
+    setIsViewerReady(false);
+    setTotalPages(null);
+    setReloadTrigger((prev) => prev + 1);
   };
 
   return (
     <View style={styles.container}>
-      {/* ── IN-APP VIEWER TOP TOOLBAR ── */}
+      {/* ── TOP TOOLBAR ── */}
       <View style={styles.topToolbar}>
         <View style={styles.toolbarLeft}>
           <View style={styles.badgeWrap}>
@@ -143,7 +444,8 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             </Text>
           </View>
           <Text style={styles.journalSubtitle} numberOfLines={1}>
-            {paper.journal || 'Academic Paper'} · {paper.publicationYear || ''}
+            {paper.journal || 'Academic Paper'} {paper.publicationYear ? `· ${paper.publicationYear}` : ''}
+            {totalPages ? ` · ${totalPages} pages` : ''}
           </Text>
         </View>
 
@@ -154,7 +456,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <RotateCw size={15} color="#4B5563" />
+            <RotateCw size={14} color="#4B5563" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -179,11 +481,10 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
         </View>
       </View>
 
-      {/* ── IN-APP VIEWER BODY (WEB IFRAME VS NATIVE EMBEDDED STREAM) ── */}
+      {/* ── VIEWER BODY ── */}
       {Platform.OS === 'web' ? (
         <View style={styles.webPdfWrapper}>
           <iframe
-            key={loadKey}
             src={effectiveStreamUrl}
             style={{
               width: '100%',
@@ -197,7 +498,6 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             loading="eager"
           />
 
-          {/* Floating Rating Dock */}
           <FloatingRatingDock
             paperId={paper.id}
             paperTitle={paper.title}
@@ -207,61 +507,68 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
         </View>
       ) : (
         <View style={styles.nativeViewerWrapper}>
-          {!effectiveStreamUrl ? (
-            <View style={styles.emptyContainer}>
-              <FileText size={40} color="#9CA3AF" />
-              <Text style={styles.emptyTitle}>PDF URL not available</Text>
-              <Text style={styles.emptySubtitle}>
-                No direct open access link was found for this paper.
+          {errorMessage ? (
+            <View style={styles.errorContainer}>
+              <View style={styles.errorIconWrap}>
+                <ShieldAlert size={36} color="#DC2626" />
+              </View>
+              <Text style={styles.errorTitle}>Publisher Portal Protected</Text>
+              <Text style={styles.errorDesc}>
+                {errorMessage}
               </Text>
-              <TouchableOpacity
-                style={styles.errorBtn}
-                onPress={handleOpenExternal}
-                activeOpacity={0.85}
-              >
-                <ExternalLink size={14} color="#FFFFFF" />
-                <Text style={styles.errorBtnText}>Open Canonical Source</Text>
-              </TouchableOpacity>
+              <View style={styles.errorButtonsRow}>
+                <TouchableOpacity
+                  style={styles.errorPrimaryBtn}
+                  onPress={handleOpenExternal}
+                  activeOpacity={0.85}
+                >
+                  <ExternalLink size={14} color="#FFFFFF" />
+                  <Text style={styles.errorPrimaryBtnText}>Open Manuscript in Browser</Text>
+                </TouchableOpacity>
+
+                {onSwitchToArticleView && (
+                  <TouchableOpacity
+                    style={styles.errorSecondaryBtn}
+                    onPress={onSwitchToArticleView}
+                    activeOpacity={0.85}
+                  >
+                    <BookOpen size={14} color={colors.textPrimary} />
+                    <Text style={styles.errorSecondaryBtnText}>Read Formatted Article</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           ) : (
-            <WebView
-              key={`viewer_${loadKey}`}
-              ref={webViewRef}
-              source={{ uri: viewerUri }}
-              style={styles.webView}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              scalesPageToFit={true}
-              allowsInlineMediaPlayback={true}
-              nestedScrollEnabled={true}
-              mixedContentMode="always"
-              originWhitelist={['*']}
-              startInLoadingState={true}
-              renderLoading={() => (
+            <>
+              {/* PDF.js HTML Canvas Viewer */}
+              <WebView
+                ref={webViewRef}
+                source={{ html: PDFJS_VIEWER_HTML, baseUrl: 'https://localhost' }}
+                style={styles.webView}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                originWhitelist={['*']}
+                allowFileAccess={true}
+                allowUniversalAccessFromFileURLs={true}
+                onMessage={handleWebViewMessage}
+                showsVerticalScrollIndicator={true}
+                bounces={false}
+                overScrollMode="never"
+              />
+
+              {/* In-App Loading Overlay */}
+              {isLoadingPdf && (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#1B4D3E" />
                   <Text style={styles.loadingTitle}>Opening PDF Manuscript...</Text>
-                  <Text style={styles.loadingSubtitle}>Rendering in-app publication view</Text>
-                </View>
-              )}
-              renderError={(errorDomain, errorCode, errorDesc) => (
-                <View style={styles.errorContainer}>
-                  <AlertCircle size={32} color="#DC2626" />
-                  <Text style={styles.errorTitle}>Could not load inline document</Text>
-                  <Text style={styles.errorDesc}>
-                    {errorDesc || 'The publisher restricted inline embedding.'}
+                  <Text style={styles.loadingSubtitle}>
+                    {downloadProgress > 0 && downloadProgress < 1
+                      ? `Loading pages (${Math.round(downloadProgress * 100)}%)...`
+                      : 'Rendering in-app publication view'}
                   </Text>
-                  <TouchableOpacity
-                    style={styles.errorBtn}
-                    onPress={handleOpenExternal}
-                    activeOpacity={0.85}
-                  >
-                    <ExternalLink size={14} color="#FFFFFF" />
-                    <Text style={styles.errorBtnText}>Open in Chrome / Browser</Text>
-                  </TouchableOpacity>
                 </View>
               )}
-            />
+            </>
           )}
 
           {/* Floating Rating Dock anchored over PDF */}
@@ -280,10 +587,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    backgroundColor: '#525659',
     overflow: 'hidden',
   },
   topToolbar: {
@@ -296,6 +600,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
     gap: 8,
+    zIndex: 10,
   },
   toolbarLeft: {
     flex: 1,
@@ -372,13 +677,12 @@ const styles = StyleSheet.create({
   },
   nativeViewerWrapper: {
     flex: 1,
-    minHeight: 650,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#525659',
     position: 'relative',
   },
   webView: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#525659',
   },
   floatingDockInPdf: {
     position: 'absolute',
@@ -404,9 +708,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     padding: spacing.xl,
     gap: 8,
+    zIndex: 20,
   },
   loadingTitle: {
     fontSize: 15,
@@ -423,52 +728,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
+    backgroundColor: '#FFFFFF',
+    gap: 12,
+  },
+  errorIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#FEF2F2',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   errorTitle: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#991B1B',
+    color: colors.textPrimary,
   },
   errorDesc: {
-    fontSize: 12,
-    color: '#B91C1C',
+    fontSize: 13,
+    color: colors.textSecondary,
     textAlign: 'center',
-    maxWidth: 280,
+    lineHeight: 19,
+    maxWidth: 300,
+    marginBottom: 8,
   },
-  errorBtn: {
+  errorButtonsRow: {
+    width: '100%',
+    maxWidth: 300,
+    gap: 8,
+  },
+  errorPrimaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: '#1B4D3E',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: 12,
     borderRadius: radii.md,
-    marginTop: spacing.sm,
   },
-  errorBtnText: {
+  errorPrimaryBtnText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  emptyContainer: {
-    flex: 1,
+  errorSecondaryBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
-    gap: 8,
-    backgroundColor: '#FFFFFF',
+    gap: 6,
+    backgroundColor: colors.surfaceHover,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingVertical: 11,
+    borderRadius: radii.md,
   },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+  errorSecondaryBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textPrimary,
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    maxWidth: 280,
   },
 });

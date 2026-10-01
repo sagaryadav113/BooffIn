@@ -1004,52 +1004,53 @@ export default function PaperDetailScreen() {
           </View>
         )}
 
-        <ScrollView
-          ref={scrollViewRef}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 130 }]}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor={colors.black}
-              colors={[colors.black]}
-            />
-          }
-        >
-          {/* ==================================================================== */}
-          {/* VIEW MODE 1: ARTICLE STATS PERFORMANCE & METRICS                    */}
-          {/* ==================================================================== */}
-          {viewMode === 'stats' ? (
-            <ArticleStatsView
+        {viewMode === 'pdf' && hasOpenAccessPdf ? (
+          /* ==================================================================== */
+          /* VIEW MODE 2: ORIGINAL OPEN ACCESS PDF DOCUMENT / PUBLISHER PORTAL    */
+          /* ==================================================================== */
+          <View style={styles.pdfStandaloneContainer}>
+            <InAppPaperPdfViewer
               paper={paper}
-              metrics={paperMetrics}
-              isSaved={isPaperSaved}
-              onToggleSave={handleSave}
+              pdfUrl={resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl || paper.canonicalUrl || ''}
+              isDirectPdf={Boolean(resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl)}
+              isArxivPdf={isArxivPdf || (paper.doi ? paper.doi.includes('arxiv') : false) || Boolean(bestOpenUrl && bestOpenUrl.includes('arxiv.org'))}
               onSwitchToArticleView={() => setViewMode('article')}
-              onOpenPdf={() => setViewMode('pdf')}
+              onRatingUpdated={(newMetrics) => setPaperMetrics(newMetrics)}
             />
-          ) : viewMode === 'pdf' && hasOpenAccessPdf ? (
-            /* ==================================================================== */
-            /* VIEW MODE 2: ORIGINAL OPEN ACCESS PDF DOCUMENT / PUBLISHER PORTAL    */
-            /* ==================================================================== */
-            <View style={styles.pdfViewWrapper}>
-              <InAppPaperPdfViewer
-                paper={paper}
-                pdfUrl={resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl || paper.canonicalUrl || ''}
-                isDirectPdf={Boolean(resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl)}
-                isArxivPdf={isArxivPdf || (paper.doi ? paper.doi.includes('arxiv') : false) || Boolean(bestOpenUrl && bestOpenUrl.includes('arxiv.org'))}
-                onSwitchToArticleView={() => setViewMode('article')}
-                onRatingUpdated={(newMetrics) => setPaperMetrics(newMetrics)}
+          </View>
+        ) : (
+          <ScrollView
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: 130 }]}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.black}
+                colors={[colors.black]}
               />
-            </View>
-          ) : (
-            /* ==================================================================== */
-            /* VIEW MODE 3: SUBSTACK-STYLE ARTICLE FORMAT                          */
-            /* ==================================================================== */
-            <>
-              <View style={styles.articleBody}>
+            }
+          >
+            {/* ==================================================================== */}
+            {/* VIEW MODE 1: ARTICLE STATS PERFORMANCE & METRICS                    */}
+            {/* ==================================================================== */}
+            {viewMode === 'stats' ? (
+              <ArticleStatsView
+                paper={paper}
+                metrics={paperMetrics}
+                isSaved={isPaperSaved}
+                onToggleSave={handleSave}
+                onSwitchToArticleView={() => setViewMode('article')}
+                onOpenPdf={() => setViewMode('pdf')}
+              />
+            ) : (
+              /* ==================================================================== */
+              /* VIEW MODE 3: SUBSTACK-STYLE ARTICLE FORMAT                          */
+              /* ==================================================================== */
+              <>
+                <View style={styles.articleBody}>
               {/* Publication Pill & Date Bar */}
               <View style={styles.editorialMetaRow}>
                 <Badge
@@ -1337,6 +1338,7 @@ export default function PaperDetailScreen() {
         </>
       )}
     </ScrollView>
+  )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1410,6 +1412,10 @@ const styles = StyleSheet.create({
   viewModeTabTextActive: {
     color: colors.white,
     fontWeight: '700',
+  },
+  pdfStandaloneContainer: {
+    flex: 1,
+    backgroundColor: '#525659',
   },
   pdfViewWrapper: {
     padding: spacing.md,
