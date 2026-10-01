@@ -327,11 +327,13 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
           <View style={styles.tooltipBadgeContainer}>
             <View style={styles.tooltipBadge}>
               <Text style={styles.tooltipValue}>
-                {activePoint.value.toFixed(1)}
+                {activePoint.value > 0 ? activePoint.value.toFixed(1) : '0.0'}
               </Text>
-              <Text style={styles.tooltipDelta}>
-                ▲ +{activePoint.deltaPercent}%
-              </Text>
+              {activePoint.deltaPercent > 0 ? (
+                <Text style={styles.tooltipDelta}>
+                  ▲ +{activePoint.deltaPercent}%
+                </Text>
+              ) : null}
               <Text style={styles.tooltipTimeframe}>
                 {stats.timeframeLabel}
               </Text>
@@ -495,11 +497,13 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
             <Text style={styles.statCardTotal}>
               {stats.views.totalFormatted}
             </Text>
-            <View style={styles.statDeltaPill}>
-              <Text style={styles.statDeltaText}>
-                ▲ {stats.views.deltaFormatted}
-              </Text>
-            </View>
+            {stats.views.delta > 0 && (
+              <View style={styles.statDeltaPill}>
+                <Text style={styles.statDeltaText}>
+                  ▲ {stats.views.deltaFormatted}
+                </Text>
+              </View>
+            )}
           </View>
           <Text style={styles.statCardSubtitle}>
             Views ({stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})
@@ -513,11 +517,13 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
             <Text style={styles.statCardTotal}>
               {stats.discussions.totalFormatted}
             </Text>
-            <View style={styles.statDeltaPill}>
-              <Text style={styles.statDeltaText}>
-                ▲ {stats.discussions.deltaFormatted}
-              </Text>
-            </View>
+            {stats.discussions.delta > 0 && (
+              <View style={styles.statDeltaPill}>
+                <Text style={styles.statDeltaText}>
+                  ▲ {stats.discussions.deltaFormatted}
+                </Text>
+              </View>
+            )}
           </View>
           <Text style={styles.statCardSubtitle}>
             Discussions ({stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})
@@ -531,11 +537,13 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
             <Text style={styles.statCardTotal}>
               {stats.hypeVotes.totalFormatted}
             </Text>
-            <View style={styles.statDeltaPill}>
-              <Text style={styles.statDeltaText}>
-                ▲ {stats.hypeVotes.deltaFormatted}
-              </Text>
-            </View>
+            {stats.hypeVotes.delta > 0 && (
+              <View style={styles.statDeltaPill}>
+                <Text style={styles.statDeltaText}>
+                  ▲ {stats.hypeVotes.deltaFormatted}
+                </Text>
+              </View>
+            )}
           </View>
           <Text style={styles.statCardSubtitle}>
             HYPE Votes ({stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})
@@ -549,11 +557,13 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
             <Text style={styles.statCardTotal}>
               {stats.shares.totalFormatted}
             </Text>
-            <View style={styles.statDeltaPill}>
-              <Text style={styles.statDeltaText}>
-                ▲ {stats.shares.deltaFormatted}
-              </Text>
-            </View>
+            {stats.shares.delta > 0 && (
+              <View style={styles.statDeltaPill}>
+                <Text style={styles.statDeltaText}>
+                  ▲ {stats.shares.deltaFormatted}
+                </Text>
+              </View>
+            )}
           </View>
           <Text style={styles.statCardSubtitle}>
             Shares ({stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})
@@ -611,7 +621,7 @@ const CircularProgressRing: React.FC<CircularProgressRingProps> = ({
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   // Progress normalized out of 5.0
-  const progress = Math.min(1.0, Math.max(0.1, score / 5.0));
+  const progress = score > 0 ? Math.min(1.0, score / 5.0) : 0;
   const strokeDashoffset = circumference * (1 - progress);
 
   return (
@@ -628,21 +638,23 @@ const CircularProgressRing: React.FC<CircularProgressRingProps> = ({
             fill="none"
           />
           {/* Progress circle */}
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke="#059669"
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${circumference} ${circumference}`}
-            strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
-            fill="none"
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
+          {progress > 0 && (
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke="#059669"
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              fill="none"
+              transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            />
+          )}
         </Svg>
         <View style={styles.ringCenterTextWrap}>
-          <Text style={styles.ringScoreText}>{score.toFixed(1)}</Text>
+          <Text style={styles.ringScoreText}>{score > 0 ? score.toFixed(1) : '—'}</Text>
         </View>
       </View>
       <Text style={styles.ringLabelText}>{label}</Text>

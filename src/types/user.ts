@@ -31,4 +31,8 @@ export interface UserProfile {
   savedCount: number;
   joinedDate: string;
   isFollowing?: boolean;
+  openAlexId?: string;
+  worksCount?: number;
+  citationCount?: number;
+  hypeScore?: number;
 }

@@ -3,7 +3,7 @@ import { Paper } from '../types';
 import { toggleBookmark as apiToggleBookmark, mapSupabasePaper } from '../api/socialService';
 import { useAuthStore } from './useAuthStore';
 import { supabase, appStorage } from '../api/client';
-import { recordPaperView, getReadPapersRegistry } from '../api/hypeScoreService';
+import { recordPaperView, getReadPapersRegistry, PaperMetrics } from '../api/hypeScoreService';
 
 const SAVED_PAPER_IDS_KEY = 'booffin_saved_paper_ids';
 const SAVED_PAPERS_CACHE_KEY = 'booffin_saved_papers_cache';
@@ -20,7 +20,7 @@ interface PaperState {
   getPaperById: (id: string) => Paper | undefined;
   getPaperByDoi: (doi: string) => Paper | undefined;
   addPaper: (paper: Paper) => void;
-  recordPaperRead: (paper: Paper, currentUserId?: string) => Promise<void>;
+  recordPaperRead: (paper: Paper, currentUserId?: string) => Promise<PaperMetrics | void>;
   searchPapers: (query: string) => Paper[];
 }
 
@@ -206,9 +206,9 @@ export const usePaperStore = create<PaperState>((set, get) => ({
         ...state.papers.filter((p) => p.id !== paper.id && (!paper.doi || p.doi !== paper.doi)),
       ],
     })),
-  recordPaperRead: async (paper: Paper, currentUserId?: string) => {
+  recordPaperRead: async (paper: Paper, currentUserId?: string): Promise<PaperMetrics | void> => {
     if (!paper || !paper.id) return;
-    // 1. Update in-memory state immediately so UI refreshes without delay
+    // 1. Update in-memory state so UI displays read paper badge/status
     set((state) => ({
       readPapers: [
         paper,
@@ -222,7 +222,8 @@ export const usePaperStore = create<PaperState>((set, get) => ({
 
     // 2. Persist view count and register paper in persistent storage
     try {
-      await recordPaperView(paper.id, currentUserId, paper);
+      const updatedMetrics = await recordPaperView(paper.id, currentUserId, paper);
+      return updatedMetrics;
     } catch (e) {
       console.warn('[usePaperStore] Error recording paper read:', e);
     }

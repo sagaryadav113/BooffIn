@@ -49,10 +49,13 @@ export default function ExploreScreen() {
     recentSearches,
     hasMoreResearchers,
     isLoadingMoreResearchers,
+    hasMorePapers,
+    isLoadingMorePapers,
     setSearchQuery,
     setActiveCategory,
     executeSearch,
     loadMoreResearchers,
+    loadMorePapers,
     clearSearch,
     removeRecentSearch,
     clearRecentSearches,
@@ -239,6 +242,21 @@ export default function ExploreScreen() {
             <PaperCard paper={paper} />
           </View>
         ))}
+
+        {hasMorePapers && (
+          <TouchableOpacity
+            style={styles.loadMoreBtn}
+            onPress={loadMorePapers}
+            disabled={isLoadingMorePapers}
+            activeOpacity={0.8}
+          >
+            {isLoadingMorePapers ? (
+              <ActivityIndicator size="small" color="#1B4D3E" />
+            ) : (
+              <Text style={styles.loadMoreText}>Load More Papers</Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -285,7 +303,6 @@ export default function ExploreScreen() {
   // Render: Domain Hyped Papers & Researchers (Exact Screenshot Match)
   // -------------------------------------------------------------
   const renderHypedDomainContent = () => {
-    const isDomainActive = activeTab !== 'For You' && activeTab !== 'Following';
     const displayPapers = hypedData?.papers || [];
     const displayResearchers = hypedData?.researchers || [];
 
@@ -405,7 +422,7 @@ export default function ExploreScreen() {
                 key={researcher.id}
                 researcher={researcher}
                 rank={idx + 1}
-                hypeScore={4.9 - idx * 0.1}
+                hypeScore={researcher.hypeScore}
               />
             ))}
           </ScrollView>

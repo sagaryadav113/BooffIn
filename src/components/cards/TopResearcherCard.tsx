@@ -102,10 +102,10 @@ export const TopResearcherCard: React.FC<TopResearcherCardProps> = ({
     if (researcher.secondaryFields && researcher.secondaryFields.length > 0) {
       return researcher.secondaryFields.slice(0, 2);
     }
-    if (researcher.primaryField) {
-      return [researcher.primaryField];
+    if (researcher.academicTitle) {
+      return [researcher.academicTitle.split('·')[0].trim()];
     }
-    return ['Neural Circuits', 'Optogenetics'];
+    return ['Academic Research'];
   }, [researcher]);
 
   return (

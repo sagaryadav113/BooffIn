@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { SearchFilterCategory, UnifiedSearchResults } from '../api/search/types';
-import { executeUnifiedSearch, loadMoreScholars } from '../api/search/unifiedSearchEngine';
+import {
+  executeUnifiedSearch,
+  loadMoreScholars,
+  loadMorePapers,
+} from '../api/search/unifiedSearchEngine';
 import { usePaperStore } from './usePaperStore';
 import { appStorage } from '../api/client';
 
@@ -15,11 +19,15 @@ interface ExploreSearchState {
   researchersPage: number;
   hasMoreResearchers: boolean;
   isLoadingMoreResearchers: boolean;
+  papersPage: number;
+  hasMorePapers: boolean;
+  isLoadingMorePapers: boolean;
   loadRecentSearches: () => Promise<void>;
   setSearchQuery: (query: string) => void;
   setActiveCategory: (category: SearchFilterCategory) => void;
   executeSearch: (queryOverride?: string) => Promise<void>;
   loadMoreResearchers: () => Promise<void>;
+  loadMorePapers: () => Promise<void>;
   clearSearch: () => void;
   addRecentSearch: (query: string) => void;
   removeRecentSearch: (query: string) => void;
@@ -35,6 +43,9 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
   researchersPage: 1,
   hasMoreResearchers: false,
   isLoadingMoreResearchers: false,
+  papersPage: 1,
+  hasMorePapers: false,
+  isLoadingMorePapers: false,
 
   loadRecentSearches: async () => {
     try {
@@ -57,6 +68,9 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
         researchersPage: 1,
         hasMoreResearchers: false,
         isLoadingMoreResearchers: false,
+        papersPage: 1,
+        hasMorePapers: false,
+        isLoadingMorePapers: false,
       });
     }
   },
@@ -78,11 +92,20 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
         researchersPage: 1,
         hasMoreResearchers: false,
         isLoadingMoreResearchers: false,
+        papersPage: 1,
+        hasMorePapers: false,
+        isLoadingMorePapers: false,
       });
       return;
     }
 
-    set({ isSearching: true, researchersPage: 1, hasMoreResearchers: false });
+    set({
+      isSearching: true,
+      researchersPage: 1,
+      hasMoreResearchers: false,
+      papersPage: 1,
+      hasMorePapers: false,
+    });
     get().addRecentSearch(targetQuery);
 
     try {
@@ -93,6 +116,9 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
         researchersPage: 1,
         hasMoreResearchers: (results.researchers?.length || 0) >= 6,
         isLoadingMoreResearchers: false,
+        papersPage: 1,
+        hasMorePapers: (results.papers?.length || 0) >= 3,
+        isLoadingMorePapers: false,
       });
 
       // Automatically hydrate found papers into in-memory paperStore
@@ -104,7 +130,7 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
       }
     } catch (err) {
       console.warn('[ExploreSearchStore] Error during search:', err);
-      set({ isSearching: false, isLoadingMoreResearchers: false });
+      set({ isSearching: false, isLoadingMoreResearchers: false, isLoadingMorePapers: false });
     }
   },
 
@@ -131,7 +157,7 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
             researchers: [...currentResults.researchers, ...newItems],
           },
           researchersPage: nextPage,
-          hasMoreResearchers: more.length >= 8,
+          hasMoreResearchers: more.length >= 6,
           isLoadingMoreResearchers: false,
         });
       } else {
@@ -140,6 +166,53 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
     } catch (err) {
       console.warn('[ExploreSearchStore] Error loading more researchers:', err);
       set({ isLoadingMoreResearchers: false });
+    }
+  },
+
+  loadMorePapers: async () => {
+    const state = get();
+    if (state.isLoadingMorePapers || !state.hasMorePapers || !state.searchQuery.trim()) {
+      return;
+    }
+    const nextPage = state.papersPage + 1;
+    set({ isLoadingMorePapers: true });
+    try {
+      const more = await loadMorePapers(state.searchQuery.trim(), nextPage, 10);
+      if (!more || more.length === 0) {
+        set({ hasMorePapers: false, isLoadingMorePapers: false });
+        return;
+      }
+      const currentResults = state.results;
+      if (currentResults) {
+        const existingIds = new Set(currentResults.papers.map((p) => p.id));
+        const existingDois = new Set(
+          currentResults.papers.map((p) => p.doi?.toLowerCase().trim()).filter(Boolean)
+        );
+        const newItems = more.filter((p) => {
+          if (existingIds.has(p.id)) return false;
+          if (p.doi && existingDois.has(p.doi.toLowerCase().trim())) return false;
+          return true;
+        });
+
+        // Hydrate to paperStore
+        const paperStore = usePaperStore.getState();
+        newItems.forEach((p) => paperStore.addPaper(p));
+
+        set({
+          results: {
+            ...currentResults,
+            papers: [...currentResults.papers, ...newItems],
+          },
+          papersPage: nextPage,
+          hasMorePapers: more.length >= 4,
+          isLoadingMorePapers: false,
+        });
+      } else {
+        set({ isLoadingMorePapers: false });
+      }
+    } catch (err) {
+      console.warn('[ExploreSearchStore] Error loading more papers:', err);
+      set({ isLoadingMorePapers: false });
     }
   },
 

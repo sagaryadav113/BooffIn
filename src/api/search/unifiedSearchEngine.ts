@@ -152,3 +152,15 @@ export async function loadMoreScholars(
 ): Promise<ResearcherSearchResult[]> {
   return searchOpenAlexAuthors(query, limit, page);
 }
+
+/**
+ * Loads additional pages of research papers matching query
+ */
+export async function loadMorePapers(
+  query: string,
+  page: number,
+  limit = 10
+): Promise<Paper[]> {
+  return searchPapers(query, limit, page);
+}
+

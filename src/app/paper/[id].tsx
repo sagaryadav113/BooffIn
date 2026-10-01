@@ -229,37 +229,50 @@ export default function PaperDetailScreen() {
   const [isLoading, setIsLoading] = useState(!initialPaper);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Automatically register and track paper read with live metrics
+  const hasRecordedReadRef = React.useRef(false);
+  const paperRef = React.useRef(paper);
+  paperRef.current = paper;
+
+  // Reset read flag whenever paperId changes
+  useEffect(() => {
+    hasRecordedReadRef.current = false;
+  }, [paperId]);
+
+  // Load verified metrics immediately; count as reader ONLY after > 25 seconds of reading
   useEffect(() => {
     let isMounted = true;
-    const targetId = paper?.id || paperId || doi;
+    const targetId = paperId || doi || paper?.id;
     if (!targetId) return;
 
-    // 1. Fetch current status immediately
+    // 1. Fetch current status immediately (does NOT count as read)
     getPaperMetrics(targetId).then((m) => {
       if (isMounted) setPaperMetrics(m);
     });
 
-    // 2. Register paper read and increment real reader count immediately
-    if (paper) {
-      recordPaperRead(paper, currentUser?.id);
-      recordPaperView(targetId, currentUser?.id, paper)
-        .then((updated) => {
-          if (isMounted) setPaperMetrics(updated);
-        })
-        .catch(() => {});
-    } else {
-      recordPaperView(targetId, currentUser?.id)
-        .then((updated) => {
-          if (isMounted) setPaperMetrics(updated);
-        })
-        .catch(() => {});
-    }
+    // 2. Count 1 verified reader only after spending > 25 seconds reading the paper
+    const timer = setTimeout(async () => {
+      if (!isMounted || hasRecordedReadRef.current) return;
+      hasRecordedReadRef.current = true;
+
+      const currentPaper = paperRef.current;
+      if (currentPaper) {
+        const updated = await recordPaperRead(currentPaper, currentUser?.id);
+        if (isMounted && updated) {
+          setPaperMetrics(updated);
+        }
+      } else {
+        const updated = await recordPaperView(targetId, currentUser?.id);
+        if (isMounted && updated) {
+          setPaperMetrics(updated);
+        }
+      }
+    }, 25000);
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
-  }, [paper, paperId, doi, currentUser?.id, recordPaperRead]);
+  }, [paperId, doi, currentUser?.id, recordPaperRead]);
 
   // Reader View Mode: 'article' (Substack format) vs 'stats' (Article Analytics) vs 'pdf' (Open Access Document)
   const [viewMode, setViewMode] = useState<'article' | 'stats' | 'pdf'>(

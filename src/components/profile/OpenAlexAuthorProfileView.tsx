@@ -9,7 +9,6 @@ import {
   Linking,
   Share,
   Clipboard,
-  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -41,7 +40,6 @@ import {
 } from '../../api/openalexAuthorService';
 import { Paper } from '../../types';
 import { usePaperStore } from '../../store/usePaperStore';
-import { useAuthStore } from '../../store/useAuthStore';
 import { ClaimProfileModal } from '../modals/ClaimProfileModal';
 
 interface OpenAlexAuthorProfileViewProps {
@@ -72,7 +70,6 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
   const [expandedAbstracts, setExpandedAbstracts] = useState<Record<string, boolean>>({});
 
   const addPaperToStore = usePaperStore((s) => s.addPaper);
-  const currentUser = useAuthStore((s) => s.user);
   const [claimModalVisible, setClaimModalVisible] = useState(false);
 
   const handleClaimProfile = () => {
@@ -220,7 +217,7 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
   const maxYearWorks = useMemo(() => {
     if (!profile?.countsByYear || profile.countsByYear.length === 0) return 1;
     return Math.max(...profile.countsByYear.map((c) => c.worksCount), 1);
-  }, [profile?.countsByYear]);
+  }, [profile]);
 
   if (isLoadingProfile) {
     return (
@@ -323,6 +320,16 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
               <Text style={styles.sourcePillText}>OpenAlex Verified Scholar Index</Text>
             </View>
           </View>
+
+          {/* Claim Profile Option in Top-Right Marked Area */}
+          <TouchableOpacity
+            style={styles.claimProfileTopBtn}
+            onPress={handleClaimProfile}
+            activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.claimProfileTopText}>Claim Profile</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Current & Historical Affiliations */}
@@ -372,40 +379,22 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
             </TouchableOpacity>
           ) : null}
 
-          {/* OpenAlex ID */}
-          <TouchableOpacity
-            onPress={() => handleCopyId(profile.openAlexId)}
-            style={styles.openAlexIdBtn}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.openAlexIdLabel}>OpenAlex ID:</Text>
-            <Text style={styles.openAlexIdText}>{profile.openAlexId}</Text>
-            {copiedId ? (
-              <Check size={12} color="#16A34A" />
-            ) : (
-              <Copy size={12} color={colors.textSecondary} />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Claim Profile Banner */}
-        <View style={styles.claimBanner}>
-          <View style={styles.claimBannerTextCol}>
-            <View style={styles.claimBadgeRow}>
-              <Award size={13} color="#4D6B18" />
-              <Text style={styles.claimBadgeTitle}>Unclaimed Scholar Profile</Text>
-            </View>
-            <Text style={styles.claimDesc}>
-              Are you {profile.displayName}? Claim this profile with your ORCID to link and highlight your publications on BooffIn.
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.claimBtn}
-            onPress={handleClaimProfile}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.claimBtnText}>Claim Profile</Text>
-          </TouchableOpacity>
+          {/* OpenAlex ID (Original Canonical OpenAlex ID) */}
+          {profile.openAlexId && !profile.openAlexId.includes('-') && (profile.openAlexId.startsWith('A') || profile.openAlexId.length > 4) ? (
+            <TouchableOpacity
+              onPress={() => handleCopyId(profile.openAlexId)}
+              style={styles.openAlexIdBtn}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.openAlexIdLabel}>OpenAlex ID:</Text>
+              <Text style={styles.openAlexIdText}>{profile.openAlexId}</Text>
+              {copiedId ? (
+                <Check size={12} color="#16A34A" />
+              ) : (
+                <Copy size={12} color={colors.textSecondary} />
+              )}
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
@@ -1375,47 +1364,20 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 13,
   },
-  claimBanner: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    backgroundColor: '#F7FEE7',
-    borderRadius: radii.md,
+  claimProfileTopBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: '#D9F99D',
-    flexDirection: 'column',
-    gap: spacing.sm,
-  },
-  claimBannerTextCol: {
-    gap: 4,
-  },
-  claimBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  claimBadgeTitle: {
-    ...typography.captionBold,
-    color: '#3F6212',
-    fontSize: 12.5,
-  },
-  claimDesc: {
-    ...typography.caption,
-    color: '#4D7C0F',
-    fontSize: 11.5,
-    lineHeight: 16,
-  },
-  claimBtn: {
-    backgroundColor: '#4D7C0F',
-    paddingVertical: 7,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: '#1B4D3E',
+    backgroundColor: '#EAF3EE',
     alignSelf: 'flex-start',
+    marginTop: 2,
   },
-  claimBtnText: {
+  claimProfileTopText: {
     ...typography.captionBold,
-    color: '#FFFFFF',
-    fontSize: 12,
+    color: '#1B4D3E',
+    fontSize: 11.5,
+    fontWeight: '700',
   },
 });

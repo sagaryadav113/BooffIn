@@ -271,17 +271,26 @@ export async function fetchOpenAlexAuthorDetails(authorId: string): Promise<Open
       }
     }
 
+    // Extract real OpenAlex canonical ID (e.g. A5012345678)
+    const realOpenAlexId = data.id
+      ? String(data.id).replace(/^https?:\/\/openalex\.org\//i, '').replace(/^authors\//i, '').trim()
+      : (cleanId.startsWith('A') ? cleanId : '');
+
     return {
-      id: cleanId,
-      openAlexId: cleanId,
-      openAlexUrl: `https://openalex.org/${cleanId}`,
+      id: realOpenAlexId || cleanId,
+      openAlexId: realOpenAlexId || (cleanId.startsWith('A') ? cleanId : ''),
+      openAlexUrl: data.id?.startsWith('http')
+        ? data.id
+        : (realOpenAlexId ? `https://openalex.org/${realOpenAlexId}` : `https://openalex.org/${cleanId}`),
       displayName: data.display_name || 'Academic Scholar',
       observedName,
       alternativeNames: alternatives,
       institutions: primaryInstitutions,
       observedInstitutions,
-      orcid: rawOrcid,
-      orcidUrl: rawOrcid ? `https://orcid.org/${rawOrcid}` : undefined,
+      orcid: rawOrcid || (isOrcid ? cleanId.replace(/^https?:\/\/orcid\.org\//i, '') : undefined),
+      orcidUrl: (rawOrcid || (isOrcid ? cleanId.replace(/^https?:\/\/orcid\.org\//i, '') : undefined))
+        ? `https://orcid.org/${rawOrcid || cleanId.replace(/^https?:\/\/orcid\.org\//i, '')}`
+        : undefined,
       worksCount: Number(data.works_count) || 0,
       citationCount: Number(data.cited_by_count) || 0,
       hIndex,

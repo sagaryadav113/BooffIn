@@ -24,37 +24,39 @@ async function fetchWithRetry(
 
 /**
  * Searches academic literature across EuropePMC, Semantic Scholar, arXiv, and OpenAlex
- * — 4 sources in parallel for maximum recall.
+ * — 4 sources in parallel for maximum recall. Supports pagination via page parameter.
  */
-export async function searchPapers(query: string, limit = 15): Promise<Paper[]> {
+export async function searchPapers(query: string, limit = 15, page = 1): Promise<Paper[]> {
   const cleanQ = query.trim();
   if (!cleanQ) return [];
 
-  // 1. Check if exact reference (DOI, arXiv ID, URL, PMID) — resolve directly first
-  const parsed = parseReferenceInput(cleanQ);
-  if (parsed.doi || parsed.arxivId || parsed.pmid) {
-    try {
-      const res = await defaultPaperResolver.resolve(cleanQ);
-      if (res.paper) {
-        // Still do a broad search too, but put the exact match first
-        const broadResults = await _broadKeywordSearch(cleanQ, limit - 1);
-        return deduplicatePapers([res.paper, ...broadResults]).slice(0, limit);
-      }
-    } catch {}
+  // 1. Check if exact reference (DOI, arXiv ID, URL, PMID) on page 1 — resolve directly first
+  if (page === 1) {
+    const parsed = parseReferenceInput(cleanQ);
+    if (parsed.doi || parsed.arxivId || parsed.pmid) {
+      try {
+        const res = await defaultPaperResolver.resolve(cleanQ);
+        if (res.paper) {
+          // Still do a broad search too, but put the exact match first
+          const broadResults = await _broadKeywordSearch(cleanQ, limit - 1, page);
+          return deduplicatePapers([res.paper, ...broadResults]).slice(0, limit);
+        }
+      } catch {}
+    }
   }
 
-  // 2. Broad keyword search across all sources
-  return _broadKeywordSearch(cleanQ, limit);
+  // 2. Broad keyword search across all sources with pagination
+  return _broadKeywordSearch(cleanQ, limit, page);
 }
 
-async function _broadKeywordSearch(query: string, limit: number): Promise<Paper[]> {
+async function _broadKeywordSearch(query: string, limit: number, page = 1): Promise<Paper[]> {
   const perSource = Math.ceil(limit * 0.6); // each source fetches a bit more, we deduplicate
 
   const [epmcRes, s2Res, arxivRes, openAlexRes] = await Promise.allSettled([
-    searchEuropePmc(query, perSource),
-    searchSemanticScholar(query, perSource),
-    searchArxiv(query, Math.min(perSource, 10)),
-    searchOpenAlex(query, perSource),
+    searchEuropePmc(query, perSource, page),
+    searchSemanticScholar(query, perSource, page),
+    searchArxiv(query, Math.min(perSource, 10), page),
+    searchOpenAlex(query, perSource, page),
   ]);
 
   const all: Paper[] = [];
@@ -88,11 +90,11 @@ function deduplicatePapers(papers: Paper[]): Paper[] {
 // ─────────────────────────────────────────────────────────────────────────────
 // Europe PMC
 // ─────────────────────────────────────────────────────────────────────────────
-async function searchEuropePmc(query: string, limit: number): Promise<Paper[]> {
+async function searchEuropePmc(query: string, limit: number, page = 1): Promise<Paper[]> {
   try {
     const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(
       query
-    )}&format=json&resultType=core&pageSize=${limit}`;
+    )}&format=json&resultType=core&pageSize=${limit}&page=${page}`;
 
     const res = await fetchWithRetry(url, {
       headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
@@ -167,12 +169,13 @@ async function searchEuropePmc(query: string, limit: number): Promise<Paper[]> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Semantic Scholar
 // ─────────────────────────────────────────────────────────────────────────────
-async function searchSemanticScholar(query: string, limit: number): Promise<Paper[]> {
+async function searchSemanticScholar(query: string, limit: number, page = 1): Promise<Paper[]> {
   try {
+    const offset = (page - 1) * limit;
     const fields = 'paperId,title,abstract,authors,year,venue,externalIds,openAccessPdf,citationCount';
     const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(
       query
-    )}&limit=${limit}&fields=${fields}`;
+    )}&offset=${offset}&limit=${limit}&fields=${fields}`;
 
     const res = await fetchWithRetry(url, {
       headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
@@ -236,11 +239,12 @@ async function searchSemanticScholar(query: string, limit: number): Promise<Pape
 // ─────────────────────────────────────────────────────────────────────────────
 // arXiv (excellent for CS, physics, math, biology preprints)
 // ─────────────────────────────────────────────────────────────────────────────
-async function searchArxiv(query: string, limit: number): Promise<Paper[]> {
+async function searchArxiv(query: string, limit: number, page = 1): Promise<Paper[]> {
   try {
+    const start = (page - 1) * limit;
     // arXiv Atom feed — search all fields (ti, au, abs)
     const searchQ = `all:${encodeURIComponent(query)}`;
-    const url = `https://export.arxiv.org/api/query?search_query=${searchQ}&start=0&max_results=${limit}&sortBy=relevance`;
+    const url = `https://export.arxiv.org/api/query?search_query=${searchQ}&start=${start}&max_results=${limit}&sortBy=relevance`;
 
     const res = await fetchWithRetry(url, {
       headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
@@ -316,11 +320,11 @@ async function searchArxiv(query: string, limit: number): Promise<Paper[]> {
 // ─────────────────────────────────────────────────────────────────────────────
 // OpenAlex (200M+ works, best broad coverage, completely free)
 // ─────────────────────────────────────────────────────────────────────────────
-async function searchOpenAlex(query: string, limit: number): Promise<Paper[]> {
+async function searchOpenAlex(query: string, limit: number, page = 1): Promise<Paper[]> {
   try {
     const url = `https://api.openalex.org/works?search=${encodeURIComponent(
       query
-    )}&per-page=${limit}&select=id,doi,title,abstract_inverted_index,authorships,publication_year,host_venue,open_access,cited_by_count,primary_location&mailto=dev@booffin.science`;
+    )}&page=${page}&per-page=${limit}&select=id,doi,title,abstract_inverted_index,authorships,publication_year,host_venue,open_access,cited_by_count,primary_location&mailto=dev@booffin.science`;
 
     const res = await fetchWithRetry(url, {
       headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
