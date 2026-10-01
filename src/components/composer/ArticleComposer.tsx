@@ -40,12 +40,14 @@ import { pickPostImages, capturePostImage, uploadPostImage } from '../../api/sto
 
 const ARTICLE_DRAFT_KEY = 'booffin_article_draft_v1';
 
-interface ArticleComposerProps {
+export interface ArticleComposerProps {
   currentUser: UserProfile;
   initialData?: Partial<ArticleData>;
   onExit: () => void;
   onPublish: (article: ArticleData) => void;
   isPublishing?: boolean;
+  submitButtonTitle?: string;
+  isEditing?: boolean;
 }
 
 export const ArticleComposer: React.FC<ArticleComposerProps> = ({
@@ -54,6 +56,8 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
   onExit,
   onPublish,
   isPublishing = false,
+  submitButtonTitle,
+  isEditing = false,
 }) => {
   // Document Structure State
   const [title, setTitle] = useState(initialData?.title || '');
@@ -92,8 +96,9 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
   // History stack for simple Undo feature
   const historyRef = useRef<Array<{ title: string; abstract: string; sections: ArticleSection[] }>>([]);
 
-  // Auto-save draft effect
+  // Auto-save draft effect (only when creating new article, not when editing an existing published post)
   useEffect(() => {
+    if (isEditing) return;
     const timer = setTimeout(async () => {
       try {
         setAutoSaveStatus('Saving...');
@@ -114,12 +119,12 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [title, subheading, authors, abstract, sections, references]);
+  }, [title, subheading, authors, abstract, sections, references, isEditing]);
 
   // Load existing draft if present and no initial data was passed
   useEffect(() => {
     async function loadSavedDraft() {
-      if (initialData?.title) return;
+      if (isEditing || initialData?.title) return;
       try {
         const saved = await SecureStore.getItemAsync(ARTICLE_DRAFT_KEY);
         if (saved) {
@@ -461,7 +466,9 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
             {isPublishing ? (
               <ActivityIndicator size="small" color={colors.white} />
             ) : (
-              <Text style={styles.publishButtonText}>Publish</Text>
+              <Text style={styles.publishButtonText}>
+                {submitButtonTitle || (isEditing ? 'Save Changes' : 'Publish')}
+              </Text>
             )}
           </TouchableOpacity>
         </View>

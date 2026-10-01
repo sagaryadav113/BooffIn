@@ -13,13 +13,16 @@ import {
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { X, Lock, Plus, Tag, AlertCircle, FileText, Check } from 'lucide-react-native';
+import { X, Lock, Plus, Tag, AlertCircle, FileText, Check, BookOpen, Edit3 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Post } from '../../types';
 import { colors, radii, spacing, fontSizes, typography, shadows } from '../../theme';
 import { usePostStore } from '../../store/usePostStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { MentionSuggestions } from '../composer/MentionSuggestions';
 import { useMentionAutocomplete } from '../../hooks/useMentionAutocomplete';
+import { ArticleComposer } from '../composer/ArticleComposer';
 
 export interface EditPostModalProps {
   visible: boolean;
@@ -46,6 +49,9 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
   onSaveSuccess,
 }) => {
   const updatePost = usePostStore((s) => s.updatePost);
+  const currentUser = useAuthStore((s) => s.user);
+  const [isArticleComposerOpen, setIsArticleComposerOpen] = useState(false);
+  const [isSavingArticle, setIsSavingArticle] = useState(false);
 
   // Mention autocomplete hook for post body
   const {
@@ -144,6 +150,7 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
   const hasPaper = Boolean(post.paper);
 
   return (
+    <>
     <Modal
       visible={visible}
       transparent
@@ -200,6 +207,32 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
+              {/* Research Article Editor Quick Banner */}
+              {post.postType === 'article' && post.article && (
+                <View style={styles.articleEditBanner}>
+                  <View style={styles.articleEditBannerLeft}>
+                    <View style={styles.articleBadge}>
+                      <BookOpen size={12} color="#1B4D3E" />
+                      <Text style={styles.articleBadgeText}>RESEARCH ARTICLE</Text>
+                    </View>
+                    <Text style={styles.articleBannerTitle} numberOfLines={2}>
+                      {post.article.title}
+                    </Text>
+                    <Text style={styles.articleBannerSub} numberOfLines={1}>
+                      {post.article.authors?.join(', ')} · {post.article.sections?.length || 0} Sections
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.openArticleEditorBtn}
+                    onPress={() => setIsArticleComposerOpen(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Edit3 size={13} color="#FFFFFF" />
+                    <Text style={styles.openArticleEditorBtnText}>Edit Article</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Text Content Editor */}
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
@@ -430,6 +463,53 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
         </KeyboardAvoidingView>
       </View>
     </Modal>
+
+    {/* Full-Screen Article Composer Modal for Structured Article Editing */}
+    {isArticleComposerOpen && post.article && (
+      <Modal
+        visible={isArticleComposerOpen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setIsArticleComposerOpen(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
+          <ArticleComposer
+            currentUser={currentUser || post.author}
+            initialData={post.article}
+            isEditing={true}
+            submitButtonTitle="Save Changes"
+            isPublishing={isSavingArticle}
+            onExit={() => setIsArticleComposerOpen(false)}
+            onPublish={async (updatedArticleData) => {
+              setIsSavingArticle(true);
+              try {
+                const success = await updatePost(
+                  post.id,
+                  updatedArticleData.abstract || updatedArticleData.title,
+                  topics,
+                  updatedArticleData
+                );
+                if (success) {
+                  try {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  } catch {}
+                  onSaveSuccess?.();
+                  setIsArticleComposerOpen(false);
+                  onClose();
+                } else {
+                  Alert.alert('Error', 'Failed to update research article. Please try again.');
+                }
+              } catch (err: any) {
+                Alert.alert('Error', err?.message || 'Failed to save changes.');
+              } finally {
+                setIsSavingArticle(false);
+              }
+            }}
+          />
+        </SafeAreaView>
+      </Modal>
+    )}
+    </>
   );
 };
 
@@ -748,5 +828,63 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.micro,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  articleEditBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  articleEditBannerLeft: {
+    flex: 1,
+    gap: 3,
+  },
+  articleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radii.full,
+    alignSelf: 'flex-start',
+    marginBottom: 2,
+  },
+  articleBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#166534',
+    letterSpacing: 0.3,
+  },
+  articleBannerTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+    lineHeight: 18,
+  },
+  articleBannerSub: {
+    fontSize: 11,
+    color: '#475569',
+  },
+  openArticleEditorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#1B4D3E',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radii.md,
+    alignSelf: 'center',
+  },
+  openArticleEditorBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,8 +21,6 @@ import { colors, radii, spacing } from '../../theme';
 import { Paper } from '../../types';
 import { FloatingRatingDock } from './FloatingRatingDock';
 import { PaperMetrics, UserPaperRating } from '../../api/hypeScoreService';
-import { downloadAndCachePdf, getCachedPdf, clearPdfCache } from '../../utils/pdfCacheManager';
-import { getPdfViewerHtml } from '../../utils/pdfViewerTemplate';
 
 export interface InAppPaperPdfViewerProps {
   paper: Paper;
@@ -31,13 +29,6 @@ export interface InAppPaperPdfViewerProps {
   isArxivPdf: boolean;
   onSwitchToArticleView?: () => void;
   onRatingUpdated?: (newMetrics: PaperMetrics, userRating: UserPaperRating) => void;
-}
-
-interface EngineState {
-  status: 'loading' | 'ready_pdf' | 'fallback_web' | 'error';
-  progress: number;
-  base64: string | null;
-  errorMessage: string | null;
 }
 
 export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
@@ -50,13 +41,6 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
 }) => {
   const webViewRef = useRef<WebView>(null);
   const [loadKey, setLoadKey] = useState(0);
-
-  const [engineState, setEngineState] = useState<EngineState>({
-    status: 'loading',
-    progress: 0.1,
-    base64: null,
-    errorMessage: null,
-  });
 
   // Derive the direct PDF stream URL
   const effectiveStreamUrl = useMemo(() => {
@@ -94,77 +78,27 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
     return raw;
   }, [pdfUrl, paper.openAccessUrl, paper.canonicalUrl, paper.doi]);
 
-  // Load and cache PDF locally on native devices
-  useEffect(() => {
-    if (Platform.OS === 'web' || !effectiveStreamUrl) return;
+  // Construct in-app viewer URI:
+  // On Android, loading raw .pdf URLs directly causes Android's OS DownloadManager
+  // to intercept and download duplicate files into the device Downloads folder, leaving WebView blank.
+  // Google Docs Viewer embeds the PDF pages seamlessly inside the WebView without triggering device downloads.
+  const viewerUri = useMemo(() => {
+    if (!effectiveStreamUrl) return '';
 
-    let isMounted = true;
-
-    const loadLocalPdf = async () => {
-      try {
-        // Reset state inside async task
-        setEngineState({ status: 'loading', progress: 0.15, base64: null, errorMessage: null });
-
-        // 1. Check local cache first
-        const cached = await getCachedPdf(paper.id);
-        if (cached && cached.isPdf && cached.base64 && isMounted) {
-          setEngineState({
-            status: 'ready_pdf',
-            progress: 1,
-            base64: cached.base64,
-            errorMessage: null,
-          });
-          return;
-        }
-
-        // 2. Download from stream URL with browser headers and progress callback
-        if (!isMounted) return;
-        setEngineState((prev) => ({ ...prev, status: 'loading', progress: 0.25 }));
-
-        const result = await downloadAndCachePdf(effectiveStreamUrl, paper.id, (p) => {
-          if (isMounted) {
-            setEngineState((prev) => ({ ...prev, progress: Math.max(0.25, Math.min(p, 0.95)) }));
-          }
-        });
-
-        if (!isMounted) return;
-
-        if (result.isPdf && result.base64) {
-          setEngineState({
-            status: 'ready_pdf',
-            progress: 1,
-            base64: result.base64,
-            errorMessage: null,
-          });
-        } else {
-          // The remote server returned an interactive HTML page or bot challenge
-          // Load URL directly in WebView (allows client-side JS engine to run challenge)
-          setEngineState({
-            status: 'fallback_web',
-            progress: 1,
-            base64: null,
-            errorMessage: null,
-          });
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          // Graceful fallback to direct URL before showing hard error
-          setEngineState({
-            status: 'fallback_web',
-            progress: 1,
-            base64: null,
-            errorMessage: err?.message || null,
-          });
-        }
+    if (Platform.OS === 'android') {
+      const isDirectPdfLike =
+        effectiveStreamUrl.toLowerCase().includes('.pdf') ||
+        effectiveStreamUrl.toLowerCase().includes('format=pdf') ||
+        effectiveStreamUrl.toLowerCase().includes('arxiv.org') ||
+        effectiveStreamUrl.toLowerCase().includes('biorxiv.org') ||
+        effectiveStreamUrl.toLowerCase().includes('nature.com/articles');
+      if (isDirectPdfLike) {
+        return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(effectiveStreamUrl)}`;
       }
-    };
+    }
 
-    loadLocalPdf();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [effectiveStreamUrl, paper.id, loadKey]);
+    return effectiveStreamUrl;
+  }, [effectiveStreamUrl]);
 
   const handleOpenExternal = async () => {
     try {
@@ -187,23 +121,15 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
     }
   };
 
-  const handleReload = async () => {
+  const handleReload = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    await clearPdfCache(paper.id);
     setLoadKey((prev) => prev + 1);
     if (webViewRef.current) {
       webViewRef.current.reload();
     }
   };
-
-  const pdfHtmlSource = useMemo(() => {
-    if (engineState.base64) {
-      return { html: getPdfViewerHtml(engineState.base64) };
-    }
-    return null;
-  }, [engineState.base64]);
 
   return (
     <View style={styles.container}>
@@ -253,7 +179,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
         </View>
       </View>
 
-      {/* ── IN-APP VIEWER BODY (WEB IFRAME VS NATIVE WEBVIEW WITH LOCAL PDF.JS) ── */}
+      {/* ── IN-APP VIEWER BODY (WEB IFRAME VS NATIVE EMBEDDED STREAM) ── */}
       {Platform.OS === 'web' ? (
         <View style={styles.webPdfWrapper}>
           <iframe
@@ -297,60 +223,25 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
                 <Text style={styles.errorBtnText}>Open Canonical Source</Text>
               </TouchableOpacity>
             </View>
-          ) : engineState.status === 'ready_pdf' && pdfHtmlSource ? (
-            /* ── LOCAL CACHED MOZILLA PDF.JS VIEWER (Zero Google proxy, zero reCAPTCHA) ── */
+          ) : (
             <WebView
-              key={`pdf_${loadKey}`}
+              key={`viewer_${loadKey}`}
               ref={webViewRef}
-              source={pdfHtmlSource}
+              source={{ uri: viewerUri }}
               style={styles.webView}
               javaScriptEnabled={true}
               domStorageEnabled={true}
               scalesPageToFit={true}
               allowsInlineMediaPlayback={true}
               nestedScrollEnabled={true}
+              mixedContentMode="always"
               originWhitelist={['*']}
-              allowFileAccess={true}
               startInLoadingState={true}
               renderLoading={() => (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#1B4D3E" />
                   <Text style={styles.loadingTitle}>Opening PDF Manuscript...</Text>
-                  <Text style={styles.loadingSubtitle}>Decoding high-resolution pages</Text>
-                </View>
-              )}
-            />
-          ) : engineState.status === 'loading' ? (
-            /* ── PROGRESSIVE CACHE & DOWNLOAD LOADING STATE ── */
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#1B4D3E" />
-              <Text style={styles.loadingTitle}>Loading PDF Manuscript...</Text>
-              <Text style={styles.loadingSubtitle}>
-                {engineState.progress > 0.2
-                  ? `Downloading document (${Math.round(engineState.progress * 100)}%)`
-                  : 'Preparing secure in-app viewer'}
-              </Text>
-            </View>
-          ) : engineState.status === 'fallback_web' ? (
-            /* ── DIRECT PUBLISHER WEBVIEW (Allows device browser engine to handle bot challenges) ── */
-            <WebView
-              key={`web_${loadKey}`}
-              ref={webViewRef}
-              source={{ uri: effectiveStreamUrl }}
-              style={styles.webView}
-              startInLoadingState={true}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              scalesPageToFit={true}
-              allowsInlineMediaPlayback={true}
-              nestedScrollEnabled={true}
-              renderLoading={() => (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#1B4D3E" />
-                  <Text style={styles.loadingTitle}>Connecting to Publisher...</Text>
-                  <Text style={styles.loadingSubtitle}>
-                    Streaming in-app manuscript view
-                  </Text>
+                  <Text style={styles.loadingSubtitle}>Rendering in-app publication view</Text>
                 </View>
               )}
               renderError={(errorDomain, errorCode, errorDesc) => (
@@ -371,22 +262,6 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
                 </View>
               )}
             />
-          ) : (
-            <View style={styles.errorContainer}>
-              <AlertCircle size={32} color="#DC2626" />
-              <Text style={styles.errorTitle}>Could not load document</Text>
-              <Text style={styles.errorDesc}>
-                {engineState.errorMessage || 'An error occurred while fetching the PDF manuscript.'}
-              </Text>
-              <TouchableOpacity
-                style={styles.errorBtn}
-                onPress={handleOpenExternal}
-                activeOpacity={0.85}
-              >
-                <ExternalLink size={14} color="#FFFFFF" />
-                <Text style={styles.errorBtnText}>Open in Chrome / Browser</Text>
-              </TouchableOpacity>
-            </View>
           )}
 
           {/* Floating Rating Dock anchored over PDF */}
@@ -498,12 +373,12 @@ const styles = StyleSheet.create({
   nativeViewerWrapper: {
     flex: 1,
     minHeight: 650,
-    backgroundColor: '#2D3748',
+    backgroundColor: '#F8FAFC',
     position: 'relative',
   },
   webView: {
     flex: 1,
-    backgroundColor: '#2D3748',
+    backgroundColor: '#F8FAFC',
   },
   floatingDockInPdf: {
     position: 'absolute',

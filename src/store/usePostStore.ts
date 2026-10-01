@@ -49,7 +49,7 @@ interface PostState {
   toggleSavePost: (postId: string, currentUserId?: string) => Promise<void>;
   votePoll: (postId: string, optionId: string, currentUserId?: string) => Promise<boolean>;
   createPost: (params: CreatePostParams, currentUserId?: string) => Promise<Post | null>;
-  updatePost: (postId: string, content: string, topics?: string[]) => Promise<boolean>;
+  updatePost: (postId: string, content: string, topics?: string[], article?: import('../types').ArticleData) => Promise<boolean>;
   deletePost: (postId: string, currentUserId?: string) => Promise<boolean>;
   fetchCommentsForPost: (postId: string, currentUserId?: string) => Promise<void>;
   getCommentsForPost: (postId: string) => Comment[];
@@ -409,7 +409,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     return optimisticPost;
   },
 
-  updatePost: async (postId, content, topics) => {
+  updatePost: async (postId, content, topics, article) => {
     // 1. Optimistic update
     const previousPosts = get().posts;
     set((state) => ({
@@ -419,6 +419,7 @@ export const usePostStore = create<PostState>((set, get) => ({
             ...p,
             content,
             topics: topics !== undefined ? topics : p.topics,
+            article: article !== undefined ? article : p.article,
           };
         }
         return p;
@@ -426,7 +427,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     }));
 
     // 2. API call
-    const res = await apiUpdatePost({ postId, content, topics });
+    const res = await apiUpdatePost({ postId, content, topics, article });
     if (res.error) {
       console.warn('[usePostStore] updatePost failed, rolling back:', res.error);
       set({ posts: previousPosts });

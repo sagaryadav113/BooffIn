@@ -841,15 +841,16 @@ export interface UpdatePostPayload {
   postId: string;
   content: string;
   topics?: string[];
+  article?: import('../types').ArticleData;
 }
 
 /**
- * Updates an existing post's text content and research topics
+ * Updates an existing post's text content, research topics, and structured article data
  */
 export async function updatePost(
   payload: UpdatePostPayload
 ): Promise<{ post: Post | null; error: string | null }> {
-  const { postId, topics } = payload;
+  const { postId, topics, article } = payload;
   const content = sanitizeTextContent(payload.content, 5000);
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -858,7 +859,7 @@ export async function updatePost(
   }
 
   try {
-    // 1. Fetch existing post to preserve any attached poll marker
+    // 1. Fetch existing post to preserve any attached poll marker or existing article
     const { data: existingPost } = await supabase
       .from('posts')
       .select('content')
@@ -866,10 +867,22 @@ export async function updatePost(
       .maybeSingle();
 
     let finalContent = content;
+
+    // Handle article data: encode new article or preserve existing article
+    if (article) {
+      finalContent = encodeArticleIntoContent(finalContent, article);
+    } else if (existingPost?.content) {
+      const { article: existingArticle } = extractArticleAndCleanContent(existingPost.content);
+      if (existingArticle) {
+        finalContent = encodeArticleIntoContent(finalContent, existingArticle);
+      }
+    }
+
+    // Preserve poll marker if present
     if (existingPost?.content) {
       const match = existingPost.content.match(/(?:\n\n)?<!--POLL_DATA:(.*?)-->|(?:(?:\n\n)?__POLL__:(.*?)(?:\n|$))/s);
       if (match) {
-        finalContent = `${content.trim()}\n\n${match[0].trim()}`;
+        finalContent = `${finalContent.trim()}\n\n${match[0].trim()}`;
       }
     }
 

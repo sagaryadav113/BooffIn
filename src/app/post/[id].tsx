@@ -261,7 +261,22 @@ export default function PostDetailScreen() {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <ResearchArticleView post={activePost} />
+        <ResearchArticleView
+          post={activePost}
+          currentUser={currentUser}
+          comments={filteredComments}
+          totalDiscussionCount={totalDiscussionCount}
+          activeFilter={activeFilter}
+          filterCounts={filterCounts}
+          onSelectFilter={setActiveFilter}
+          onSubmitDiscussion={handleCreateDiscussion}
+          onAddReply={handleAddReply}
+          onDeleteComment={handleDeleteComment}
+          onLikeComment={(cId) => toggleLikeComment(cId, activePost.id, currentUser.id)}
+          onLikeReply={(_, replyId) => toggleLikeComment(replyId, activePost.id, currentUser.id)}
+          isSubmittingComment={isSubmitting}
+          onPostUpdated={(updated) => setPost(updated)}
+        />
       </SafeAreaView>
     );
   }

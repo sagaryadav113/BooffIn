@@ -8,7 +8,10 @@ import {
   Share,
   Platform,
   Linking,
+  Modal,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import {
@@ -20,23 +23,61 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
+  Edit3,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
-import { Post, ArticleData, ArticleReference } from '../../types/post';
-import { Paper } from '../../types/paper';
+import { Post, ArticleData, ArticleReference, Comment, DiscussionType } from '../../types';
+import { UserProfile } from '../../types/user';
+import { DiscussionIcon } from '../core/DiscussionIcon';
+import { DiscussionComposer, DiscussionTypePills } from '../discussion';
+import { CommentCard } from '../cards/CommentCard';
+import { EmptyState } from '../feedback/EmptyState';
+import { ArticleComposer } from '../composer/ArticleComposer';
+import { usePostStore } from '../../store/usePostStore';
 
-interface ResearchArticleViewProps {
+export interface ResearchArticleViewProps {
   post: Post;
   onBack?: () => void;
+  currentUser?: UserProfile | null;
+  onPostUpdated?: (updated: Post) => void;
+  comments?: Comment[];
+  totalDiscussionCount?: number;
+  activeFilter?: 'all' | DiscussionType;
+  filterCounts?: Record<'all' | DiscussionType, number>;
+  onSelectFilter?: (type: 'all' | DiscussionType) => void;
+  onSubmitDiscussion?: (data: { type: DiscussionType; title?: string; content: string }) => Promise<void>;
+  onAddReply?: (parentId: string, replyText: string) => Promise<void>;
+  onDeleteComment?: (commentId: string) => void;
+  onLikeComment?: (commentId: string) => void;
+  onLikeReply?: (parentId: string, replyId: string) => void;
+  isSubmittingComment?: boolean;
 }
 
 export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
   post,
   onBack,
+  currentUser,
+  onPostUpdated,
+  comments,
+  totalDiscussionCount,
+  activeFilter,
+  filterCounts,
+  onSelectFilter,
+  onSubmitDiscussion,
+  onAddReply,
+  onDeleteComment,
+  onLikeComment,
+  onLikeReply,
+  isSubmittingComment = false,
 }) => {
   const article: ArticleData | undefined = post.article;
   const [viewMode, setViewMode] = useState<'article' | 'pdf'>('article');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSavingArticle, setIsSavingArticle] = useState(false);
+  const updatePost = usePostStore((s) => s.updatePost);
+
+  const isAuthor = Boolean(currentUser?.id && post.author?.id && currentUser.id === post.author.id);
 
   // Fallback if post is missing structured article data
   if (!article) {
@@ -141,6 +182,17 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
         <Text style={styles.headerTitle}>Research Article</Text>
 
         <View style={styles.headerActions}>
+          {isAuthor && (
+            <TouchableOpacity
+              onPress={() => setIsEditModalOpen(true)}
+              style={styles.headerEditBtn}
+              activeOpacity={0.8}
+            >
+              <Edit3 size={13} color="#1B4D3E" />
+              <Text style={styles.headerEditBtnText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+
           {post.paper?.openAccessUrl && (
             <TouchableOpacity
               onPress={() => router.push(`/paper/${post.paper?.id || post.paper?.doi}`)}
@@ -320,8 +372,129 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
           </View>
         )}
 
-        <View style={{ height: 60 }} />
+        {/* ==================================================================== */}
+        {/* DISCUSSION & PEER REVIEW SECTION                                     */}
+        {/* ==================================================================== */}
+        <View style={styles.discussionSectionContainer}>
+          <View style={styles.discussionSectionDivider} />
+
+          {/* Section Header */}
+          <View style={styles.discussionHeader}>
+            <View style={styles.discussionTitleRow}>
+              <DiscussionIcon size={20} color={colors.textPrimary} />
+              <Text style={styles.discussionTitleText}>Discussion & Peer Review</Text>
+              <View style={styles.discussionCountBadge}>
+                <Text style={styles.discussionCountBadgeText}>
+                  {totalDiscussionCount ?? (comments?.length || 0)}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.discussionSubtitleText}>
+              Constructive scientific inquiry, questions & methodology review
+            </Text>
+          </View>
+
+          {/* Discussion Type Filter Pills */}
+          {filterCounts && onSelectFilter && (
+            <View style={styles.filterPillsWrapper}>
+              <DiscussionTypePills
+                activeType={activeFilter || 'all'}
+                counts={filterCounts}
+                onSelectType={onSelectFilter}
+              />
+            </View>
+          )}
+
+          {/* Discussion Composer Card */}
+          {currentUser && onSubmitDiscussion && (
+            <View style={styles.composerWrapper}>
+              <DiscussionComposer
+                currentUser={currentUser}
+                onSubmit={onSubmitDiscussion}
+                isSubmitting={isSubmittingComment}
+              />
+            </View>
+          )}
+
+          {/* Discussion List */}
+          <View style={styles.discussionsList}>
+            {comments && comments.length > 0 ? (
+              comments.map((c) => (
+                <CommentCard
+                  key={c.id}
+                  comment={c}
+                  onAddReply={onAddReply || (async () => {})}
+                  onLike={(cId) => onLikeComment?.(cId)}
+                  onLikeReply={(_, replyId) => onLikeReply?.(_, replyId)}
+                  onDelete={onDeleteComment || (() => {})}
+                  currentUserId={currentUser?.id || ''}
+                  currentUser={currentUser || undefined}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyWrap}>
+                <EmptyState
+                  icon="Discussion"
+                  title="No discussions yet"
+                  description="Be the first to ask a question or share insights on this article."
+                />
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View style={{ height: 80 }} />
       </ScrollView>
+
+      {/* Full-Screen Article Composer Modal for Editing */}
+      {isEditModalOpen && (
+        <Modal
+          visible={isEditModalOpen}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setIsEditModalOpen(false)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
+            <ArticleComposer
+              currentUser={currentUser || post.author}
+              initialData={post.article}
+              isEditing={true}
+              submitButtonTitle="Save Changes"
+              isPublishing={isSavingArticle}
+              onExit={() => setIsEditModalOpen(false)}
+              onPublish={async (updatedArticleData) => {
+                setIsSavingArticle(true);
+                try {
+                  const success = await updatePost(
+                    post.id,
+                    updatedArticleData.abstract || updatedArticleData.title,
+                    post.topics,
+                    updatedArticleData
+                  );
+                  if (success) {
+                    try {
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    } catch {}
+                    const updatedPost: Post = {
+                      ...post,
+                      content: updatedArticleData.abstract || updatedArticleData.title,
+                      article: updatedArticleData,
+                    };
+                    onPostUpdated?.(updatedPost);
+                    setIsEditModalOpen(false);
+                  } else {
+                    Alert.alert('Error', 'Failed to update research article. Please try again.');
+                  }
+                } catch (err: any) {
+                  Alert.alert('Error', err?.message || 'Failed to save changes.');
+                } finally {
+                  setIsSavingArticle(false);
+                }
+              }}
+            />
+          </SafeAreaView>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -586,5 +759,79 @@ const styles = StyleSheet.create({
     ...typography.captionBold,
     fontSize: 11,
     color: colors.accentBlue,
+  },
+  headerEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    marginRight: 2,
+  },
+  headerEditBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1B4D3E',
+  },
+  discussionSectionContainer: {
+    marginTop: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  discussionSectionDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginBottom: spacing.lg,
+  },
+  discussionHeader: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  discussionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+    marginBottom: 4,
+  },
+  discussionTitleText: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  discussionCountBadge: {
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  discussionCountBadgeText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  discussionSubtitleText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+  filterPillsWrapper: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  composerWrapper: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  discussionsList: {
+    marginTop: spacing.xs,
+  },
+  emptyWrap: {
+    paddingVertical: spacing.xl,
   },
 });
