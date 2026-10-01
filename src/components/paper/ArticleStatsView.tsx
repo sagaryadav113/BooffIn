@@ -31,6 +31,7 @@ import {
   Activity,
   Info,
   Radio,
+  Lock,
 } from 'lucide-react-native';
 import { Paper } from '../../types/paper';
 import { PaperMetrics } from '../../api/hypeScoreService';
@@ -212,15 +213,22 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
           <View style={styles.heroMetaContent}>
             {/* Badges row */}
             <View style={styles.badgeRow}>
-              {paper.isOpenAccess && (
-                <View style={styles.openAccessPill}>
-                  <View style={styles.greenDot} />
-                  <Text style={styles.openAccessText}>Open Access</Text>
+              {paper.isOpenAccess ? (
+                <>
+                  <View style={styles.openAccessPill}>
+                    <View style={styles.greenDot} />
+                    <Text style={styles.openAccessText}>Open Access</Text>
+                  </View>
+                  <View style={styles.licensePill}>
+                    <Text style={styles.licenseText}>CC BY</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.closedAccessPill}>
+                  <Lock size={10} color="#DC2626" />
+                  <Text style={styles.closedAccessText}>Closed Paper</Text>
                 </View>
               )}
-              <View style={styles.licensePill}>
-                <Text style={styles.licenseText}>CC BY</Text>
-              </View>
             </View>
 
             {/* Paper Title */}
@@ -302,24 +310,31 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
             <Text style={styles.impactTitle}>Paper Impact</Text>
           </View>
 
-          {/* HYPE Rating Badge Box */}
-          <View style={styles.hypeBox}>
-            <Text style={styles.hypeBoxLabel}>HYPE</Text>
-            <View style={styles.hypeValueRow}>
-              <Text style={styles.hypeValueMain}>
-                {stats.currentHypeScore.toFixed(1)}
-              </Text>
-              <Text style={styles.hypeValueSub}> / 5</Text>
+          {/* HYPE Rating Badge Box - only for open access papers */}
+          {paper.isOpenAccess ? (
+            <View style={styles.hypeBox}>
+              <Text style={styles.hypeBoxLabel}>HYPE</Text>
+              <View style={styles.hypeValueRow}>
+                <Text style={styles.hypeValueMain}>
+                  {stats.currentHypeScore.toFixed(1)}
+                </Text>
+                <Text style={styles.hypeValueSub}> / 5</Text>
+              </View>
+              <View style={styles.hypeBarBg}>
+                <View
+                  style={[
+                    styles.hypeBarFill,
+                    { width: `${(stats.currentHypeScore / 5) * 100}%` },
+                  ]}
+                />
+              </View>
             </View>
-            <View style={styles.hypeBarBg}>
-              <View
-                style={[
-                  styles.hypeBarFill,
-                  { width: `${(stats.currentHypeScore / 5) * 100}%` },
-                ]}
-              />
+          ) : (
+            <View style={styles.closedHypeBox}>
+              <Text style={styles.closedHypeBoxLabel}>ACCESS</Text>
+              <Text style={styles.closedHypeBoxValue}>Closed Paper</Text>
             </View>
-          </View>
+          )}
         </View>
 
         {/* Dynamic Tooltip Badge based on active scrubbed point */}
@@ -530,14 +545,14 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
           </Text>
         </View>
 
-        {/* Card 3: HYPE Votes */}
+        {/* Card 3: HYPE Votes or Citations */}
         <View style={styles.statCard}>
           <View style={styles.statCardHeader}>
             <BarChart2 size={18} color="#059669" />
             <Text style={styles.statCardTotal}>
-              {stats.hypeVotes.totalFormatted}
+              {paper.isOpenAccess ? stats.hypeVotes.totalFormatted : (paper.citationCount || 0).toLocaleString()}
             </Text>
-            {stats.hypeVotes.delta > 0 && (
+            {paper.isOpenAccess && stats.hypeVotes.delta > 0 && (
               <View style={styles.statDeltaPill}>
                 <Text style={styles.statDeltaText}>
                   ▲ {stats.hypeVotes.deltaFormatted}
@@ -546,7 +561,9 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
             )}
           </View>
           <Text style={styles.statCardSubtitle}>
-            HYPE Votes ({stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})
+            {paper.isOpenAccess
+              ? `HYPE Votes (${stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})`
+              : 'Citations (Indexed)'}
           </Text>
         </View>
 
@@ -754,6 +771,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#065F46',
   },
+  closedAccessPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 4,
+    gap: 4,
+  },
+  closedAccessText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
   licensePill: {
     backgroundColor: '#F3F4F6',
     paddingHorizontal: 6,
@@ -879,6 +910,27 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     borderWidth: 1,
     borderColor: '#F3F4F6',
+  },
+  closedHypeBox: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'flex-end',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  closedHypeBoxLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#991B1B',
+    letterSpacing: 0.6,
+  },
+  closedHypeBoxValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#DC2626',
+    marginTop: 2,
   },
   hypeBoxLabel: {
     fontSize: 10,

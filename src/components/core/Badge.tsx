@@ -4,7 +4,7 @@ import { colors, radii, spacing, typography } from '../../theme';
 
 interface BadgeProps {
   label: string;
-  variant?: 'nature' | 'science' | 'cell' | 'generic' | 'topic' | 'oa';
+  variant?: 'nature' | 'science' | 'cell' | 'generic' | 'topic' | 'oa' | 'closed';
   style?: ViewStyle;
 }
 
@@ -19,6 +19,8 @@ export const Badge: React.FC<BadgeProps> = ({ label, variant = 'generic', style 
         return { text: colors.journalCell, bg: 'rgba(2, 132, 199, 0.08)' };
       case 'oa':
         return { text: colors.accentGreen, bg: 'rgba(16, 185, 129, 0.08)' };
+      case 'closed':
+        return { text: '#DC2626', bg: 'rgba(220, 38, 38, 0.08)' };
       case 'topic':
         return { text: colors.textSecondary, bg: colors.backgroundTertiary };
       default:

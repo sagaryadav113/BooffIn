@@ -35,6 +35,7 @@ import {
   ZoomOut,
   RotateCcw,
   Flame,
+  Lock,
 } from 'lucide-react-native';
 import { FloatingRatingDock } from '../../components/paper/FloatingRatingDock';
 import { InAppPaperPdfViewer } from '../../components/paper/InAppPaperPdfViewer';
@@ -882,7 +883,20 @@ export default function PaperDetailScreen() {
   }
 
   const authorsString = paper.authors.map((a) => a.name).join(', ');
-  const hasOpenAccessPdf = Boolean(paper.openAccessUrl || paper.canonicalUrl || paper.isOpenAccess);
+  const isPaperOpenAccess = Boolean(
+    paper.isOpenAccess ||
+    (paper.openAccessUrl && paper.openAccessUrl.trim().length > 0) ||
+    (paper.doi && paper.doi.toLowerCase().includes('arxiv'))
+  );
+  const isClosedPaper = !isPaperOpenAccess;
+  const hasOpenAccessPdf = isPaperOpenAccess && Boolean(resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl);
+
+  // If paper is closed, ensure viewMode is never 'pdf'
+  useEffect(() => {
+    if (isClosedPaper && viewMode === 'pdf') {
+      setViewMode('article');
+    }
+  }, [isClosedPaper, viewMode]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -913,66 +927,66 @@ export default function PaperDetailScreen() {
           }
         />
 
-        {/* View Mode Switcher: Article (Substack) vs PDF Document */}
-        {hasOpenAccessPdf && (
-          <View style={styles.viewModeSwitcherContainer}>
-            <View style={styles.viewModeSwitcher}>
-              <TouchableOpacity
-                onPress={() => {
-                  try {
-                    Haptics.selectionAsync();
-                  } catch {}
-                  setViewMode('article');
-                }}
+        {/* View Mode Switcher: Article (Substack) vs Stats vs PDF Document */}
+        <View style={styles.viewModeSwitcherContainer}>
+          <View style={styles.viewModeSwitcher}>
+            <TouchableOpacity
+              onPress={() => {
+                try {
+                  Haptics.selectionAsync();
+                } catch {}
+                setViewMode('article');
+              }}
+              style={[
+                styles.viewModeTab,
+                viewMode === 'article' && styles.viewModeTabActive,
+              ]}
+              activeOpacity={0.8}
+            >
+              <BookOpen
+                size={14}
+                color={viewMode === 'article' ? colors.white : colors.textSecondary}
+              />
+              <Text
                 style={[
-                  styles.viewModeTab,
-                  viewMode === 'article' && styles.viewModeTabActive,
+                  styles.viewModeTabText,
+                  viewMode === 'article' && styles.viewModeTabTextActive,
                 ]}
-                activeOpacity={0.8}
+                numberOfLines={1}
               >
-                <BookOpen
-                  size={14}
-                  color={viewMode === 'article' ? colors.white : colors.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.viewModeTabText,
-                    viewMode === 'article' && styles.viewModeTabTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  Article View
-                </Text>
-              </TouchableOpacity>
+                Article View
+              </Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => {
-                  try {
-                    Haptics.selectionAsync();
-                  } catch {}
-                  setViewMode('stats');
-                }}
+            <TouchableOpacity
+              onPress={() => {
+                try {
+                  Haptics.selectionAsync();
+                } catch {}
+                setViewMode('stats');
+              }}
+              style={[
+                styles.viewModeTab,
+                viewMode === 'stats' && styles.viewModeTabActive,
+              ]}
+              activeOpacity={0.8}
+            >
+              <TrendingUp
+                size={14}
+                color={viewMode === 'stats' ? colors.white : colors.textSecondary}
+              />
+              <Text
                 style={[
-                  styles.viewModeTab,
-                  viewMode === 'stats' && styles.viewModeTabActive,
+                  styles.viewModeTabText,
+                  viewMode === 'stats' && styles.viewModeTabTextActive,
                 ]}
-                activeOpacity={0.8}
+                numberOfLines={1}
               >
-                <TrendingUp
-                  size={14}
-                  color={viewMode === 'stats' ? colors.white : colors.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.viewModeTabText,
-                    viewMode === 'stats' && styles.viewModeTabTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  Article Stats
-                </Text>
-              </TouchableOpacity>
+                Article Stats
+              </Text>
+            </TouchableOpacity>
 
+            {hasOpenAccessPdf && (
               <TouchableOpacity
                 onPress={() => {
                   try {
@@ -1000,9 +1014,9 @@ export default function PaperDetailScreen() {
                   {isDirectPdf ? 'Original PDF' : 'Publisher Portal'}
                 </Text>
               </TouchableOpacity>
-            </View>
+            )}
           </View>
-        )}
+        </View>
 
         {viewMode === 'pdf' && hasOpenAccessPdf ? (
           /* ==================================================================== */
@@ -1057,13 +1071,19 @@ export default function PaperDetailScreen() {
                   label={paper.journal}
                   variant={getJournalVariant(paper.journal)}
                 />
-                {paper.isOpenAccess && <Badge label="Open Access" variant="oa" />}
+                {isPaperOpenAccess ? (
+                  <Badge label="Open Access" variant="oa" />
+                ) : (
+                  <Badge label="Closed Paper" variant="closed" />
+                )}
 
-                {/* BOOFFIN HYPE SCORE BADGE */}
-                <HypeScoreBadge
-                  score={paperMetrics ? paperMetrics.hypeScore : 0}
-                  metrics={paperMetrics || undefined}
-                />
+                {/* BOOFFIN HYPE SCORE BADGE - ONLY FOR OPEN ACCESS PAPERS */}
+                {isPaperOpenAccess && (
+                  <HypeScoreBadge
+                    score={paperMetrics ? paperMetrics.hypeScore : 0}
+                    metrics={paperMetrics || undefined}
+                  />
+                )}
 
                 <Text style={styles.editorialDateText}>
                   {paper.publicationDate || `${paper.publicationYear}`} · 8 min read
@@ -1084,6 +1104,19 @@ export default function PaperDetailScreen() {
                   </View>
                 )}
               </View>
+
+              {/* Closed Paper Informational Callout */}
+              {isClosedPaper && (
+                <View style={styles.closedPaperNoticeBox}>
+                  <View style={styles.closedPaperNoticeHeader}>
+                    <Lock size={13} color="#DC2626" />
+                    <Text style={styles.closedPaperNoticeTitle}>Closed Access Publication</Text>
+                  </View>
+                  <Text style={styles.closedPaperNoticeBody}>
+                    This article is behind a publisher subscription paywall. The abstract and bibliographic data are freely viewable, while full manuscript access is governed by institutional credentials via the publisher link below.
+                  </Text>
+                </View>
+              )}
 
               {/* Real-Time Live Readers Velocity */}
               {paperMetrics && (
@@ -1220,14 +1253,16 @@ export default function PaperDetailScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* 3-Pill Live HYPE Rating Dock for Article Reader */}
-              <View style={{ marginTop: spacing.md, alignItems: 'center' }}>
-                <FloatingRatingDock
-                  paperId={paper.id}
-                  paperTitle={paper.title}
-                  onRatingUpdated={(newMetrics) => setPaperMetrics(newMetrics)}
-                />
-              </View>
+              {/* 3-Pill Live HYPE Rating Dock for Article Reader - ONLY FOR OPEN ACCESS PAPERS */}
+              {isPaperOpenAccess && (
+                <View style={{ marginTop: spacing.md, alignItems: 'center' }}>
+                  <FloatingRatingDock
+                    paperId={paper.id}
+                    paperTitle={paper.title}
+                    onRatingUpdated={(newMetrics) => setPaperMetrics(newMetrics)}
+                  />
+                </View>
+              )}
             </View>
 
           {/* ==================================================================== */}
@@ -1944,6 +1979,31 @@ const styles = StyleSheet.create({
   },
   emptyDiscussionWrap: {
     paddingVertical: spacing.xl,
+  },
+  closedPaperNoticeBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    gap: 4,
+  },
+  closedPaperNoticeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  closedPaperNoticeTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#991B1B',
+  },
+  closedPaperNoticeBody: {
+    fontSize: 12.5,
+    color: '#7F1D1D',
+    lineHeight: 18,
   },
   publisherProtectedIconRow: {
     alignItems: 'center',
