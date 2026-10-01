@@ -1,19 +1,22 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {
   ExternalLink,
   BookOpen,
   FileText,
-  Globe,
+  RotateCw,
+  AlertCircle,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
+import { WebView } from 'react-native-webview';
 import { colors, radii, spacing } from '../../theme';
 import { Paper } from '../../types';
 import { FloatingRatingDock } from './FloatingRatingDock';
@@ -36,6 +39,9 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   onSwitchToArticleView,
   onRatingUpdated,
 }) => {
+  const webViewRef = useRef<WebView>(null);
+  const [loadKey, setLoadKey] = useState(0);
+
   // Derive the direct PDF stream URL
   const effectiveStreamUrl = useMemo(() => {
     const raw = (pdfUrl || paper.openAccessUrl || paper.canonicalUrl || '').trim();
@@ -72,6 +78,24 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
     return raw;
   }, [pdfUrl, paper.openAccessUrl, paper.canonicalUrl, paper.doi]);
 
+  // Determine native webview source URL (Android uses Google Docs viewer to embed raw PDFs)
+  const webViewUrl = useMemo(() => {
+    if (!effectiveStreamUrl) return '';
+    const lower = effectiveStreamUrl.toLowerCase();
+    const isPdf =
+      lower.endsWith('.pdf') ||
+      lower.includes('.pdf?') ||
+      lower.includes('format=pdf') ||
+      lower.includes('?pdf=render') ||
+      lower.includes('.full.pdf') ||
+      lower.includes('/pdf');
+
+    if (Platform.OS === 'android' && isPdf) {
+      return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(effectiveStreamUrl)}`;
+    }
+    return effectiveStreamUrl;
+  }, [effectiveStreamUrl]);
+
   const handleOpenExternal = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -93,12 +117,69 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
     }
   };
 
+  const handleReload = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setLoadKey((prev) => prev + 1);
+    if (webViewRef.current) {
+      webViewRef.current.reload();
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* ── IN-APP PDF VIEWER WITH EMBEDDED FLOATING RATING DOCK ── */}
+      {/* ── IN-APP VIEWER TOP TOOLBAR ── */}
+      <View style={styles.topToolbar}>
+        <View style={styles.toolbarLeft}>
+          <View style={styles.badgeWrap}>
+            <FileText size={12} color="#1B4D3E" />
+            <Text style={styles.badgeText}>
+              {isArxivPdf ? 'arXiv PDF' : 'Original PDF'}
+            </Text>
+          </View>
+          <Text style={styles.journalSubtitle} numberOfLines={1}>
+            {paper.journal || 'Academic Paper'} · {paper.publicationYear || ''}
+          </Text>
+        </View>
+
+        <View style={styles.toolbarActions}>
+          <TouchableOpacity
+            style={styles.toolbarIconBtn}
+            onPress={handleReload}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <RotateCw size={15} color="#4B5563" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.toolbarActionBtn}
+            onPress={handleOpenExternal}
+            activeOpacity={0.8}
+          >
+            <ExternalLink size={13} color="#1B4D3E" />
+            <Text style={styles.toolbarActionBtnText}>Browser</Text>
+          </TouchableOpacity>
+
+          {onSwitchToArticleView && (
+            <TouchableOpacity
+              style={styles.articleToggleBtn}
+              onPress={onSwitchToArticleView}
+              activeOpacity={0.8}
+            >
+              <BookOpen size={13} color="#FFFFFF" />
+              <Text style={styles.articleToggleBtnText}>Article</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* ── IN-APP VIEWER BODY (WEB IFRAME VS NATIVE WEBVIEW) ── */}
       {Platform.OS === 'web' ? (
         <View style={styles.webPdfWrapper}>
           <iframe
+            key={loadKey}
             src={effectiveStreamUrl}
             style={{
               width: '100%',
@@ -112,75 +193,80 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             loading="eager"
           />
 
-          {/* Floating Rating Dock anchored directly INSIDE the PDF viewer */}
+          {/* Floating Rating Dock */}
           <FloatingRatingDock
             paperId={paper.id}
             paperTitle={paper.title}
             onRatingUpdated={onRatingUpdated}
             style={styles.floatingDockInPdf}
           />
-
-          {/* Quick Toolbar Footer */}
-          <View style={styles.pdfHelperBanner}>
-            <View style={styles.helperLeft}>
-              <Globe size={13} color="#6B7280" />
-              <Text style={styles.helperText} numberOfLines={1}>
-                {paper.journal || 'Publisher'} Original PDF Manuscript
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              onPress={handleOpenExternal}
-              style={styles.helperActionLink}
-              activeOpacity={0.7}
-            >
-              <ExternalLink size={12} color="#1B4D3E" />
-              <Text style={styles.helperActionText}>Open Full Screen</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       ) : (
-        /* Mobile Native Android APK / iOS Presentation */
-        <View style={styles.nativePdfCard}>
-          <View style={styles.nativePdfIconWrap}>
-            <FileText size={36} color="#1B4D3E" />
-          </View>
-          <Text style={styles.nativePdfTitle}>{paper.title}</Text>
-          <Text style={styles.nativePdfJournal}>
-            {paper.journal || 'Academic Literature'} · {paper.publicationYear}
-          </Text>
-
-          <View style={styles.nativePdfActionsRow}>
-            <TouchableOpacity
-              style={styles.nativePrimaryBtn}
-              onPress={handleOpenExternal}
-              activeOpacity={0.85}
-            >
-              <FileText size={16} color="#FFFFFF" />
-              <Text style={styles.nativePrimaryBtnText}>Open Full Multi-Page PDF</Text>
-              <ExternalLink size={14} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            {onSwitchToArticleView && (
+        <View style={styles.nativeViewerWrapper}>
+          {webViewUrl ? (
+            <WebView
+              key={loadKey}
+              ref={webViewRef}
+              source={{ uri: webViewUrl }}
+              style={styles.webView}
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#1B4D3E" />
+                  <Text style={styles.loadingTitle}>Loading PDF Manuscript...</Text>
+                  <Text style={styles.loadingSubtitle}>
+                    Streaming in-app research document
+                  </Text>
+                </View>
+              )}
+              renderError={(errorDomain, errorCode, errorDesc) => (
+                <View style={styles.errorContainer}>
+                  <AlertCircle size={32} color="#DC2626" />
+                  <Text style={styles.errorTitle}>Could not load inline document</Text>
+                  <Text style={styles.errorDesc}>
+                    {errorDesc || 'The publisher or network restricted inline embedding.'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.errorBtn}
+                    onPress={handleOpenExternal}
+                    activeOpacity={0.85}
+                  >
+                    <ExternalLink size={14} color="#FFFFFF" />
+                    <Text style={styles.errorBtnText}>Open in Chrome / Browser</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              scalesPageToFit={true}
+              allowsInlineMediaPlayback={true}
+              nestedScrollEnabled={true}
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <FileText size={40} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>PDF URL not available</Text>
+              <Text style={styles.emptySubtitle}>
+                No direct open access link was found for this DOI.
+              </Text>
               <TouchableOpacity
-                style={styles.nativeSecondaryBtn}
-                onPress={onSwitchToArticleView}
+                style={styles.errorBtn}
+                onPress={handleOpenExternal}
                 activeOpacity={0.85}
               >
-                <BookOpen size={16} color={colors.textPrimary} />
-                <Text style={styles.nativeSecondaryBtnText}>Formatted Article View</Text>
+                <ExternalLink size={14} color="#FFFFFF" />
+                <Text style={styles.errorBtnText}>Open Canonical Source</Text>
               </TouchableOpacity>
-            )}
-          </View>
+            </View>
+          )}
 
-          {/* Embedded Rating Dock on Native Mobile Card */}
-          <View style={{ marginTop: spacing.xl, width: '100%', alignItems: 'center' }}>
-            <FloatingRatingDock
-              paperId={paper.id}
-              paperTitle={paper.title}
-              onRatingUpdated={onRatingUpdated}
-            />
-          </View>
+          {/* Floating Rating Dock anchored over PDF */}
+          <FloatingRatingDock
+            paperId={paper.id}
+            paperTitle={paper.title}
+            onRatingUpdated={onRatingUpdated}
+            style={styles.nativeFloatingDock}
+          />
         </View>
       )}
     </View>
@@ -189,126 +275,196 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
+    flex: 1,
+    backgroundColor: '#F9FAFB',
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     overflow: 'hidden',
-    marginBottom: spacing.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+  },
+  topToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    gap: 8,
+  },
+  toolbarLeft: {
+    flex: 1,
+    flexDirection: 'column',
+    gap: 2,
+  },
+  badgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+    alignSelf: 'flex-start',
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1B4D3E',
+  },
+  journalSubtitle: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  toolbarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  toolbarIconBtn: {
+    padding: 6,
+    borderRadius: radii.full,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  toolbarActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: radii.sm,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  toolbarActionBtnText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#1B4D3E',
+  },
+  articleToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: radii.sm,
+    backgroundColor: '#1B4D3E',
+  },
+  articleToggleBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   webPdfWrapper: {
-    width: '100%',
+    flex: 1,
+    minHeight: 900,
     backgroundColor: '#525659',
     position: 'relative',
   },
+  nativeViewerWrapper: {
+    flex: 1,
+    minHeight: 650,
+    backgroundColor: '#FFFFFF',
+    position: 'relative',
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   floatingDockInPdf: {
     position: 'absolute',
-    bottom: 52,
+    bottom: 24,
     left: 0,
     right: 0,
     alignItems: 'center',
     zIndex: 50,
   },
-  pdfHelperBanner: {
-    flexDirection: 'row',
+  nativeFloatingDock: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F9FAFB',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 9,
-    flexWrap: 'wrap',
+    zIndex: 50,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: spacing.xl,
     gap: 8,
   },
-  helperLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  helperText: {
-    fontSize: 11.5,
-    color: '#6B7280',
-  },
-  helperActionLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  helperActionText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#1B4D3E',
-  },
-  nativePdfCard: {
-    padding: spacing.xl,
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  nativePdfIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: radii.full,
-    backgroundColor: '#ECFDF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  nativePdfTitle: {
-    fontSize: 17,
+  loadingTitle: {
+    fontSize: 15,
     fontWeight: '700',
     color: colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-    lineHeight: 22,
+    marginTop: spacing.sm,
   },
-  nativePdfActionsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    width: '100%',
-    maxWidth: 420,
+  loadingSubtitle: {
+    fontSize: 12,
+    color: colors.textSecondary,
   },
-  nativePrimaryBtn: {
+  errorContainer: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: spacing.xl,
+    backgroundColor: '#FEF2F2',
+    gap: 8,
+  },
+  errorTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#991B1B',
+  },
+  errorDesc: {
+    fontSize: 12,
+    color: '#B91C1C',
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  errorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     backgroundColor: '#1B4D3E',
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: radii.md,
+    marginTop: spacing.sm,
   },
-  nativePrimaryBtnText: {
-    fontSize: 13.5,
+  errorBtnText: {
+    fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  nativeSecondaryBtn: {
+  emptyContainer: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
+    padding: spacing.xl,
+    gap: 8,
   },
-  nativeSecondaryBtnText: {
-    fontSize: 13.5,
-    fontWeight: '600',
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
-  nativePdfJournal: {
-    fontSize: 13,
+  emptySubtitle: {
+    fontSize: 12,
     color: colors.textSecondary,
-    marginBottom: spacing.lg,
+    textAlign: 'center',
+    maxWidth: 280,
   },
 });
+

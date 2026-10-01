@@ -539,7 +539,7 @@ export default function PaperDetailScreen() {
     }
 
     return '';
-  }, [paper?.openAccessUrl, paper?.canonicalUrl, paper?.doi]);
+  }, [paper]);
 
   /**
    * Best URL to open in new tab / external browser.
@@ -608,7 +608,7 @@ export default function PaperDetailScreen() {
       if (pmcMatch) return `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcMatch[1]}/`;
     }
     return paper?.canonicalUrl || paper?.openAccessUrl || '';
-  }, [paper?.openAccessUrl, paper?.canonicalUrl, paper?.doi]);
+  }, [paper]);
 
   // Background auto-resolver for Open Access PDFs when DOI is present
   useEffect(() => {
@@ -631,21 +631,6 @@ export default function PaperDetailScreen() {
   // PMC, EuropePMC, Springer, Nature, etc. all block iframe embedding — we detect this
   // upfront and show a clean card UI instead of a broken browser error page.
   const isArxivPdf = isDirectPdf && resolvedPdfUrl.includes('arxiv.org');
-
-  const handleOpenPdfBrowser = async () => {
-    // bestOpenUrl: direct PDF if available, stable landing page otherwise
-    const targetUrl = bestOpenUrl || paper?.canonicalUrl || (paper?.doi ? `https://doi.org/${paper.doi}` : '');
-    if (!targetUrl) return;
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    try {
-      await WebBrowser.openBrowserAsync(targetUrl);
-    } catch {
-      Linking.openURL(targetUrl);
-    }
-  };
 
   const handleOpenPublisher = async () => {
     const pubUrl = paper?.canonicalUrl || (paper?.doi ? `https://doi.org/${paper.doi}` : '') || paper?.openAccessUrl;
