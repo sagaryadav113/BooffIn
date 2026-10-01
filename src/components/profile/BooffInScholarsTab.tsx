@@ -267,11 +267,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   const handleConfirmAndSyncOrcid = async () => {
     if (!verifiedPersonPreview) return;
     if (!connectPassword.trim()) {
-      setConnectStepError('Please enter your official ORCID account password to verify ownership and claim your author badge.');
-      return;
-    }
-    if (connectPassword.trim().length < 8) {
-      setConnectStepError('ORCID account passwords must be at least 8 characters long as required by orcid.org.');
+      setConnectStepError('Please enter your BooffIn account password to verify account ownership and authorize linking this scholar badge.');
       return;
     }
     const cleanOrcid = verifiedPersonPreview.orcidId;
@@ -1350,16 +1346,16 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 <View style={styles.passwordInputWrap}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <ShieldCheck size={14} color={colors.accentBlue} />
-                    <Text style={styles.passwordInputLabel}>Confirm Official ORCID Password</Text>
+                    <Text style={styles.passwordInputLabel}>Confirm BooffIn Account Password</Text>
                   </View>
                   <Text style={[styles.passwordModalSubtitle, { marginBottom: 6 }]}>
-                    To prevent unauthorized claims, please enter your official ORCID password (from orcid.org). BooffIn account passwords cannot be used to claim researcher profiles.
+                    To protect your account and author badge integrity, please enter your BooffIn password to confirm linking this ORCID iD.
                   </Text>
                   <View style={styles.passwordInputFieldRow}>
                     <KeyRound size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
                     <TextInput
                       style={styles.passwordTextInput}
-                      placeholder="Enter your official ORCID password..."
+                      placeholder="Enter your BooffIn password..."
                       placeholderTextColor={colors.textMuted}
                       secureTextEntry={!showConnectPassword}
                       value={connectPassword}
@@ -1389,7 +1385,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 <View style={styles.antiImpersonationBox}>
                   <ShieldCheck size={15} color={colors.accentBlue} />
                   <Text style={styles.antiImpersonationText}>
-                    Academic Integrity Guarantee: Each ORCID iD can only be bound to a single BooffIn account. Password authentication is required before issuing the verified badge.
+                    Academic Integrity Guarantee: Each ORCID iD can only be bound to a single BooffIn account. Account authorization is required before issuing the verified badge.
                   </Text>
                 </View>
               )}
@@ -1408,7 +1404,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                     title={
                       isConnectingWithPassword || isSyncing
                         ? 'Verifying...'
-                        : 'Verify Password & Claim Badge'
+                        : 'Authorize & Claim Badge'
                     }
                     variant="primary"
                     size="sm"

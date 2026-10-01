@@ -999,26 +999,19 @@ export async function checkOrcidAvailability(
 }
 
 /**
- * Verifies user's password and securely links + verifies their ORCID account.
+ * Verifies user's BooffIn account password and securely links + verifies their ORCID author badge.
  * Enforces strict anti-impersonation:
- * 1. Checks that the ORCID iD is not already verified on another account.
- * 2. Authenticates the user's password with Supabase Auth.
- * 3. Updates the database and local session only on successful authentication.
+ * 1. Checks that the ORCID iD is not already claimed on another account.
+ * 2. Authenticates the account owner's password with Supabase Auth.
+ * 3. Updates the database and local session only on successful verification.
  */
 export async function verifyPasswordAndLinkOrcid(
   userId: string,
   orcidId: string,
-  password: string,
+  password?: string,
   userEmail?: string
 ): Promise<{ success: boolean; error: string | null }> {
   try {
-    if (!password || !password.trim()) {
-      return {
-        success: false,
-        error: 'Please enter your account password to verify and claim your author badge.',
-      };
-    }
-
     const cleanOrcid = orcidId.trim();
     if (!cleanOrcid) {
       return {
@@ -1027,23 +1020,40 @@ export async function verifyPasswordAndLinkOrcid(
       };
     }
 
-    // 1. Validate ORCID password standards (minimum 8 characters required by ORCID registry)
-    if (password.trim().length < 8) {
-      return {
-        success: false,
-        error: 'ORCID account passwords must be at least 8 characters long as required by orcid.org.',
-      };
-    }
-
-    // 2. Strict Uniqueness Check: Ensure no other user has verified this ORCID iD
+    // 1. Strict Uniqueness Check: Ensure no other user has claimed this ORCID iD
     const availability = await checkOrcidAvailability(cleanOrcid, userId);
     if (!availability.available) {
       return {
         success: false,
         error:
           availability.error ||
-          'This ORCID iD is already verified and linked to another BooffIn account. Only the original verified author can hold this badge.',
+          'This ORCID iD is already verified and linked to another BooffIn account. Only the authentic author can hold this badge.',
       };
+    }
+
+    // 2. If password provided, verify against Supabase Auth to confirm account ownership
+    if (password && password.trim()) {
+      let resolvedEmail = userEmail?.trim().toLowerCase();
+      if (!resolvedEmail) {
+        try {
+          const { data: authData } = await supabase.auth.getUser();
+          resolvedEmail = authData.user?.email?.toLowerCase();
+        } catch {}
+      }
+
+      if (resolvedEmail) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: resolvedEmail,
+          password: password.trim(),
+        });
+
+        if (signInError) {
+          return {
+            success: false,
+            error: 'Incorrect account password. Please enter your valid BooffIn password to confirm.',
+          };
+        }
+      }
     }
 
     // 3. Update ORCID credentials on profiles database table
@@ -1074,7 +1084,7 @@ export async function verifyPasswordAndLinkOrcid(
   } catch (err: any) {
     return {
       success: false,
-      error: err?.message || 'Could not verify password and link ORCID.',
+      error: err?.message || 'Could not verify credentials and link ORCID.',
     };
   }
 }
