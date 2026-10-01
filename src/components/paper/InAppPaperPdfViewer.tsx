@@ -260,6 +260,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   const webViewRef = useRef<WebView>(null);
 
   // States
+  const [renderMode, setRenderMode] = useState<'pdfjs' | 'publisher_web'>('pdfjs');
   const [isLoadingPdf, setIsLoadingPdf] = useState(true);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
@@ -304,6 +305,16 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
     return raw;
   }, [pdfUrl, paper.openAccessUrl, paper.canonicalUrl, paper.doi]);
 
+  // Fallback publisher web URL if PDF binary is not returned
+  const publisherWebUrl = useMemo(() => {
+    return (
+      paper.canonicalUrl ||
+      (paper.doi ? `https://doi.org/${paper.doi}` : '') ||
+      paper.openAccessUrl ||
+      effectiveStreamUrl
+    );
+  }, [paper.canonicalUrl, paper.doi, paper.openAccessUrl, effectiveStreamUrl]);
+
   // Load and cache PDF on mount or reload
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -323,6 +334,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
         if (cached && cached.isPdf && cached.base64) {
           if (isMounted) {
             setPdfBase64(cached.base64);
+            setRenderMode('pdfjs');
             setIsLoadingPdf(false);
           }
           return;
@@ -330,7 +342,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
 
         if (!effectiveStreamUrl) {
           if (isMounted) {
-            setErrorMessage('No open access PDF link available for this manuscript.');
+            setRenderMode('publisher_web');
             setIsLoadingPdf(false);
           }
           return;
@@ -349,17 +361,18 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
 
         if (result.isPdf && result.base64) {
           setPdfBase64(result.base64);
+          setRenderMode('pdfjs');
           setIsLoadingPdf(false);
         } else {
-          setErrorMessage(
-            result.error ||
-              'This publisher restricts direct PDF downloads. You can view the full manuscript directly in the browser.'
-          );
+          // If direct PDF binary was not returned (e.g. publisher provided HTML article page),
+          // seamlessly switch to publisher web reader so the user reads the paper in the window without any fail!
+          setRenderMode('publisher_web');
           setIsLoadingPdf(false);
         }
       } catch (err: any) {
         if (isMounted) {
-          setErrorMessage(err?.message || 'Could not load PDF document.');
+          // Seamless fallback to publisher portal in WebView
+          setRenderMode('publisher_web');
           setIsLoadingPdf(false);
         }
       }
@@ -440,7 +453,11 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
           <View style={styles.badgeWrap}>
             <FileText size={12} color="#1B4D3E" />
             <Text style={styles.badgeText}>
-              {isArxivPdf ? 'arXiv PDF' : 'Original PDF'}
+              {renderMode === 'publisher_web'
+                ? 'Publisher Portal'
+                : isArxivPdf
+                ? 'arXiv PDF'
+                : 'Original PDF'}
             </Text>
           </View>
           <Text style={styles.journalSubtitle} numberOfLines={1}>
@@ -507,38 +524,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
         </View>
       ) : (
         <View style={styles.nativeViewerWrapper}>
-          {errorMessage ? (
-            <View style={styles.errorContainer}>
-              <View style={styles.errorIconWrap}>
-                <ShieldAlert size={36} color="#DC2626" />
-              </View>
-              <Text style={styles.errorTitle}>Publisher Portal Protected</Text>
-              <Text style={styles.errorDesc}>
-                {errorMessage}
-              </Text>
-              <View style={styles.errorButtonsRow}>
-                <TouchableOpacity
-                  style={styles.errorPrimaryBtn}
-                  onPress={handleOpenExternal}
-                  activeOpacity={0.85}
-                >
-                  <ExternalLink size={14} color="#FFFFFF" />
-                  <Text style={styles.errorPrimaryBtnText}>Open Manuscript in Browser</Text>
-                </TouchableOpacity>
-
-                {onSwitchToArticleView && (
-                  <TouchableOpacity
-                    style={styles.errorSecondaryBtn}
-                    onPress={onSwitchToArticleView}
-                    activeOpacity={0.85}
-                  >
-                    <BookOpen size={14} color={colors.textPrimary} />
-                    <Text style={styles.errorSecondaryBtnText}>Read Formatted Article</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          ) : (
+          {renderMode === 'pdfjs' ? (
             <>
               {/* PDF.js HTML Canvas Viewer */}
               <WebView
@@ -568,6 +554,48 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
                   </Text>
                 </View>
               )}
+            </>
+          ) : (
+            <>
+              {/* Seamless Publisher Web Reader Inside App Window */}
+              <WebView
+                ref={webViewRef}
+                source={{ uri: publisherWebUrl }}
+                style={styles.webView}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                mixedContentMode="always"
+                originWhitelist={['*']}
+                scalesPageToFit={true}
+                allowsInlineMediaPlayback={true}
+                nestedScrollEnabled={true}
+                userAgent="Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
+                startInLoadingState={true}
+                renderLoading={() => (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#1B4D3E" />
+                    <Text style={styles.loadingTitle}>Opening Publication Reader...</Text>
+                    <Text style={styles.loadingSubtitle}>Loading manuscript from publisher</Text>
+                  </View>
+                )}
+                renderError={(errorDomain, errorCode, errorDesc) => (
+                  <View style={styles.errorContainer}>
+                    <ShieldAlert size={36} color="#DC2626" />
+                    <Text style={styles.errorTitle}>Publisher Portal Protected</Text>
+                    <Text style={styles.errorDesc}>
+                      {errorDesc || 'This publisher requires an external browser session.'}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.errorPrimaryBtn}
+                      onPress={handleOpenExternal}
+                      activeOpacity={0.85}
+                    >
+                      <ExternalLink size={14} color="#FFFFFF" />
+                      <Text style={styles.errorPrimaryBtnText}>Open Manuscript in Browser</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              />
             </>
           )}
 
