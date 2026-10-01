@@ -144,7 +144,10 @@ const PDFJS_VIEWER_HTML = `<!DOCTYPE html>
       return bytes;
     }
 
+    window._pdfLoaded = false;
     function renderPdfData(base64String) {
+      if (window._pdfLoaded) return;
+      window._pdfLoaded = true;
       try {
         updateStatus('Rendering PDF pages...', false);
         var bytes = base64ToUint8(base64String);
@@ -221,6 +224,7 @@ const PDFJS_VIEWER_HTML = `<!DOCTYPE html>
         updateStatus('Error rendering document. Tap Browser to view online.', true);
       }
     }
+    window.renderPdfData = renderPdfData;
 
     // Listen for data from React Native
     window.addEventListener('message', function(event) {
@@ -388,12 +392,20 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   // Send PDF base64 to WebView once both are ready
   useEffect(() => {
     if (isViewerReady && pdfBase64 && webViewRef.current) {
-      webViewRef.current.postMessage(
-        JSON.stringify({
-          type: 'LOAD_PDF',
-          base64: pdfBase64,
-        })
-      );
+      const sendPayload = () => {
+        try {
+          webViewRef.current?.postMessage(
+            JSON.stringify({
+              type: 'LOAD_PDF',
+              base64: pdfBase64,
+            })
+          );
+        } catch {}
+      };
+
+      sendPayload();
+      const timer = setTimeout(sendPayload, 300);
+      return () => clearTimeout(timer);
     }
   }, [isViewerReady, pdfBase64]);
 
@@ -533,9 +545,11 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
                 style={styles.webView}
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
+                mixedContentMode="always"
                 originWhitelist={['*']}
                 allowFileAccess={true}
                 allowUniversalAccessFromFileURLs={true}
+                onLoadEnd={() => setIsViewerReady(true)}
                 onMessage={handleWebViewMessage}
                 showsVerticalScrollIndicator={true}
                 bounces={false}
