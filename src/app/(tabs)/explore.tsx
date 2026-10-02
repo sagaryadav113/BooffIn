@@ -87,8 +87,8 @@ export default function ExploreScreen() {
   // Active top navigation tab
   const [activeTab, setActiveTab] = useState<string>('Neuroscience');
 
-  // Timeframe filter state
-  const [timeframe, setTimeframe] = useState<'week' | 'month' | 'all'>('week');
+  // Timeframe filter state (Default to last 48 hours)
+  const [timeframe, setTimeframe] = useState<'48h' | 'week' | 'all'>('48h');
 
   // Add Interests modal state
   const [isAddInterestsVisible, setIsAddInterestsVisible] = useState(false);
@@ -107,23 +107,23 @@ export default function ExploreScreen() {
     }
   }, [userInterests, activeTab]);
 
-  // Load domain-specific hyped feed
-  const loadHypedFeed = useCallback(async (domain: string, tf: 'week' | 'month' | 'all') => {
-    if (domain === 'For You' || domain === 'Following') return;
+  // Load domain-specific or personalized hyped feed
+  const loadHypedFeed = useCallback(async (domain: string, tf: '48h' | 'week' | 'all') => {
+    if (domain === 'Following') return;
 
     setIsLoadingHyped(true);
     try {
-      const data = await getHypedDomainData(domain, tf);
+      const data = await getHypedDomainData(domain, tf, userInterests);
       setHypedData(data);
     } catch (e) {
       console.warn('[ExploreScreen] Error loading hyped domain data:', e);
     } finally {
       setIsLoadingHyped(false);
     }
-  }, []);
+  }, [userInterests]);
 
   useEffect(() => {
-    if (activeTab !== 'For You' && activeTab !== 'Following') {
+    if (activeTab !== 'Following') {
       loadHypedFeed(activeTab, timeframe);
     }
   }, [activeTab, timeframe, loadHypedFeed]);
@@ -131,7 +131,7 @@ export default function ExploreScreen() {
   // Dynamically update explore hyped feed when a paper is read
   useEffect(() => {
     const unsubscribe = subscribeToPaperRead(() => {
-      if (activeTab !== 'For You' && activeTab !== 'Following') {
+      if (activeTab !== 'Following') {
         loadHypedFeed(activeTab, timeframe);
       }
     });
@@ -146,7 +146,7 @@ export default function ExploreScreen() {
         fetchPapers(),
         fetchTopics(currentUser?.id),
         fetchFeed('For You', currentUser?.id),
-        activeTab !== 'For You' && activeTab !== 'Following'
+        activeTab !== 'Following'
           ? loadHypedFeed(activeTab, timeframe)
           : Promise.resolve(),
       ]);
@@ -173,7 +173,7 @@ export default function ExploreScreen() {
     setActiveTab(tab);
   };
 
-  const handleTimeframeSelect = (tf: 'week' | 'month' | 'all') => {
+  const handleTimeframeSelect = (tf: '48h' | 'week' | 'all') => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
@@ -326,16 +326,16 @@ export default function ExploreScreen() {
           </View>
 
           <Text style={styles.hypedSubtitle}>
-            Top papers in {activeTab} {timeframe === 'week' ? 'this week' : timeframe === 'month' ? 'this month' : 'of all time'}, ranked by HYPE
+            Top papers in {activeTab === 'For You' ? 'your personalized feed' : activeTab} {timeframe === '48h' ? 'in the last 48 hours' : timeframe === 'week' ? 'this week' : 'of all time'}, ranked by HYPE
           </Text>
 
           {/* Timeframe Filter Selector */}
           <View style={styles.timeframeRow}>
             <View style={styles.timeframePills}>
-              {(['week', 'month', 'all'] as const).map((tf) => {
+              {(['48h', 'week', 'all'] as const).map((tf) => {
                 const isSelected = timeframe === tf;
                 const label =
-                  tf === 'week' ? 'This Week' : tf === 'month' ? 'This Month' : 'All Time';
+                  tf === '48h' ? 'Last 48 Hrs' : tf === 'week' ? 'This Week' : 'All Time';
                 return (
                   <TouchableOpacity
                     key={tf}

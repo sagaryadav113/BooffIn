@@ -368,18 +368,89 @@ export async function registerReadPaper(paper: Paper): Promise<void> {
   }
 }
 
+export interface RegisteredReadPaper {
+  paper: Paper;
+  lastReadAt: number;
+  readCount: number;
+}
+
+/**
+ * Retrieves all papers with read metadata (timestamps and view counts)
+ */
+export async function getDetailedReadPapersRegistry(): Promise<RegisteredReadPaper[]> {
+  try {
+    const raw = await appStorage.getItem(STORAGE_KEY_READ_PAPERS_REGISTRY);
+    if (!raw) return [];
+    const list: RegisteredReadPaper[] = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Retrieves all papers that have been read by users in the app
  */
 export async function getReadPapersRegistry(): Promise<Paper[]> {
   try {
-    const raw = await appStorage.getItem(STORAGE_KEY_READ_PAPERS_REGISTRY);
-    if (!raw) return [];
-    const list: { paper: Paper; lastReadAt: number; readCount: number }[] = JSON.parse(raw);
+    const list = await getDetailedReadPapersRegistry();
     return list.map((item) => item.paper);
   } catch {
     return [];
   }
+}
+
+/**
+ * 48-Hour HYPE Algorithm
+ * Evaluates papers based on:
+ * 1. 48h Reading & View Velocity (35% weight):
+ *    - Reads / views within the last 48 hours (+0.5 to +1.2 pts)
+ * 2. Community Rating & Review Quality (30% weight):
+ *    - Bayesian-averaged ratings (impact, clarity, visuals)
+ * 3. Academic Citation Momentum (20% weight):
+ *    - Normalized logarithmic citation scale
+ * 4. Discussion & Scholarly Discourse (15% weight):
+ *    - Community comments and questions
+ */
+export function calculate48hHypeScore(
+  paper: Paper,
+  metrics?: PaperMetrics | null,
+  lastReadAt?: number
+): number {
+  const now = Date.now();
+  const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
+  const isRecentRead = Boolean(lastReadAt && now - lastReadAt < FORTY_EIGHT_HOURS_MS);
+
+  // 1. 48h Reader Velocity (1.0 - 5.0)
+  const views48h =
+    (metrics?.viewsLast24h || 0) * 1.8 +
+    (isRecentRead ? 4 : metrics?.views ? Math.min(metrics.views, 6) : 0);
+  const velocityScore = Math.min(5.0, 3.2 + Math.log10(1 + views48h) * 1.25);
+
+  // 2. Community Review (1.0 - 5.0)
+  const ratingScore =
+    metrics?.communityRating && metrics.communityRating > 0
+      ? metrics.communityRating
+      : 3.5;
+
+  // 3. Citation Momentum (1.0 - 5.0)
+  const citations = paper.citationCount || 0;
+  const citationScore =
+    citations > 0 ? Math.min(5.0, 3.3 + Math.log10(1 + citations) * 0.42) : 3.4;
+
+  // 4. Discussions (1.0 - 5.0)
+  const discussions = paper.discussionCount || 0;
+  const discussionScore = Math.min(
+    5.0,
+    3.0 + Math.log10(1 + discussions * 3) * 0.85
+  );
+
+  const composite =
+    velocityScore * 0.35 +
+    ratingScore * 0.30 +
+    citationScore * 0.20 +
+    discussionScore * 0.15;
+  return parseFloat(Math.min(5.0, Math.max(3.2, composite)).toFixed(1));
 }
 
 /**

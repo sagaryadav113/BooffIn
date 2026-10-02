@@ -5,13 +5,15 @@ import { usePaperStore } from '../store/usePaperStore';
 import {
   getPaperMetrics,
   getReadPapersRegistry,
+  getDetailedReadPapersRegistry,
+  calculate48hHypeScore,
   subscribeToPaperRead,
   PaperMetrics,
 } from './hypeScoreService';
 
 export interface HypedDomainData {
   domain: string;
-  timeframe: 'week' | 'month' | 'all';
+  timeframe: '48h' | 'week' | 'month' | 'all';
   papers: Paper[];
   researchers: UserProfile[];
 }
@@ -30,23 +32,167 @@ subscribeToPaperRead(() => {
 });
 
 /**
- * Checks if a paper relates to a target scientific domain keyword
+ * Domain-specific keyword and query dictionary
+ * Ensures complete separation between domains (e.g. Neuroscience vs Artificial Intelligence)
  */
-function isPaperInDomain(paper: Paper, domain: string): boolean {
+export const SCIENTIFIC_DOMAINS: Record<
+  string,
+  { searchTerms: string; keywords: string[]; excludedTerms?: string[] }
+> = {
+  'artificial intelligence': {
+    searchTerms: 'artificial intelligence machine learning deep learning neural networks',
+    keywords: [
+      'artificial intelligence',
+      'machine learning',
+      'deep learning',
+      'neural network',
+      'neural networks',
+      'language model',
+      'large language models',
+      'llm',
+      'computer vision',
+      'generative ai',
+      'reinforcement learning',
+      'transformers',
+      'foundation models',
+      'deep neural',
+      'convolutional neural',
+      'autonomous agents',
+      'ai model',
+    ],
+    excludedTerms: ['nursing', 'geriatric', 'palliative', 'neurological examination', 'nursing care'],
+  },
+  'ai in science': {
+    searchTerms: 'ai in science machine learning scientific discovery computational biology',
+    keywords: [
+      'ai in science',
+      'machine learning',
+      'deep learning',
+      'alphafold',
+      'computational biology',
+      'cheminformatics',
+      'scientific machine learning',
+      'neural network',
+      'molecular dynamics',
+    ],
+  },
+  'neuroscience': {
+    searchTerms: 'neuroscience brain cognitive neural neurobiology synaptic',
+    keywords: [
+      'neuroscience',
+      'brain',
+      'cortex',
+      'cognitive neuroscience',
+      'hippocampus',
+      'synaptic',
+      'neurobiology',
+      'neurological',
+      'neuroimaging',
+      'fmri',
+      'eeg',
+      'cerebral',
+      'neuron',
+      'nervous system',
+      'episodic memory',
+      'neurodegeneration',
+    ],
+  },
+  'biotech': {
+    searchTerms: 'biotechnology crispr genomics gene therapy synthetic biology',
+    keywords: [
+      'biotechnology',
+      'biotech',
+      'crispr',
+      'genomics',
+      'gene editing',
+      'synthetic biology',
+      'gene therapy',
+      'mrna',
+      'bioengineering',
+      'cellular therapy',
+      'molecular genetics',
+    ],
+  },
+  'quantum': {
+    searchTerms: 'quantum computing quantum mechanics qubit superconductivity',
+    keywords: [
+      'quantum',
+      'qubit',
+      'quantum computing',
+      'superconductivity',
+      'quantum mechanics',
+      'entanglement',
+    ],
+  },
+  'medicine': {
+    searchTerms: 'clinical trial oncology cardiology therapeutics pharmacology',
+    keywords: [
+      'clinical trial',
+      'oncology',
+      'cardiology',
+      'pathology',
+      'therapeutics',
+      'pharmacology',
+      'immunology',
+      'epidemiology',
+      'pediatrics',
+    ],
+  },
+};
+
+/**
+ * Checks if a paper relates strictly to a target scientific domain
+ * Prevents cross-contamination (e.g. Neuroscience papers showing in AI)
+ */
+export function isPaperInDomain(paper: Paper, domain: string): boolean {
   const normDomain = domain.trim().toLowerCase();
-  if (normDomain === 'for you' || normDomain === 'following' || normDomain === 'all' || !normDomain) {
+  if (normDomain === 'for you' || normDomain === 'all' || !normDomain) {
     return true;
   }
 
-  // Check topics
-  if (paper.topics && paper.topics.some((t) => t.toLowerCase().includes(normDomain))) {
+  const titleLower = (paper.title || '').toLowerCase();
+  const abstractLower = (paper.abstract || '').toLowerCase();
+  const journalLower = (paper.journal || '').toLowerCase();
+  const topicsLower = (paper.topics || []).map((t) => (t || '').toLowerCase());
+  const combinedText = `${titleLower} ${abstractLower} ${topicsLower.join(' ')}`;
+
+  // 1. Direct topic tag match
+  if (topicsLower.some((t) => t === normDomain || t.includes(normDomain))) {
     return true;
   }
 
-  // Check title, abstract, or journal
-  const text = `${paper.title} ${paper.abstract || ''} ${paper.journal || ''}`.toLowerCase();
-  const domainWords = normDomain.split(/\s+/).filter((w) => w.length > 2);
-  return domainWords.some((w) => text.includes(w));
+  // 2. Predefined domain configuration
+  const config = SCIENTIFIC_DOMAINS[normDomain];
+  if (config) {
+    // Check exclusions (e.g. nursing/clinical papers shouldn't match AI just because journal was 'computational intelligence')
+    if (config.excludedTerms && config.excludedTerms.some((term) => titleLower.includes(term))) {
+      return false;
+    }
+
+    return config.keywords.some((kw) => {
+      return (
+        titleLower.includes(kw) ||
+        topicsLower.some((t) => t.includes(kw)) ||
+        (abstractLower.length > 0 && abstractLower.includes(kw))
+      );
+    });
+  }
+
+  // 3. User custom added interest (e.g., "Astrophysics", "Genomics")
+  const words = normDomain.split(/\s+/).filter((w) => w.length > 2);
+  if (words.length <= 1) {
+    return (
+      titleLower.includes(normDomain) ||
+      topicsLower.some((t) => t.includes(normDomain)) ||
+      abstractLower.includes(normDomain)
+    );
+  }
+
+  // Multi-word phrase or all words present
+  if (titleLower.includes(normDomain) || topicsLower.some((t) => t.includes(normDomain))) {
+    return true;
+  }
+  return words.every((w) => combinedText.includes(w));
 }
 
 /**
@@ -173,97 +319,174 @@ async function deriveTopResearchers(
 
 /**
  * Fetches domain-specific Hyped feed:
- * 1. Real papers read in the app (automatically updating whenever someone reads)
- * 2. Augments with live verified scientific publications from EuropePMC/OpenAlex
- * 3. Real researchers derived directly from paper authors & verified profiles
+ * 1. 48-Hour HYPE Algorithm scoring
+ * 2. Strict domain boundary enforcement (zero cross-contamination)
+ * 3. Personalized 'For You' curation across all user added interests
  */
 export async function getHypedDomainData(
   domain: string,
-  timeframe: 'week' | 'month' | 'all' = 'week'
+  timeframe: '48h' | 'week' | 'month' | 'all' = '48h',
+  userInterests: string[] = []
 ): Promise<HypedDomainData> {
   const normDomain = domain.trim().toLowerCase();
-  const cacheKey = `${normDomain}_${timeframe}`;
+  const cacheKey = `${normDomain}_${timeframe}_${userInterests.join(',')}`;
 
   const cached = domainFeedCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return cached.data;
   }
 
-  // 1. Fetch real read papers from persistent registry
-  let readPapers: Paper[] = [];
-  try {
-    const allRead = await getReadPapersRegistry();
-    readPapers = allRead.filter((p) => isPaperInDomain(p, domain));
-  } catch (err) {
-    console.warn('[getHypedDomainData] Error getting read papers:', err);
-  }
+  let finalPapers: Paper[] = [];
 
-  // Pre-load metrics for all read papers
-  const readPapersWithMetrics = await Promise.all(
-    readPapers.map(async (p) => {
-      const m = await getPaperMetrics(p.id);
-      return { paper: p, metrics: m };
-    })
-  );
+  // CASE 1: Personalized "For You" Feed across all user added interests
+  if (normDomain === 'for you' || normDomain === 'all') {
+    const interests =
+      userInterests.length > 0
+        ? userInterests
+        : ['Neuroscience', 'Artificial Intelligence', 'Biotech'];
 
-  // Sort read papers based on selected timeframe & real engagement
-  readPapersWithMetrics.sort((a, b) => {
-    if (timeframe === 'week') {
-      const velocityA = a.metrics.viewsLast24h * 5 + a.metrics.views;
-      const velocityB = b.metrics.viewsLast24h * 5 + b.metrics.views;
-      return velocityB - velocityA || b.metrics.hypeScore - a.metrics.hypeScore;
-    }
-    if (timeframe === 'month') {
-      return b.metrics.views - a.metrics.views || b.metrics.hypeScore - a.metrics.hypeScore;
-    }
-    return (
-      b.metrics.views * 3 +
-      b.metrics.hypeScore -
-      (a.metrics.views * 3 + a.metrics.hypeScore) ||
-      (b.paper.citationCount || 0) - (a.paper.citationCount || 0)
+    const subFeeds = await Promise.all(
+      interests.slice(0, 4).map((interest) =>
+        fetchSingleDomainHyped(interest, timeframe, 4)
+      )
     );
-  });
 
-  const rankedReadPapers = readPapersWithMetrics.map((item) => item.paper);
+    const merged: Paper[] = [];
+    const seenDois = new Set<string>();
+    const seenTitles = new Set<string>();
 
-  // 2. If fewer than 6 papers exist in this domain, fetch real academic papers to augment
-  let livePapers: Paper[] = [];
-  if (rankedReadPapers.length < 6) {
-    try {
-      const searchResults = await searchPapers(domain, 8);
-      // Exclude already ranked read papers
-      livePapers = searchResults.filter(
-        (sp) =>
-          !rankedReadPapers.some(
-            (rp) => rp.id === sp.id || (rp.doi && sp.doi && rp.doi.toLowerCase() === sp.doi.toLowerCase())
-          )
-      );
-      // Pre-load real metrics for live papers
-      await Promise.all(livePapers.map((p) => getPaperMetrics(p.id)));
-    } catch (err) {
-      console.warn('[getHypedDomainData] Error searching live papers:', err);
+    for (const subList of subFeeds) {
+      for (const p of subList) {
+        const doiKey = (p.doi || '').toLowerCase().trim();
+        const titleKey = (p.title || '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '')
+          .slice(0, 50);
+        if (doiKey && seenDois.has(doiKey)) continue;
+        if (titleKey && seenTitles.has(titleKey)) continue;
+        if (doiKey) seenDois.add(doiKey);
+        if (titleKey) seenTitles.add(titleKey);
+        merged.push(p);
+      }
     }
-  }
 
-  // Combine real read papers (which take priority because users in app read them) + live papers
-  const combinedPapers = [...rankedReadPapers, ...livePapers].slice(0, 10);
+    // Sort by 48h HYPE score descending
+    merged.sort(
+      (a, b) =>
+        ((b as any).calculatedHype || 0) - ((a as any).calculatedHype || 0)
+    );
+    finalPapers = merged.slice(0, 10);
+  } else {
+    // CASE 2: Specific scientific domain (e.g. "Neuroscience", "Artificial Intelligence")
+    finalPapers = await fetchSingleDomainHyped(domain, timeframe, 10);
+  }
 
   // Pre-seed into usePaperStore so any click anywhere on these papers opens immediately
   try {
     const addPaper = usePaperStore.getState().addPaper;
-    combinedPapers.forEach((p) => addPaper(p));
+    finalPapers.forEach((p) => addPaper(p));
   } catch {}
 
   // 3. Derive real Top Researchers from the actual authors of these papers
-  const domainResearchers = await deriveTopResearchers(combinedPapers, domain);
+  const researchDomain =
+    normDomain === 'for you' || normDomain === 'all'
+      ? userInterests[0] || 'Neuroscience'
+      : domain;
+  const domainResearchers = await deriveTopResearchers(finalPapers, researchDomain);
 
   const result: HypedDomainData = {
     domain,
     timeframe,
-    papers: combinedPapers,
+    papers: finalPapers,
     researchers: domainResearchers,
   };
 
   domainFeedCache.set(cacheKey, { timestamp: Date.now(), data: result });
   return result;
+}
+
+/**
+ * Evaluates, ranks and returns hyped papers for a single scientific domain
+ * using the 48-Hour HYPE Algorithm
+ */
+async function fetchSingleDomainHyped(
+  domain: string,
+  timeframe: '48h' | 'week' | 'month' | 'all',
+  limit: number = 10
+): Promise<Paper[]> {
+  const normDomain = domain.trim().toLowerCase();
+
+  // 1. Fetch relevant read papers from persistent registry
+  let readCandidates: { paper: Paper; lastReadAt: number }[] = [];
+  try {
+    const allDetailed = await getDetailedReadPapersRegistry();
+    readCandidates = allDetailed
+      .filter((item) => isPaperInDomain(item.paper, domain))
+      .map((item) => ({ paper: item.paper, lastReadAt: item.lastReadAt }));
+  } catch (err) {
+    console.warn('[fetchSingleDomainHyped] Read registry error:', err);
+  }
+
+  // 2. Fetch live papers specifically for this domain
+  let liveCandidates: { paper: Paper; lastReadAt: number }[] = [];
+  try {
+    const domainConfig = SCIENTIFIC_DOMAINS[normDomain];
+    const searchQuery = domainConfig?.searchTerms || domain;
+    const searchResults = await searchPapers(searchQuery, 12);
+
+    // Filter live papers so only genuine domain matches are included
+    const filteredLive = searchResults.filter((sp) => {
+      // Exclude if already in readCandidates
+      const isAlreadyRead = readCandidates.some(
+        (rc) =>
+          rc.paper.id === sp.id ||
+          (rc.paper.doi &&
+            sp.doi &&
+            rc.paper.doi.toLowerCase() === sp.doi.toLowerCase())
+      );
+      if (isAlreadyRead) return false;
+      return isPaperInDomain(sp, domain);
+    });
+
+    liveCandidates = filteredLive.map((p) => ({ paper: p, lastReadAt: 0 }));
+  } catch (err) {
+    console.warn('[fetchSingleDomainHyped] Live search error:', err);
+  }
+
+  // Combine candidates
+  const allCandidates = [...readCandidates, ...liveCandidates];
+
+  // 3. Compute 48-Hour HYPE score for all candidate papers
+  const scored = await Promise.all(
+    allCandidates.map(async ({ paper, lastReadAt }) => {
+      const metrics = await getPaperMetrics(paper.id);
+      const hype = calculate48hHypeScore(paper, metrics, lastReadAt);
+      return {
+        paper: {
+          ...paper,
+          calculatedHype: hype,
+        },
+        hype,
+        lastReadAt,
+        views: metrics.views,
+        views24h: metrics.viewsLast24h,
+      };
+    })
+  );
+
+  // 4. Sort by 48h HYPE score descending
+  scored.sort((a, b) => {
+    if (timeframe === '48h' || timeframe === 'week') {
+      return b.hype - a.hype || b.views24h - a.views24h;
+    }
+    if (timeframe === 'month') {
+      return b.views - a.views || b.hype - a.hype;
+    }
+    return (
+      (b.paper.citationCount || 0) - (a.paper.citationCount || 0) ||
+      b.hype - a.hype
+    );
+  });
+
+  return scored.slice(0, limit).map((s) => s.paper);
 }

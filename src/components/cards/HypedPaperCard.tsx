@@ -16,12 +16,12 @@ import { DiscussionIcon } from '../core/DiscussionIcon';
 import { ReadBookIcon } from '../core/ReadBookIcon';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { getPaperMetrics, subscribeToPaperRead, PaperMetrics } from '../../api/hypeScoreService';
+import { getPaperMetrics, subscribeToPaperRead, PaperMetrics, calculate48hHypeScore } from '../../api/hypeScoreService';
 
 export interface HypedPaperCardProps {
   paper: Paper;
   rank: number;
-  timeframe?: 'week' | 'month' | 'all';
+  timeframe?: '48h' | 'week' | 'month' | 'all';
   style?: ViewStyle;
 }
 
@@ -112,20 +112,14 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
   const citationCount = paper.citationCount ?? 0;
   const shareCount = (paper as any).sharesCount ?? (readCount > 0 ? Math.floor(readCount * 0.05) : 0);
 
-  // Compute realistic HYPE score (1.0 - 5.0) from verified ratings, citations, and reader velocity
+  // Compute realistic 48-Hour HYPE score (1.0 - 5.0) from verified ratings, citations, and reader velocity
   const hypeScoreFormatted = React.useMemo(() => {
-    if (metrics?.communityRating && metrics.communityRating > 0) {
-      return metrics.communityRating.toFixed(1);
+    if (typeof (paper as any).calculatedHype === 'number' && (paper as any).calculatedHype > 0) {
+      return (paper as any).calculatedHype.toFixed(1);
     }
-    if (metrics?.hypeScore && metrics.hypeScore > 0) {
-      return Math.min(5.0, metrics.hypeScore / 20).toFixed(1);
-    }
-    if (citationCount > 0) {
-      const citationScore = Math.min(5.0, Math.max(3.2, 3.2 + Math.log10(1 + citationCount) * 0.45));
-      return citationScore.toFixed(1);
-    }
-    return readCount > 0 ? '3.8' : '3.5';
-  }, [metrics, citationCount, readCount]);
+    const score = calculate48hHypeScore(paper, metrics);
+    return score.toFixed(1);
+  }, [paper, metrics]);
 
   const scoreValue = parseFloat(hypeScoreFormatted);
   const progressPercent = Math.min(100, Math.max(10, (scoreValue / 5.0) * 100));
