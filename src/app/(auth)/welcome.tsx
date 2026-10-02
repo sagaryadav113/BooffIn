@@ -72,30 +72,29 @@ export default function WelcomeScreen() {
             gap: 60,
           }}
         >
-          {/* Left Column: Welcome Graphic & Branding */}
+          {/* Left Column: Welcome Graphic & Branding (Zoomed to fit space) */}
           <div
             style={{
-              flex: 1.1,
+              flex: 1.2,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              textAlign: 'center',
+              height: '100%',
+              maxWidth: 560,
             }}
           >
             <Image
               source={WELCOME_HERO_BG}
-              style={{ width: 440, height: 380, maxHeight: 420 }}
+              style={{
+                width: '100%',
+                maxWidth: 540,
+                height: 520,
+                maxHeight: 540,
+              }}
               contentFit="contain"
-              accessibilityLabel="BooffIn Welcome"
+              accessibilityLabel="Welcome to BooffIn - Research finds its people"
             />
-            <View style={{ marginTop: 8, alignItems: 'center' }}>
-              <Text style={styles.desktopTitle}>Let's BooffIn</Text>
-              <Text style={styles.desktopSubtitle}>Research finds its people.</Text>
-              <Text style={styles.desktopDescription}>
-                The open scientific network where researchers, peers, and PIs share papers, discuss findings, and build collaborations.
-              </Text>
-            </View>
           </div>
 
           {/* Right Column: Clean White Authentication Card */}

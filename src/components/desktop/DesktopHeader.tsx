@@ -166,36 +166,6 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
               accessibilityLabel="BooffIn"
             />
           </TouchableOpacity>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => router.push('/(tabs)')}
-              style={{ paddingVertical: 8, paddingHorizontal: 12 }}
-            >
-              <Text style={{ fontSize: 13.5, fontWeight: '600', color: '#475569' }}>
-                Explore Discussions
-              </Text>
-            </TouchableOpacity>
-
-            {pathname.includes('/login') ? (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => router.push('/(auth)/signup')}
-                style={styles.authSwitchBtn}
-              >
-                <Text style={styles.authSwitchBtnText}>Sign Up</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => router.push('/(auth)/login')}
-                style={styles.authSwitchBtn}
-              >
-                <Text style={styles.authSwitchBtnText}>Sign In</Text>
-              </TouchableOpacity>
-            )}
-          </View>
         </View>
       </header>
     );
