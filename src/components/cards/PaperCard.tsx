@@ -61,10 +61,15 @@ export const PaperCard: React.FC<PaperCardProps> = ({
   };
 
   const handleCardPress = () => {
+    usePaperStore.getState().addPaper(paper);
     router.push({
       pathname: '/paper/[id]',
       params: {
         id: paper.id,
+        doi: paper.doi || '',
+        title: paper.title ? encodeURIComponent(paper.title) : '',
+        url: paper.canonicalUrl || '',
+        pdfUrl: paper.openAccessUrl || '',
         ...(fromPostId ? { fromPostId } : {}),
       },
     });

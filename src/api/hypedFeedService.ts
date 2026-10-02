@@ -1,6 +1,7 @@
 import { Paper, UserProfile } from '../types';
 import { supabase } from './client';
 import { searchPapers } from './search/providers/paperSearchProvider';
+import { usePaperStore } from '../store/usePaperStore';
 import {
   getPaperMetrics,
   getReadPapersRegistry,
@@ -246,6 +247,12 @@ export async function getHypedDomainData(
 
   // Combine real read papers (which take priority because users in app read them) + live papers
   const combinedPapers = [...rankedReadPapers, ...livePapers].slice(0, 10);
+
+  // Pre-seed into usePaperStore so any click anywhere on these papers opens immediately
+  try {
+    const addPaper = usePaperStore.getState().addPaper;
+    combinedPapers.forEach((p) => addPaper(p));
+  } catch {}
 
   // 3. Derive real Top Researchers from the actual authors of these papers
   const domainResearchers = await deriveTopResearchers(combinedPapers, domain);

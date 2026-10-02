@@ -381,14 +381,35 @@ export default function PaperDetailScreen() {
 
     // Online resolver fallback:
     // If paper still missing, or missing abstract or openAccessUrl, resolve online
+    const decodedTitle = title
+      ? (() => {
+          try {
+            return decodeURIComponent(title);
+          } catch {
+            return title;
+          }
+        })()
+      : undefined;
+
+    const cleanPaperId =
+      paperId.startsWith('openalex_')
+        ? paperId.replace('openalex_', '')
+        : paperId.startsWith('epmc_')
+        ? `pmid:${paperId.replace('epmc_', '')}`
+        : paperId.startsWith('arxiv_')
+        ? paperId.replace('arxiv_', '')
+        : paperId.includes('/') || paperId.includes('10.') || paperId.startsWith('http')
+        ? paperId
+        : null;
+
     const lookupKey =
       currentPaper?.doi ||
       doi ||
-      (paperId.includes('/') || paperId.includes('10.') || paperId.startsWith('http') ? paperId : null) ||
+      cleanPaperId ||
       currentPaper?.canonicalUrl ||
       url ||
       currentPaper?.title ||
-      title;
+      decodedTitle;
 
     if (lookupKey && (!currentPaper || !currentPaper.abstract || !currentPaper.openAccessUrl)) {
       try {

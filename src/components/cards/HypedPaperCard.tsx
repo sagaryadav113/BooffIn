@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { TrendingUp, Share2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -77,9 +76,17 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
     try {
       Haptics.selectionAsync();
     } catch {}
+    // Pre-seed into usePaperStore so /paper/[id] immediately finds it without loading or failing
+    usePaperStore.getState().addPaper(paper);
     router.push({
       pathname: '/paper/[id]',
-      params: { id: paper.id },
+      params: {
+        id: paper.id,
+        doi: paper.doi || '',
+        title: paper.title ? encodeURIComponent(paper.title) : '',
+        url: paper.canonicalUrl || '',
+        pdfUrl: paper.openAccessUrl || '',
+      },
     });
   };
 
@@ -142,8 +149,6 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
   const pubYear = paper.publicationYear || new Date().getFullYear();
   const metaLine = `${authorDisplay} · ${paper.journal || 'Journal'} · ${pubYear}`;
 
-  const figureUrl = paper.figures?.[0]?.url;
-
   // Clean and constrain topic tags so they never exceed the designated card bounds
   const cleanedTopics = React.useMemo(() => {
     const rawList =
@@ -188,22 +193,6 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
       </View>
 
       <View style={styles.cardContent}>
-        {/* Paper Figure / Thumbnail */}
-        <View style={styles.thumbnailWrapper}>
-          {figureUrl ? (
-            <Image
-              source={{ uri: figureUrl }}
-              style={styles.thumbnailImage}
-              contentFit="cover"
-              transition={200}
-            />
-          ) : (
-            <View style={styles.thumbnailPlaceholder}>
-              <ReadBookIcon size={32} color="#1B4D3E" />
-            </View>
-          )}
-        </View>
-
         {/* Paper Details */}
         <View style={styles.centerDetails}>
           <Text style={styles.titleText} numberOfLines={2} ellipsizeMode="tail">
@@ -302,7 +291,8 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 12,
+    padding: 14,
+    paddingTop: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#F1F5F9',
@@ -315,8 +305,8 @@ const styles = StyleSheet.create({
   },
   rankBadge: {
     position: 'absolute',
-    top: -6,
-    left: 8,
+    top: -7,
+    left: 12,
     width: 22,
     height: 22,
     borderRadius: 6,
@@ -339,28 +329,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    marginTop: 2,
-  },
-  thumbnailWrapper: {
-    width: 76,
-    height: 76,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#0F172A',
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailPlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
   },
   centerDetails: {
     flex: 1,
