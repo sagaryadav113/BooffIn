@@ -112,17 +112,17 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
   const citationCount = paper.citationCount ?? 0;
   const shareCount = (paper as any).sharesCount ?? (readCount > 0 ? Math.floor(readCount * 0.05) : 0);
 
-  // Compute realistic 48-Hour HYPE score (1.0 - 5.0) from verified ratings, citations, and reader velocity
-  const hypeScoreFormatted = React.useMemo(() => {
-    if (typeof (paper as any).calculatedHype === 'number' && (paper as any).calculatedHype > 0) {
-      return (paper as any).calculatedHype.toFixed(1);
+  // Authentic 48-Hour HYPE score (only computed if genuine community rating exists)
+  const numericHypeScore = React.useMemo(() => {
+    if (typeof (paper as any).calculatedHype === 'number') {
+      return (paper as any).calculatedHype;
     }
-    const score = calculate48hHypeScore(paper, metrics);
-    return score.toFixed(1);
+    return calculate48hHypeScore(paper, metrics);
   }, [paper, metrics]);
 
-  const scoreValue = parseFloat(hypeScoreFormatted);
-  const progressPercent = Math.min(100, Math.max(10, (scoreValue / 5.0) * 100));
+  const isUnrated = !numericHypeScore || numericHypeScore <= 0;
+  const hypeScoreFormatted = isUnrated ? 'Unrated' : numericHypeScore.toFixed(1);
+  const progressPercent = isUnrated ? 0 : Math.min(100, Math.max(10, (numericHypeScore / 5.0) * 100));
 
   // Rank badge styling
   const getRankBadgeStyle = (r: number) => {
@@ -262,19 +262,25 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
         </View>
 
         {/* Right HYPE Score Rating Box */}
-        <View style={styles.hypeScoreBox}>
+        <View style={[styles.hypeScoreBox, isUnrated && styles.unratedHypeBox]}>
           <Text style={styles.hypeScoreLabel}>HYPE</Text>
-          <Text style={styles.hypeScoreNumber}>{hypeScoreFormatted}</Text>
+          {isUnrated ? (
+            <Text style={styles.unratedText}>Unrated</Text>
+          ) : (
+            <>
+              <Text style={styles.hypeScoreNumber}>{hypeScoreFormatted}</Text>
 
-          {/* Solid Forest Green Score Progress Indicator */}
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressBar,
-                { width: `${progressPercent}%` },
-              ]}
-            />
-          </View>
+              {/* Solid Forest Green Score Progress Indicator */}
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressBar,
+                    { width: `${progressPercent}%` },
+                  ]}
+                />
+              </View>
+            </>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -390,17 +396,31 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   hypeScoreBox: {
-    width: 58,
+    width: 60,
     backgroundColor: '#F8FAFC',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     paddingVertical: 8,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-start',
     marginTop: 2,
+  },
+  unratedHypeBox: {
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  unratedText: {
+    ...typography.captionBold,
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#94A3B8',
+    marginTop: 2,
+    textAlign: 'center',
   },
   hypeScoreLabel: {
     ...typography.microBold,

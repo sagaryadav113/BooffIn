@@ -314,20 +314,30 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
           {paper.isOpenAccess ? (
             <View style={styles.hypeBox}>
               <Text style={styles.hypeBoxLabel}>HYPE</Text>
-              <View style={styles.hypeValueRow}>
-                <Text style={styles.hypeValueMain}>
-                  {stats.currentHypeScore.toFixed(1)}
-                </Text>
-                <Text style={styles.hypeValueSub}> / 5</Text>
-              </View>
-              <View style={styles.hypeBarBg}>
-                <View
-                  style={[
-                    styles.hypeBarFill,
-                    { width: `${(stats.currentHypeScore / 5) * 100}%` },
-                  ]}
-                />
-              </View>
+              {stats.currentHypeScore > 0 ? (
+                <>
+                  <View style={styles.hypeValueRow}>
+                    <Text style={styles.hypeValueMain}>
+                      {stats.currentHypeScore.toFixed(1)}
+                    </Text>
+                    <Text style={styles.hypeValueSub}> / 5</Text>
+                  </View>
+                  <View style={styles.hypeBarBg}>
+                    <View
+                      style={[
+                        styles.hypeBarFill,
+                        { width: `${(stats.currentHypeScore / 5) * 100}%` },
+                      ]}
+                    />
+                  </View>
+                </>
+              ) : (
+                <View style={styles.hypeValueRow}>
+                  <Text style={[styles.hypeValueSub, { fontSize: 13, fontWeight: '700', color: '#94A3B8', marginTop: 3 }]}>
+                    Unrated
+                  </Text>
+                </View>
+              )}
             </View>
           ) : (
             <View style={styles.closedHypeBox}>

@@ -474,17 +474,29 @@ async function fetchSingleDomainHyped(
     })
   );
 
-  // 4. Sort by 48h HYPE score descending
+  // 4. Sort: rated papers with authentic hype > 0 take priority,
+  // then papers are ranked by genuine 48h readership momentum & citations
   scored.sort((a, b) => {
-    if (timeframe === '48h' || timeframe === 'week') {
+    // 1. Rated papers with authentic community HYPE score come first
+    if (a.hype > 0 && b.hype === 0) return -1;
+    if (b.hype > 0 && a.hype === 0) return 1;
+    if (a.hype > 0 && b.hype > 0) {
       return b.hype - a.hype || b.views24h - a.views24h;
     }
+
+    // 2. Unrated papers: rank by real engagement in the timeframe (views, discussions, citations)
+    if (timeframe === '48h' || timeframe === 'week') {
+      const aMomentum = (a.views24h * 4) + (a.views || 0) + (a.paper.discussionCount || 0) * 3 + (a.lastReadAt ? 15 : 0);
+      const bMomentum = (b.views24h * 4) + (b.views || 0) + (b.paper.discussionCount || 0) * 3 + (b.lastReadAt ? 15 : 0);
+      if (bMomentum !== aMomentum) return bMomentum - aMomentum;
+      return (b.paper.citationCount || 0) - (a.paper.citationCount || 0);
+    }
     if (timeframe === 'month') {
-      return b.views - a.views || b.hype - a.hype;
+      return (b.views - a.views) || ((b.paper.citationCount || 0) - (a.paper.citationCount || 0));
     }
     return (
       (b.paper.citationCount || 0) - (a.paper.citationCount || 0) ||
-      b.hype - a.hype
+      b.views - a.views
     );
   });
 
