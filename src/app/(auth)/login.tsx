@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography, layout } from '../../theme';
@@ -92,6 +92,21 @@ export default function LoginScreen() {
 
         {/* Google Single Sign-On Button */}
         <View style={styles.oauthButtonGroup}>
+          <TouchableOpacity
+            style={styles.signUpButton}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              router.push('/(auth)/signup');
+            }}
+            activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel="Sign up for free"
+          >
+            <Text style={styles.signUpButtonText}>Sign up for free</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.googleButton}
             onPress={handleGoogleSignIn}
@@ -209,6 +224,32 @@ const styles = StyleSheet.create({
   oauthButtonGroup: {
     gap: spacing.sm,
     marginBottom: spacing.md,
+  },
+  signUpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.brandDarkGreen,
+    height: layout.buttonHeights.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.md,
+    shadowColor: colors.brandDarkGreen,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 2,
+    ...(Platform.OS === 'web'
+      ? {
+          cursor: 'pointer' as any,
+          transition: 'all 0.15s ease',
+        }
+      : {}),
+  },
+  signUpButtonText: {
+    ...typography.captionBold,
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
   googleButton: {
     flexDirection: 'row',

@@ -43,6 +43,13 @@ export default function WelcomeScreen() {
     router.push('/(auth)/email');
   };
 
+  const handleSignUp = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    router.push('/(auth)/signup');
+  };
+
   return (
     <View style={styles.outerContainer}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -67,6 +74,18 @@ export default function WelcomeScreen() {
                   <Text style={styles.errorText}>{authError}</Text>
                 </View>
               )}
+
+              {/* Sign up for free */}
+              <TouchableOpacity
+                style={styles.signUpButton}
+                onPress={handleSignUp}
+                disabled={isLoading}
+                activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel="Sign up for free"
+              >
+                <Text style={styles.signUpButtonText}>Sign up for free</Text>
+              </TouchableOpacity>
 
               {/* Continue with Google */}
               <TouchableOpacity
@@ -166,6 +185,33 @@ const styles = StyleSheet.create({
     color: colors.accentRed,
     textAlign: 'center',
     fontSize: 13,
+  },
+  signUpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: layout.buttonHeights.lg,
+    backgroundColor: colors.brandDarkGreen,
+    borderRadius: radii.md,
+    shadowColor: colors.brandDarkGreen,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+    elevation: 3,
+    ...(Platform.OS === 'web'
+      ? {
+          cursor: 'pointer' as any,
+          transition: 'all 0.15s ease',
+        }
+      : {}),
+  },
+  signUpButtonText: {
+    ...typography.bodyBold,
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   googleButton: {
     flexDirection: 'row',

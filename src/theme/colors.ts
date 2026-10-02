@@ -54,6 +54,8 @@ export const colors = {
   accentLink: '#2563EB', // Semantic alias for links
   accentBlueHover: '#1D4ED8',
   accentGreen: '#10B981', // Open Access / verified
+  brandGreen: '#064E3B', // BooffIn deep forest green
+  brandDarkGreen: '#064E3B',
   accentRed: '#EF4444', // Likes and error alerts
   error: '#EF4444',
   accentOrange: '#F59E0B', // Trending alerts
