@@ -69,22 +69,18 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
   return (
     <header style={{ width: '100%', backgroundColor: '#FFFFFF', zIndex: 50 }}>
       <View style={styles.container}>
-        {/* Left: Real Brand Logo & Tagline */}
+        {/* Left: Official Brand Wordmark Logo */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => router.push('/(tabs)')}
           style={styles.logoSection}
         >
-          <View style={styles.brandRow}>
-            <Image
-              source={require('../../../assets/images/booffin-symbol.png')}
-              style={styles.logoImage}
-              contentFit="contain"
-              accessibilityLabel="BooffIn"
-            />
-            <Text style={styles.brandTitle}>BooffIn</Text>
-          </View>
-          <Text style={styles.brandTagline}>research finds its people.</Text>
+          <Image
+            source={require('../../../assets/images/booffin-wordmark.jpg')}
+            style={styles.brandLogoImage}
+            contentFit="contain"
+            accessibilityLabel="BooffIn"
+          />
         </TouchableOpacity>
 
         {/* Center: Global Search Input with ⌘K */}
@@ -184,31 +180,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   logoSection: {
-    flexDirection: 'column',
     justifyContent: 'center',
-  },
-  brandRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
-  logoImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-  },
-  brandTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#064E3B',
-    letterSpacing: -0.4,
-  },
-  brandTagline: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#DC2626',
-    marginTop: 1,
-    letterSpacing: 0.1,
+  brandLogoImage: {
+    width: 124,
+    height: 38,
   },
   searchContainer: {
     flexDirection: 'row',
