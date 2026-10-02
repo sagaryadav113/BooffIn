@@ -72,7 +72,7 @@ export default function WelcomeScreen() {
             gap: 56,
           }}
         >
-          {/* Left Column: Welcome Graphic & Branding (Zoomed boldly to fill space) */}
+          {/* Left Column: Welcome Graphic & Branding (Zoomed 1.5X and pulled down 20px) */}
           <div
             style={{
               flex: 1.35,
@@ -81,7 +81,7 @@ export default function WelcomeScreen() {
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
-              maxWidth: 700,
+              maxWidth: 720,
               width: '100%',
               overflow: 'hidden',
               borderRadius: 24,
@@ -91,10 +91,10 @@ export default function WelcomeScreen() {
               source={WELCOME_HERO_BG}
               style={{
                 width: '100%',
-                maxWidth: 640,
-                height: 700,
-                maxHeight: 740,
-                transform: [{ scale: 1.35 }],
+                maxWidth: 660,
+                height: 720,
+                maxHeight: 760,
+                transform: [{ translateY: 20 }, { scale: 1.5 }],
               }}
               contentFit="contain"
               accessibilityLabel="Welcome to BooffIn - Research finds its people"
