@@ -277,9 +277,9 @@ async function deriveTopResearchers(
     const { data: dbProfiles } = await supabase
       .from('profiles')
       .select(
-        'id, username, full_name, avatar_url, academic_title, institution, bio, orcid_id, is_orcid_verified, followers_count, following_count'
+        'id, username, full_name, avatar_url, academic_title, institution, orcid_id, orcid_verified, followers_count, following_count'
       )
-      .eq('is_orcid_verified', true)
+      .eq('orcid_verified', true)
       .order('followers_count', { ascending: false })
       .limit(3);
 
@@ -294,8 +294,8 @@ async function deriveTopResearchers(
             avatarUrl: row.avatar_url,
             academicTitle: row.academic_title || 'Lead Investigator',
             institution: row.institution || 'Research Institution',
-            bio: row.bio || '',
-            orcidVerified: Boolean(row.is_orcid_verified),
+            bio: '',
+            orcidVerified: Boolean(row.orcid_verified),
             orcidId: row.orcid_id,
             followersCount: row.followers_count || 0,
             followingCount: row.following_count || 0,

@@ -72,13 +72,13 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
           post_type,
           likes_count,
           created_at,
-          author:profiles(id, username, full_name, avatar_url, academic_title, institution, orcid_id, is_orcid_verified),
+          author:profiles(id, username, full_name, avatar_url, academic_title, institution, orcid_id, orcid_verified),
           comments(
             id,
             content,
             likes_count,
             created_at,
-            author:profiles(id, username, full_name, avatar_url, academic_title, institution, orcid_id, is_orcid_verified)
+            author:profiles(id, username, full_name, avatar_url, academic_title, institution, orcid_id, orcid_verified)
           )
         `)
         .eq('paper_id', paperId)
@@ -100,7 +100,7 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
           academicTitle: row.author?.academic_title || 'Researcher',
           institution: row.author?.institution || '',
           bio: '',
-          orcidVerified: Boolean(row.author?.is_orcid_verified),
+          orcidVerified: Boolean(row.author?.orcid_verified),
           orcidId: row.author?.orcid_id,
           followersCount: 0,
           followingCount: 0,
@@ -126,7 +126,7 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
             academicTitle: c.author?.academic_title || 'Researcher',
             institution: c.author?.institution || '',
             bio: '',
-            orcidVerified: Boolean(c.author?.is_orcid_verified),
+            orcidVerified: Boolean(c.author?.orcid_verified),
             orcidId: c.author?.orcid_id,
             followersCount: 0,
             followingCount: 0,

@@ -84,68 +84,72 @@ export function mapProfileRecord(raw: any, fallbackEmail?: string, isFollowing?:
       ? new Date(raw.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
       : 'Recently joined',
     isFollowing: isFollowing !== undefined ? isFollowing : (raw.is_following ?? undefined),
+    department: raw.department || undefined,
+    labGroup: raw.lab_group || undefined,
+    primaryField: raw.primary_field || undefined,
+    secondaryFields: Array.isArray(raw.secondary_fields) ? raw.secondary_fields : [],
+    degreeProgram: raw.degree_program || undefined,
+    graduationYear: raw.graduation_year || undefined,
+    googleScholarUrl: raw.google_scholar_url || undefined,
+    researchgateUrl: raw.researchgate_url || undefined,
+    linkedinUrl: raw.linkedin_url || undefined,
+    scopusId: raw.scopus_id || undefined,
+    isPrivateRestricted: Boolean(raw.is_private_restricted),
+    visibilityLevel: raw.visibility_level || 'public',
   };
 }
 
 /**
- * Fetch profile for a given user UUID from Supabase public.profiles, checking viewer follow status if provided
+ * Fetch profile for a given user UUID from Supabase, enforcing database privacy boundary
  */
 export async function fetchUserProfile(userId: string, viewerId?: string): Promise<UserProfile | null> {
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    // 1. Database-enforced profile privacy boundary via get_user_profile RPC
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_user_profile', {
+      p_user_id: userId,
+    });
 
-    if (error || !data) return null;
-
-    let isFollowing = false;
-    if (viewerId && viewerId !== userId) {
-      const { data: followRow } = await supabase
-        .from('follows')
-        .select('follower_id')
-        .eq('follower_id', viewerId)
-        .eq('following_id', userId)
-        .maybeSingle();
-      isFollowing = Boolean(followRow);
+    if (!rpcError && rpcData && typeof rpcData === 'object' && (rpcData as any).id) {
+      return mapProfileRecord(rpcData, undefined, (rpcData as any).is_following);
     }
 
-    return mapProfileRecord(data, undefined, viewerId && viewerId !== userId ? isFollowing : undefined);
-  } catch {
+    if (rpcError) {
+      console.warn('[authService] get_user_profile RPC error:', rpcError.message);
+    }
+
+    // Fail safe: NEVER fall back to unrestricted table select('*')
+    return null;
+  } catch (err) {
+    console.warn('[authService] fetchUserProfile error:', err);
     return null;
   }
 }
 
 /**
- * Fetch profile for a given unique handle/username (case-insensitive), checking viewer follow status if provided
+ * Fetch profile for a given unique handle/username, enforcing database privacy boundary
  */
 export async function fetchUserProfileByUsername(username: string, viewerId?: string): Promise<UserProfile | null> {
   try {
     const normalized = normalizeHandle(username);
     if (!normalized) return null;
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('username', normalized)
-      .maybeSingle();
+    // 1. Database-enforced profile privacy boundary via get_user_profile RPC
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_user_profile', {
+      p_username: normalized,
+    });
 
-    if (error || !data) return null;
-
-    let isFollowing = false;
-    if (viewerId && viewerId !== data.id) {
-      const { data: followRow } = await supabase
-        .from('follows')
-        .select('follower_id')
-        .eq('follower_id', viewerId)
-        .eq('following_id', data.id)
-        .maybeSingle();
-      isFollowing = Boolean(followRow);
+    if (!rpcError && rpcData && typeof rpcData === 'object' && (rpcData as any).id) {
+      return mapProfileRecord(rpcData, undefined, (rpcData as any).is_following);
     }
 
-    return mapProfileRecord(data, undefined, viewerId && viewerId !== data.id ? isFollowing : undefined);
-  } catch {
+    if (rpcError) {
+      console.warn('[authService] get_user_profile by username RPC error:', rpcError.message);
+    }
+
+    // Fail safe: NEVER fall back to unrestricted table select('*')
+    return null;
+  } catch (err) {
+    console.warn('[authService] fetchUserProfileByUsername error:', err);
     return null;
   }
 }
@@ -1094,7 +1098,6 @@ export async function verifyPasswordAndLinkOrcid(
       .update({
         orcid_id: cleanOrcid,
         orcid_verified: true,
-        is_orcid_verified: true,
       })
       .eq('id', userId);
 

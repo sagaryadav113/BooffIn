@@ -35,4 +35,6 @@ export interface UserProfile {
   worksCount?: number;
   citationCount?: number;
   hypeScore?: number;
+  isPrivateRestricted?: boolean;
+  visibilityLevel?: 'public' | 'registered' | 'private';
 }

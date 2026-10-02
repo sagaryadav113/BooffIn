@@ -147,7 +147,6 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
       .from('profiles')
       .update({
         orcid_id: cleanOrcid,
-        is_orcid_verified: true,
         orcid_verified: true,
         institution: institutionName,
         academic_title: academicTitle,

@@ -26,6 +26,7 @@ import {
   Clock,
   Users,
   UserPlus,
+  Lock,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -136,7 +137,7 @@ export default function OtherResearcherProfileScreen() {
         }
       }
       setResearcher(prof);
-      if (prof?.id) {
+      if (prof?.id && !prof.isPrivateRestricted) {
         loadResearcherPosts(prof.id);
       }
       setIsLoading(false);
@@ -160,11 +161,12 @@ export default function OtherResearcherProfileScreen() {
         prof = await fetchUserProfileByUsername(cleanId, currentUser?.id);
       }
       if (prof) setResearcher(prof);
+      return prof;
     };
-    await Promise.all([
-      refreshProfile(),
-      loadResearcherPosts(researcher.id),
-    ]);
+    const refreshedProf = await refreshProfile();
+    if (refreshedProf?.id && !refreshedProf.isPrivateRestricted) {
+      await loadResearcherPosts(refreshedProf.id);
+    }
     setIsRefreshing(false);
   };
 
@@ -532,70 +534,85 @@ export default function OtherResearcherProfileScreen() {
           </View>
         </View>
 
-        {/* Sub-Tabs: Posts | Scholars | Activity */}
-        <View style={styles.tabsRow}>
-          {(['Posts', 'Scholars', 'Activity'] as const).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              onPress={() => setActiveSubTab(tab)}
-              style={[
-                styles.tabButton,
-                activeSubTab === tab && styles.tabButtonActive,
-              ]}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeSubTab === tab && styles.tabTextActive,
-                ]}
-              >
-                {tab === 'Posts' ? 'All Posts & Shares' : tab === 'Scholars' ? 'BooffIn Scholars' : 'Activity'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Sub-Tabs or Private Restricted Notice */}
+        {researcher.isPrivateRestricted ? (
+          <View style={styles.privateProfileContainer}>
+            <View style={styles.privateIconCircle}>
+              <Lock size={26} color={colors.textSecondary} />
+            </View>
+            <Text style={styles.privateTitle}>This Profile is Private</Text>
+            <Text style={styles.privateSubtitle}>
+              {"Only approved connections can view this researcher's full profile, publications, and scientific discussions."}
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Sub-Tabs: Posts | Scholars | Activity */}
+            <View style={styles.tabsRow}>
+              {(['Posts', 'Scholars', 'Activity'] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  onPress={() => setActiveSubTab(tab)}
+                  style={[
+                    styles.tabButton,
+                    activeSubTab === tab && styles.tabButtonActive,
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      activeSubTab === tab && styles.tabTextActive,
+                    ]}
+                  >
+                    {tab === 'Posts' ? 'All Posts & Shares' : tab === 'Scholars' ? 'BooffIn Scholars' : 'Activity'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-        {/* Tab Content */}
-        {activeSubTab === 'Posts' && (
-          <View style={styles.postsList}>
-            {isLoadingPosts && posts.length === 0 ? (
-              <View style={{ paddingVertical: spacing.xl * 2, alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator size="small" color={colors.accentBlue} />
-                <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm }}>
-                  Loading posts & shares...
-                </Text>
+            {/* Tab Content */}
+            {activeSubTab === 'Posts' && (
+              <View style={styles.postsList}>
+                {isLoadingPosts && posts.length === 0 ? (
+                  <View style={{ paddingVertical: spacing.xl * 2, alignItems: 'center', justifyContent: 'center' }}>
+                    <ActivityIndicator size="small" color={colors.accentBlue} />
+                    <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm }}>
+                      Loading posts & shares...
+                    </Text>
+                  </View>
+                ) : posts.length > 0 ? (
+                  posts.map((p) => <PostCard key={p.id} post={p} />)
+                ) : (
+                  <EmptyState
+                    icon="Discussion"
+                    title="No posts yet"
+                    description="This researcher hasn't shared any public research thoughts or questions yet."
+                  />
+                )}
               </View>
-            ) : posts.length > 0 ? (
-              posts.map((p) => <PostCard key={p.id} post={p} />)
-            ) : (
-              <EmptyState
-                icon="Discussion"
-                title="No posts yet"
-                description="This researcher hasn't shared any public research thoughts or questions yet."
+            )}
+
+            {activeSubTab === 'Scholars' && (
+              <BooffInScholarsTab
+                userId={researcher.id}
+                isCurrentUser={isOwnProfile}
+                userFullName={researcher.fullName}
+                orcidId={researcher.orcidId}
+                orcidVerified={researcher.orcidVerified}
               />
             )}
-          </View>
-        )}
 
-        {activeSubTab === 'Scholars' && (
-          <BooffInScholarsTab
-            userId={researcher.id}
-            isCurrentUser={isOwnProfile}
-            userFullName={researcher.fullName}
-            orcidId={researcher.orcidId}
-            orcidVerified={researcher.orcidVerified}
-          />
-        )}
-
-        {activeSubTab === 'Activity' && (
-          <View style={styles.activityList}>
-            <EmptyState
-              icon="TrendingUp"
-              title="Recent Activity"
-              description="Peer discussions, commentary, and scientific questions will appear here."
-            />
-          </View>
+            {activeSubTab === 'Activity' && (
+              <View style={styles.activityList}>
+                <EmptyState
+                  icon="TrendingUp"
+                  title="Recent Activity"
+                  description="Peer discussions, commentary, and scientific questions will appear here."
+                />
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -920,6 +937,39 @@ const styles = StyleSheet.create({
   },
   activityList: {
     padding: spacing.lg,
+  },
+  privateProfileContainer: {
+    paddingVertical: spacing.xl * 2,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+    marginTop: spacing.md,
+  },
+  privateIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.cardBackground,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  privateTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  privateSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    maxWidth: 280,
+    lineHeight: 18,
   },
 });
 

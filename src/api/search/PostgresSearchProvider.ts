@@ -64,9 +64,12 @@ export class PostgresSearchProvider implements SearchProvider {
 
         const { data, count, error } = await supabase
           .from('profiles')
-          .select('*', { count: 'exact' })
+          .select(
+            'id, username, full_name, avatar_url, academic_title, institution, orcid_id, orcid_verified, followers_count, following_count',
+            { count: 'exact' }
+          )
           .or(
-            `full_name.ilike.${ilikePattern},username.ilike.${ilikePattern},academic_title.ilike.${ilikePattern},institution.ilike.${ilikePattern},bio.ilike.${ilikePattern}`
+            `full_name.ilike.${ilikePattern},username.ilike.${ilikePattern},academic_title.ilike.${ilikePattern},institution.ilike.${ilikePattern}`
           )
           .range(offset, offset + fetchLimit - 1);
 
@@ -142,7 +145,16 @@ export class PostgresSearchProvider implements SearchProvider {
             reposts_count,
             saves_count,
             created_at,
-            author:profiles!author_id (*),
+            author:profiles!author_id (
+              id,
+              username,
+              full_name,
+              avatar_url,
+              academic_title,
+              institution,
+              orcid_id,
+              orcid_verified
+            ),
             paper:papers!paper_id (
               id,
               doi,

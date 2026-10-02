@@ -246,7 +246,16 @@ export async function fetchTopicPageData(
         reposts_count,
         saves_count,
         created_at,
-        author:profiles!author_id (*),
+        author:profiles!author_id (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        ),
         paper:papers!paper_id (*),
         post_topics!inner (
           topic:topics!inner ( slug, name )
@@ -276,7 +285,16 @@ export async function fetchTopicPageData(
         reposts_count,
         saves_count,
         created_at,
-        author:profiles!author_id (*),
+        author:profiles!author_id (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        ),
         paper:papers!paper_id (*),
         post_topics!inner (
           topic:topics!inner ( slug, name )
@@ -295,7 +313,9 @@ export async function fetchTopicPageData(
     // 4. Researchers interested in this topic
     const { data: researchersData } = await supabase
       .from('profiles')
-      .select('*')
+      .select(
+        'id, username, full_name, avatar_url, academic_title, institution, orcid_id, orcid_verified, followers_count, following_count'
+      )
       .contains('research_interests', [topic.name])
       .limit(10);
 

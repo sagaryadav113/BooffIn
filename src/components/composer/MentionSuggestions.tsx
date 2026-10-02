@@ -68,7 +68,9 @@ export const MentionSuggestions: React.FC<MentionSuggestionsProps> = ({
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select(
+            'id, username, full_name, avatar_url, academic_title, institution, orcid_id, orcid_verified'
+          )
           .or(`username.ilike.%${cleanQuery}%,full_name.ilike.%${cleanQuery}%`)
           .neq('id', currentUser.id)
           .limit(10);

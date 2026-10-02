@@ -247,8 +247,26 @@ export async function getCollaborationRequests(
       .from('collaboration_requests')
       .select(`
         *,
-        sender:profiles!collaboration_requests_sender_id_fkey(*),
-        recipient:profiles!collaboration_requests_recipient_id_fkey(*)
+        sender:profiles!collaboration_requests_sender_id_fkey(
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        ),
+        recipient:profiles!collaboration_requests_recipient_id_fkey(
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        )
       `)
       .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
       .order('created_at', { ascending: false });

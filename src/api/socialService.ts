@@ -454,11 +454,8 @@ export async function fetchFeed(
           avatar_url,
           academic_title,
           institution,
-          bio,
           orcid_id,
-          orcid_verified,
-          followers_count,
-          following_count
+          orcid_verified
         ),
         paper:papers!paper_id (
           id,
@@ -690,7 +687,16 @@ export async function createPost(
         reposts_count,
         saves_count,
         created_at,
-        author:profiles!author_id (*)
+        author:profiles!author_id (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        )
       `
       )
       .single();
@@ -905,7 +911,16 @@ export async function updatePost(
         reposts_count,
         saves_count,
         created_at,
-        author:profiles!author_id (*)
+        author:profiles!author_id (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        )
       `
       )
       .single();
@@ -1147,7 +1162,6 @@ export async function fetchComments(
           avatar_url,
           academic_title,
           institution,
-          bio,
           orcid_id,
           orcid_verified
         )
@@ -1232,7 +1246,16 @@ export async function addComment(
         content,
         likes_count,
         created_at,
-        author:profiles!author_id (*)
+        author:profiles!author_id (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        )
       `
       )
       .single();
@@ -1634,7 +1657,6 @@ export async function fetchFollowers(
           banner_url,
           academic_title,
           institution,
-          bio,
           orcid_id,
           orcid_verified,
           followers_count,
@@ -1707,7 +1729,6 @@ export async function fetchFollowing(
           banner_url,
           academic_title,
           institution,
-          bio,
           orcid_id,
           orcid_verified,
           followers_count,
@@ -1772,7 +1793,16 @@ export async function fetchUserPosts(
       reposts_count,
       saves_count,
       created_at,
-      author:profiles!author_id (*),
+      author:profiles!author_id (
+        id,
+        username,
+        full_name,
+        avatar_url,
+        academic_title,
+        institution,
+        orcid_id,
+        orcid_verified
+      ),
       paper:papers!paper_id (
         id,
         doi,
@@ -1813,7 +1843,16 @@ export async function fetchUserPosts(
         `
         created_at,
         user_id,
-        user:profiles!user_id (*),
+        user:profiles!user_id (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        ),
         post:posts!post_id (
           ${postSelectQuery}
         )
@@ -1892,7 +1931,16 @@ export async function fetchSavedPostsAndPapers(
       reposts_count,
       saves_count,
       created_at,
-      author:profiles!author_id (*),
+      author:profiles!author_id (
+        id,
+        username,
+        full_name,
+        avatar_url,
+        academic_title,
+        institution,
+        orcid_id,
+        orcid_verified
+      ),
       paper:papers!paper_id (
         id,
         doi,

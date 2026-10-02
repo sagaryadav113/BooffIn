@@ -35,10 +35,10 @@ export async function searchBooffInUsers(
     const { data, error } = await supabase
       .from('profiles')
       .select(
-        'id, username, full_name, avatar_url, academic_title, institution, bio, orcid_id, is_orcid_verified, followers_count, following_count'
+        'id, username, full_name, avatar_url, academic_title, institution, orcid_id, orcid_verified, followers_count, following_count'
       )
       .or(
-        `username.ilike.%${cleanQ}%,full_name.ilike.%${cleanQ}%,academic_title.ilike.%${cleanQ}%,institution.ilike.%${cleanQ}%,bio.ilike.%${cleanQ}%`
+        `username.ilike.%${cleanQ}%,full_name.ilike.%${cleanQ}%,academic_title.ilike.%${cleanQ}%,institution.ilike.%${cleanQ}%`
       )
       .limit(limit);
 
@@ -51,9 +51,9 @@ export async function searchBooffInUsers(
       avatarUrl: row.avatar_url,
       academicTitle: row.academic_title || 'Researcher',
       institution: row.institution || '',
-      bio: row.bio || '',
+      bio: '',
       orcidId: row.orcid_id,
-      orcidVerified: Boolean(row.is_orcid_verified),
+      orcidVerified: Boolean(row.orcid_verified),
       followersCount: row.followers_count || 0,
       followingCount: row.following_count || 0,
       isRegisteredUser: true,

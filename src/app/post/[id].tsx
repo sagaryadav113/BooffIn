@@ -64,7 +64,16 @@ export default function PostDetailScreen() {
         .from('posts')
         .select(`
           *,
-          author:profiles!author_id (*),
+          author:profiles!author_id (
+            id,
+            username,
+            full_name,
+            avatar_url,
+            academic_title,
+            institution,
+            orcid_id,
+            orcid_verified
+          ),
           paper:papers!paper_id (
             *,
             paper_authors (*)

@@ -1,4 +1,4 @@
-import { supabase } from './client';
+import { supabase, appStorage } from './client';
 import { UserSettings, defaultUserSettings } from '../types/settings';
 
 /**
@@ -304,24 +304,35 @@ export async function exportUserData(userId: string): Promise<{ success: boolean
 }
 
 /**
- * Deletes authenticated user account and associated personal data
+ * Deletes authenticated user account and associated personal data via atomic server-side RPC
  */
 export async function deleteUserAccount(): Promise<{ success: boolean; error: string | null }> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: 'User is not authenticated.' };
-
-    // Delete user profile data (cascades via foreign keys to user_settings, posts, etc.)
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', user.id);
-
-    if (profileError) {
-      console.warn('delete profile warning:', profileError.message);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return { success: false, error: 'User is not authenticated.' };
     }
 
-    // Sign out active session
+    // Call atomic SECURITY DEFINER RPC in Supabase
+    const { error: rpcError } = await supabase.rpc('delete_user_account');
+
+    if (rpcError) {
+      console.error('[deleteUserAccount] RPC deletion error:', rpcError.message);
+      return {
+        success: false,
+        error: rpcError.message || 'Failed to execute account deletion on server.',
+      };
+    }
+
+    // Clear local stored session
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem('booffin_active_user_session');
+      }
+      await appStorage.removeItem('booffin_active_user_session');
+    } catch {}
+
+    // Sign out active session cleanly only after successful deletion
     await supabase.auth.signOut();
 
     return { success: true, error: null };
