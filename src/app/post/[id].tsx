@@ -87,15 +87,15 @@ export default function PostDetailScreen() {
         .maybeSingle();
 
       if (data && !error) {
-        const mappedPost = mapSupabasePost(data, currentUser.id);
-        const [postWithVotes] = await populatePollVotes([mappedPost], currentUser.id);
+        const mappedPost = mapSupabasePost(data, currentUser?.id);
+        const [postWithVotes] = await populatePollVotes([mappedPost], currentUser?.id);
         setPost(postWithVotes || mappedPost);
       }
     } catch {}
-    await fetchCommentsForPost(postId, currentUser.id);
+    await fetchCommentsForPost(postId, currentUser?.id);
     setIsLoading(false);
     if (isRefresh) setIsRefreshing(false);
-  }, [postId, currentUser.id, fetchCommentsForPost]);
+  }, [postId, currentUser?.id, fetchCommentsForPost]);
 
   useEffect(() => {
     loadPostData();

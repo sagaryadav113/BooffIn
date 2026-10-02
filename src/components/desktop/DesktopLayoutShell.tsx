@@ -75,6 +75,8 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
           <main
             style={{
               flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
               maxWidth: 680,
               minWidth: 520,
               margin: '0 16px',

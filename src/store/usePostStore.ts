@@ -74,7 +74,7 @@ export const usePostStore = create<PostState>((set, get) => ({
 
   fetchFeed: async (tab, currentUserId) => {
     const activeTab = tab || get().activeTab;
-    const resolvedUserId = currentUserId || useAuthStore.getState().user.id;
+    const resolvedUserId = currentUserId || useAuthStore.getState().user?.id;
     set({ isLoading: true, feedError: null, page: 1 });
 
     const res = await apiFetchFeed({
@@ -188,7 +188,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     }));
 
     // 2. Perform backend API mutation
-    const userId = currentUserId || useAuthStore.getState().user.id;
+    const userId = currentUserId || useAuthStore.getState().user?.id;
     const res = await apiToggleLike(postId, wasLiked, userId);
 
     // 3. Rollback if error
@@ -232,7 +232,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     }));
 
     // 2. Backend mutation
-    const userId = currentUserId || useAuthStore.getState().user.id;
+    const userId = currentUserId || useAuthStore.getState().user?.id;
     const res = await apiToggleRepost(postId, wasReposted, userId);
 
     // 3. Rollback on failure
@@ -276,7 +276,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     }));
 
     // 2. Backend mutation
-    const userId = currentUserId || useAuthStore.getState().user.id;
+    const userId = currentUserId || useAuthStore.getState().user?.id;
     const res = await apiToggleBookmark({ postId }, wasSaved, userId);
 
     // 3. Rollback on failure
@@ -340,7 +340,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     }));
 
     // 2. Backend mutation
-    const userId = currentUserId || useAuthStore.getState().user.id;
+    const userId = currentUserId || useAuthStore.getState().user?.id;
     const res = await apiVotePoll(postId, optionId, userId);
 
     if (!res.success) {
