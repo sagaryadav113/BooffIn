@@ -108,24 +108,8 @@ export default function HomeScreen() {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-
-      {/* Mobile-only Header */}
-      {!isDesktop && (
-        <AppHeader
-          title="BooffIn"
-          isBrandTitle
-          onTitlePress={handleRefresh}
-          isRefreshing={isRefreshing}
-          showSearch
-          onSearch={() => router.push('/search')}
-          showCreate
-          onCreatePress={() => router.push('/(tabs)/create')}
-        />
-      )}
-
+  const renderHeader = () => (
+    <View>
       {/* Desktop Compose Box */}
       {isDesktop && (
         <View style={{ paddingTop: 16, paddingHorizontal: 16 }}>
@@ -150,12 +134,33 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       )}
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+
+      {/* Mobile-only Header */}
+      {!isDesktop && (
+        <AppHeader
+          title="BooffIn"
+          isBrandTitle
+          onTitlePress={handleRefresh}
+          isRefreshing={isRefreshing}
+          showSearch
+          onSearch={() => router.push('/search')}
+          showCreate
+          onCreatePress={() => router.push('/(tabs)/create')}
+        />
+      )}
 
       {/* Virtualized Feed with Smooth Scrolling & Infinite Pagination */}
       <FlatList
         data={filteredPosts}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        ListHeaderComponent={renderHeader}
         initialNumToRender={5}
         maxToRenderPerBatch={8}
         windowSize={7}
