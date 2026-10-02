@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
   Search,
@@ -68,16 +69,19 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
   return (
     <header style={{ width: '100%', backgroundColor: '#FFFFFF', zIndex: 50 }}>
       <View style={styles.container}>
-        {/* Left: Brand Logo & Tagline */}
+        {/* Left: Real Brand Logo & Tagline */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => router.push('/(tabs)')}
           style={styles.logoSection}
         >
           <View style={styles.brandRow}>
-            <View style={styles.logoIconBadge}>
-              <Text style={styles.logoBadgeLetter}>B</Text>
-            </View>
+            <Image
+              source={require('../../../assets/images/booffin-symbol.png')}
+              style={styles.logoImage}
+              contentFit="contain"
+              accessibilityLabel="BooffIn"
+            />
             <Text style={styles.brandTitle}>BooffIn</Text>
           </View>
           <Text style={styles.brandTagline}>research finds its people.</Text>
@@ -188,19 +192,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  logoIconBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
-    backgroundColor: '#064E3B',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoBadgeLetter: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    fontFamily: 'serif',
+  logoImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
   },
   brandTitle: {
     fontSize: 22,
