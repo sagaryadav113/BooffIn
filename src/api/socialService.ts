@@ -388,6 +388,7 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
     isReposted,
     isSaved,
     createdAt: formatRelativeTime(row.created_at),
+    rawCreatedAt: row.created_at || undefined,
   };
 }
 
@@ -1975,5 +1976,104 @@ export async function fetchSavedPostsAndPapers(
     return { posts: postsWithPolls, papers, error: null };
   } catch (err: any) {
     return { posts: [], papers: [], error: err?.message || 'Failed to fetch bookmarks' };
+  }
+}
+
+export interface UserCommentActivity {
+  id: string;
+  postId: string;
+  content: string;
+  likesCount: number;
+  createdAt: string;
+  parentCommentId?: string | null;
+  postTitle?: string;
+  postAuthorName?: string;
+  postType?: PostType;
+}
+
+export async function fetchUserComments(
+  userId: string
+): Promise<{ comments: UserCommentActivity[]; error: string | null }> {
+  if (!isSupabaseConfigured() || !userId) {
+    return { comments: [], error: null };
+  }
+  try {
+    const { data, error } = await supabase
+      .from('comments')
+      .select(`
+        id,
+        post_id,
+        parent_id,
+        content,
+        likes_count,
+        created_at,
+        post:posts!post_id (
+          id,
+          content,
+          post_type,
+          author:profiles!author_id (
+            full_name,
+            username
+          ),
+          paper:papers!paper_id (
+            title
+          )
+        )
+      `)
+      .eq('author_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      // Fallback simple query if relationship join isn't direct
+      const { data: fallback, error: fbError } = await supabase
+        .from('comments')
+        .select('id, post_id, parent_id, content, likes_count, created_at')
+        .eq('author_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (fbError || !fallback) {
+        return { comments: [], error: fbError?.message || error.message };
+      }
+
+      const rows: UserCommentActivity[] = fallback
+        .filter((r: any) => !r.content || !r.content.startsWith('[POLL_VOTE:'))
+        .map((r: any) => ({
+          id: r.id,
+          postId: r.post_id,
+          content: r.content,
+          likesCount: r.likes_count || 0,
+          createdAt: r.created_at,
+          parentCommentId: r.parent_id,
+        }));
+      return { comments: rows, error: null };
+    }
+
+    const filtered = (data || []).filter(
+      (r: any) => !r.content || !r.content.startsWith('[POLL_VOTE:')
+    );
+
+    const rows: UserCommentActivity[] = filtered.map((r: any) => {
+      const p = r.post;
+      const authorName = p?.author?.full_name || (p?.author?.username ? `@${p.author.username}` : undefined);
+      const postTitle = p?.paper?.title || (p?.content ? (p.content.length > 70 ? p.content.slice(0, 70) + '...' : p.content) : undefined);
+      return {
+        id: r.id,
+        postId: r.post_id,
+        content: r.content,
+        likesCount: r.likes_count || 0,
+        createdAt: r.created_at,
+        parentCommentId: r.parent_id,
+        postTitle,
+        postAuthorName: authorName,
+        postType: p?.post_type as PostType | undefined,
+      };
+    });
+
+    return { comments: rows, error: null };
+  } catch (err: any) {
+    console.warn('[socialService] fetchUserComments error:', err);
+    return { comments: [], error: err?.message || 'Failed to fetch user comments' };
   }
 }

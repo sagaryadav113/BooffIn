@@ -88,6 +88,7 @@ export interface Post {
   isReposted?: boolean;
   isSaved?: boolean;
   createdAt: string;
+  rawCreatedAt?: string;
   repostedBy?: UserProfile;
   repostedAt?: string;
 }

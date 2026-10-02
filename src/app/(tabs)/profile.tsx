@@ -36,6 +36,11 @@ import {
   Trash2,
   Upload,
   Image as ImageIcon,
+  CornerDownRight,
+  HelpCircle,
+  MessageSquare,
+  FileText,
+  Repeat,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography, layout } from '../../theme';
@@ -47,6 +52,7 @@ import { TopicChip } from '../../components/core/TopicChip';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { PostCard } from '../../components/cards/PostCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
+import { LikeIcon } from '../../components/core/LikeIcon';
 import { ProfileAnalyticsBar } from '../../components/profile/ProfileAnalyticsBar';
 import { ProfileAnalyticsModal } from '../../components/profile/ProfileAnalyticsModal';
 import { AppHeader } from '../../components/layout/AppHeader';
@@ -67,7 +73,13 @@ import {
   removeProfileAvatar,
   removeProfileBanner,
 } from '../../api/storageService';
-import { fetchUserPosts, fetchSavedPostsAndPapers } from '../../api/socialService';
+import {
+  fetchUserPosts,
+  fetchSavedPostsAndPapers,
+  fetchUserComments,
+  UserCommentActivity,
+  formatRelativeTime,
+} from '../../api/socialService';
 import { Post, Paper, CollaborationRequest } from '../../types';
 import { ScholarPublication } from '../../types/scholar';
 import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab';
@@ -193,6 +205,9 @@ export default function CurrentUserProfileScreen() {
   const [savedPapersDb, setSavedPapersDb] = useState<Paper[]>([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
   const [savedSubFilter, setSavedSubFilter] = useState<'All' | 'Posts' | 'Papers'>('All');
+  const [userComments, setUserComments] = useState<UserCommentActivity[]>([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [activitySubFilter, setActivitySubFilter] = useState<'All' | 'Discussions' | 'Questions' | 'Replies'>('All');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const loadRequests = React.useCallback(async () => {
@@ -209,6 +224,16 @@ export default function CurrentUserProfileScreen() {
       setUserPosts(res.posts);
     }
     setIsLoadingPosts(false);
+  }, [user?.id]);
+
+  const loadUserComments = React.useCallback(async () => {
+    if (!user?.id) return;
+    setIsLoadingComments(true);
+    const res = await fetchUserComments(user.id);
+    if (res.comments) {
+      setUserComments(res.comments);
+    }
+    setIsLoadingComments(false);
   }, [user?.id]);
 
   const loadSavedItems = React.useCallback(async () => {
@@ -241,8 +266,9 @@ export default function CurrentUserProfileScreen() {
   React.useEffect(() => {
     loadRequests();
     loadUserPosts();
+    loadUserComments();
     loadSavedItems();
-  }, [loadRequests, loadUserPosts, loadSavedItems]);
+  }, [loadRequests, loadUserPosts, loadUserComments, loadSavedItems]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -252,6 +278,7 @@ export default function CurrentUserProfileScreen() {
     await Promise.all([
       refreshCurrentUserProfile(),
       loadUserPosts(),
+      loadUserComments(),
       loadRequests(),
       loadSavedItems(),
     ]);
@@ -347,6 +374,93 @@ export default function CurrentUserProfileScreen() {
     });
     return Array.from(combinedMap.values());
   }, [savedPapersDb, papers, savedPaperIds]);
+
+  // Unified chronological user activity feed (discussions, questions, and replies)
+  const unifiedActivities = useMemo(() => {
+    type ActivityItem =
+      | {
+          id: string;
+          kind: 'discussion' | 'question' | 'article';
+          createdAt: string;
+          timestamp: number;
+          post: Post;
+        }
+      | {
+          id: string;
+          kind: 'reply';
+          createdAt: string;
+          timestamp: number;
+          comment: UserCommentActivity;
+        };
+
+    const items: ActivityItem[] = [];
+
+    // Add user's discussions, questions, and articles
+    userPosts.forEach((post) => {
+      let kind: 'discussion' | 'question' | 'article' = 'discussion';
+      if (post.postType === 'question') kind = 'question';
+      else if (post.postType === 'article') kind = 'article';
+      else kind = 'discussion';
+
+      let ts = 0;
+      if (post.rawCreatedAt) {
+        ts = new Date(post.rawCreatedAt).getTime();
+      }
+      if (!ts || isNaN(ts)) {
+        ts = Date.now();
+      }
+
+      items.push({
+        id: `post_${post.id}`,
+        kind,
+        createdAt: post.createdAt,
+        timestamp: ts,
+        post,
+      });
+    });
+
+    // Add user's replies & comments
+    userComments.forEach((c) => {
+      const ts = new Date(c.createdAt).getTime();
+      items.push({
+        id: `comment_${c.id}`,
+        kind: 'reply',
+        createdAt: formatRelativeTime(c.createdAt),
+        timestamp: isNaN(ts) ? 0 : ts,
+        comment: c,
+      });
+    });
+
+    // Sort descending by timestamp (chronological order)
+    items.sort((a, b) => b.timestamp - a.timestamp);
+
+    return items;
+  }, [userPosts, userComments]);
+
+  const filteredActivities = useMemo(() => {
+    if (activitySubFilter === 'Discussions') {
+      return unifiedActivities.filter((it) => it.kind === 'discussion' || it.kind === 'article');
+    }
+    if (activitySubFilter === 'Questions') {
+      return unifiedActivities.filter((it) => it.kind === 'question');
+    }
+    if (activitySubFilter === 'Replies') {
+      return unifiedActivities.filter((it) => it.kind === 'reply');
+    }
+    return unifiedActivities;
+  }, [unifiedActivities, activitySubFilter]);
+
+  const activityCounts = useMemo(() => {
+    const discussions = unifiedActivities.filter((it) => it.kind === 'discussion' || it.kind === 'article').length;
+    const questions = unifiedActivities.filter((it) => it.kind === 'question').length;
+    const replies = unifiedActivities.filter((it) => it.kind === 'reply').length;
+    return {
+      All: unifiedActivities.length,
+      Discussions: discussions,
+      Questions: questions,
+      Replies: replies,
+    };
+  }, [unifiedActivities]);
 
   const handleOpenOrcid = () => {
     if (user.orcidId) {
@@ -683,6 +797,13 @@ export default function CurrentUserProfileScreen() {
                       </Text>
                     </View>
                   )}
+                  {tab === 'Activity' && unifiedActivities.length > 0 && (
+                    <View style={[styles.tabBadge, { backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.borderLight }]}>
+                      <Text style={[styles.tabBadgeText, { color: colors.textSecondary }]}>
+                        {unifiedActivities.length}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -854,11 +975,273 @@ export default function CurrentUserProfileScreen() {
 
         {activeSubTab === 'Activity' && (
           <View style={styles.activityList}>
-            <EmptyState
-              icon="TrendingUp"
-              title="Recent Activity"
-              description="Your recent discussions, questions, and replies will appear here in chronological order."
-            />
+            {/* Filter Chips: All | Discussions | Questions | Replies */}
+            <View style={styles.savedFilterRow}>
+              {(['All', 'Discussions', 'Questions', 'Replies'] as const).map((filter) => {
+                const count = activityCounts[filter];
+                return (
+                  <TouchableOpacity
+                    key={filter}
+                    style={[
+                      styles.savedFilterChip,
+                      activitySubFilter === filter && styles.savedFilterChipActive,
+                    ]}
+                    onPress={() => {
+                      try {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      } catch {}
+                      setActivitySubFilter(filter);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.savedFilterChipText,
+                        activitySubFilter === filter && styles.savedFilterChipTextActive,
+                      ]}
+                    >
+                      {filter}
+                    </Text>
+                    <View
+                      style={[
+                        styles.savedFilterCountBadge,
+                        activitySubFilter === filter && styles.savedFilterCountBadgeActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.savedFilterCountText,
+                          activitySubFilter === filter && styles.savedFilterCountTextActive,
+                        ]}
+                      >
+                        {count}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {isLoadingPosts || isLoadingComments ? (
+              <View style={{ paddingVertical: spacing.xl * 2, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="small" color={colors.accentBlue} />
+                <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm }}>
+                  Loading recent activity...
+                </Text>
+              </View>
+            ) : filteredActivities.length === 0 ? (
+              <EmptyState
+                icon="TrendingUp"
+                title={
+                  activitySubFilter === 'All'
+                    ? 'Recent Activity'
+                    : `No ${activitySubFilter.toLowerCase()} yet`
+                }
+                description={
+                  activitySubFilter === 'All'
+                    ? 'Your recent discussions, questions, and replies will appear here in chronological order.'
+                    : `Your ${activitySubFilter.toLowerCase()} will appear here once published.`
+                }
+                actionTitle={activitySubFilter === 'Replies' ? 'Explore Feed' : 'Start a Discussion'}
+                onAction={() =>
+                  activitySubFilter === 'Replies'
+                    ? router.push('/(tabs)')
+                    : router.push('/(tabs)/create')
+                }
+              />
+            ) : (
+              <View style={styles.activityItemsList}>
+                {filteredActivities.map((item) => {
+                  if (item.kind === 'reply') {
+                    const c = item.comment;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.activityCard}
+                        onPress={() => {
+                          try {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          } catch {}
+                          router.push({
+                            pathname: '/post/[id]',
+                            params: { id: c.postId },
+                          });
+                        }}
+                        activeOpacity={0.88}
+                      >
+                        {/* Header Badge & Time */}
+                        <View style={styles.activityCardHeader}>
+                          <View
+                            style={[
+                              styles.activityBadge,
+                              {
+                                backgroundColor: 'rgba(5, 150, 105, 0.08)',
+                                borderColor: 'rgba(5, 150, 105, 0.2)',
+                              },
+                            ]}
+                          >
+                            <CornerDownRight size={13} color="#059669" strokeWidth={2.2} />
+                            <Text style={[styles.activityBadgeText, { color: '#059669' }]}>
+                              Replied to Discussion
+                            </Text>
+                          </View>
+                          <View style={styles.activityTimeRow}>
+                            <Clock size={11} color={colors.textMuted} style={{ marginRight: 4 }} />
+                            <Text style={styles.activityTimeText}>{item.createdAt}</Text>
+                          </View>
+                        </View>
+
+                        {/* In response to target post */}
+                        {c.postTitle && (
+                          <View style={styles.activityContextRow}>
+                            <Text style={styles.activityContextLabel} numberOfLines={1}>
+                              In discussion:{' '}
+                              <Text style={styles.activityContextTitle}>{c.postTitle}</Text>
+                            </Text>
+                          </View>
+                        )}
+
+                        {/* Reply content quote bubble */}
+                        <View style={styles.activityReplyBubble}>
+                          <Text style={styles.activityReplyContent} numberOfLines={4}>
+                            "{c.content}"
+                          </Text>
+                        </View>
+
+                        {/* Footer */}
+                        <View style={styles.activityFooterRow}>
+                          <View style={styles.activityStatsGroup}>
+                            <View style={styles.activityStatItem}>
+                              <LikeIcon size={14} color={colors.textMuted} />
+                              <Text style={styles.activityStatNumber}>{c.likesCount || 0}</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.activityViewThreadText}>
+                            View discussion thread →
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
+
+                  // It's a post (discussion, question, article)
+                  const p = item.post;
+                  const isQuestion = item.kind === 'question';
+                  const isArticle = item.kind === 'article';
+
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.activityCard}
+                      onPress={() => {
+                        try {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        } catch {}
+                        router.push({
+                          pathname: '/post/[id]',
+                          params: { id: p.id },
+                        });
+                      }}
+                      activeOpacity={0.88}
+                    >
+                      {/* Header Badge & Time */}
+                      <View style={styles.activityCardHeader}>
+                        <View
+                          style={[
+                            styles.activityBadge,
+                            isQuestion
+                              ? {
+                                  backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                                  borderColor: 'rgba(37, 99, 235, 0.2)',
+                                }
+                              : isArticle
+                              ? {
+                                  backgroundColor: 'rgba(124, 58, 237, 0.08)',
+                                  borderColor: 'rgba(124, 58, 237, 0.2)',
+                                }
+                              : {
+                                  backgroundColor: 'rgba(6, 78, 59, 0.08)',
+                                  borderColor: 'rgba(6, 78, 59, 0.2)',
+                                },
+                          ]}
+                        >
+                          {isQuestion ? (
+                            <HelpCircle size={13} color="#2563EB" strokeWidth={2.2} />
+                          ) : isArticle ? (
+                            <FileText size={13} color="#7C3AED" strokeWidth={2.2} />
+                          ) : (
+                            <MessageSquare size={13} color="#064E3B" strokeWidth={2.2} />
+                          )}
+                          <Text
+                            style={[
+                              styles.activityBadgeText,
+                              {
+                                color: isQuestion
+                                  ? '#2563EB'
+                                  : isArticle
+                                  ? '#7C3AED'
+                                  : '#064E3B',
+                              },
+                            ]}
+                          >
+                            {isQuestion
+                              ? 'Asked a Question'
+                              : isArticle
+                              ? 'Published Article'
+                              : 'Started a Discussion'}
+                          </Text>
+                        </View>
+                        <View style={styles.activityTimeRow}>
+                          <Clock size={11} color={colors.textMuted} style={{ marginRight: 4 }} />
+                          <Text style={styles.activityTimeText}>{p.createdAt}</Text>
+                        </View>
+                      </View>
+
+                      {/* Title if present */}
+                      {p.article?.title ? (
+                        <Text style={styles.activityPostTitle} numberOfLines={2}>
+                          {p.article.title}
+                        </Text>
+                      ) : null}
+
+                      {/* Content snippet */}
+                      <Text style={styles.activityPostContent} numberOfLines={3}>
+                        {p.content}
+                      </Text>
+
+                      {/* Paper snippet if attached */}
+                      {p.paper && (
+                        <View style={styles.activityPaperSnippet}>
+                          <FileText size={14} color={colors.textSecondary} style={{ marginRight: 6 }} />
+                          <Text style={styles.activityPaperTitle} numberOfLines={1}>
+                            {p.paper.title}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Footer */}
+                      <View style={styles.activityFooterRow}>
+                        <View style={styles.activityStatsGroup}>
+                          <View style={styles.activityStatItem}>
+                            <LikeIcon size={14} color={colors.textMuted} />
+                            <Text style={styles.activityStatNumber}>{p.likesCount || 0}</Text>
+                          </View>
+                          <View style={styles.activityStatItem}>
+                            <MessageSquare size={14} color={colors.textMuted} />
+                            <Text style={styles.activityStatNumber}>{p.commentsCount || 0}</Text>
+                          </View>
+                          <View style={styles.activityStatItem}>
+                            <Repeat size={14} color={colors.textMuted} />
+                            <Text style={styles.activityStatNumber}>{p.repostsCount || 0}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.activityViewThreadText}>Open discussion →</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -1480,6 +1863,140 @@ const styles = StyleSheet.create({
   },
   activityList: {
     padding: spacing.lg,
+  },
+  activityItemsList: {
+    width: '100%',
+  },
+  activityCard: {
+    backgroundColor: colors.cardBackground,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  activityCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  activityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+    borderWidth: 1,
+  },
+  activityBadgeText: {
+    ...typography.micro,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+  activityTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  activityTimeText: {
+    ...typography.micro,
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  activityPostTitle: {
+    ...typography.captionBold,
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  activityPostContent: {
+    ...typography.body,
+    color: colors.textPrimary,
+    fontSize: 13.5,
+    lineHeight: 19,
+    marginBottom: spacing.sm,
+  },
+  activityPaperSnippet: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  activityPaperTitle: {
+    ...typography.captionMedium,
+    color: colors.textSecondary,
+    fontSize: 12,
+    flex: 1,
+  },
+  activityContextRow: {
+    marginBottom: spacing.xs,
+  },
+  activityContextLabel: {
+    ...typography.micro,
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  activityContextTitle: {
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  activityReplyBubble: {
+    backgroundColor: colors.backgroundSecondary,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.brandGreen,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  activityReplyContent: {
+    ...typography.body,
+    color: colors.textPrimary,
+    fontSize: 13.5,
+    lineHeight: 19,
+    fontStyle: 'italic',
+  },
+  activityFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  activityStatsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  activityStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  activityStatNumber: {
+    ...typography.micro,
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  activityViewThreadText: {
+    ...typography.captionBold,
+    color: colors.accentBlue,
+    fontSize: 12,
+    fontWeight: '600',
   },
   connectsList: {
     padding: spacing.lg,
