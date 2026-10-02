@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ViewStyle,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -15,6 +16,7 @@ import {
   Check,
   BookOpen,
   ArrowRight,
+  UserPlus,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Post } from '../../types';
@@ -54,6 +56,45 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
   const toggleSave = usePostStore((s) => s.toggleSavePost);
   const votePoll = usePostStore((s) => s.votePoll);
   const currentUser = useAuthStore((s) => s.user);
+
+  const isFollowing = useAuthStore(
+    (s) =>
+      Boolean(post.author?.id && s.followingIds.has(post.author.id)) ||
+      Boolean(post.author?.isFollowing)
+  );
+  const isFollowLoading = useAuthStore(
+    (s) => Boolean(post.author?.id && s.followLoadingIds.has(post.author.id))
+  );
+  const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
+  const isSelf = Boolean(currentUser?.id && currentUser.id === post.author?.id);
+  const [hasToggledInSession, setHasToggledInSession] = useState(false);
+
+  // Synchronize initial author isFollowing flag into global auth store
+  React.useEffect(() => {
+    if (post.author?.isFollowing && post.author.id) {
+      useAuthStore.setState((state) => {
+        if (!state.followingIds.has(post.author.id)) {
+          const next = new Set(state.followingIds);
+          next.add(post.author.id);
+          return { followingIds: next };
+        }
+        return state;
+      });
+    }
+  }, [post.author?.id, post.author?.isFollowing]);
+
+  const handleToggleFollow = async (e: any) => {
+    e.stopPropagation();
+    if (!post.author?.id || isFollowLoading) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    setHasToggledInSession(true);
+    await toggleFollowUser(post.author.id);
+  };
+
+  const showFollowButton =
+    !isSelf && Boolean(post.author?.id) && (!isFollowing || hasToggledInSession);
 
   const handlePostPress = () => {
     router.push({
@@ -157,19 +198,52 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.moreButton}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          onPress={(e) => {
-            e.stopPropagation();
-            try {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            } catch {}
-            setIsOptionsOpen(true);
-          }}
-        >
-          <MoreHorizontal size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {showFollowButton && (
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={handleToggleFollow}
+              disabled={isFollowLoading}
+              style={[
+                styles.postFollowBtn,
+                isFollowing && styles.postFollowingBtn,
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            >
+              {isFollowLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={isFollowing ? '#064E3B' : '#FFFFFF'}
+                  style={{ transform: [{ scale: 0.7 }] }}
+                />
+              ) : isFollowing ? (
+                <View style={styles.followBtnContent}>
+                  <Check size={11} color="#064E3B" strokeWidth={2.5} />
+                  <Text style={styles.postFollowingBtnText}>Following</Text>
+                </View>
+              ) : (
+                <View style={styles.followBtnContent}>
+                  <UserPlus size={11} color="#FFFFFF" strokeWidth={2.4} />
+                  <Text style={styles.postFollowBtnText}>Follow</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={styles.moreButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            onPress={(e) => {
+              e.stopPropagation();
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              setIsOptionsOpen(true);
+            }}
+          >
+            <MoreHorizontal size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Research Article Preview Card */}
@@ -443,6 +517,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: spacing.xs,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 4,
+  },
+  postFollowBtn: {
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 11,
+    paddingVertical: 4.5,
+    borderRadius: radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 27,
+    shadowColor: '#064E3B',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.16,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  postFollowingBtn: {
+    backgroundColor: '#EAF3EE',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  followBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  postFollowBtnText: {
+    ...typography.captionBold,
+    fontSize: 11.5,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+  postFollowingBtnText: {
+    ...typography.captionMedium,
+    fontSize: 11.5,
+    color: '#064E3B',
+    fontWeight: '700',
+    letterSpacing: 0.1,
   },
   authorMeta: {
     marginLeft: spacing.md,

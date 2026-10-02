@@ -116,15 +116,24 @@ export default function OtherResearcherProfileScreen() {
       if (!prof) {
         prof = await fetchUserProfileByUsername(cleanId, currentUser?.id);
       }
-      if (prof && prof.isFollowing) {
-        useAuthStore.setState((state) => {
-          if (!state.followingIds.has(prof.id)) {
-            const next = new Set(state.followingIds);
-            next.add(prof.id);
-            return { followingIds: next };
-          }
-          return state;
-        });
+      if (prof) {
+        const currentlyFollowing = useAuthStore.getState().followingIds.has(prof.id);
+        if (currentlyFollowing) {
+          prof = {
+            ...prof,
+            isFollowing: true,
+            followersCount: prof.isFollowing ? prof.followersCount : (prof.followersCount || 0) + 1,
+          };
+        } else if (prof.isFollowing) {
+          useAuthStore.setState((state) => {
+            if (!state.followingIds.has(prof!.id)) {
+              const next = new Set(state.followingIds);
+              next.add(prof!.id);
+              return { followingIds: next };
+            }
+            return state;
+          });
+        }
       }
       setResearcher(prof);
       if (prof?.id) {
