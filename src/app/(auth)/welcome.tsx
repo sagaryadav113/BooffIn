@@ -72,7 +72,7 @@ export default function WelcomeScreen() {
             gap: 56,
           }}
         >
-          {/* Left Column: Welcome Graphic & Branding (Zoomed 1.5X and pulled down 20px) */}
+          {/* Left Column: Welcome Graphic & Branding (Zoomed 1.5X and pulled down 50px) */}
           <div
             style={{
               flex: 1.35,
@@ -94,7 +94,7 @@ export default function WelcomeScreen() {
                 maxWidth: 660,
                 height: 720,
                 maxHeight: 760,
-                transform: [{ translateY: 20 }, { scale: 1.5 }],
+                transform: [{ translateY: 50 }, { scale: 1.5 }],
               }}
               contentFit="contain"
               accessibilityLabel="Welcome to BooffIn - Research finds its people"
