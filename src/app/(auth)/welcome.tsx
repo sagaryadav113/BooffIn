@@ -94,7 +94,7 @@ export default function WelcomeScreen() {
                 maxWidth: 660,
                 height: 720,
                 maxHeight: 760,
-                transform: [{ translateY: 70 }, { scale: 1.5 }],
+                transform: [{ translateY: 100 }, { scale: 1.5 }],
               }}
               contentFit="contain"
               accessibilityLabel="Welcome to BooffIn - Research finds its people"
