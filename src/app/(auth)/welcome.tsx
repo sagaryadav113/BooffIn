@@ -45,7 +45,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.outerContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="#EDEAE4" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <ImageBackground
         source={WELCOME_HERO_BG}
         style={styles.backgroundImage}
@@ -119,7 +119,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
-    backgroundColor: '#EDEAE4',
+    backgroundColor: '#FFFFFF',
   },
   backgroundImage: {
     flex: 1,
@@ -175,12 +175,12 @@ const styles = StyleSheet.create({
     height: layout.buttonHeights.lg,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.12)',
+    borderColor: colors.gray200,
     borderRadius: radii.md,
     gap: spacing.sm + 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1.5 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 3,
     elevation: 2,
     ...(Platform.OS === 'web'
@@ -202,16 +202,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     height: layout.buttonHeights.lg,
-    backgroundColor: colors.white,
+    backgroundColor: colors.gray50,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.12)',
+    borderColor: colors.gray200,
     borderRadius: radii.md,
     gap: spacing.sm + 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1.5 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
     ...(Platform.OS === 'web'
       ? {
           cursor: 'pointer' as any,
@@ -232,13 +232,13 @@ const styles = StyleSheet.create({
   },
   legalText: {
     ...typography.metadata,
-    color: '#6B6862',
+    color: colors.textSecondary,
     fontSize: 12.5,
     lineHeight: 17,
     textAlign: 'center',
   },
   legalLink: {
-    color: '#2A2927',
+    color: colors.textPrimary,
     textDecorationLine: 'underline',
   },
 });
