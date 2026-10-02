@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
@@ -12,14 +12,25 @@ import {
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
+import { fetchUserAnalytics } from '../../api/analyticsService';
+import { UserAnalyticsSummary } from '../../types/analytics';
 
 export const DesktopSettingsRightSidebar: React.FC = () => {
   const currentUser = useAuthStore((s) => s.user);
+  const [analytics, setAnalytics] = useState<UserAnalyticsSummary | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchUserAnalytics(currentUser.id, '28d').then(({ summary }) => {
+        if (summary) setAnalytics(summary);
+      });
+    }
+  }, [currentUser?.id]);
 
   return (
     <aside style={{ width: 320, minWidth: 320 }}>
       <View style={styles.container}>
-        {/* User Mini Profile Preview Card */}
+        {/* User Real Profile Preview Card */}
         <View style={styles.profileCard}>
           {/* Banner */}
           <View style={styles.bannerWrap}>
@@ -49,7 +60,9 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
               <Text style={styles.fullName} numberOfLines={1}>
                 {currentUser?.fullName || currentUser?.handle || 'Academic Researcher'}
               </Text>
-              <CheckCircle2 size={15} color="#064E3B" fill="#EAF3EE" />
+              {currentUser?.orcidVerified && (
+                <CheckCircle2 size={15} color="#064E3B" fill="#EAF3EE" />
+              )}
             </View>
 
             <Text style={styles.handle}>@{currentUser?.handle || 'scholar'}</Text>
@@ -66,7 +79,7 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
               </Text>
             ) : null}
 
-            {/* Location & Joined */}
+            {/* Location & Joined Date */}
             <View style={styles.metaRow}>
               {currentUser?.location && (
                 <View style={styles.metaItem}>
@@ -74,10 +87,12 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
                   <Text style={styles.metaText}>{currentUser.location}</Text>
                 </View>
               )}
-              <View style={styles.metaItem}>
-                <Calendar size={12} color="#64748B" />
-                <Text style={styles.metaText}>Joined 2026</Text>
-              </View>
+              {currentUser?.joinedDate && (
+                <View style={styles.metaItem}>
+                  <Calendar size={12} color="#64748B" />
+                  <Text style={styles.metaText}>Joined {currentUser.joinedDate}</Text>
+                </View>
+              )}
             </View>
 
             {/* Impact Bar */}
@@ -91,30 +106,30 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
                 <View>
                   <Text style={styles.impactTitle}>RESEARCH IMPACT</Text>
                   <Text style={styles.impactCount}>
-                    1.2K Views (last 28d)
+                    {analytics?.totalViews ? `${analytics.totalViews}` : '0'} Views (last 28d)
                   </Text>
                 </View>
               </View>
               <ArrowRight size={14} color="#064E3B" />
             </TouchableOpacity>
 
-            {/* Profile Counts */}
+            {/* Real Database Profile Counts */}
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>
-                  {currentUser?.followingCount ?? 1}
+                  {currentUser?.followingCount ?? 0}
                 </Text>
                 <Text style={styles.statLabel}>Following</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>
-                  {currentUser?.followersCount ?? 4}
+                  {currentUser?.followersCount ?? 0}
                 </Text>
                 <Text style={styles.statLabel}>Followers</Text>
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statNumber}>
-                  {currentUser?.postsCount ?? 8}
+                  {currentUser?.postsCount ?? 0}
                 </Text>
                 <Text style={styles.statLabel}>Posts & Shares</Text>
               </View>

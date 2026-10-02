@@ -46,7 +46,7 @@ export const DesktopRightSidebar: React.FC = () => {
       });
     }
 
-    // Fetch suggested researchers from Supabase
+    // Fetch real suggested researchers from Supabase profiles
     const loadSuggested = async () => {
       try {
         let query = supabase
@@ -90,17 +90,20 @@ export const DesktopRightSidebar: React.FC = () => {
     try {
       await toggleFollowUserRpc(currentUser.id, researcherId);
     } catch {
-      // Revert on error
       setFollowingStates((prev) => ({ ...prev, [researcherId]: currentFollowing }));
     }
   };
 
   const topTopics = topics.slice(0, 5);
+  const sparklineData = analytics?.dailySeries && analytics.dailySeries.length > 0
+    ? analytics.dailySeries.slice(-14)
+    : [];
+  const maxViews = Math.max(...sparklineData.map((d) => d.views || 0), 1);
 
   return (
     <aside style={{ width: 320, minWidth: 320 }}>
       <View style={styles.container}>
-        {/* 1. Researcher Impact Card */}
+        {/* 1. Real Researcher Impact Card */}
         <View style={styles.card}>
           <View style={styles.impactHeader}>
             <View style={styles.impactTitleRow}>
@@ -121,48 +124,54 @@ export const DesktopRightSidebar: React.FC = () => {
 
           <View style={styles.impactBody}>
             <Text style={styles.impactStatNumber}>
-              {analytics?.totalViews ? `${analytics.totalViews}` : '1.2K'}
+              {analytics?.totalViews ? `${analytics.totalViews}` : '0'}
             </Text>
             <Text style={styles.impactStatLabel}>Views (last 28d)</Text>
           </View>
 
-          {/* Mini Sparkline Visualization */}
-          <View style={styles.sparklineContainer}>
-            {[35, 42, 38, 55, 60, 48, 70, 65, 80, 75, 90, 85, 95, 100].map((val, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.sparklineBar,
-                  {
-                    height: (val / 100) * 28,
-                    backgroundColor: idx >= 10 ? '#064E3B' : '#CBD5E1',
-                  },
-                ]}
-              />
-            ))}
-          </View>
+          {/* Real Daily Series Sparkline Visualization */}
+          {sparklineData.length > 0 ? (
+            <View style={styles.sparklineContainer}>
+              {sparklineData.map((dp, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.sparklineBar,
+                    {
+                      height: Math.max(((dp.views || 0) / maxViews) * 28, 4),
+                      backgroundColor: idx >= sparklineData.length - 4 ? '#064E3B' : '#CBD5E1',
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptySparkline}>
+              <Text style={styles.emptySparklineText}>Analytics tracking active</Text>
+            </View>
+          )}
         </View>
 
-        {/* 2. Trending Research Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.headerLeft}>
-              <TrendingUp size={16} color="#DC2626" strokeWidth={2.4} />
-              <Text style={styles.cardTitle}>Trending Research</Text>
+        {/* 2. Real Trending Topics */}
+        {topTopics.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.headerLeft}>
+                <TrendingUp size={16} color="#DC2626" strokeWidth={2.4} />
+                <Text style={styles.cardTitle}>Trending Research</Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push('/topic')}
+                style={styles.seeAllRow}
+              >
+                <Text style={styles.seeAllText}>View all</Text>
+                <ArrowRight size={12} color="#64748B" />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => router.push('/topic')}
-              style={styles.seeAllRow}
-            >
-              <Text style={styles.seeAllText}>View all</Text>
-              <ArrowRight size={12} color="#64748B" />
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.trendingList}>
-            {topTopics.length > 0 ? (
-              topTopics.map((topic, idx) => (
+            <View style={styles.trendingList}>
+              {topTopics.map((topic, idx) => (
                 <TouchableOpacity
                   key={topic.id}
                   activeOpacity={0.7}
@@ -175,101 +184,80 @@ export const DesktopRightSidebar: React.FC = () => {
                       {topic.name}
                     </Text>
                     <Text style={styles.trendingPostsCount}>
-                      {topic.postsCount > 0 ? `${topic.postsCount} posts` : 'Trending'}
+                      {topic.postsCount > 0 ? `${topic.postsCount} posts` : 'Active'}
                     </Text>
                   </View>
                 </TouchableOpacity>
-              ))
-            ) : (
-              [
-                { name: 'Synaptic plasticity', count: '12.4K posts' },
-                { name: 'CRISPR screening', count: '8.7K posts' },
-                { name: 'Protein language models', count: '8.1K posts' },
-                { name: 'Brain-computer interfaces', count: '6.9K posts' },
-                { name: 'Spatial transcriptomics', count: '5.6K posts' },
-              ].map((item, idx) => (
-                <TouchableOpacity
-                  key={item.name}
-                  activeOpacity={0.7}
-                  onPress={() => router.push('/topic')}
-                  style={styles.trendingItem}
-                >
-                  <Text style={styles.trendingRank}>{idx + 1}</Text>
-                  <View style={styles.trendingMeta}>
-                    <Text style={styles.trendingName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.trendingPostsCount}>{item.count}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        </View>
-
-        {/* 3. Researchers to Follow */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.headerLeft}>
-              <Users size={16} color="#064E3B" strokeWidth={2.4} />
-              <Text style={styles.cardTitle}>Researchers to Follow</Text>
+              ))}
             </View>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => router.push('/search?tab=researchers')}
-              style={styles.seeAllRow}
-            >
-              <Text style={styles.seeAllText}>View all</Text>
-              <ArrowRight size={12} color="#64748B" />
-            </TouchableOpacity>
           </View>
+        )}
 
-          <View style={styles.researchersList}>
-            {suggestedResearchers.map((researcher) => {
-              const isFollowing = followingStates[researcher.id];
-              return (
-                <View key={researcher.id} style={styles.researcherRow}>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => router.push(`/profile/${researcher.id}`)}
-                    style={styles.researcherMetaTouch}
-                  >
-                    <Avatar
-                      uri={researcher.avatarUrl}
-                      name={researcher.fullName}
-                      size="sm"
-                    />
-                    <View style={styles.researcherInfo}>
-                      <Text style={styles.researcherName} numberOfLines={1}>
-                        {researcher.fullName}
-                      </Text>
-                      <Text style={styles.researcherSub} numberOfLines={1}>
-                        {[researcher.academicTitle, researcher.institution]
-                          .filter(Boolean)
-                          .join(' · ') || `@${researcher.handle}`}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
+        {/* 3. Real Suggested Researchers from Database */}
+        {suggestedResearchers.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.headerLeft}>
+                <Users size={16} color="#064E3B" strokeWidth={2.4} />
+                <Text style={styles.cardTitle}>Researchers to Follow</Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push('/search?tab=researchers')}
+                style={styles.seeAllRow}
+              >
+                <Text style={styles.seeAllText}>View all</Text>
+                <ArrowRight size={12} color="#64748B" />
+              </TouchableOpacity>
+            </View>
 
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => handleFollowToggle(researcher.id)}
-                    style={[
-                      styles.followBtn,
-                      isFollowing && styles.followingBtn,
-                    ]}
-                  >
-                    {isFollowing ? (
-                      <Check size={14} color="#064E3B" strokeWidth={2.5} />
-                    ) : (
-                      <Plus size={14} color="#064E3B" strokeWidth={2.5} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
+            <View style={styles.researchersList}>
+              {suggestedResearchers.map((researcher) => {
+                const isFollowing = followingStates[researcher.id];
+                return (
+                  <View key={researcher.id} style={styles.researcherRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => router.push(`/profile/${researcher.id}`)}
+                      style={styles.researcherMetaTouch}
+                    >
+                      <Avatar
+                        uri={researcher.avatarUrl}
+                        name={researcher.fullName}
+                        size="sm"
+                      />
+                      <View style={styles.researcherInfo}>
+                        <Text style={styles.researcherName} numberOfLines={1}>
+                          {researcher.fullName}
+                        </Text>
+                        <Text style={styles.researcherSub} numberOfLines={1}>
+                          {[researcher.academicTitle, researcher.institution]
+                            .filter(Boolean)
+                            .join(' · ') || `@${researcher.handle}`}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => handleFollowToggle(researcher.id)}
+                      style={[
+                        styles.followBtn,
+                        isFollowing && styles.followingBtn,
+                      ]}
+                    >
+                      {isFollowing ? (
+                        <Check size={14} color="#064E3B" strokeWidth={2.5} />
+                      ) : (
+                        <Plus size={14} color="#064E3B" strokeWidth={2.5} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
           </View>
-        </View>
+        )}
       </View>
     </aside>
   );
@@ -351,6 +339,13 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 2,
     minHeight: 4,
+  },
+  emptySparkline: {
+    paddingVertical: 6,
+  },
+  emptySparklineText: {
+    fontSize: 11.5,
+    color: '#94A3B8',
   },
   cardHeaderRow: {
     flexDirection: 'row',

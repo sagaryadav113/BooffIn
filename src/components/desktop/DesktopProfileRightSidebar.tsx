@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import {
   Activity,
@@ -15,6 +15,9 @@ import {
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { UserProfile } from '../../types';
+import { fetchUserAnalytics } from '../../api/analyticsService';
+import { UserAnalyticsSummary } from '../../types/analytics';
+import { fetchUserComments, UserCommentActivity } from '../../api/socialService';
 
 interface DesktopProfileRightSidebarProps {
   user: UserProfile | null;
@@ -30,10 +33,40 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
   const fields = [user?.primaryField, ...(user?.secondaryFields || [])].filter(Boolean);
   const interests = user?.researchInterests || [];
 
+  const [analytics, setAnalytics] = useState<UserAnalyticsSummary | null>(null);
+  const [activities, setActivities] = useState<UserCommentActivity[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (user?.id) {
+      setIsLoading(true);
+      Promise.all([
+        fetchUserAnalytics(user.id, '28d').then(({ summary }) => {
+          if (summary) setAnalytics(summary);
+        }),
+        fetchUserComments(user.id).then(({ comments }) => {
+          setActivities(comments.slice(0, 4));
+        }),
+      ]).finally(() => setIsLoading(false));
+    }
+  }, [user?.id]);
+
+  const handleOpenLink = (url?: string) => {
+    if (!url) return;
+    const clean = url.startsWith('http') ? url : `https://${url}`;
+    Linking.openURL(clean).catch(() => {});
+  };
+
+  const sparklineData = analytics?.dailySeries && analytics.dailySeries.length > 0
+    ? analytics.dailySeries.slice(-14)
+    : [];
+
+  const maxViews = Math.max(...sparklineData.map((d) => d.views || 0), 1);
+
   return (
     <aside style={{ width: 320, minWidth: 320 }}>
       <View style={styles.container}>
-        {/* 1. Research Impact Card */}
+        {/* 1. Real Research Impact Card */}
         <View style={styles.card}>
           <View style={styles.impactHeader}>
             <View style={styles.impactTitleRow}>
@@ -44,7 +77,7 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={onOpenAnalytics}
+              onPress={onOpenAnalytics || (() => router.push('/(tabs)/profile'))}
               style={styles.viewAnalyticsBtn}
             >
               <Text style={styles.viewAnalyticsText}>View Analytics</Text>
@@ -53,27 +86,35 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
           </View>
 
           <View style={styles.impactBody}>
-            <Text style={styles.impactStatNumber}>1.2K</Text>
+            <Text style={styles.impactStatNumber}>
+              {analytics?.totalViews ? `${analytics.totalViews}` : '0'}
+            </Text>
             <Text style={styles.impactStatLabel}>Views (last 28d)</Text>
           </View>
 
-          <View style={styles.sparklineContainer}>
-            {[35, 42, 38, 55, 60, 48, 70, 65, 80, 75, 90, 85, 95, 100].map((val, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.sparklineBar,
-                  {
-                    height: (val / 100) * 28,
-                    backgroundColor: idx >= 10 ? '#064E3B' : '#CBD5E1',
-                  },
-                ]}
-              />
-            ))}
-          </View>
+          {sparklineData.length > 0 ? (
+            <View style={styles.sparklineContainer}>
+              {sparklineData.map((dp, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.sparklineBar,
+                    {
+                      height: Math.max(((dp.views || 0) / maxViews) * 28, 4),
+                      backgroundColor: idx >= sparklineData.length - 4 ? '#064E3B' : '#CBD5E1',
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptySparkline}>
+              <Text style={styles.emptySparklineText}>Analytics syncing</Text>
+            </View>
+          )}
         </View>
 
-        {/* 2. About Card */}
+        {/* 2. Real About Card */}
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>About</Text>
@@ -104,70 +145,94 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
               </Text>
             </View>
 
-            <View style={styles.aboutRow}>
-              <Text style={styles.aboutLabel}>Website</Text>
-              <Text style={styles.aboutValue}>
-                {user?.websiteUrl ? user.websiteUrl : 'Add website'}
-              </Text>
-            </View>
+            {user?.websiteUrl ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleOpenLink(user.websiteUrl)}
+                style={styles.aboutRowClickable}
+              >
+                <Text style={styles.aboutLabel}>Website</Text>
+                <View style={styles.linkValueRow}>
+                  <Text style={styles.aboutLinkText} numberOfLines={1}>
+                    {user.websiteUrl.replace(/^https?:\/\//, '')}
+                  </Text>
+                  <ExternalLink size={11} color="#2563EB" />
+                </View>
+              </TouchableOpacity>
+            ) : null}
 
-            <View style={styles.aboutRow}>
-              <Text style={styles.aboutLabel}>ORCID</Text>
-              <Text style={styles.aboutValue}>
-                {user?.orcidId ? user.orcidId : 'Add your ORCID'}
-              </Text>
-            </View>
+            {user?.orcidId ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleOpenLink(`https://orcid.org/${user.orcidId}`)}
+                style={styles.aboutRowClickable}
+              >
+                <Text style={styles.aboutLabel}>ORCID</Text>
+                <View style={styles.linkValueRow}>
+                  <Text style={styles.aboutLinkText}>{user.orcidId}</Text>
+                  <ExternalLink size={11} color="#2563EB" />
+                </View>
+              </TouchableOpacity>
+            ) : null}
 
-            <View style={styles.aboutRow}>
-              <Text style={styles.aboutLabel}>Google Scholar</Text>
-              <Text style={styles.aboutValue}>
-                {user?.googleScholarUrl ? 'Connected' : 'Add profile'}
-              </Text>
-            </View>
+            {user?.googleScholarUrl ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleOpenLink(user.googleScholarUrl)}
+                style={styles.aboutRowClickable}
+              >
+                <Text style={styles.aboutLabel}>Google Scholar</Text>
+                <View style={styles.linkValueRow}>
+                  <Text style={styles.aboutLinkText}>Connected</Text>
+                  <ExternalLink size={11} color="#2563EB" />
+                </View>
+              </TouchableOpacity>
+            ) : null}
 
-            <View style={styles.aboutRow}>
-              <Text style={styles.aboutLabel}>ResearchGate</Text>
-              <Text style={styles.aboutValue}>
-                {user?.researchgateUrl ? 'Connected' : 'Add profile'}
-              </Text>
-            </View>
+            {user?.researchgateUrl ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleOpenLink(user.researchgateUrl)}
+                style={styles.aboutRowClickable}
+              >
+                <Text style={styles.aboutLabel}>ResearchGate</Text>
+                <View style={styles.linkValueRow}>
+                  <Text style={styles.aboutLinkText}>Connected</Text>
+                  <ExternalLink size={11} color="#2563EB" />
+                </View>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
 
-        {/* 3. Research Interests */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Research Interests</Text>
-            {onEditProfile && (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={onEditProfile}
-                style={styles.editAction}
-              >
-                <Edit2 size={12} color="#64748B" />
-                <Text style={styles.editText}>Edit</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        {/* 3. Real Research Interests */}
+        {interests.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>Research Interests</Text>
+              {onEditProfile && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={onEditProfile}
+                  style={styles.editAction}
+                >
+                  <Edit2 size={12} color="#64748B" />
+                  <Text style={styles.editText}>Edit</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
-          <View style={styles.chipsWrap}>
-            {interests.length > 0 ? (
-              interests.map((interest, idx) => (
+            <View style={styles.chipsWrap}>
+              {interests.map((interest, idx) => (
                 <View key={idx} style={styles.interestChip}>
                   <Text style={styles.interestChipText}>{interest}</Text>
                 </View>
-              ))
-            ) : (
-              ['Neural circuits', 'Brain aging', 'Single-cell genomics', 'Computational neuroscience'].map((item, idx) => (
-                <View key={idx} style={styles.interestChip}>
-                  <Text style={styles.interestChipText}>{item}</Text>
-                </View>
-              ))
-            )}
+              ))}
+            </View>
           </View>
-        </View>
+        )}
 
-        {/* 4. Recent Activity */}
+        {/* 4. Real Recent Activity */}
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>Recent Activity</Text>
@@ -181,47 +246,30 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
             </TouchableOpacity>
           </View>
 
-          <View style={styles.activityList}>
-            <View style={styles.activityItem}>
-              <Repeat2 size={15} color="#059669" />
-              <View style={styles.activityMeta}>
-                <Text style={styles.activityTitle} numberOfLines={1}>
-                  Reposted a discussion
-                </Text>
-                <Text style={styles.activityTime}>1d ago</Text>
-              </View>
+          {activities.length > 0 ? (
+            <View style={styles.activityList}>
+              {activities.map((act) => (
+                <TouchableOpacity
+                  key={act.id}
+                  activeOpacity={0.7}
+                  onPress={() => router.push(`/post/${act.postId}`)}
+                  style={styles.activityItem}
+                >
+                  <MessageSquare size={14} color="#064E3B" />
+                  <View style={styles.activityMeta}>
+                    <Text style={styles.activityTitle} numberOfLines={1}>
+                      {act.content}
+                    </Text>
+                    <Text style={styles.activityTime}>{act.createdAt}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
-
-            <View style={styles.activityItem}>
-              <Bookmark size={15} color="#2563EB" />
-              <View style={styles.activityMeta}>
-                <Text style={styles.activityTitle} numberOfLines={1}>
-                  Saved a paper
-                </Text>
-                <Text style={styles.activityTime}>3d ago</Text>
-              </View>
+          ) : (
+            <View style={styles.emptyActivity}>
+              <Text style={styles.emptyActivityText}>No recent public comments or discussions.</Text>
             </View>
-
-            <View style={styles.activityItem}>
-              <UserPlus size={15} color="#D97706" />
-              <View style={styles.activityMeta}>
-                <Text style={styles.activityTitle} numberOfLines={1}>
-                  Followed a researcher
-                </Text>
-                <Text style={styles.activityTime}>5d ago</Text>
-              </View>
-            </View>
-
-            <View style={styles.activityItem}>
-              <MessageSquare size={15} color="#9333EA" />
-              <View style={styles.activityMeta}>
-                <Text style={styles.activityTitle} numberOfLines={1}>
-                  Commented on a paper
-                </Text>
-                <Text style={styles.activityTime}>1w ago</Text>
-              </View>
-            </View>
-          </View>
+          )}
         </View>
       </View>
     </aside>
@@ -303,6 +351,13 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     minHeight: 4,
   },
+  emptySparkline: {
+    paddingVertical: 6,
+  },
+  emptySparklineText: {
+    fontSize: 11.5,
+    color: '#94A3B8',
+  },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -338,6 +393,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 8,
   },
+  aboutRowClickable: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
   aboutLabel: {
     fontSize: 12.5,
     color: '#64748B',
@@ -348,6 +409,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#0F172A',
     flex: 1,
+    textAlign: 'right',
+  },
+  linkValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  aboutLinkText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#2563EB',
     textAlign: 'right',
   },
   chipsWrap: {
@@ -386,5 +460,12 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     color: '#94A3B8',
     marginTop: 1,
+  },
+  emptyActivity: {
+    paddingVertical: 8,
+  },
+  emptyActivityText: {
+    fontSize: 12,
+    color: '#94A3B8',
   },
 });

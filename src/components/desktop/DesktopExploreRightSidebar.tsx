@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -12,9 +12,24 @@ import {
   Users,
   ArrowRight,
   Plus,
+  Check,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
+import { useTopicStore } from '../../store/useTopicStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { supabase } from '../../api/client';
+import { toggleFollowUserRpc } from '../../api/socialService';
+
+interface SuggestedResearcher {
+  id: string;
+  fullName: string;
+  handle: string;
+  academicTitle?: string;
+  institution?: string;
+  avatarUrl?: string;
+  isFollowing?: boolean;
+}
 
 interface DesktopExploreRightSidebarProps {
   onSelectField?: (field: string) => void;
@@ -23,22 +38,72 @@ interface DesktopExploreRightSidebarProps {
 export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProps> = ({
   onSelectField,
 }) => {
-  const fields = [
-    { name: 'Biomedical Engineering', icon: Microscope, color: '#064E3B' },
-    { name: 'Neuroscience', icon: Brain, color: '#2563EB' },
-    { name: 'Cancer Biology', icon: FlaskConical, color: '#D97706' },
-    { name: 'AI & Biology', icon: Cpu, color: '#7C3AED' },
-    { name: 'Genomics', icon: Dna, color: '#059669' },
-    { name: 'Drug Discovery', icon: Pill, color: '#DC2626' },
-  ];
+  const currentUser = useAuthStore((s) => s.user);
+  const topics = useTopicStore((s) => s.topics);
+  const fetchTopics = useTopicStore((s) => s.fetchTopics);
+
+  const [suggestedResearchers, setSuggestedResearchers] = useState<SuggestedResearcher[]>([]);
+  const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    fetchTopics(currentUser?.id);
+
+    const loadSuggested = async () => {
+      try {
+        let query = supabase
+          .from('profiles')
+          .select('id, full_name, handle, academic_title, institution, avatar_url')
+          .limit(4);
+
+        if (currentUser?.id) {
+          query = query.neq('id', currentUser.id);
+        }
+
+        const { data, error } = await query;
+        if (data && !error) {
+          setSuggestedResearchers(
+            data.map((p) => ({
+              id: p.id,
+              fullName: p.full_name || p.handle || 'Researcher',
+              handle: p.handle || 'scholar',
+              academicTitle: p.academic_title,
+              institution: p.institution,
+              avatarUrl: p.avatar_url,
+              isFollowing: false,
+            }))
+          );
+        }
+      } catch {}
+    };
+
+    loadSuggested();
+  }, [currentUser?.id, fetchTopics]);
+
+  const handleFollowToggle = async (researcherId: string) => {
+    if (!currentUser?.id) {
+      router.push('/(auth)/login');
+      return;
+    }
+
+    const currentFollowing = Boolean(followingStates[researcherId]);
+    setFollowingStates((prev) => ({ ...prev, [researcherId]: !currentFollowing }));
+
+    try {
+      await toggleFollowUserRpc(currentUser.id, researcherId);
+    } catch {
+      setFollowingStates((prev) => ({ ...prev, [researcherId]: currentFollowing }));
+    }
+  };
+
+  const displayTopics = topics.slice(0, 6);
 
   return (
     <aside style={{ width: 320, minWidth: 320 }}>
       <View style={styles.container}>
-        {/* 1. Research Fields Grid */}
+        {/* 1. Real Research Topics / Fields */}
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Research Fields</Text>
+            <Text style={styles.cardTitle}>Research Topics</Text>
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => router.push('/topic')}
@@ -49,120 +114,129 @@ export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProp
             </TouchableOpacity>
           </View>
 
-          <View style={styles.fieldsGrid}>
-            {fields.map((f) => {
-              const IconComp = f.icon;
-              return (
+          {displayTopics.length > 0 ? (
+            <View style={styles.fieldsGrid}>
+              {displayTopics.map((t) => (
                 <TouchableOpacity
-                  key={f.name}
+                  key={t.id}
                   activeOpacity={0.8}
-                  onPress={() => (onSelectField ? onSelectField(f.name) : router.push(`/topic`))}
+                  onPress={() =>
+                    onSelectField ? onSelectField(t.name) : router.push(`/topic/${t.slug}`)
+                  }
                   style={styles.fieldTile}
                 >
-                  <View style={[styles.fieldIconWrap, { backgroundColor: `${f.color}15` }]}>
-                    <IconComp size={18} color={f.color} strokeWidth={2.2} />
+                  <View style={styles.fieldIconWrap}>
+                    <Brain size={17} color="#064E3B" strokeWidth={2.2} />
                   </View>
                   <Text style={styles.fieldTileName} numberOfLines={2}>
-                    {f.name}
+                    {t.name}
+                  </Text>
+                  <Text style={styles.fieldTileCount}>
+                    {t.postsCount > 0 ? `${t.postsCount} posts` : 'Active'}
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyText}>Loading scientific topics...</Text>
+            </View>
+          )}
         </View>
 
         {/* 2. Trending Topics */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.headerLeft}>
-              <TrendingUp size={16} color="#D97706" />
-              <Text style={styles.cardTitle}>Trending Topics</Text>
-            </View>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => router.push('/topic')}
-              style={styles.seeAllRow}
-            >
-              <Text style={styles.seeAllText}>See all</Text>
-              <ArrowRight size={12} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.trendingList}>
-            {[
-              { name: 'Synaptic plasticity', count: '12.4K posts', rank: 1 },
-              { name: 'CRISPR screening', count: '9.8K posts', rank: 2 },
-              { name: 'Protein language models', count: '8.1K posts', rank: 3 },
-              { name: 'Brain-computer interfaces', count: '7.3K posts', rank: 4 },
-              { name: 'Spatial transcriptomics', count: '6.7K posts', rank: 5 },
-            ].map((topic) => (
-              <TouchableOpacity
-                key={topic.name}
-                activeOpacity={0.7}
-                onPress={() => router.push(`/search?q=${encodeURIComponent(topic.name)}`)}
-                style={styles.topicRow}
-              >
-                <Text style={styles.topicRank}>{topic.rank}</Text>
-                <View style={styles.topicMeta}>
-                  <Text style={styles.topicName} numberOfLines={1}>
-                    {topic.name}
-                  </Text>
-                  <Text style={styles.topicCount}>{topic.count}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* 3. Suggested Researchers */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Suggested Researchers</Text>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => router.push('/search?tab=researchers')}
-              style={styles.seeAllRow}
-            >
-              <Text style={styles.seeAllText}>See all</Text>
-              <ArrowRight size={12} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.researchersList}>
-            {[
-              {
-                name: 'Dr. Arjun Mehta',
-                sub: 'Computational Biology · NCBS',
-                count: '12K followers',
-              },
-              {
-                name: 'Dr. Elena Park',
-                sub: 'Neuroimmunology · Stanford',
-                count: '8.4K followers',
-              },
-              {
-                name: 'Dr. Sofia Almeida',
-                sub: 'AI for Drug Discovery · Oxford',
-                count: '6.1K followers',
-              },
-            ].map((res) => (
-              <View key={res.name} style={styles.scholarRow}>
-                <Avatar name={res.name} size="sm" />
-                <View style={styles.scholarMeta}>
-                  <Text style={styles.scholarName} numberOfLines={1}>
-                    {res.name}
-                  </Text>
-                  <Text style={styles.scholarSub} numberOfLines={1}>
-                    {res.sub}
-                  </Text>
-                </View>
-                <TouchableOpacity activeOpacity={0.8} style={styles.followPill}>
-                  <Text style={styles.followPillText}>Follow</Text>
-                </TouchableOpacity>
+        {topics.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.headerLeft}>
+                <TrendingUp size={16} color="#D97706" />
+                <Text style={styles.cardTitle}>Trending Topics</Text>
               </View>
-            ))}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push('/topic')}
+                style={styles.seeAllRow}
+              >
+                <Text style={styles.seeAllText}>See all</Text>
+                <ArrowRight size={12} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.trendingList}>
+              {topics.slice(0, 5).map((topic, idx) => (
+                <TouchableOpacity
+                  key={topic.id}
+                  activeOpacity={0.7}
+                  onPress={() => router.push(`/topic/${topic.slug}`)}
+                  style={styles.topicRow}
+                >
+                  <Text style={styles.topicRank}>{idx + 1}</Text>
+                  <View style={styles.topicMeta}>
+                    <Text style={styles.topicName} numberOfLines={1}>
+                      {topic.name}
+                    </Text>
+                    <Text style={styles.topicCount}>
+                      {topic.followersCount > 0 ? `${topic.followersCount} followers` : 'Trending'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
+
+        {/* 3. Real Suggested Researchers from Database */}
+        {suggestedResearchers.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>Suggested Researchers</Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push('/search?tab=researchers')}
+                style={styles.seeAllRow}
+              >
+                <Text style={styles.seeAllText}>See all</Text>
+                <ArrowRight size={12} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.researchersList}>
+              {suggestedResearchers.map((res) => {
+                const isFollowing = followingStates[res.id];
+                return (
+                  <View key={res.id} style={styles.scholarRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => router.push(`/profile/${res.id}`)}
+                      style={styles.scholarTouch}
+                    >
+                      <Avatar uri={res.avatarUrl} name={res.fullName} size="sm" />
+                      <View style={styles.scholarMeta}>
+                        <Text style={styles.scholarName} numberOfLines={1}>
+                          {res.fullName}
+                        </Text>
+                        <Text style={styles.scholarSub} numberOfLines={1}>
+                          {[res.academicTitle, res.institution].filter(Boolean).join(' · ') || `@${res.handle}`}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => handleFollowToggle(res.id)}
+                      style={[styles.followBtn, isFollowing && styles.followingBtn]}
+                    >
+                      {isFollowing ? (
+                        <Check size={14} color="#064E3B" strokeWidth={2.5} />
+                      ) : (
+                        <Plus size={14} color="#064E3B" strokeWidth={2.5} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </View>
     </aside>
   );
@@ -222,18 +296,32 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
   },
   fieldIconWrap: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#EAF3EE',
     marginBottom: 6,
   },
   fieldTileName: {
-    fontSize: 11.5,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#1E293B',
     textAlign: 'center',
+  },
+  fieldTileCount: {
+    fontSize: 10.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  emptyWrap: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#94A3B8',
   },
   trendingList: {
     gap: 10,
@@ -268,7 +356,14 @@ const styles = StyleSheet.create({
   scholarRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  scholarTouch: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
   scholarMeta: {
     flex: 1,
@@ -283,17 +378,18 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 1,
   },
-  followPill: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+  followBtn: {
+    width: 28,
+    height: 28,
     borderRadius: radii.full,
+    borderWidth: 1.5,
+    borderColor: '#064E3B',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  followPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#0F172A',
+  followingBtn: {
+    backgroundColor: '#EAF3EE',
+    borderColor: '#064E3B',
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,51 +6,50 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import { router } from 'expo-router';
 import {
   MessageSquare,
   ChevronUp,
   ChevronDown,
   Search,
   Users,
-  Edit3,
+  Sparkles,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
+import { getCollaborationRequests } from '../../api/connectionService';
+import { CollaborationRequest } from '../../types';
 
 export const DesktopMessagesDock: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [requests, setRequests] = useState<CollaborationRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const currentUser = useAuthStore((s) => s.user);
 
-  // Mock initial connections for desktop DM dock preview
-  const sampleConversations = [
-    {
-      id: '1',
-      name: 'Dr. Arjun Mehta',
-      title: 'Computational Biology · NCBS',
-      lastMessage: 'Let us connect on the synaptic plasticity dataset.',
-      time: '2h',
-      unread: true,
-    },
-    {
-      id: '2',
-      name: 'Dr. Elena Park',
-      title: 'Neuroimmunology · Stanford',
-      lastMessage: 'Shared a new preprint on microglial activation.',
-      time: '1d',
-      unread: false,
-    },
-    {
-      id: '3',
-      name: 'Dr. Sofia Almeida',
-      title: 'AI for Drug Discovery · Oxford',
-      lastMessage: 'The AlphaFold confidence intervals look solid.',
-      time: '3d',
-      unread: false,
-    },
-  ];
+  useEffect(() => {
+    if (currentUser?.id && isOpen) {
+      setIsLoading(true);
+      getCollaborationRequests(currentUser.id)
+        .then(({ incoming, outgoing }) => {
+          setRequests([...incoming, ...outgoing]);
+        })
+        .finally(() => setIsLoading(false));
+    }
+  }, [currentUser?.id, isOpen]);
+
+  const filtered = requests.filter((req) => {
+    const otherUser = req.senderId === currentUser?.id ? req.recipient : req.sender;
+    const name = otherUser?.fullName || otherUser?.handle || '';
+    const topic = req.topic || '';
+    const q = searchQuery.toLowerCase();
+    return name.toLowerCase().includes(q) || topic.toLowerCase().includes(q);
+  });
+
+  const pendingCount = requests.filter((r) => r.status === 'pending' && r.recipientId === currentUser?.id).length;
 
   return (
     <div
@@ -73,13 +72,15 @@ export const DesktopMessagesDock: React.FC = () => {
           <View style={styles.headerLeft}>
             <Avatar
               uri={currentUser?.avatarUrl}
-              name={currentUser?.fullName || 'User'}
+              name={currentUser?.fullName || currentUser?.handle || 'User'}
               size="xs"
             />
             <Text style={styles.headerTitle}>Community & DMs</Text>
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>1</Text>
-            </View>
+            {pendingCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{pendingCount}</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.headerRight}>
@@ -100,42 +101,69 @@ export const DesktopMessagesDock: React.FC = () => {
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Search messages..."
+                placeholder="Search messages & topics..."
                 placeholderTextColor="#94A3B8"
                 style={styles.searchInput}
               />
-              <TouchableOpacity activeOpacity={0.7} style={styles.newChatBtn}>
-                <Edit3 size={15} color="#064E3B" />
-              </TouchableOpacity>
             </View>
 
             {/* Conversations List */}
-            <ScrollView style={styles.conversationsList} showsVerticalScrollIndicator={false}>
-              {sampleConversations.map((conv) => (
-                <TouchableOpacity
-                  key={conv.id}
-                  activeOpacity={0.7}
-                  style={[
-                    styles.conversationItem,
-                    conv.unread && styles.conversationItemUnread,
-                  ]}
-                >
-                  <Avatar name={conv.name} size="sm" />
-                  <View style={styles.convMeta}>
-                    <View style={styles.convNameRow}>
-                      <Text style={styles.convName} numberOfLines={1}>
-                        {conv.name}
-                      </Text>
-                      <Text style={styles.convTime}>{conv.time}</Text>
-                    </View>
-                    <Text style={styles.convLastMessage} numberOfLines={1}>
-                      {conv.lastMessage}
-                    </Text>
-                  </View>
-                  {conv.unread && <View style={styles.activeDot} />}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {isLoading ? (
+              <View style={styles.centerContainer}>
+                <ActivityIndicator size="small" color="#064E3B" />
+              </View>
+            ) : filtered.length > 0 ? (
+              <ScrollView style={styles.conversationsList} showsVerticalScrollIndicator={false}>
+                {filtered.map((req) => {
+                  const isIncoming = req.recipientId === currentUser?.id;
+                  const otherUser = isIncoming ? req.sender : req.recipient;
+                  const name = otherUser?.fullName || otherUser?.handle || 'Researcher';
+                  const avatar = otherUser?.avatarUrl;
+                  const isPending = req.status === 'pending' && isIncoming;
+
+                  return (
+                    <TouchableOpacity
+                      key={req.id}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        if (otherUser?.id) {
+                          router.push(`/profile/${otherUser.id}`);
+                        }
+                      }}
+                      style={[
+                        styles.conversationItem,
+                        isPending && styles.conversationItemUnread,
+                      ]}
+                    >
+                      <Avatar uri={avatar} name={name} size="sm" />
+                      <View style={styles.convMeta}>
+                        <View style={styles.convNameRow}>
+                          <Text style={styles.convName} numberOfLines={1}>
+                            {name}
+                          </Text>
+                          <Text style={styles.convTime}>{req.createdAt}</Text>
+                        </View>
+                        <Text style={styles.convTopic} numberOfLines={1}>
+                          Topic: {req.topic}
+                        </Text>
+                        <Text style={styles.convLastMessage} numberOfLines={1}>
+                          {req.message}
+                        </Text>
+                      </View>
+                      {isPending && <View style={styles.activeDot} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Users size={28} color="#CBD5E1" strokeWidth={1.5} />
+                <Text style={styles.emptyTitle}>No messages yet</Text>
+                <Text style={styles.emptySub}>
+                  Send collaboration proposals from researcher profiles or discussions to start messaging.
+                </Text>
+              </View>
+            )}
 
             <View style={styles.footerNote}>
               <Users size={12} color="#94A3B8" />
@@ -225,8 +253,29 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     outlineStyle: 'none' as any,
   },
-  newChatBtn: {
-    padding: 4,
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 6,
+  },
+  emptyTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+    marginTop: 4,
+  },
+  emptySub: {
+    fontSize: 11.5,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 16,
   },
   conversationsList: {
     flex: 1,
@@ -260,6 +309,12 @@ const styles = StyleSheet.create({
   convTime: {
     fontSize: 10.5,
     color: '#94A3B8',
+  },
+  convTopic: {
+    fontSize: 11.5,
+    color: '#064E3B',
+    fontWeight: '600',
+    marginTop: 1,
   },
   convLastMessage: {
     fontSize: 11.5,
