@@ -64,33 +64,34 @@ export default function WelcomeScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            maxWidth: 1120,
+            maxWidth: 1260,
             width: '100%',
             margin: 'auto',
-            padding: '40px 24px',
-            minHeight: 'calc(100vh - 80px)',
-            gap: 60,
+            padding: '24px 28px',
+            minHeight: 'calc(100vh - 76px)',
+            gap: 56,
           }}
         >
-          {/* Left Column: Welcome Graphic & Branding (Zoomed to fit space) */}
+          {/* Left Column: Welcome Graphic & Branding (Zoomed to boldly fill space) */}
           <div
             style={{
-              flex: 1.2,
+              flex: 1.3,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
-              maxWidth: 560,
+              maxWidth: 680,
+              width: '100%',
             }}
           >
             <Image
               source={WELCOME_HERO_BG}
               style={{
                 width: '100%',
-                maxWidth: 540,
-                height: 520,
-                maxHeight: 540,
+                maxWidth: 640,
+                height: 680,
+                maxHeight: 720,
               }}
               contentFit="contain"
               accessibilityLabel="Welcome to BooffIn - Research finds its people"
@@ -100,7 +101,7 @@ export default function WelcomeScreen() {
           {/* Right Column: Clean White Authentication Card */}
           <div
             style={{
-              flex: 0.9,
+              flex: 0.85,
               maxWidth: 420,
               width: '100%',
               backgroundColor: '#FFFFFF',
