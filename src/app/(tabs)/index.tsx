@@ -22,9 +22,12 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
+import { DesktopWritePostCard } from '../../components/desktop/DesktopWritePostCard';
 import { Post } from '../../types';
 
 export default function HomeScreen() {
+  const { isDesktop } = useResponsiveLayout();
   const posts = usePostStore((s) => s.posts);
   const activeTab = usePostStore((s) => s.activeTab);
   const setActiveTab = usePostStore((s) => s.setActiveTab);
@@ -109,17 +112,26 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-      {/* Header with BooffIn Wordmark, Search icon, and Create Button */}
-      <AppHeader
-        title="BooffIn"
-        isBrandTitle
-        onTitlePress={handleRefresh}
-        isRefreshing={isRefreshing}
-        showSearch
-        onSearch={() => router.push('/search')}
-        showCreate
-        onCreatePress={() => router.push('/(tabs)/create')}
-      />
+      {/* Mobile-only Header */}
+      {!isDesktop && (
+        <AppHeader
+          title="BooffIn"
+          isBrandTitle
+          onTitlePress={handleRefresh}
+          isRefreshing={isRefreshing}
+          showSearch
+          onSearch={() => router.push('/search')}
+          showCreate
+          onCreatePress={() => router.push('/(tabs)/create')}
+        />
+      )}
+
+      {/* Desktop Compose Box */}
+      {isDesktop && (
+        <View style={{ paddingTop: 16, paddingHorizontal: 16 }}>
+          <DesktopWritePostCard />
+        </View>
+      )}
 
       {/* Feed Navigation Tabs (For You, Following, plus User's Research Interests) */}
       <FeedNavigation

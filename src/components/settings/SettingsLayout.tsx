@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { colors, spacing, radii } from '../../theme';
 import { Header } from '../layout/Header';
 import { Typography } from '../core/Typography';
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 
 interface SettingsLayoutProps {
   title: string;
@@ -26,6 +27,8 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = ({
   isLoading = false,
   rightAction,
 }) => {
+  const { isDesktop } = useResponsiveLayout();
+
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -38,23 +41,38 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = ({
 
   return (
     <View style={styles.container}>
-      <Header
-        title={title}
-        showBack={showBack}
-        onBack={handleBack}
-        rightElement={
-          rightAction || (
-            isSaving ? (
-              <View style={styles.savingBadge}>
-                <ActivityIndicator size="small" color={colors.textSecondary} />
-                <Typography variant="micro" color={colors.textSecondary} style={{ marginLeft: 6 }}>
-                  Saving...
-                </Typography>
-              </View>
-            ) : null
-          )
-        }
-      />
+      {!isDesktop && (
+        <Header
+          title={title}
+          showBack={showBack}
+          onBack={handleBack}
+          rightElement={
+            rightAction || (
+              isSaving ? (
+                <View style={styles.savingBadge}>
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                  <Typography variant="micro" color={colors.textSecondary} style={{ marginLeft: 6 }}>
+                    Saving...
+                  </Typography>
+                </View>
+              ) : null
+            )
+          }
+        />
+      )}
+
+      {isDesktop && (
+        <View style={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 8 }}>
+          <Typography variant="h1" color={colors.textPrimary}>
+            {title}
+          </Typography>
+          {subtitle && (
+            <Typography variant="body" color={colors.textSecondary} style={{ marginTop: 4 }}>
+              {subtitle}
+            </Typography>
+          )}
+        </View>
+      )}
 
       {isLoading ? (
         <View style={styles.loadingContainer}>

@@ -36,11 +36,13 @@ import { usePaperStore } from '../../store/usePaperStore';
 import { useTopicStore } from '../../store/useTopicStore';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 import { getHypedDomainData, HypedDomainData } from '../../api/hypedFeedService';
 import { subscribeToPaperRead } from '../../api/hypeScoreService';
 import { Paper, UserProfile } from '../../types';
 
 export default function ExploreScreen() {
+  const { isDesktop } = useResponsiveLayout();
   const {
     searchQuery,
     activeCategory,
@@ -435,19 +437,33 @@ export default function ExploreScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Main App Header */}
-      <AppHeader title="Explore" />
+      {/* Mobile Main App Header */}
+      {!isDesktop && <AppHeader title="Explore" />}
+
+      {/* Desktop Page Title Banner */}
+      {isDesktop && (
+        <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 }}>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 }}>
+            Explore
+          </Text>
+          <Text style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>
+            Discover research, people and ideas from across science.
+          </Text>
+        </View>
+      )}
 
       {/* Universal Search Bar */}
-      <View style={styles.searchBarContainer}>
-        <SearchBar
-          value={searchQuery}
-          onChangeText={(text) => setSearchQuery(text)}
-          placeholder="Search by DOI, arXiv, ORCID, author, title..."
-          onSubmitEditing={() => handleSearchSubmit()}
-          onClear={clearSearch}
-        />
-      </View>
+      {!isDesktop && (
+        <View style={styles.searchBarContainer}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={(text) => setSearchQuery(text)}
+            placeholder="Search by DOI, arXiv, ORCID, author, title..."
+            onSubmitEditing={() => handleSearchSubmit()}
+            onClear={clearSearch}
+          />
+        </View>
+      )}
 
       {/* When searching, show category tabs (All, Papers, Researchers) */}
       {hasQuery && (

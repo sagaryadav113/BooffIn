@@ -473,12 +473,12 @@ export interface UsernameValidationResult {
 }
 
 /**
- * Validates username using professional social media standards (like Instagram):
+ * Validates username using professional social media standards:
  * - Length: between 3 and 16 characters (16-character limit)
  * - No spaces allowed anywhere in username
- * - Allowed characters: lowercase letters, numbers, underscores (_), and periods (.)
- * - Cannot start or end with a period or underscore
- * - Cannot have consecutive periods or underscores (e.g. '..' or '__')
+ * - Allowed characters: lowercase letters, numbers, and underscores (_)
+ * - Cannot start or end with an underscore
+ * - Cannot have consecutive underscores ('__')
  * - Protected against reserved system usernames
  */
 export function validateUsername(handle: string): UsernameValidationResult {
@@ -499,32 +499,32 @@ export function validateUsername(handle: string): UsernameValidationResult {
   if (normalized.length > 16) {
     return { isValid: false, normalized, error: 'Username cannot exceed 16 characters.' };
   }
-  if (!/^[a-z0-9_.]+$/.test(normalized)) {
+  if (!/^[a-z0-9_]+$/.test(normalized)) {
     return {
       isValid: false,
       normalized,
-      error: 'Username can only contain letters, numbers, underscores, and periods.',
+      error: 'Username can only contain letters, numbers, and underscores.',
     };
   }
-  if (/^[._]/.test(normalized)) {
+  if (/^_/.test(normalized)) {
     return {
       isValid: false,
       normalized,
-      error: 'Username cannot start with a period or underscore.',
+      error: 'Username cannot start with an underscore.',
     };
   }
-  if (/[._]$/.test(normalized)) {
+  if (/_$/.test(normalized)) {
     return {
       isValid: false,
       normalized,
-      error: 'Username cannot end with a period or underscore.',
+      error: 'Username cannot end with an underscore.',
     };
   }
-  if (/\.\./.test(normalized) || /__/.test(normalized) || /\._|\_\./.test(normalized)) {
+  if (/__/.test(normalized)) {
     return {
       isValid: false,
       normalized,
-      error: 'Username cannot contain consecutive symbols.',
+      error: 'Username cannot contain consecutive underscores.',
     };
   }
   if (RESERVED_USERNAMES.has(normalized)) {

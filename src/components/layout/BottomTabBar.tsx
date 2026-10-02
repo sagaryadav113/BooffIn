@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { colors, layout, spacing } from '../../theme';
+import { colors, layout } from '../../theme';
 import { Icon, IconName } from '../core/Icon';
 import { Typography } from '../core/Typography';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 
 export interface BottomTabBarProps {
   state: {
@@ -46,10 +48,26 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   descriptors,
   navigation,
 }) => {
+  const { isDesktop } = useResponsiveLayout();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom || 0;
+
+  // On desktop web, navigation is handled by the left sidebar
+  if (isDesktop) {
+    return null;
+  }
 
   return (
-    <View style={styles.tabBarContainer}>
+    <View
+      style={[
+        styles.tabBarContainer,
+        {
+          paddingBottom: bottomInset > 0 ? bottomInset + 2 : 6,
+          height: layout.tabBarHeight + (bottomInset > 0 ? bottomInset - 4 : 0),
+        },
+      ]}
+    >
       {state.routes.map((route, index) => {
         const descriptor = descriptors[route.key] || { options: {} };
         const options = descriptor.options || {};
@@ -103,6 +121,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
               variant="micro"
               color={isFocused ? colors.black : '#374151'}
               style={[styles.label, isFocused && styles.labelFocused]}
+              numberOfLines={1}
             >
               {meta.label}
             </Typography>
@@ -116,11 +135,9 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
 const styles = StyleSheet.create({
   tabBarContainer: {
     flexDirection: 'row',
-    height: layout.tabBarHeight,
     backgroundColor: colors.background,
     borderTopWidth: 1.5,
     borderTopColor: colors.border,
-    paddingBottom: 6,
     paddingTop: 6,
   },
   tabItem: {
@@ -128,6 +145,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: layout.touchTargetMin,
+    paddingHorizontal: 2,
   },
   iconWrapper: {
     position: 'relative',
@@ -152,10 +170,11 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   label: {
-    marginTop: 3,
-    fontSize: 11.5,
+    marginTop: 2,
+    fontSize: 10.5,
     fontWeight: '600',
     color: '#374151',
+    textAlign: 'center',
   },
   labelFocused: {
     fontWeight: '700',

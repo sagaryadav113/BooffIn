@@ -124,8 +124,11 @@ export default function OtherResearcherProfileScreen() {
         return;
       }
 
-      let prof = await fetchUserProfile(id, currentUser?.id);
-      if (!prof) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+      let prof: UserProfile | null = null;
+      if (isUuid) {
+        prof = await fetchUserProfile(id.trim(), currentUser?.id);
+      } else {
         prof = await fetchUserProfileByUsername(cleanId, currentUser?.id);
       }
       if (prof) {

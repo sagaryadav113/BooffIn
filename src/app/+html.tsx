@@ -19,7 +19,7 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="apple-touch-icon" href="/icon-192.png" />
 
         {/* Standalone Window & PWA Capabilities */}
-        <meta name="theme-color" content="#000000" />
+        <meta name="theme-color" content="#064E3B" />
         <meta name="application-name" content="BooffIn" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />

@@ -32,7 +32,7 @@
   "start_url": "/",
   "scope": "/",
   "background_color": "#FFFFFF",
-  "theme_color": "#000000",
+  "theme_color": "#064E3B",
   "display": "standalone",
   "display_override": ["standalone", "window-controls-overlay", "minimal-ui"],
   "orientation": "portrait",
