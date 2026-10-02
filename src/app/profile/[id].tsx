@@ -53,6 +53,22 @@ import { FollowListModal } from '../../components/modals/FollowListModal';
 import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab';
 import { OpenAlexAuthorProfileView } from '../../components/profile/OpenAlexAuthorProfileView';
 
+function isOpenAlexOrOrcidIdentifier(
+  id?: string,
+  openAlexId?: string,
+  orcidId?: string
+): boolean {
+  if (Boolean(openAlexId) || Boolean(orcidId)) return true;
+  if (!id) return false;
+  return (
+    id.startsWith('openalex_author_') ||
+    id.startsWith('openalex_') ||
+    id.startsWith('orcid_') ||
+    /^A\d+$/i.test(id) ||
+    /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(id)
+  );
+}
+
 export default function OtherResearcherProfileScreen() {
   const { id, openAlexId, orcidId } = useLocalSearchParams<{
     id: string;
@@ -88,16 +104,7 @@ export default function OtherResearcherProfileScreen() {
 
   useEffect(() => {
     async function loadProfile() {
-      const isExplicitOpenAlex =
-        Boolean(openAlexId) ||
-        Boolean(orcidId) ||
-        Boolean(
-          id &&
-            (id.startsWith('openalex_author_') ||
-              id.startsWith('orcid_') ||
-              /^A\d+$/i.test(id) ||
-              /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(id))
-        );
+      const isExplicitOpenAlex = isOpenAlexOrOrcidIdentifier(id, openAlexId, orcidId);
 
       if (!id || isExplicitOpenAlex) {
         setIsLoading(false);
@@ -228,16 +235,7 @@ export default function OtherResearcherProfileScreen() {
     setFollowModalVisible(true);
   };
 
-  const isExplicitOpenAlex =
-    Boolean(openAlexId) ||
-    Boolean(orcidId) ||
-    Boolean(
-      id &&
-        (id.startsWith('openalex_author_') ||
-          id.startsWith('orcid_') ||
-          /^A\d+$/i.test(id) ||
-          /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(id))
-    );
+  const isExplicitOpenAlex = isOpenAlexOrOrcidIdentifier(id, openAlexId, orcidId);
 
   if (isExplicitOpenAlex) {
     const cleanOaId =
@@ -246,6 +244,7 @@ export default function OtherResearcherProfileScreen() {
       (id
         ? id
             .replace(/^openalex_author_/i, '')
+            .replace(/^openalex_/i, '')
             .replace(/^orcid_/i, '')
         : '');
 
@@ -274,22 +273,17 @@ export default function OtherResearcherProfileScreen() {
   }
 
   if (!researcher) {
-    const fallbackAuthorId =
-      openAlexId ||
-      orcidId ||
-      (id
-        ? id
-            .replace(/^openalex_author_/i, '')
-            .replace(/^orcid_/i, '')
-        : '');
+    if (isExplicitOpenAlex) {
+      const fallbackAuthorId =
+        openAlexId ||
+        orcidId ||
+        (id
+          ? id
+              .replace(/^openalex_author_/i, '')
+              .replace(/^openalex_/i, '')
+              .replace(/^orcid_/i, '')
+          : '');
 
-    if (
-      fallbackAuthorId &&
-      (isExplicitOpenAlex ||
-        id?.startsWith('openalex_') ||
-        id?.startsWith('orcid_') ||
-        id?.length > 8)
-    ) {
       return (
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
           <StatusBar barStyle="dark-content" backgroundColor={colors.background} />

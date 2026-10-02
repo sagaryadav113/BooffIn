@@ -60,9 +60,13 @@ BEGIN
   END IF;
 
   -- A. Clean up user's storage objects in profile-media bucket
+  -- Supabase storage protects direct deletion with protect_objects_delete trigger;
+  -- setting storage.allow_delete_query to true authorizes transactional cleanup.
   -- If storage cleanup fails (e.g. permission issues or network errors), the exception
   -- is NOT swallowed. The transaction will roll back completely, ensuring the user's
   -- auth account is NOT deleted and preventing orphaned storage files.
+  PERFORM set_config('storage.allow_delete_query', 'true', true);
+
   DELETE FROM storage.objects
   WHERE bucket_id = 'profile-media'
     AND (

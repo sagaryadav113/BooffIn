@@ -56,8 +56,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- 3. STORAGE RLS POLICIES FOR profile-media BUCKET
 -- ----------------------------------------------------------------------------
 
--- Enable RLS on storage.objects (standard Supabase default)
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- Note: Row Level Security is already enabled on storage.objects by default in Supabase.
 
 -- 3.1 Public Read Policy: Anyone can view researcher avatars and banners
 DROP POLICY IF EXISTS "Public Profile Media View" ON storage.objects;

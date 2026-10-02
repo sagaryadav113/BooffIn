@@ -60,7 +60,16 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Refresher trigger on updated_at
+-- Refresher function & trigger on updated_at
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_user_settings_updated_at ON public.user_settings;
 CREATE TRIGGER trg_user_settings_updated_at
   BEFORE UPDATE ON public.user_settings
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -69,18 +78,21 @@ CREATE TRIGGER trg_user_settings_updated_at
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
 
 -- Users can view their own settings
+DROP POLICY IF EXISTS "Users can view own settings" ON public.user_settings;
 CREATE POLICY "Users can view own settings"
   ON public.user_settings FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
 -- Users can insert their own settings
+DROP POLICY IF EXISTS "Users can insert own settings" ON public.user_settings;
 CREATE POLICY "Users can insert own settings"
   ON public.user_settings FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
 -- Users can update their own settings
+DROP POLICY IF EXISTS "Users can update own settings" ON public.user_settings;
 CREATE POLICY "Users can update own settings"
   ON public.user_settings FOR UPDATE
   TO authenticated
@@ -98,6 +110,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS trg_init_user_settings ON public.profiles;
 CREATE TRIGGER trg_init_user_settings
   AFTER INSERT ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_settings();
