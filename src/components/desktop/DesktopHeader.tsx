@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import {
   Search,
   Bell,
@@ -135,10 +135,71 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
     router.push(`/topic/${topicSlug}`);
   };
 
+  const pathname = usePathname();
+  const isAuthPage =
+    pathname.includes('(auth)') ||
+    pathname.includes('/login') ||
+    pathname.includes('/signup') ||
+    pathname.includes('/welcome') ||
+    pathname.includes('/onboarding') ||
+    pathname.includes('/email') ||
+    pathname.includes('/forgot-password');
+
   const papersCount = searchResults?.papers?.length || 0;
   const researchersCount = searchResults?.researchers?.length || 0;
   const topicsCount = searchResults?.topics?.length || 0;
   const hasResults = papersCount > 0 || researchersCount > 0 || topicsCount > 0;
+
+  if (isAuthPage) {
+    return (
+      <header style={{ width: '100%', backgroundColor: '#FFFFFF', borderBottom: '1px solid #F1F5F9', zIndex: 999 }}>
+        <View style={styles.authContainer}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push('/(tabs)')}
+            style={styles.logoSection}
+          >
+            <Image
+              source={require('../../../assets/images/booffin-wordmark.jpg')}
+              style={styles.brandLogoImage}
+              contentFit="contain"
+              accessibilityLabel="BooffIn"
+            />
+          </TouchableOpacity>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => router.push('/(tabs)')}
+              style={{ paddingVertical: 8, paddingHorizontal: 12 }}
+            >
+              <Text style={{ fontSize: 13.5, fontWeight: '600', color: '#475569' }}>
+                Explore Discussions
+              </Text>
+            </TouchableOpacity>
+
+            {pathname.includes('/login') ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push('/(auth)/signup')}
+                style={styles.authSwitchBtn}
+              >
+                <Text style={styles.authSwitchBtnText}>Sign Up</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push('/(auth)/login')}
+                style={styles.authSwitchBtn}
+              >
+                <Text style={styles.authSwitchBtnText}>Sign In</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </header>
+    );
+  }
 
   return (
     <header style={{ width: '100%', backgroundColor: '#FFFFFF', zIndex: 999 }}>
@@ -774,6 +835,28 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   signInBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  authContainer: {
+    height: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 32,
+    maxWidth: 1200,
+    marginHorizontal: 'auto' as any,
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+  },
+  authSwitchBtn: {
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: radii.full,
+  },
+  authSwitchBtnText: {
     color: '#FFFFFF',
     fontSize: 13.5,
     fontWeight: '700',

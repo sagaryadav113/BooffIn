@@ -26,6 +26,36 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
     return <>{children}</>;
   }
 
+  const isAuthPage =
+    pathname.includes('(auth)') ||
+    pathname.includes('/login') ||
+    pathname.includes('/signup') ||
+    pathname.includes('/welcome') ||
+    pathname.includes('/onboarding') ||
+    pathname.includes('/email') ||
+    pathname.includes('/forgot-password');
+
+  // If on Auth/Welcome/Login/Signup page, render a clean full-screen plain white layout
+  if (isAuthPage) {
+    return (
+      <View style={[styles.desktopRoot, { backgroundColor: '#FFFFFF' }]}>
+        <DesktopHeader />
+        <main
+          style={{
+            flex: 1,
+            width: '100%',
+            backgroundColor: '#FFFFFF',
+            minHeight: 'calc(100vh - 68px)',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {children}
+        </main>
+      </View>
+    );
+  }
+
   // Determine appropriate right sidebar based on active pathname
   const renderRightSidebar = () => {
     if (pathname.includes('explore')) {
