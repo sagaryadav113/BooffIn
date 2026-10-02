@@ -72,17 +72,19 @@ export default function WelcomeScreen() {
             gap: 56,
           }}
         >
-          {/* Left Column: Welcome Graphic & Branding (Zoomed to boldly fill space) */}
+          {/* Left Column: Welcome Graphic & Branding (Zoomed boldly to fill space) */}
           <div
             style={{
-              flex: 1.3,
+              flex: 1.35,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
-              maxWidth: 680,
+              maxWidth: 700,
               width: '100%',
+              overflow: 'hidden',
+              borderRadius: 24,
             }}
           >
             <Image
@@ -90,8 +92,9 @@ export default function WelcomeScreen() {
               style={{
                 width: '100%',
                 maxWidth: 640,
-                height: 680,
-                maxHeight: 720,
+                height: 700,
+                maxHeight: 740,
+                transform: [{ scale: 1.35 }],
               }}
               contentFit="contain"
               accessibilityLabel="Welcome to BooffIn - Research finds its people"
