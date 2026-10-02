@@ -16,14 +16,16 @@ import {
   Link as LinkIcon,
   Flag,
   Copy,
+  UserX,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { Post } from '../../types';
-import { colors, radii, spacing, fontSizes, typography, shadows } from '../../theme';
+import { colors, radii, spacing, fontSizes, shadows } from '../../theme';
 import { SaveIcon } from '../core/SaveIcon';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { blockUser } from '../../api/moderationService';
 
 export interface PostOptionsModalProps {
   visible: boolean;
@@ -301,6 +303,63 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
                     <Text style={styles.itemTitle}>Report Post</Text>
                     <Text style={styles.itemSubtitle}>
                       Flag inappropriate or non-academic content
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    onClose();
+                    const executeBlock = async () => {
+                      const res = await blockUser(post.author.id);
+                      if (res.success) {
+                        usePostStore.setState((state) => ({
+                          posts: state.posts.filter((p) => p.author.id !== post.author.id),
+                        }));
+                        if (Platform.OS === 'web') {
+                          window.alert(`${post.author.fullName || 'Researcher'} has been blocked.`);
+                        } else {
+                          Alert.alert('Blocked', `${post.author.fullName || 'Researcher'} has been blocked.`);
+                        }
+                      } else {
+                        if (Platform.OS === 'web') {
+                          window.alert(res.error || 'Failed to block user.');
+                        } else {
+                          Alert.alert('Error', res.error || 'Failed to block user.');
+                        }
+                      }
+                    };
+
+                    const promptText = `Are you sure you want to block ${post.author.fullName || '@' + post.author.handle}? They will not be able to follow you, view your posts, or interact with your research notes.`;
+
+                    if (Platform.OS === 'web') {
+                      if (window.confirm(promptText)) {
+                        executeBlock();
+                      }
+                    } else {
+                      Alert.alert(
+                        'Block Researcher',
+                        promptText,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Block', style: 'destructive', onPress: executeBlock },
+                        ],
+                        { cancelable: true }
+                      );
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.iconContainer, { backgroundColor: colors.accentRed + '15' }]}>
+                    <UserX size={18} color={colors.accentRed} />
+                  </View>
+                  <View style={styles.itemTextContainer}>
+                    <Text style={[styles.itemTitle, { color: colors.accentRed }]}>
+                      Block Researcher
+                    </Text>
+                    <Text style={styles.itemSubtitle}>
+                      Prevent interactions and hide research updates
                     </Text>
                   </View>
                 </TouchableOpacity>

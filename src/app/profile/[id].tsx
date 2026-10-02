@@ -10,6 +10,8 @@ import {
   Share,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -27,7 +29,9 @@ import {
   Users,
   UserPlus,
   Lock,
+  UserX,
 } from 'lucide-react-native';
+import { blockUser, unblockUser } from '../../api/moderationService';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -195,7 +199,7 @@ export default function OtherResearcherProfileScreen() {
       });
     }
     return allPosts.filter((p) => p.author.id === researcher.id || (p.isReposted && p.author.id !== researcher.id));
-  }, [researcherPosts, allPosts, researcher?.id]);
+  }, [researcherPosts, allPosts, researcher]);
 
   const paperPosts = React.useMemo(() => {
     return posts.filter((p) => !!p.paper);
@@ -345,6 +349,86 @@ export default function OtherResearcherProfileScreen() {
     ? researcher.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')
     : null;
 
+  const handleBlockToggle = () => {
+    if (!researcher?.id) return;
+    if (researcher.isBlocked) {
+      const executeUnblock = async () => {
+        const res = await unblockUser(researcher.id);
+        if (res.success) {
+          setResearcher((prev) => (prev ? { ...prev, isBlocked: false, isPrivateRestricted: false } : prev));
+          loadResearcherPosts(researcher.id);
+          if (Platform.OS === 'web') {
+            window.alert(`${researcher.fullName} has been unblocked.`);
+          } else {
+            Alert.alert('Unblocked', `${researcher.fullName} has been unblocked.`);
+          }
+        } else {
+          if (Platform.OS === 'web') {
+            window.alert(res.error || 'Failed to unblock.');
+          } else {
+            Alert.alert('Error', res.error || 'Failed to unblock.');
+          }
+        }
+      };
+
+      const unblockMsg = `Unblock ${researcher.fullName}? You will be able to follow each other and view research discussions.`;
+      if (Platform.OS === 'web') {
+        if (window.confirm(unblockMsg)) {
+          executeUnblock();
+        }
+      } else {
+        Alert.alert(
+          'Unblock Researcher',
+          unblockMsg,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Unblock', onPress: executeUnblock },
+          ]
+        );
+      }
+    } else {
+      const executeBlock = async () => {
+        const res = await blockUser(researcher.id);
+        if (res.success) {
+          setResearcher((prev) =>
+            prev ? { ...prev, isBlocked: true, isFollowing: false, isPrivateRestricted: true } : prev
+          );
+          setResearcherPosts([]);
+          usePostStore.setState((state) => ({
+            posts: state.posts.filter((p) => p.author.id !== researcher.id),
+          }));
+          if (Platform.OS === 'web') {
+            window.alert(`${researcher.fullName} has been blocked.`);
+          } else {
+            Alert.alert('Blocked', `${researcher.fullName} has been blocked.`);
+          }
+        } else {
+          if (Platform.OS === 'web') {
+            window.alert(res.error || 'Failed to block.');
+          } else {
+            Alert.alert('Error', res.error || 'Failed to block.');
+          }
+        }
+      };
+
+      const blockMsg = `Block ${researcher.fullName}? They will not be able to follow you, view your posts, or interact with you.`;
+      if (Platform.OS === 'web') {
+        if (window.confirm(blockMsg)) {
+          executeBlock();
+        }
+      } else {
+        Alert.alert(
+          'Block Researcher',
+          blockMsg,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Block', style: 'destructive', onPress: executeBlock },
+          ]
+        );
+      }
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" />
@@ -379,14 +463,26 @@ export default function OtherResearcherProfileScreen() {
               style={styles.bannerIconButton}
             />
 
-            <IconButton
-              icon="Share2"
-              size="sm"
-              variant="filled"
-              color={colors.white}
-              onPress={handleShare}
-              style={styles.bannerIconButton}
-            />
+            <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+              {!isOwnProfile && (
+                <IconButton
+                  icon={researcher.isBlocked ? 'UserCheck' : 'UserX'}
+                  size="sm"
+                  variant="filled"
+                  color={researcher.isBlocked ? colors.accentGreen : colors.white}
+                  onPress={handleBlockToggle}
+                  style={styles.bannerIconButton}
+                />
+              )}
+              <IconButton
+                icon="Share2"
+                size="sm"
+                variant="filled"
+                color={colors.white}
+                onPress={handleShare}
+                style={styles.bannerIconButton}
+              />
+            </View>
           </View>
         </View>
 
@@ -404,15 +500,17 @@ export default function OtherResearcherProfileScreen() {
 
             <View style={styles.actionButtonsGroup}>
               {/* Follow Button */}
-              <Button
-                title={isOwnProfile ? 'Edit Profile' : isFollowing ? 'Following' : 'Follow'}
-                variant={isOwnProfile || isFollowing ? 'outline' : 'primary'}
-                size="sm"
-                loading={isFollowLoading}
-                disabled={isFollowLoading}
-                onPress={handleFollowToggle}
-                style={styles.followButton}
-              />
+              {!researcher.isBlocked && (
+                <Button
+                  title={isOwnProfile ? 'Edit Profile' : isFollowing ? 'Following' : 'Follow'}
+                  variant={isOwnProfile || isFollowing ? 'outline' : 'primary'}
+                  size="sm"
+                  loading={isFollowLoading}
+                  disabled={isFollowLoading}
+                  onPress={handleFollowToggle}
+                  style={styles.followButton}
+                />
+              )}
             </View>
           </View>
 
@@ -528,8 +626,33 @@ export default function OtherResearcherProfileScreen() {
           </View>
         </View>
 
-        {/* Sub-Tabs or Private Restricted Notice */}
-        {researcher.isPrivateRestricted ? (
+        {/* Sub-Tabs or Blocked / Private Restricted Notice */}
+        {researcher.isBlocked ? (
+          <View style={styles.privateProfileContainer}>
+            <View style={[styles.privateIconCircle, { backgroundColor: colors.accentRed + '15' }]}>
+              <UserX size={26} color={colors.accentRed} />
+            </View>
+            <Text style={styles.privateTitle}>Blocked Researcher</Text>
+            <Text style={styles.privateSubtitle}>
+              {"You have blocked this researcher. Their research notes and interactions are restricted."}
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.followButton,
+                {
+                  marginTop: spacing.md,
+                  paddingHorizontal: spacing.lg,
+                  alignSelf: 'center',
+                  backgroundColor: colors.surfaceHover,
+                },
+              ]}
+              onPress={handleBlockToggle}
+            >
+              <Text style={{ ...typography.captionBold, color: colors.textPrimary }}>Unblock Researcher</Text>
+            </TouchableOpacity>
+          </View>
+        ) : researcher.isPrivateRestricted ? (
           <View style={styles.privateProfileContainer}>
             <View style={styles.privateIconCircle}>
               <Lock size={26} color={colors.textSecondary} />

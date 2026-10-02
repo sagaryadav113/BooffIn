@@ -48,3 +48,6 @@ example
 # generated native folders
 /ios
 /android
+
+# scratch test scripts
+scratch/

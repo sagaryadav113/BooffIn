@@ -525,7 +525,20 @@ export async function fetchFeed(
       return { posts: [], hasMore: false, error: null };
     }
 
-    const mappedPosts = data.map((row: any) => mapSupabasePost(row, resolvedUserId));
+    let mappedPosts = data.map((row: any) => mapSupabasePost(row, resolvedUserId));
+
+    if (resolvedUserId) {
+      const { data: blocks } = await supabase
+        .from('user_blocks')
+        .select('blocker_id, blocked_id')
+        .or(`blocker_id.eq.${resolvedUserId},blocked_id.eq.${resolvedUserId}`);
+      if (blocks && blocks.length > 0) {
+        const blockedSet = new Set(
+          blocks.map((b: any) => (b.blocker_id === resolvedUserId ? b.blocked_id : b.blocker_id))
+        );
+        mappedPosts = mappedPosts.filter((p: any) => !blockedSet.has(p.author?.id));
+      }
+    }
 
     let filtered = mappedPosts;
     if (tab === 'For You') {
@@ -1782,6 +1795,21 @@ export async function fetchUserPosts(
   currentUserId?: string
 ): Promise<{ posts: Post[]; error: string | null }> {
   try {
+    if (currentUserId && currentUserId !== userId) {
+      const { data: blockRow } = await supabase
+        .from('user_blocks')
+        .select('blocker_id')
+        .or(
+          `and(blocker_id.eq.${currentUserId},blocked_id.eq.${userId}),and(blocker_id.eq.${userId},blocked_id.eq.${currentUserId})`
+        )
+        .limit(1)
+        .maybeSingle();
+
+      if (blockRow) {
+        return { posts: [], error: null };
+      }
+    }
+
     const postSelectQuery = `
       id,
       post_type,

@@ -95,6 +95,7 @@ export function mapProfileRecord(raw: any, fallbackEmail?: string, isFollowing?:
     linkedinUrl: raw.linkedin_url || undefined,
     scopusId: raw.scopus_id || undefined,
     isPrivateRestricted: Boolean(raw.is_private_restricted),
+    isBlocked: Boolean(raw.is_blocked),
     visibilityLevel: raw.visibility_level || 'public',
   };
 }

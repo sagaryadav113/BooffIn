@@ -45,22 +45,32 @@ export class PostgresSearchProvider implements SearchProvider {
       let countTopics = 0;
       let countDiscussions = 0;
 
+      let viewerFollowingSet = new Set<string>();
+      let viewerBlockedSet = new Set<string>();
+      const { data: authData } = await supabase.auth.getUser();
+      const viewerId = authData?.user?.id;
+      if (viewerId) {
+        const [followRes, blockRes] = await Promise.all([
+          supabase.from('follows').select('following_id').eq('follower_id', viewerId),
+          supabase
+            .from('user_blocks')
+            .select('blocker_id, blocked_id')
+            .or(`blocker_id.eq.${viewerId},blocked_id.eq.${viewerId}`),
+        ]);
+
+        if (followRes.data) {
+          followRes.data.forEach((r: any) => viewerFollowingSet.add(r.following_id));
+        }
+        if (blockRes.data) {
+          blockRes.data.forEach((b: any) => {
+            viewerBlockedSet.add(b.blocker_id === viewerId ? b.blocked_id : b.blocker_id);
+          });
+        }
+      }
+
       // 1. Search Researchers (PostgreSQL profiles table)
       if (category === 'all' || category === 'researchers') {
         const fetchLimit = category === 'researchers' ? limit : Math.max(3, Math.floor(limit / 4));
-        
-        let viewerFollowingSet = new Set<string>();
-        const { data: authData } = await supabase.auth.getUser();
-        const viewerId = authData?.user?.id;
-        if (viewerId) {
-          const { data: followRows } = await supabase
-            .from('follows')
-            .select('following_id')
-            .eq('follower_id', viewerId);
-          if (followRows) {
-            followRows.forEach((r) => viewerFollowingSet.add(r.following_id));
-          }
-        }
 
         const { data, count, error } = await supabase
           .from('profiles')
@@ -74,10 +84,12 @@ export class PostgresSearchProvider implements SearchProvider {
           .range(offset, offset + fetchLimit - 1);
 
         if (!error && data) {
-          researchers = data.map((row) => {
-            const isFollowing = viewerFollowingSet.has(row.id);
-            return mapProfileRecord(row, undefined, isFollowing);
-          });
+          researchers = data
+            .filter((row: any) => !viewerBlockedSet.has(row.id))
+            .map((row: any) => {
+              const isFollowing = viewerFollowingSet.has(row.id);
+              return mapProfileRecord(row, undefined, isFollowing);
+            });
           countResearchers = count || data.length;
         }
       }
@@ -172,7 +184,9 @@ export class PostgresSearchProvider implements SearchProvider {
           .range(offset, offset + fetchLimit - 1);
 
         if (!error && data) {
-          discussions = data.map((row: any) => mapSupabasePost(row));
+          discussions = data
+            .filter((row: any) => !viewerBlockedSet.has(row.author?.id))
+            .map((row: any) => mapSupabasePost(row));
           countDiscussions = count || data.length;
         }
       }

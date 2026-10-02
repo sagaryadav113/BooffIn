@@ -36,5 +36,6 @@ export interface UserProfile {
   citationCount?: number;
   hypeScore?: number;
   isPrivateRestricted?: boolean;
+  isBlocked?: boolean;
   visibilityLevel?: 'public' | 'registered' | 'private';
 }

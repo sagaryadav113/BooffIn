@@ -44,7 +44,23 @@ export async function searchBooffInUsers(
 
     if (error || !data) return [];
 
-    return data.map((row: any) => ({
+    const { data: { user } } = await supabase.auth.getUser();
+    let blockedSet = new Set<string>();
+    if (user?.id) {
+      const { data: blocks } = await supabase
+        .from('user_blocks')
+        .select('blocker_id, blocked_id')
+        .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+      if (blocks && blocks.length > 0) {
+        blockedSet = new Set(
+          blocks.map((b: any) => (b.blocker_id === user.id ? b.blocked_id : b.blocker_id))
+        );
+      }
+    }
+
+    return data
+      .filter((row: any) => !blockedSet.has(row.id))
+      .map((row: any) => ({
       id: row.id,
       fullName: row.full_name || 'Researcher',
       handle: row.username || 'scholar',
