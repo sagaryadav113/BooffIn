@@ -66,14 +66,13 @@ export default function WelcomeScreen() {
             justifyContent: 'center',
             maxWidth: 1260,
             width: '100%',
-            margin: '0 auto',
+            margin: 'auto',
             padding: '24px 28px',
-            minHeight: 'calc(100vh - 68px)',
-            boxSizing: 'border-box',
+            minHeight: 'calc(100vh - 76px)',
             gap: 56,
           }}
         >
-          {/* Left Column: Welcome Graphic & Branding */}
+          {/* Left Column: Welcome Graphic & Branding (Zoomed 1.5X and pulled down 50px) */}
           <div
             style={{
               flex: 1.35,
@@ -81,7 +80,7 @@ export default function WelcomeScreen() {
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              alignSelf: 'center',
+              height: '100%',
               maxWidth: 720,
               width: '100%',
               overflow: 'hidden',
@@ -102,7 +101,7 @@ export default function WelcomeScreen() {
             />
           </div>
 
-          {/* Right Column: Clean White Authentication Card (Vertically Center Aligned) */}
+          {/* Right Column: Clean White Authentication Card */}
           <div
             style={{
               flex: 0.85,
@@ -115,9 +114,6 @@ export default function WelcomeScreen() {
               border: '1px solid #E2E8F0',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
-              alignSelf: 'center',
-              margin: 'auto 0',
             }}
           >
             <Text style={styles.cardHeaderTitle}>Join the community</Text>
@@ -300,7 +296,7 @@ const styles = StyleSheet.create({
   desktopContainer: {
     flex: 1,
     width: '100%',
-    minHeight: 'calc(100vh - 68px)' as any,
+    minHeight: '100vh' as any,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
