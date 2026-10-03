@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { usePathname, router } from 'expo-router';
 import {
@@ -13,10 +13,13 @@ import {
   FileText,
   Settings,
   HelpCircle,
+  Download,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
+import { InstallAppModal } from '../modals/InstallAppModal';
 
 interface DesktopLeftSidebarProps {
   onOpenMessages?: () => void;
@@ -28,6 +31,19 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
   const pathname = usePathname();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const currentUser = useAuthStore((s) => s.user);
+  const { hasNativePrompt, promptInstall } = usePWAInstall();
+  const [showInstallModal, setShowInstallModal] = useState(false);
+
+  const handleInstallPress = async () => {
+    if (hasNativePrompt) {
+      const installed = await promptInstall();
+      if (!installed) {
+        setShowInstallModal(true);
+      }
+    } else {
+      setShowInstallModal(true);
+    }
+  };
 
   const isHomeActive = pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/index';
   const isExploreActive = pathname.includes('explore');
@@ -185,8 +201,17 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
           })}
         </View>
 
-        {/* Bottom Settings & Help */}
+        {/* Bottom Install App, Settings & Help */}
         <View style={styles.bottomSection}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleInstallPress}
+            style={styles.navItem}
+          >
+            <Download size={18} color="#475569" strokeWidth={2} />
+            <Text style={styles.navLabel}>Install App</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => router.push('/settings')}
@@ -216,6 +241,12 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
             <Text style={styles.navLabel}>Help & Safety</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Install Modal Popup */}
+        <InstallAppModal
+          visible={showInstallModal}
+          onClose={() => setShowInstallModal(false)}
+        />
       </View>
     </aside>
   );
