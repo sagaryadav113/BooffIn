@@ -33,7 +33,7 @@ export async function fetchUserAnalytics(
     // 1. Fetch user's profile for base counts
     const profilePromise = supabase
       .from('profiles')
-      .select('followers_count, following_count, posts_count, created_at')
+      .select('institution, followers_count, following_count, posts_count, created_at')
       .eq('id', userId)
       .maybeSingle();
 
@@ -224,13 +224,9 @@ export async function fetchUserAnalytics(
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    if (topInstitutions.length === 0) {
-      // Graceful baseline academic distribution for active researchers
+    if (topInstitutions.length === 0 && profile?.institution) {
       topInstitutions = [
-        { name: 'Stanford University', count: Math.max(1, Math.round(engagedScholars * 0.35)), percentage: 35 },
-        { name: 'MIT - CSAIL & BioEng', count: Math.max(1, Math.round(engagedScholars * 0.28)), percentage: 28 },
-        { name: 'Oxford Genomics Institute', count: Math.max(1, Math.round(engagedScholars * 0.22)), percentage: 22 },
-        { name: 'Amity Institute of Neurosciences', count: Math.max(1, Math.round(engagedScholars * 0.15)), percentage: 15 },
+        { name: profile.institution, count: 1, percentage: 100 },
       ];
     }
 
@@ -259,14 +255,6 @@ export async function fetchUserAnalytics(
       .sort((a, b) => b.percentage - a.percentage)
       .slice(0, 5);
 
-    if (topDisciplines.length === 0) {
-      topDisciplines = [
-        { name: 'AI in Science & Deep Learning', percentage: 42, count: 18 },
-        { name: 'Structural Biology & AlphaFold', percentage: 28, count: 12 },
-        { name: 'Neuroscience & Cellular Plasticity', percentage: 18, count: 8 },
-        { name: 'Bioinformatics & Genetics', percentage: 12, count: 5 },
-      ];
-    }
 
     // Post Clicks & Reads: user interactions, clicks to expand, paper DOI reads
     const postClicks = Math.max(
@@ -647,15 +635,7 @@ export async function fetchSinglePostImpact(
       .sort((a, b) => b.count - a.count)
       .slice(0, 4);
 
-    if (topInstitutions.length === 0) {
-      topInstitutions = [
-        { name: 'Stanford University', count: Math.max(1, Math.round(engagedScholars * 0.4)), percentage: 40 },
-        { name: 'MIT - CSAIL', count: Math.max(1, Math.round(engagedScholars * 0.3)), percentage: 30 },
-        { name: 'Oxford Genomics Institute', count: Math.max(1, Math.round(engagedScholars * 0.2)), percentage: 20 },
-      ];
-    }
-
-    // Disciplines
+    // Disciplines derived from real post topics and interacting scholars
     const discMap: Record<string, number> = {};
     topics.forEach((t) => {
       discMap[t] = (discMap[t] || 0) + 3;
@@ -680,13 +660,6 @@ export async function fetchSinglePostImpact(
       .sort((a, b) => b.percentage - a.percentage)
       .slice(0, 4);
 
-    if (topDisciplines.length === 0) {
-      topDisciplines = [
-        { name: 'AI in Science & Deep Learning', percentage: 45, count: 6 },
-        { name: 'Structural Biology', percentage: 30, count: 4 },
-        { name: 'Neuroscience', percentage: 25, count: 3 },
-      ];
-    }
 
     // Total Impressions & Unique Reach for single post
     const totalImpressions = Math.max(

@@ -361,24 +361,30 @@ export const PostImpactModal: React.FC<PostImpactModalProps> = ({
               <View style={styles.demoCard}>
                 <Text style={styles.demoTitle}>Top Disciplines Reached</Text>
                 <View style={styles.demoList}>
-                  {(summary?.topDisciplines || []).map((disc, idx) => (
-                    <View key={idx} style={styles.demoItem}>
-                      <View style={styles.demoItemHeader}>
-                        <Text style={styles.demoItemName} numberOfLines={1}>
-                          {disc.name}
-                        </Text>
-                        <Text style={styles.demoItemPercent}>{disc.percentage}%</Text>
+                  {summary?.topDisciplines && summary.topDisciplines.length > 0 ? (
+                    summary.topDisciplines.map((disc, idx) => (
+                      <View key={idx} style={styles.demoItem}>
+                        <View style={styles.demoItemHeader}>
+                          <Text style={styles.demoItemName} numberOfLines={1}>
+                            {disc.name}
+                          </Text>
+                          <Text style={styles.demoItemPercent}>{disc.percentage}%</Text>
+                        </View>
+                        <View style={styles.progressBarTrack}>
+                          <View
+                            style={[
+                              styles.progressBarFill,
+                              { width: `${Math.min(100, disc.percentage)}%`, backgroundColor: '#064E3B' },
+                            ]}
+                          />
+                        </View>
                       </View>
-                      <View style={styles.progressBarTrack}>
-                        <View
-                          style={[
-                            styles.progressBarFill,
-                            { width: `${Math.min(100, disc.percentage)}%`, backgroundColor: '#064E3B' },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  ))}
+                    ))
+                  ) : (
+                    <Text style={styles.emptyDemoText}>
+                      Audience discipline data will populate as researchers engage with this post.
+                    </Text>
+                  )}
                 </View>
               </View>
 
@@ -386,27 +392,34 @@ export const PostImpactModal: React.FC<PostImpactModalProps> = ({
               <View style={styles.demoCard}>
                 <Text style={styles.demoTitle}>Top Academic Institutions</Text>
                 <View style={styles.demoList}>
-                  {(summary?.topInstitutions || []).map((inst, idx) => (
-                    <View key={idx} style={styles.demoItem}>
-                      <View style={styles.demoItemHeader}>
-                        <Text style={styles.demoItemName} numberOfLines={1}>
-                          {inst.name}
-                        </Text>
-                        <Text style={styles.demoItemPercent}>{inst.percentage}%</Text>
+                  {summary?.topInstitutions && summary.topInstitutions.length > 0 ? (
+                    summary.topInstitutions.map((inst, idx) => (
+                      <View key={idx} style={styles.demoItem}>
+                        <View style={styles.demoItemHeader}>
+                          <Text style={styles.demoItemName} numberOfLines={1}>
+                            {inst.name}
+                          </Text>
+                          <Text style={styles.demoItemPercent}>{inst.percentage}%</Text>
+                        </View>
+                        <View style={styles.progressBarTrack}>
+                          <View
+                            style={[
+                              styles.progressBarFill,
+                              { width: `${Math.min(100, inst.percentage)}%`, backgroundColor: '#3B82F6' },
+                            ]}
+                          />
+                        </View>
                       </View>
-                      <View style={styles.progressBarTrack}>
-                        <View
-                          style={[
-                            styles.progressBarFill,
-                            { width: `${Math.min(100, inst.percentage)}%`, backgroundColor: '#3B82F6' },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  ))}
+                    ))
+                  ) : (
+                    <Text style={styles.emptyDemoText}>
+                      Institution data will populate as verified scholars read and interact.
+                    </Text>
+                  )}
                 </View>
               </View>
             </View>
+
 
             {/* Profile Activity Generated */}
             <Text style={styles.sectionHeader}>PROFILE ACTIVITY GENERATED</Text>
@@ -805,4 +818,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  emptyDemoText: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    paddingVertical: spacing.xs,
+  },
 });
+
