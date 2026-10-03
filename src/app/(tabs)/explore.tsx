@@ -197,6 +197,18 @@ export default function ExploreScreen() {
     executeSearch(term);
   };
 
+  // Automatically trigger debounced unified search when searchQuery changes
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      executeSearch(trimmed);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [searchQuery, activeCategory, executeSearch]);
+
   const hasQuery = Boolean(searchQuery.trim());
   const hasResults = Boolean(
     results && (results.papers.length > 0 || results.researchers.length > 0)
@@ -452,18 +464,16 @@ export default function ExploreScreen() {
         </View>
       )}
 
-      {/* Universal Search Bar */}
-      {!isDesktop && (
-        <View style={styles.searchBarContainer}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={(text) => setSearchQuery(text)}
-            placeholder="Search by DOI, arXiv, ORCID, author, title..."
-            onSubmitEditing={() => handleSearchSubmit()}
-            onClear={clearSearch}
-          />
-        </View>
-      )}
+      {/* Universal Search Bar (Mobile & Desktop) */}
+      <View style={[styles.searchBarContainer, isDesktop && styles.desktopSearchBarContainer]}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={(text) => setSearchQuery(text)}
+          placeholder="Search by DOI, arXiv, ORCID, author, title, topic..."
+          onSubmitEditing={() => handleSearchSubmit()}
+          onClear={clearSearch}
+        />
+      </View>
 
       {/* When searching, show category tabs (All, Papers, Researchers) */}
       {hasQuery && (
@@ -584,8 +594,12 @@ export default function ExploreScreen() {
               </View>
             )}
 
-            {/* Sections (ordered dynamically based on query intent) */}
-            {showResearchersFirst ? (
+            {/* Sections (ordered dynamically based on active category & query intent) */}
+            {activeCategory === 'papers' ? (
+              renderPapersSection()
+            ) : activeCategory === 'researchers' ? (
+              renderResearchersSection()
+            ) : showResearchersFirst ? (
               <>
                 {renderResearchersSection()}
                 {renderPapersSection()}
@@ -653,6 +667,11 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 8,
     backgroundColor: '#FFFFFF',
+  },
+  desktopSearchBarContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 12,
   },
   topTabsWrapper: {
     backgroundColor: '#FFFFFF',

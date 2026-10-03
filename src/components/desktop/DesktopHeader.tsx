@@ -28,6 +28,7 @@ import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { useExploreSearchStore } from '../../store/useExploreSearchStore';
 import { searchBooffIn, POPULAR_DISCOVERIES } from '../../api/search/searchService';
 import { SearchCategory, SearchResults } from '../../types';
 
@@ -40,13 +41,25 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const exploreQuery = useExploreSearchStore((s) => s.searchQuery);
+  const setExploreQuery = useExploreSearchStore((s) => s.setSearchQuery);
+  const executeExploreSearch = useExploreSearchStore((s) => s.executeSearch);
+  const clearExploreSearch = useExploreSearchStore((s) => s.clearSearch);
+
+  const [searchQuery, setSearchQuery] = useState(exploreQuery || '');
   const [activeCategory, setActiveCategory] = useState<SearchCategory>('all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
 
   const searchContainerRef = useRef<any>(null);
+  const pathname = usePathname();
+  const isExplorePage = pathname.includes('explore');
+
+  // Keep local search input synchronized with explore search store
+  useEffect(() => {
+    setSearchQuery(exploreQuery);
+  }, [exploreQuery]);
 
   // Global ⌘K keyboard shortcut listener on web
   useEffect(() => {
@@ -112,11 +125,15 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
     const trimmed = searchQuery.trim();
     setIsSearchOpen(false);
     if (trimmed) {
+      setExploreQuery(trimmed);
+      executeExploreSearch(trimmed);
       if (onSearch) {
         onSearch(trimmed);
-      } else {
-        router.push(`/search?q=${encodeURIComponent(trimmed)}&category=${activeCategory}`);
+      } else if (!isExplorePage) {
+        router.push('/(tabs)/explore');
       }
+    } else if (!isExplorePage) {
+      router.push('/(tabs)/explore');
     }
   };
 
@@ -135,7 +152,6 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
     router.push(`/topic/${topicSlug}`);
   };
 
-  const pathname = usePathname();
   const isAuthPage =
     pathname.includes('(auth)') ||
     pathname.includes('/login') ||
@@ -200,9 +216,12 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
               value={searchQuery}
               onChangeText={(text) => {
                 setSearchQuery(text);
-                if (!isSearchOpen) setIsSearchOpen(true);
+                setExploreQuery(text);
+                if (!isSearchOpen && !isExplorePage) setIsSearchOpen(true);
               }}
-              onFocus={() => setIsSearchOpen(true)}
+              onFocus={() => {
+                if (!isExplorePage) setIsSearchOpen(true);
+              }}
               placeholder="Search papers, researchers, topics, methods..."
               placeholderTextColor="#94A3B8"
               style={styles.searchInput}
@@ -211,7 +230,10 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
             />
             {searchQuery.length > 0 ? (
               <TouchableOpacity
-                onPress={() => setSearchQuery('')}
+                onPress={() => {
+                  setSearchQuery('');
+                  clearExploreSearch();
+                }}
                 style={{ padding: 4 }}
               >
                 <X size={16} color="#94A3B8" />
@@ -401,6 +423,10 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                           activeOpacity={0.7}
                           onPress={() => {
                             setSearchQuery(disc.query);
+                            setExploreQuery(disc.query);
+                            executeExploreSearch(disc.query);
+                            setIsSearchOpen(false);
+                            if (!isExplorePage) router.push('/(tabs)/explore');
                           }}
                           style={styles.popularTopicChip}
                         >
