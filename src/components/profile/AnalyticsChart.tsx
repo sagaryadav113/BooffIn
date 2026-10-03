@@ -58,13 +58,13 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
         };
       case 'views':
         return {
-          title: 'Views & Reach',
+          title: 'Impressions & Reach',
           icon: Eye,
           color: '#3B82F6',
           gradientId: 'gradViews',
-          getValue: (d: DayDataPoint) => d.views,
-          getSubValue: (d: DayDataPoint) => `${d.views} views`,
-          unit: 'views',
+          getValue: (d: DayDataPoint) => d.impressions ?? d.views,
+          getSubValue: (d: DayDataPoint) => `${d.impressions ?? d.views} impressions`,
+          unit: 'impressions',
         };
       case 'engagement':
         return {

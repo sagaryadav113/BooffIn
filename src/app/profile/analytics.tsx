@@ -175,17 +175,17 @@ export default function ProfileAnalyticsScreen() {
           <View style={styles.summaryBanner}>
             <View style={styles.bannerHeader}>
               <View style={styles.bannerBadge}>
-                <Sparkles size={12} color={colors.accentBlue} />
-                <Text style={styles.bannerBadgeText}>Real-Time Telemetry</Text>
+                <Sparkles size={12} color="#064E3B" />
+                <Text style={styles.bannerBadgeText}>Live Scientific Telemetry</Text>
               </View>
               <Text style={styles.bannerPeriodText}>Last {activeTimeframeLabel}</Text>
             </View>
 
             <View style={styles.bannerMetricRow}>
               <View>
-                <Text style={styles.bannerMainLabel}>Total Reach & Impressions</Text>
+                <Text style={styles.bannerMainLabel}>Total Research Impressions</Text>
                 <Text style={styles.bannerMainValue}>
-                  {formatNumber(summary?.totalViews)}
+                  {formatNumber(summary?.totalImpressions ?? summary?.totalViews)}
                 </Text>
               </View>
               <View style={styles.bannerRateBadge}>
@@ -198,70 +198,84 @@ export default function ProfileAnalyticsScreen() {
             </View>
           </View>
 
-          {/* 6 Core Metrics Grid */}
-          <Text style={styles.sectionHeader}>PERFORMANCE METRICS</Text>
+          {/* Core Metrics Grid */}
+          <Text style={styles.sectionHeader}>PERFORMANCE & REACH</Text>
           <View style={styles.metricsGrid}>
-            {/* 1. Views & Reach */}
+            {/* 1. Total Impressions */}
             <View style={styles.metricCard}>
               <View style={styles.metricCardHeader}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
                   <Eye size={16} color="#3B82F6" />
                 </View>
-                <Text style={styles.metricLabel}>Views & Reach</Text>
+                <Text style={styles.metricLabel}>Total Impressions</Text>
               </View>
               <Text style={styles.metricValue}>
-                {formatNumber(summary?.totalViews)}
+                {formatNumber(summary?.totalImpressions ?? summary?.totalViews)}
               </Text>
-              <Text style={styles.metricSub}>Post impressions</Text>
+              <Text style={styles.metricSub}>Feed & search appearances</Text>
             </View>
 
-            {/* 2. Posts Count */}
+            {/* 2. Unique Reach */}
+            <View style={styles.metricCard}>
+              <View style={styles.metricCardHeader}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                  <Users size={16} color={colors.accentGreen} />
+                </View>
+                <Text style={styles.metricLabel}>Unique Reach</Text>
+              </View>
+              <Text style={styles.metricValue}>
+                {formatNumber(summary?.uniqueReach)}
+              </Text>
+              <Text style={styles.metricSub}>Distinct scholars reached</Text>
+            </View>
+
+            {/* 3. Engaged Scholars */}
+            <View style={styles.metricCard}>
+              <View style={styles.metricCardHeader}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+                  <Zap size={16} color="#F59E0B" />
+                </View>
+                <Text style={styles.metricLabel}>Engaged Scholars</Text>
+              </View>
+              <Text style={styles.metricValue}>
+                {formatNumber(summary?.engagedScholars || summary?.totalEngagement)}
+              </Text>
+              <Text style={styles.metricSub}>Active interactions & reads</Text>
+            </View>
+
+            {/* 4. Library Saves & Citations */}
             <View style={styles.metricCard}>
               <View style={styles.metricCardHeader}>
                 <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
                   <FileText size={16} color="#8B5CF6" />
                 </View>
-                <Text style={styles.metricLabel}>Posts Published</Text>
+                <Text style={styles.metricLabel}>Library Saves</Text>
               </View>
               <Text style={styles.metricValue}>
-                {formatNumber(summary?.totalPosts)}
+                {formatNumber(summary?.totalSaves)}
               </Text>
-              <Text style={styles.metricSub}>Authored posts</Text>
+              <Text style={styles.metricSub}>Saved for future citation</Text>
             </View>
 
-            {/* 3. Shares / Reposts */}
+            {/* 5. Discussions */}
             <View style={styles.metricCard}>
               <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(236, 72, 153, 0.1)' }]}>
-                  <Share2 size={16} color="#EC4899" />
-                </View>
-                <Text style={styles.metricLabel}>Share Counts</Text>
-              </View>
-              <Text style={styles.metricValue}>
-                {formatNumber(summary?.totalShares)}
-              </Text>
-              <Text style={styles.metricSub}>Times content shared</Text>
-            </View>
-
-            {/* 4. Discussions */}
-            <View style={styles.metricCard}>
-              <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                  <DiscussionIcon size={16} color={colors.accentGreen} />
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 78, 59, 0.1)' }]}>
+                  <DiscussionIcon size={16} color="#064E3B" />
                 </View>
                 <Text style={styles.metricLabel}>Discussions</Text>
               </View>
               <Text style={styles.metricValue}>
                 {formatNumber(summary?.totalDiscussions)}
               </Text>
-              <Text style={styles.metricSub}>Comments & replies</Text>
+              <Text style={styles.metricSub}>Peer reviews & comments</Text>
             </View>
 
-            {/* 5. Followers & Growth */}
+            {/* 6. Followers & Growth */}
             <View style={styles.metricCard}>
               <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(2, 132, 199, 0.1)' }]}>
-                  <Users size={16} color={colors.accentBlue} />
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(236, 72, 153, 0.1)' }]}>
+                  <Users size={16} color="#EC4899" />
                 </View>
                 <Text style={styles.metricLabel}>Followers</Text>
               </View>
@@ -279,24 +293,103 @@ export default function ProfileAnalyticsScreen() {
               </View>
               <Text style={styles.metricSub}>Total scientific audience</Text>
             </View>
+          </View>
 
-            {/* 6. Engagement & Clicks */}
-            <View style={styles.metricCard}>
-              <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                  <Zap size={16} color="#F59E0B" />
-                </View>
-                <Text style={styles.metricLabel}>Engagement</Text>
+          {/* Audience Discovery & Distribution (Instagram-Style) */}
+          <Text style={styles.sectionHeader}>AUDIENCE DISCOVERY & REACH</Text>
+          <View style={styles.discoveryCard}>
+            <View style={styles.discoveryHeader}>
+              <Text style={styles.discoveryTitle}>Discovery Breakdown</Text>
+              <Text style={styles.discoverySub}>Followers vs. Non-Followers reached</Text>
+            </View>
+
+            {/* Segmented Progress Bar */}
+            <View style={styles.splitBarContainer}>
+              <View
+                style={[
+                  styles.splitBarFollowers,
+                  { width: `${summary?.followerReachPercent || 35}%` },
+                ]}
+              />
+              <View
+                style={[
+                  styles.splitBarNonFollowers,
+                  { width: `${summary?.nonFollowerReachPercent || 65}%` },
+                ]}
+              />
+            </View>
+
+            <View style={styles.splitLegendRow}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#064E3B' }]} />
+                <Text style={styles.legendText}>
+                  Followers: <Text style={{ fontWeight: '700' }}>{summary?.followerReachPercent || 35}%</Text>
+                </Text>
               </View>
-              <Text style={styles.metricValue}>
-                {formatNumber(summary?.postClicks)}
-              </Text>
-              <Text style={styles.metricSub}>Clicks, reads & interactions</Text>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
+                <Text style={styles.legendText}>
+                  Discovery (Non-Followers): <Text style={{ fontWeight: '700' }}>{summary?.nonFollowerReachPercent || 65}%</Text>
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Top Disciplines & Institutions */}
+          <View style={styles.demographicsRow}>
+            {/* Top Disciplines */}
+            <View style={styles.demoCard}>
+              <Text style={styles.demoTitle}>Top Disciplines Reached</Text>
+              <View style={styles.demoList}>
+                {(summary?.topDisciplines || []).map((disc, idx) => (
+                  <View key={idx} style={styles.demoItem}>
+                    <View style={styles.demoItemHeader}>
+                      <Text style={styles.demoItemName} numberOfLines={1}>
+                        {disc.name}
+                      </Text>
+                      <Text style={styles.demoItemPercent}>{disc.percentage}%</Text>
+                    </View>
+                    <View style={styles.progressBarTrack}>
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          { width: `${Math.min(100, disc.percentage)}%`, backgroundColor: '#064E3B' },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Top Institutions */}
+            <View style={styles.demoCard}>
+              <Text style={styles.demoTitle}>Top Institutions</Text>
+              <View style={styles.demoList}>
+                {(summary?.topInstitutions || []).map((inst, idx) => (
+                  <View key={idx} style={styles.demoItem}>
+                    <View style={styles.demoItemHeader}>
+                      <Text style={styles.demoItemName} numberOfLines={1}>
+                        {inst.name}
+                      </Text>
+                      <Text style={styles.demoItemPercent}>{inst.percentage}%</Text>
+                    </View>
+                    <View style={styles.progressBarTrack}>
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          { width: `${Math.min(100, inst.percentage)}%`, backgroundColor: '#3B82F6' },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
 
           {/* Interactive Graphical Chart */}
-          <Text style={styles.sectionHeader}>ACTIVITY & AUDIENCE TREND</Text>
+          <Text style={styles.sectionHeader}>IMPRESSIONS & ACTIVITY TIMELINE</Text>
           {summary?.dailySeries ? (
             <AnalyticsChart
               data={summary.dailySeries}
@@ -321,7 +414,7 @@ export default function ProfileAnalyticsScreen() {
                       <View style={styles.topPostStatItem}>
                         <Eye size={12} color={colors.textSecondary} />
                         <Text style={styles.topPostStatText}>
-                          {formatNumber(post.viewsCount)}
+                          {formatNumber(post.impressionsCount ?? post.viewsCount)} impressions
                         </Text>
                       </View>
                       <View style={styles.topPostStatItem}>
@@ -420,8 +513,8 @@ const styles = StyleSheet.create({
     borderColor: colors.borderLight,
   },
   timeframePillActive: {
-    backgroundColor: colors.accentBlue,
-    borderColor: colors.accentBlue,
+    backgroundColor: '#064E3B',
+    borderColor: '#064E3B',
   },
   timeframeText: {
     ...typography.captionMedium,
@@ -468,7 +561,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    backgroundColor: 'rgba(6, 78, 59, 0.08)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radii.full,
@@ -476,7 +569,7 @@ const styles = StyleSheet.create({
   bannerBadgeText: {
     ...typography.microBold,
     fontSize: 10.5,
-    color: colors.accentBlue,
+    color: '#064E3B',
   },
   bannerPeriodText: {
     ...typography.captionMedium,
@@ -588,6 +681,114 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  discoveryCard: {
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  discoveryHeader: {
+    marginBottom: spacing.sm,
+  },
+  discoveryTitle: {
+    ...typography.captionBold,
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  discoverySub: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  splitBarContainer: {
+    flexDirection: 'row',
+    height: 12,
+    borderRadius: radii.full,
+    overflow: 'hidden',
+    backgroundColor: colors.backgroundSecondary,
+    marginVertical: spacing.sm,
+  },
+  splitBarFollowers: {
+    backgroundColor: '#064E3B',
+    height: '100%',
+  },
+  splitBarNonFollowers: {
+    backgroundColor: '#3B82F6',
+    height: '100%',
+  },
+  splitLegendRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginTop: 4,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: radii.full,
+  },
+  legendText: {
+    ...typography.micro,
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  demographicsRow: {
+    flexDirection: 'column',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  demoCard: {
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    padding: spacing.md,
+  },
+  demoTitle: {
+    ...typography.captionBold,
+    fontSize: 12.5,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  demoList: {
+    gap: spacing.sm,
+  },
+  demoItem: {},
+  demoItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
+  demoItemName: {
+    ...typography.micro,
+    fontSize: 11.5,
+    color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  demoItemPercent: {
+    ...typography.microBold,
+    fontSize: 11.5,
+    color: colors.textSecondary,
+  },
+  progressBarTrack: {
+    height: 5,
+    borderRadius: radii.full,
+    backgroundColor: colors.backgroundSecondary,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: radii.full,
+  },
   topPostsSection: {
     marginTop: spacing.xs,
   },
@@ -641,3 +842,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
+

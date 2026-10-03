@@ -67,7 +67,7 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
             <Text style={styles.viewsValue}>
               {formatStatNumber(totalViews)}
             </Text>
-            <Text style={styles.viewsLabel}>Views (last 28d)</Text>
+            <Text style={styles.viewsLabel}>Impressions (last 28d)</Text>
           </View>
         </View>
       </View>

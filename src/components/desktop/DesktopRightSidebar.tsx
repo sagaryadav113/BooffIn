@@ -133,7 +133,7 @@ export const DesktopRightSidebar: React.FC = () => {
             <Text style={styles.impactStatNumber}>
               {analytics?.totalViews ? `${analytics.totalViews}` : '3510'}
             </Text>
-            <Text style={styles.impactStatLabel}>Views (last 28d)</Text>
+            <Text style={styles.impactStatLabel}>Impressions (last 28d)</Text>
           </View>
 
           {/* Daily Series Sparkline Visualization */}
