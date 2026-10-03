@@ -4,7 +4,6 @@ import { usePathname, router } from 'expo-router';
 import {
   Home,
   Compass,
-  Atom,
   Users,
   Bookmark,
   UserCheck,
@@ -12,7 +11,6 @@ import {
   Bell,
   User,
   FileText,
-  MessageSquare,
   Settings,
   HelpCircle,
 } from 'lucide-react-native';
@@ -52,13 +50,6 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
       icon: Compass,
       isActive: isExploreActive,
       onPress: () => router.push('/(tabs)/explore'),
-    },
-    {
-      id: 'topics',
-      label: 'Research Topics',
-      icon: Atom,
-      isActive: isTopicsActive,
-      onPress: () => router.push('/topic'),
     },
     {
       id: 'researchers',
@@ -120,13 +111,6 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
       icon: FileText,
       isActive: false,
       onPress: () => router.push('/(tabs)/profile?tab=Posts'),
-    },
-    {
-      id: 'my-discussions',
-      label: 'My Discussions',
-      icon: MessageSquare,
-      isActive: false,
-      onPress: () => router.push('/(tabs)/profile?tab=Activity'),
     },
   ];
 
