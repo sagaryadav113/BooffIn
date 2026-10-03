@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { supabase } from './client';
@@ -384,17 +385,74 @@ export async function connectOrcidOAuth(
         : 'https://orcid.org/signin';
     }
 
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+    // On web, also listen for postMessage and localStorage events from popup
+    let messageCleanup: (() => void) | undefined;
+    let webAuthPromise: Promise<{ code?: string; orcid?: string; error?: string }> | undefined;
 
-    if (result.type === 'cancel' || result.type === 'dismiss') {
-      return { success: false, error: 'ORCID verification was cancelled.' };
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      webAuthPromise = new Promise((resolve) => {
+        const handleMessage = (event: MessageEvent) => {
+          if (event.data && event.data.type === 'ORCID_AUTH_SUCCESS') {
+            resolve({
+              code: event.data.code,
+              orcid: event.data.orcid,
+              error: event.data.error,
+            });
+          }
+        };
+
+        const handleStorage = (event: StorageEvent) => {
+          if (event.key === 'booffin_orcid_auth' && event.newValue) {
+            try {
+              const data = JSON.parse(event.newValue);
+              if (data && data.type === 'ORCID_AUTH_SUCCESS') {
+                resolve({
+                  code: data.code,
+                  orcid: data.orcid,
+                  error: data.error,
+                });
+              }
+            } catch {}
+          }
+        };
+
+        window.addEventListener('message', handleMessage);
+        window.addEventListener('storage', handleStorage);
+
+        messageCleanup = () => {
+          window.removeEventListener('message', handleMessage);
+          window.removeEventListener('storage', handleStorage);
+        };
+      });
     }
 
-    if (result.type === 'success') {
-      if (result.url) {
-        let code: string | null = null;
-        let orcid: string | null = null;
+    const authSessionPromise = WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
+    const raceResult = webAuthPromise
+      ? await Promise.race([
+          authSessionPromise.then((res) => ({ fromAuthSession: true, res })),
+          webAuthPromise.then((msgData) => ({ fromWebMessage: true, msgData })),
+        ])
+      : await authSessionPromise.then((res) => ({ fromAuthSession: true, res }));
+
+    if (messageCleanup) messageCleanup();
+
+    let code: string | null = null;
+    let orcid: string | null = null;
+
+    if ('fromWebMessage' in raceResult && raceResult.msgData) {
+      if (raceResult.msgData.error) {
+        return { success: false, error: decodeURIComponent(raceResult.msgData.error) };
+      }
+      code = raceResult.msgData.code || null;
+      orcid = raceResult.msgData.orcid || null;
+    } else if ('fromAuthSession' in raceResult && raceResult.res) {
+      const result = raceResult.res;
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        return { success: false, error: 'ORCID verification was cancelled.' };
+      }
+
+      if (result.type === 'success' && result.url) {
         try {
           const urlObj = new URL(result.url);
           code = urlObj.searchParams.get('code');
@@ -409,59 +467,60 @@ export async function connectOrcidOAuth(
           code = params.get('code');
           orcid = params.get('orcid');
         }
+      }
+    }
 
-        if (orcid) {
-          return {
-            success: true,
-            orcidId: normalizeOrcidId(orcid),
-          };
-        }
+    if (orcid) {
+      return {
+        success: true,
+        orcidId: normalizeOrcidId(orcid),
+      };
+    }
 
-        if (code && process.env.EXPO_PUBLIC_ORCID_CLIENT_SECRET) {
-          try {
-            const tokenRes = await fetch(ORCID_OAUTH_TOKEN_URL, {
-              method: 'POST',
-              headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              body: new URLSearchParams({
-                client_id: rawClientId || '',
-                client_secret: process.env.EXPO_PUBLIC_ORCID_CLIENT_SECRET || '',
-                grant_type: 'authorization_code',
-                code,
-                redirect_uri: redirectUri,
-              }).toString(),
-            });
+    if (code && process.env.EXPO_PUBLIC_ORCID_CLIENT_SECRET) {
+      try {
+        const tokenRes = await fetch(ORCID_OAUTH_TOKEN_URL, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            client_id: rawClientId || '',
+            client_secret: process.env.EXPO_PUBLIC_ORCID_CLIENT_SECRET || '',
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri: redirectUri,
+          }).toString(),
+        });
 
-            if (tokenRes.ok) {
-              const tokenData = await tokenRes.json();
-              if (tokenData.orcid) {
-                return {
-                  success: true,
-                  orcidId: normalizeOrcidId(tokenData.orcid),
-                  name: tokenData.name,
-                  accessToken: tokenData.access_token,
-                };
-              }
-            }
-          } catch (tokenErr) {
-            console.warn('ORCID token exchange error:', tokenErr);
+        if (tokenRes.ok) {
+          const tokenData = await tokenRes.json();
+          if (tokenData.orcid) {
+            return {
+              success: true,
+              orcidId: normalizeOrcidId(tokenData.orcid),
+              name: tokenData.name,
+              accessToken: tokenData.access_token,
+            };
           }
         }
-
-        if (code) {
-          return {
-            success: true,
-            orcidId: cleanTargetOrcid || undefined,
-          };
-        }
+      } catch (tokenErr) {
+        console.warn('ORCID token exchange error:', tokenErr);
       }
+    }
 
-      // If browser session closed after official authentication
+    if (code) {
       return {
         success: true,
         orcidId: cleanTargetOrcid || undefined,
+      };
+    }
+
+    if (cleanTargetOrcid) {
+      return {
+        success: true,
+        orcidId: cleanTargetOrcid,
       };
     }
 
