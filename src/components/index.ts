@@ -70,6 +70,8 @@ export * from './modals/ImageViewerModal';
 export * from './modals/PostOptionsModal';
 export * from './modals/EditPostModal';
 export * from './modals/SharePostModal';
+export * from './modals/LikesListModal';
+export * from './post/PostImpactModal';
 
 // Composer Components
 export * from './composer/MentionSuggestions';

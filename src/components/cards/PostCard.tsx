@@ -31,6 +31,7 @@ import { PostImageCluster } from './PostImageCluster';
 import { PostOptionsModal } from '../modals/PostOptionsModal';
 import { EditPostModal } from '../modals/EditPostModal';
 import { SharePostModal } from '../modals/SharePostModal';
+import { LikesListModal } from '../modals/LikesListModal';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -50,6 +51,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isLikesModalOpen, setIsLikesModalOpen] = useState(false);
 
   const toggleLike = usePostStore((s) => s.toggleLikePost);
   const toggleRepost = usePostStore((s) => s.toggleRepost);
@@ -420,6 +422,11 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           isLiked={Boolean(post.isLiked)}
           likesCount={post.likesCount}
           onPress={handleLike}
+          onCountPress={() => {
+            if (post.likesCount > 0) {
+              setIsLikesModalOpen(true);
+            }
+          }}
           size={19}
           style={styles.actionItem}
         />
@@ -482,9 +489,20 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           post={post}
         />
       )}
+
+      {/* Liked By Modal */}
+      {isLikesModalOpen && (
+        <LikesListModal
+          visible={isLikesModalOpen}
+          postId={post.id}
+          likesCount={post.likesCount}
+          onClose={() => setIsLikesModalOpen(false)}
+        />
+      )}
     </TouchableOpacity>
   );
 });
+
 
 const styles = StyleSheet.create({
   container: {

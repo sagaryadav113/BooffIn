@@ -1716,6 +1716,68 @@ export async function fetchFollowers(
 }
 
 /**
+ * Fetches list of researchers who liked/endorsed a specific post.
+ */
+export async function fetchPostLikers(
+  postId: string,
+  viewerId?: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ researchers: UserProfile[]; error: string | null }> {
+  if (!postId) return { researchers: [], error: 'Post ID is required.' };
+  const verifiedViewerId = await getVerifiedUserId(viewerId);
+
+  try {
+    const { data, error } = await supabase
+      .from('likes')
+      .select(`
+        created_at,
+        user:profiles!user_id (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          banner_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified,
+          followers_count,
+          following_count,
+          posts_count,
+          created_at
+        )
+      `)
+      .eq('post_id', postId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      return { researchers: [], error: error.message };
+    }
+
+    if (Array.isArray(data)) {
+      const viewerFollowingIds = verifiedViewerId ? await fetchUserFollowingIds(verifiedViewerId) : [];
+      const followingSet = new Set(viewerFollowingIds);
+      const researchers: UserProfile[] = [];
+      for (const row of data) {
+        if (row.user) {
+          const prof = mapSupabaseProfile(row.user);
+          prof.isFollowing = verifiedViewerId ? followingSet.has(prof.id) : false;
+          researchers.push(prof);
+        }
+      }
+      return { researchers, error: null };
+    }
+
+    return { researchers: [], error: null };
+  } catch (err: any) {
+    return { researchers: [], error: err?.message || 'Failed to fetch likers.' };
+  }
+}
+
+
+/**
  * Fetches list of researchers a given target user is following with profile details and viewer follow state.
  */
 export async function fetchFollowing(
