@@ -98,7 +98,7 @@ export const DesktopRightSidebar: React.FC = () => {
   const topPapers = useMemo(() => {
     if (!papers || papers.length === 0) return [];
     return [...papers]
-      .sort((a, b) => (b.hypeScore || 0) - (a.hypeScore || 0) || (b.citations || 0) - (a.citations || 0))
+      .sort((a, b) => (b.citationCount || 0) - (a.citationCount || 0) || (b.likesCount || 0) - (a.likesCount || 0))
       .slice(0, 5);
   }, [papers]);
 
@@ -208,7 +208,7 @@ export const DesktopRightSidebar: React.FC = () => {
                     </Text>
                     <Text style={styles.paperTrendingSub} numberOfLines={1}>
                       {[
-                        paper.journal || paper.source,
+                        paper.journal || paper.publisher,
                         paper.publicationYear,
                         paper.authors?.[0]?.name ? `${paper.authors[0].name} et al.` : '',
                       ]
