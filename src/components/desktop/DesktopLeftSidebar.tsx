@@ -61,8 +61,8 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
       onPress: () => router.push('/(tabs)'),
     },
     {
-      id: 'discover',
-      label: 'Discover',
+      id: 'explore',
+      label: 'Explore',
       icon: Compass,
       isActive: isExploreActive,
       onPress: () => router.push('/(tabs)/explore'),
