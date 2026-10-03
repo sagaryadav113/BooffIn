@@ -364,10 +364,10 @@ export async function connectOrcidOAuth(
     const rawClientId = clientId || process.env.EXPO_PUBLIC_ORCID_CLIENT_ID;
     const cleanTargetOrcid = targetOrcid ? normalizeOrcidId(targetOrcid) : '';
 
-    const redirectUri = AuthSession.makeRedirectUri({
-      scheme: 'booffin',
-      path: 'orcid-callback',
-    });
+    const registeredRedirect =
+      process.env.EXPO_PUBLIC_ORCID_REDIRECT_URI ||
+      'https://booff-in.vercel.app/orcid-callback';
+    const redirectUri = registeredRedirect;
 
     let authUrl: string;
 
@@ -415,6 +415,39 @@ export async function connectOrcidOAuth(
             success: true,
             orcidId: normalizeOrcidId(orcid),
           };
+        }
+
+        if (code && process.env.EXPO_PUBLIC_ORCID_CLIENT_SECRET) {
+          try {
+            const tokenRes = await fetch(ORCID_OAUTH_TOKEN_URL, {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                client_id: rawClientId || '',
+                client_secret: process.env.EXPO_PUBLIC_ORCID_CLIENT_SECRET || '',
+                grant_type: 'authorization_code',
+                code,
+                redirect_uri: redirectUri,
+              }).toString(),
+            });
+
+            if (tokenRes.ok) {
+              const tokenData = await tokenRes.json();
+              if (tokenData.orcid) {
+                return {
+                  success: true,
+                  orcidId: normalizeOrcidId(tokenData.orcid),
+                  name: tokenData.name,
+                  accessToken: tokenData.access_token,
+                };
+              }
+            }
+          } catch (tokenErr) {
+            console.warn('ORCID token exchange error:', tokenErr);
+          }
         }
 
         if (code) {
