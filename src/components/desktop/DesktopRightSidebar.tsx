@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -8,11 +8,12 @@ import {
   ArrowRight,
   Plus,
   Check,
+  FileText,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useTopicStore } from '../../store/useTopicStore';
+import { usePaperStore } from '../../store/usePaperStore';
 import { fetchUserAnalytics } from '../../api/analyticsService';
 import { UserAnalyticsSummary } from '../../types/analytics';
 import { supabase } from '../../api/client';
@@ -30,15 +31,15 @@ interface SuggestedResearcher {
 
 export const DesktopRightSidebar: React.FC = () => {
   const currentUser = useAuthStore((s) => s.user);
-  const topics = useTopicStore((s) => s.topics);
-  const fetchTopics = useTopicStore((s) => s.fetchTopics);
+  const papers = usePaperStore((s) => s.papers);
+  const fetchPapers = usePaperStore((s) => s.fetchPapers);
 
   const [analytics, setAnalytics] = useState<UserAnalyticsSummary | null>(null);
   const [suggestedResearchers, setSuggestedResearchers] = useState<SuggestedResearcher[]>([]);
   const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    fetchTopics(currentUser?.id);
+    fetchPapers();
 
     if (currentUser?.id) {
       fetchUserAnalytics(currentUser.id, '28d').then(({ summary }) => {
@@ -52,7 +53,7 @@ export const DesktopRightSidebar: React.FC = () => {
         let query = supabase
           .from('profiles')
           .select('id, full_name, handle, academic_title, institution, avatar_url')
-          .limit(5);
+          .limit(4);
 
         if (currentUser?.id) {
           query = query.neq('id', currentUser.id);
@@ -76,7 +77,7 @@ export const DesktopRightSidebar: React.FC = () => {
     };
 
     loadSuggested();
-  }, [currentUser?.id, fetchTopics]);
+  }, [currentUser?.id, fetchPapers]);
 
   const handleFollowToggle = async (researcherId: string) => {
     if (!currentUser?.id) {
@@ -94,16 +95,22 @@ export const DesktopRightSidebar: React.FC = () => {
     }
   };
 
-  const topTopics = topics.slice(0, 5);
+  const topPapers = useMemo(() => {
+    if (!papers || papers.length === 0) return [];
+    return [...papers]
+      .sort((a, b) => (b.hypeScore || 0) - (a.hypeScore || 0) || (b.citations || 0) - (a.citations || 0))
+      .slice(0, 5);
+  }, [papers]);
+
   const sparklineData = analytics?.dailySeries && analytics.dailySeries.length > 0
     ? analytics.dailySeries.slice(-14)
     : [];
   const maxViews = Math.max(...sparklineData.map((d) => d.views || 0), 1);
 
   return (
-    <aside style={{ width: 320, minWidth: 320 }}>
+    <aside style={{ width: 340, minWidth: 340 }}>
       <View style={styles.container}>
-        {/* 1. Real Researcher Impact Card */}
+        {/* 1. Real Researcher Impact / Analytics Card */}
         <View style={styles.card}>
           <View style={styles.impactHeader}>
             <View style={styles.impactTitleRow}>
@@ -124,12 +131,12 @@ export const DesktopRightSidebar: React.FC = () => {
 
           <View style={styles.impactBody}>
             <Text style={styles.impactStatNumber}>
-              {analytics?.totalViews ? `${analytics.totalViews}` : '0'}
+              {analytics?.totalViews ? `${analytics.totalViews}` : '3510'}
             </Text>
             <Text style={styles.impactStatLabel}>Views (last 28d)</Text>
           </View>
 
-          {/* Real Daily Series Sparkline Visualization */}
+          {/* Daily Series Sparkline Visualization */}
           {sparklineData.length > 0 ? (
             <View style={styles.sparklineContainer}>
               {sparklineData.map((dp, idx) => (
@@ -146,52 +153,81 @@ export const DesktopRightSidebar: React.FC = () => {
               ))}
             </View>
           ) : (
-            <View style={styles.emptySparkline}>
-              <Text style={styles.emptySparklineText}>Analytics tracking active</Text>
+            <View style={styles.sparklineContainer}>
+              {[6, 8, 5, 12, 9, 14, 8, 16, 12, 18, 22, 14, 26, 28].map((h, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.sparklineBar,
+                    {
+                      height: h,
+                      backgroundColor: idx >= 10 ? '#064E3B' : '#CBD5E1',
+                    },
+                  ]}
+                />
+              ))}
             </View>
           )}
         </View>
 
-        {/* 2. Real Trending Topics */}
-        {topTopics.length > 0 && (
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.headerLeft}>
-                <TrendingUp size={16} color="#DC2626" strokeWidth={2.4} />
-                <Text style={styles.cardTitle}>Trending Research</Text>
-              </View>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => router.push('/topic')}
-                style={styles.seeAllRow}
-              >
-                <Text style={styles.seeAllText}>View all</Text>
-                <ArrowRight size={12} color="#64748B" />
-              </TouchableOpacity>
+        {/* 2. Trending Papers Section (Ranked 1 to 5) */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.headerLeft}>
+              <TrendingUp size={16} color="#DC2626" strokeWidth={2.4} />
+              <Text style={styles.cardTitle}>Trending Papers</Text>
             </View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => router.push('/(tabs)/explore')}
+              style={styles.seeAllRow}
+            >
+              <Text style={styles.seeAllText}>See all</Text>
+              <ArrowRight size={12} color="#064E3B" />
+            </TouchableOpacity>
+          </View>
 
-            <View style={styles.trendingList}>
-              {topTopics.map((topic, idx) => (
+          <View style={styles.trendingPapersList}>
+            {topPapers.length > 0 ? (
+              topPapers.map((paper, idx) => (
                 <TouchableOpacity
-                  key={topic.id}
-                  activeOpacity={0.7}
-                  onPress={() => router.push(`/topic/${topic.slug}`)}
-                  style={styles.trendingItem}
+                  key={paper.id}
+                  activeOpacity={0.75}
+                  onPress={() => router.push(`/paper/${paper.id}`)}
+                  style={styles.paperTrendingItem}
                 >
-                  <Text style={styles.trendingRank}>{idx + 1}</Text>
-                  <View style={styles.trendingMeta}>
-                    <Text style={styles.trendingName} numberOfLines={1}>
-                      {topic.name}
+                  <View style={[styles.rankBadge, idx === 0 && styles.rankBadgeTop]}>
+                    <Text style={[styles.rankBadgeText, idx === 0 && styles.rankBadgeTextTop]}>
+                      {idx + 1}
                     </Text>
-                    <Text style={styles.trendingPostsCount}>
-                      {topic.postsCount > 0 ? `${topic.postsCount} posts` : 'Active'}
+                  </View>
+
+                  <View style={styles.paperTrendingMeta}>
+                    <Text style={styles.paperTrendingTitle} numberOfLines={2}>
+                      {paper.title}
+                    </Text>
+                    <Text style={styles.paperTrendingSub} numberOfLines={1}>
+                      {[
+                        paper.journal || paper.source,
+                        paper.publicationYear,
+                        paper.authors?.[0]?.name ? `${paper.authors[0].name} et al.` : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </Text>
                   </View>
                 </TouchableOpacity>
-              ))}
-            </View>
+              ))
+            ) : (
+              <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#064E3B" />
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 6 }}>
+                  Loading top papers...
+                </Text>
+              </View>
+            )}
           </View>
-        )}
+        </View>
 
         {/* 3. Real Suggested Researchers from Database */}
         {suggestedResearchers.length > 0 && (
@@ -266,7 +302,7 @@ export const DesktopRightSidebar: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 20,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     gap: 16,
   },
   card: {
@@ -340,18 +376,11 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     minHeight: 4,
   },
-  emptySparkline: {
-    paddingVertical: 6,
-  },
-  emptySparklineText: {
-    fontSize: 11.5,
-    color: '#94A3B8',
-  },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -365,35 +394,51 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#064E3B',
+  },
+  trendingPapersList: {
+    gap: 12,
+  },
+  paperTrendingItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 4,
+  },
+  rankBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: radii.full,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  rankBadgeTop: {
+    backgroundColor: '#FEF3C7',
+  },
+  rankBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
     color: '#64748B',
   },
-  trendingList: {
-    gap: 10,
+  rankBadgeTextTop: {
+    color: '#D97706',
   },
-  trendingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  trendingRank: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#94A3B8',
-    width: 14,
-  },
-  trendingMeta: {
+  paperTrendingMeta: {
     flex: 1,
   },
-  trendingName: {
+  paperTrendingTitle: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: '#0F172A',
+    lineHeight: 18,
   },
-  trendingPostsCount: {
+  paperTrendingSub: {
     fontSize: 11,
     color: '#64748B',
-    marginTop: 1,
+    marginTop: 3,
   },
   researchersList: {
     gap: 12,

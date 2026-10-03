@@ -83,7 +83,7 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
           justifyContent: 'center',
           width: '100%',
           flex: 1,
-          backgroundColor: '#F8FAFC',
+          backgroundColor: '#FFFFFF',
           minHeight: 'calc(100vh - 68px)',
         }}
       >
@@ -92,10 +92,11 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
             display: 'flex',
             flexDirection: 'row',
             width: '100%',
-            maxWidth: 1360,
+            maxWidth: 1440,
             justifyContent: 'space-between',
-            paddingLeft: 16,
-            paddingRight: 16,
+            paddingLeft: 28,
+            paddingRight: 28,
+            boxSizing: 'border-box',
           }}
         >
           {/* Left Navigation Sidebar */}
@@ -107,12 +108,10 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              maxWidth: 680,
-              minWidth: 520,
-              margin: '0 16px',
+              maxWidth: 700,
+              minWidth: 540,
+              margin: '0 24px',
               backgroundColor: '#FFFFFF',
-              borderLeft: '1px solid #F1F5F9',
-              borderRight: '1px solid #F1F5F9',
               minHeight: 'calc(100vh - 68px)',
             }}
           >
@@ -135,6 +134,6 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     minHeight: '100vh' as any,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
 });
