@@ -347,6 +347,10 @@ export async function fetchOrcidPersonDetails(orcidId: string): Promise<{
   }
 }
 
+export const DEFAULT_ORCID_CLIENT_ID = 'APP-NSUXYHOR9ADH7JS8';
+export const DEFAULT_ORCID_CLIENT_SECRET = '9f1e1f72-e722-4313-b2f2-121c37725f12';
+export const DEFAULT_ORCID_REDIRECT_URI = 'https://booff-in.vercel.app/orcid-callback';
+
 /**
  * Initiates the ORCID OAuth 2.0 / Official Web Authentication flow
  */
@@ -362,28 +366,19 @@ export async function connectOrcidOAuth(
   error?: string;
 }> {
   try {
-    const rawClientId = clientId || process.env.EXPO_PUBLIC_ORCID_CLIENT_ID;
+    const rawClientId =
+      clientId || process.env.EXPO_PUBLIC_ORCID_CLIENT_ID || DEFAULT_ORCID_CLIENT_ID;
+    const clientSecret =
+      process.env.EXPO_PUBLIC_ORCID_CLIENT_SECRET || DEFAULT_ORCID_CLIENT_SECRET;
+    const redirectUri =
+      process.env.EXPO_PUBLIC_ORCID_REDIRECT_URI || DEFAULT_ORCID_REDIRECT_URI;
     const cleanTargetOrcid = targetOrcid ? normalizeOrcidId(targetOrcid) : '';
 
-    const registeredRedirect =
-      process.env.EXPO_PUBLIC_ORCID_REDIRECT_URI ||
-      'https://booff-in.vercel.app/orcid-callback';
-    const redirectUri = registeredRedirect;
-
-    let authUrl: string;
-
-    if (rawClientId && rawClientId !== 'APP-BOFFIN-SCHOLARS') {
-      authUrl = `${ORCID_OAUTH_AUTHORIZE_URL}?client_id=${encodeURIComponent(
-        rawClientId
-      )}&response_type=code&scope=%2Fauthenticate%20%2Fread-public&redirect_uri=${encodeURIComponent(
-        redirectUri
-      )}`;
-    } else {
-      // Direct official ORCID authentication portal
-      authUrl = cleanTargetOrcid
-        ? `https://orcid.org/signin?email_or_orcid=${encodeURIComponent(cleanTargetOrcid)}`
-        : 'https://orcid.org/signin';
-    }
+    const authUrl = `${ORCID_OAUTH_AUTHORIZE_URL}?client_id=${encodeURIComponent(
+      rawClientId
+    )}&response_type=code&scope=%2Fauthenticate%20%2Fread-public&redirect_uri=${encodeURIComponent(
+      redirectUri
+    )}`;
 
     // On web, also listen for postMessage and localStorage events from popup
     let messageCleanup: (() => void) | undefined;
@@ -477,7 +472,7 @@ export async function connectOrcidOAuth(
       };
     }
 
-    if (code && process.env.EXPO_PUBLIC_ORCID_CLIENT_SECRET) {
+    if (code && clientSecret) {
       try {
         const tokenRes = await fetch(ORCID_OAUTH_TOKEN_URL, {
           method: 'POST',
@@ -487,7 +482,7 @@ export async function connectOrcidOAuth(
           },
           body: new URLSearchParams({
             client_id: rawClientId || '',
-            client_secret: process.env.EXPO_PUBLIC_ORCID_CLIENT_SECRET || '',
+            client_secret: clientSecret,
             grant_type: 'authorization_code',
             code,
             redirect_uri: redirectUri,
