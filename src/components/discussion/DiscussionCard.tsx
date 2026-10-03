@@ -26,7 +26,7 @@ import { LikeIcon } from '../core/LikeIcon';
 
 export interface DiscussionCardProps {
   discussion: DiscussionContribution;
-  currentUser: UserProfile;
+  currentUser?: UserProfile | null;
   onLike: (discussionId: string) => void;
   onLikeReply: (discussionId: string, replyId: string) => void;
   onAddReply: (discussionId: string, content: string) => void;
@@ -234,7 +234,7 @@ export const DiscussionCard: React.FC<DiscussionCardProps> = ({
       {/* Inline Reply Composer */}
       {isReplying && (
         <View style={styles.replyComposerContainer}>
-          <Avatar url={currentUser.avatarUrl} name={currentUser.fullName} size={28} />
+          <Avatar url={currentUser?.avatarUrl} name={currentUser?.fullName || currentUser?.handle || 'User'} size={28} />
           <TextInput
             placeholder={`Reply to @${discussion.author.handle}...`}
             placeholderTextColor={colors.textMuted}

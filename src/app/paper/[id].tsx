@@ -134,6 +134,8 @@ export default function PaperDetailScreen() {
   const setActiveFilter = useDiscussionStore((s) => s.setActiveFilter);
   const addDiscussion = useDiscussionStore((s) => s.addDiscussion);
   const addReply = useDiscussionStore((s) => s.addReply);
+  const deleteDiscussion = useDiscussionStore((s) => s.deleteDiscussion);
+  const deleteReply = useDiscussionStore((s) => s.deleteReply);
   const toggleLikeDiscussion = useDiscussionStore((s) => s.toggleLikeDiscussion);
   const toggleLikeReply = useDiscussionStore((s) => s.toggleLikeReply);
   const getParticipatingResearchers = useDiscussionStore((s) => s.getParticipatingResearchers);
@@ -434,8 +436,13 @@ export default function PaperDetailScreen() {
     try {
       if (activePostId) {
         await fetchCommentsForPost(activePostId, currentUser?.id);
-      } else if (paperId) {
-        await fetchDiscussionsForPaper(paperId, currentUser?.id);
+      } else if (paperId || doi || currentPaper?.doi) {
+        await fetchDiscussionsForPaper(
+          paperId,
+          currentUser?.id,
+          doi || currentPaper?.doi,
+          url || currentPaper?.canonicalUrl
+        );
       }
     } catch (e) {}
 
@@ -691,7 +698,7 @@ export default function PaperDetailScreen() {
     title?: string;
     content: string;
   }) => {
-    if (!content.trim() || isSubmittingComment || !paper) return;
+    if (!content.trim() || isSubmittingComment || !paper || !currentUser) return;
 
     setIsSubmittingComment(true);
     try {
@@ -703,9 +710,10 @@ export default function PaperDetailScreen() {
         if (type !== 'discussion') {
           finalContent = `[${type}] ${finalContent}`;
         }
-        await addPostComment(activePostId, finalContent, undefined, currentUser?.id);
+        await addPostComment(activePostId, finalContent, undefined, currentUser.id);
       } else {
-        addDiscussion({
+        await addDiscussion({
+          paper,
           paperId: paper.id,
           author: currentUser,
           type,
@@ -724,12 +732,12 @@ export default function PaperDetailScreen() {
   };
 
   const handleAddReplyToDiscussion = async (parentId: string, replyText: string) => {
-    if (!replyText.trim() || !paper) return;
+    if (!replyText.trim() || !paper || !currentUser) return;
     try {
       if (activePostId) {
-        await addPostComment(activePostId, replyText.trim(), parentId, currentUser?.id);
+        await addPostComment(activePostId, replyText.trim(), parentId, currentUser.id);
       } else {
-        addReply({
+        await addReply({
           paperId: paper.id,
           discussionId: parentId,
           author: currentUser,
@@ -745,21 +753,38 @@ export default function PaperDetailScreen() {
   };
 
   const handleDeleteComment = (commentId: string) => {
-    if (!activePostId) return;
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Are you sure you want to delete this discussion?');
-      if (confirmed) {
-        deletePostComment(commentId, activePostId, currentUser?.id);
+    if (activePostId) {
+      if (Platform.OS === 'web') {
+        const confirmed = window.confirm('Are you sure you want to delete this discussion?');
+        if (confirmed) {
+          deletePostComment(commentId, activePostId, currentUser?.id);
+        }
+      } else {
+        Alert.alert('Delete Discussion', 'Are you sure you want to delete this contribution?', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => deletePostComment(commentId, activePostId, currentUser?.id),
+          },
+        ]);
       }
-    } else {
-      Alert.alert('Delete Discussion', 'Are you sure you want to delete this contribution?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deletePostComment(commentId, activePostId, currentUser?.id),
-        },
-      ]);
+    } else if (paper) {
+      if (Platform.OS === 'web') {
+        const confirmed = window.confirm('Are you sure you want to delete this discussion?');
+        if (confirmed) {
+          deleteDiscussion(paper.id, commentId, currentUser?.id);
+        }
+      } else {
+        Alert.alert('Delete Discussion', 'Are you sure you want to delete this contribution?', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => deleteDiscussion(paper.id, commentId, currentUser?.id),
+          },
+        ]);
+      }
     }
   };
 
@@ -1367,12 +1392,7 @@ export default function PaperDetailScreen() {
                         toggleLikeReply(paper.id, disc.id, replyId, currentUser?.id)
                       }
                       onAddReply={(_, replyContent) =>
-                        addReply({
-                          paperId: paper.id,
-                          discussionId: disc.id,
-                          author: currentUser,
-                          content: replyContent,
-                        })
+                        handleAddReplyToDiscussion(disc.id, replyContent)
                       }
                     />
                   ))
