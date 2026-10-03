@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { FileText, MessageSquare, Image as ImageIcon, Sparkles } from 'lucide-react-native';
+import { FileText, MessageSquare, Image as ImageIcon } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -56,15 +56,6 @@ export const DesktopWritePostCard: React.FC = () => {
         >
           <ImageIcon size={16} color="#D97706" strokeWidth={2.2} />
           <Text style={styles.actionPillText}>Figure / Media</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => router.push('/(tabs)/create')}
-          style={styles.actionPill}
-        >
-          <Sparkles size={16} color="#9333EA" strokeWidth={2.2} />
-          <Text style={styles.actionPillText}>Propose Collab</Text>
         </TouchableOpacity>
       </View>
     </View>

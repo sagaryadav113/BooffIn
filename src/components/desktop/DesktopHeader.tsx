@@ -228,7 +228,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
               onSubmitEditing={handleSearchSubmit}
               returnKeyType="search"
             />
-            {searchQuery.length > 0 ? (
+            {searchQuery.length > 0 && (
               <TouchableOpacity
                 onPress={() => {
                   setSearchQuery('');
@@ -238,10 +238,6 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
               >
                 <X size={16} color="#94A3B8" />
               </TouchableOpacity>
-            ) : (
-              <View style={styles.shortcutBadge}>
-                <Text style={styles.shortcutText}>⌘K</Text>
-              </View>
             )}
           </View>
 
