@@ -23,6 +23,7 @@ import {
   ChevronUp,
   Copy,
   Check,
+  CheckCircle2,
   BarChart2,
   Layers,
   Lock,
@@ -40,6 +41,9 @@ import {
 } from '../../api/openalexAuthorService';
 import { Paper } from '../../types';
 import { usePaperStore } from '../../store/usePaperStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { supabase } from '../../api/client';
+import { normalizeOrcidId } from '../../api/orcidService';
 import { ClaimProfileModal } from '../modals/ClaimProfileModal';
 
 interface OpenAlexAuthorProfileViewProps {
@@ -70,7 +74,9 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
   const [expandedAbstracts, setExpandedAbstracts] = useState<Record<string, boolean>>({});
 
   const addPaperToStore = usePaperStore((s) => s.addPaper);
+  const currentUser = useAuthStore((s) => s.user);
   const [claimModalVisible, setClaimModalVisible] = useState(false);
+  const [isClaimedByAuthor, setIsClaimedByAuthor] = useState(false);
 
   const handleClaimProfile = () => {
     try {
@@ -78,6 +84,50 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
     } catch {}
     setClaimModalVisible(true);
   };
+
+  // Check if profile is claimed in Supabase
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkClaimStatus() {
+      const targetOrcid = normalizeOrcidId(profile?.orcid || initialOrcid || '');
+      if (!targetOrcid) {
+        if (isMounted) setIsClaimedByAuthor(false);
+        return;
+      }
+
+      // Check if current user has this verified ORCID
+      if (
+        currentUser?.orcidVerified &&
+        currentUser?.orcidId &&
+        normalizeOrcidId(currentUser.orcidId) === targetOrcid
+      ) {
+        if (isMounted) setIsClaimedByAuthor(true);
+        return;
+      }
+
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, orcid_id, orcid_verified')
+          .eq('orcid_id', targetOrcid)
+          .eq('orcid_verified', true)
+          .maybeSingle();
+
+        if (isMounted) {
+          setIsClaimedByAuthor(Boolean(data));
+        }
+      } catch {
+        if (isMounted) setIsClaimedByAuthor(false);
+      }
+    }
+
+    checkClaimStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [profile?.orcid, initialOrcid, currentUser?.orcidId, currentUser?.orcidVerified]);
 
   // 1. Fetch Author Profile
   useEffect(() => {
@@ -321,15 +371,22 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
             </View>
           </View>
 
-          {/* Claim Profile Option in Top-Right Marked Area */}
-          <TouchableOpacity
-            style={styles.claimProfileTopBtn}
-            onPress={handleClaimProfile}
-            activeOpacity={0.8}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.claimProfileTopText}>Claim Profile</Text>
-          </TouchableOpacity>
+          {/* Claim Profile Option or Claimed by Author Badge */}
+          {isClaimedByAuthor ? (
+            <View style={styles.claimedProfileTopBadge}>
+              <CheckCircle2 size={12} color="#15803D" />
+              <Text style={styles.claimedProfileTopText}>Claimed by Author</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.claimProfileTopBtn}
+              onPress={handleClaimProfile}
+              activeOpacity={0.8}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.claimProfileTopText}>Claim Profile</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Current & Historical Affiliations */}
@@ -717,6 +774,10 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
           visible={claimModalVisible}
           onClose={() => setClaimModalVisible(false)}
           profile={profile}
+          onClaimSuccess={() => {
+            setIsClaimedByAuthor(true);
+            setClaimModalVisible(false);
+          }}
         />
       )}
     </ScrollView>
@@ -1377,6 +1438,25 @@ const styles = StyleSheet.create({
   claimProfileTopText: {
     ...typography.captionBold,
     color: '#1B4D3E',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  claimedProfileTopBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    backgroundColor: '#DCFCE7',
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  claimedProfileTopText: {
+    ...typography.captionBold,
+    color: '#15803D',
     fontSize: 11.5,
     fontWeight: '700',
   },
