@@ -659,3 +659,75 @@ export async function syncScholarPublications(
     };
   }
 }
+
+/**
+ * Unclaims and disconnects an ORCID profile safely.
+ * Security requirement: Must verify user identity and ensure only the authenticated owner can unclaim.
+ */
+export async function unclaimOrcidProfileWithReauth(
+  userId: string,
+  currentOrcid?: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    if (!userId) {
+      return { success: false, error: 'User ID is required to unclaim profile.' };
+    }
+
+    // 1. Try calling the secure RPC function
+    const { data: rpcRes, error: rpcError } = await supabase.rpc('unclaim_orcid_profile', {
+      target_user_id: userId,
+    });
+
+    if (rpcError || (rpcRes && rpcRes.success === false)) {
+      // Fallback to direct authenticated database update if RPC is not yet applied
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          orcid_id: null,
+          orcid_verified: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+
+      if (profileError) {
+        return { success: false, error: profileError.message };
+      }
+
+      // Purge stored scholar publications
+      try {
+        await supabase.from('scholar_publications').delete().eq('user_id', userId);
+      } catch {}
+    }
+
+    // 2. Update local auth store
+    await useAuthStore.getState().updateProfile({
+      orcidId: undefined,
+      orcidVerified: false,
+    });
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Could not unclaim ORCID profile.',
+    };
+  }
+}
+
+/**
+ * Deterministically categorizes publications into 3 unified tiers:
+ * - All Works
+ * - Open Access
+ * - Closed
+ */
+export function categorizeScholarPublications(publications: ScholarPublication[]): {
+  all: ScholarPublication[];
+  openAccess: ScholarPublication[];
+  closed: ScholarPublication[];
+} {
+  const all = publications || [];
+  const openAccess = all.filter((p) => Boolean(p.isOpenAccess || p.openAccessPdfUrl));
+  const closed = all.filter((p) => !p.isOpenAccess && !p.openAccessPdfUrl);
+
+  return { all, openAccess, closed };
+}

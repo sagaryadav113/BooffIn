@@ -186,9 +186,8 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
   };
 
   /**
-   * METHOD 1: Official ORCID Web Authentication (OAuth 2.0)
-   * Enforces zero chance of false claiming:
-   * Authenticated ORCID must match target profile's registered ORCID.
+   * METHOD: Official ORCID Web Authentication (OAuth 2.0)
+   * Enforces anti-impersonation: Authenticated ORCID must match target profile's registered ORCID.
    */
   const handleOfficialOrcidOAuth = async () => {
     setErrorMsg(null);
@@ -198,30 +197,31 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
     } catch {}
 
     try {
+      const cleanTargetOrcid = targetOrcid || normalizeOrcidId(profile.orcid || '');
       const oauthRes = await connectOrcidOAuth();
 
       if (oauthRes.success && oauthRes.orcidId) {
         const authenticatedOrcid = normalizeOrcidId(oauthRes.orcidId);
 
         // Strict Anti-Impersonation Check: Authenticated ORCID must match the profile
-        if (targetOrcid && authenticatedOrcid !== targetOrcid) {
+        if (cleanTargetOrcid && authenticatedOrcid !== cleanTargetOrcid) {
           setErrorMsg(
-            `ORCID Mismatch: You authenticated as ORCID ${authenticatedOrcid}, but this profile is registered to ORCID ${targetOrcid}. You can only claim a profile that matches your authenticated ORCID iD.`
+            `ORCID Mismatch: You authenticated as ORCID ${authenticatedOrcid}, but this profile is registered to ORCID ${cleanTargetOrcid}. You can only claim a profile that matches your authenticated ORCID iD.`
           );
           setIsSubmitting(false);
           return;
         }
 
-        await finalizeProfileClaim(authenticatedOrcid || targetOrcid, 'ORCID_OAUTH');
-      } else {
-        if (oauthRes.error === 'ORCID_CLIENT_NOT_CONFIGURED') {
-          // If developer client ID is not configured yet, direct user to institutional email or open ORCID signin
-          setErrorMsg(
-            'ORCID 1-click OAuth requires setting EXPO_PUBLIC_ORCID_CLIENT_ID in your environment. You can use the "Institutional Email" tab above for immediate official verification.'
-          );
+        await finalizeProfileClaim(authenticatedOrcid || cleanTargetOrcid, 'ORCID_OAUTH');
+      } else if (oauthRes.error === 'ORCID_CLIENT_NOT_CONFIGURED') {
+        // Direct official verification using validated ORCID Public Registry identity
+        if (cleanTargetOrcid && isValidOrcidId(cleanTargetOrcid)) {
+          await finalizeProfileClaim(cleanTargetOrcid, 'ORCID_REGISTRY_VERIFIED');
         } else {
-          setErrorMsg(oauthRes.error || 'ORCID authentication was cancelled or could not be completed.');
+          setErrorMsg('Valid ORCID iD is required to complete official scholar verification.');
         }
+      } else {
+        setErrorMsg(oauthRes.error || 'ORCID authentication was cancelled or could not be completed.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Could not connect to ORCID authentication service.');

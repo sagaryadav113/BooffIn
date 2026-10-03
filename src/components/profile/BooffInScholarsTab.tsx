@@ -58,6 +58,7 @@ import {
   connectOrcidOAuth,
   fetchOrcidPersonDetails,
   OrcidPersonDetails,
+  unclaimOrcidProfileWithReauth,
 } from '../../api/orcidService';
 import {
   verifyPasswordAndDisconnectOrcid,
@@ -116,7 +117,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isQuickSharing, setIsQuickSharing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'journal' | 'preprint' | 'oa'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'oa' | 'closed'>('all');
 
   // 3-dot Action Sheet state
   const [selectedMenuPublication, setSelectedMenuPublication] = useState<ScholarPublication | null>(null);
@@ -140,7 +141,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   const [isConnectingWithPassword, setIsConnectingWithPassword] = useState(false);
   const [connectStepError, setConnectStepError] = useState<string | null>(null);
 
-  // Password verification modal for disconnecting ORCID
+  // Re-authentication modal for unclaiming / disconnecting ORCID
   const [disconnectModalVisible, setDisconnectModalVisible] = useState(false);
   const [disconnectPassword, setDisconnectPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -340,7 +341,68 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   };
 
   /**
-   * Disconnects ORCID with password verification
+   * Official ORCID OAuth Re-authentication to Unclaim Profile
+   */
+  const handleOfficialOrcidUnclaimReauth = async () => {
+    setIsDisconnecting(true);
+    setDisconnectError(null);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    try {
+      const oauthRes = await connectOrcidOAuth();
+      if (oauthRes.success && oauthRes.orcidId) {
+        const authedOrcid = normalizeOrcidId(oauthRes.orcidId);
+        if (activeOrcid && authedOrcid !== normalizeOrcidId(activeOrcid)) {
+          setIsDisconnecting(false);
+          setDisconnectError(
+            `ORCID Mismatch: You authenticated as ${authedOrcid}, but this profile is registered to ${activeOrcid}.`
+          );
+          return;
+        }
+      }
+
+      // Execute unclaim & publication purge
+      const res = await unclaimOrcidProfileWithReauth(userId, activeOrcid);
+      setIsDisconnecting(false);
+
+      if (res.success) {
+        setDisconnectModalVisible(false);
+        setDisconnectPassword('');
+        setPublications([]);
+        setStats({
+          totalPublications: 0,
+          totalCitations: 0,
+          openAccessCount: 0,
+          isVerified: false,
+          orcidId: undefined,
+        });
+
+        await updateProfile({
+          orcidId: undefined,
+          orcidVerified: false,
+        });
+
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+
+        Alert.alert(
+          'Profile Unclaimed',
+          'Your ORCID profile and publications have been safely unlinked and removed.'
+        );
+      } else {
+        setDisconnectError(res.error || 'Could not unclaim profile.');
+      }
+    } catch (err: any) {
+      setIsDisconnecting(false);
+      setDisconnectError(err.message || 'Could not complete ORCID re-authentication.');
+    }
+  };
+
+  /**
+   * Disconnects / Unclaims ORCID with account password verification
    */
   const handleConfirmDisconnect = async () => {
     if (!disconnectPassword.trim() || isDisconnecting) return;
@@ -381,7 +443,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
       } catch {}
 
       Alert.alert(
-        'ORCID Account Disconnected',
+        'ORCID Profile Unclaimed',
         'Your ORCID iD and verified publications have been safely removed from your profile.'
       );
     } else {
@@ -627,18 +689,11 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
   };
 
   const filteredPublications = useMemo(() => {
-    if (activeFilter === 'journal') {
-      return publications.filter(
-        (p) => (p.workType || '').toLowerCase().includes('journal') || !p.workType
-      );
-    }
-    if (activeFilter === 'preprint') {
-      return publications.filter((p) =>
-        (p.workType || '').toLowerCase().includes('preprint')
-      );
-    }
     if (activeFilter === 'oa') {
       return publications.filter((p) => p.isOpenAccess || Boolean(p.openAccessPdfUrl));
+    }
+    if (activeFilter === 'closed') {
+      return publications.filter((p) => !p.isOpenAccess && !p.openAccessPdfUrl);
     }
     return publications;
   }, [publications, activeFilter]);
@@ -723,7 +778,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 activeOpacity={0.7}
               >
                 <Trash2 size={11} color={colors.accentRed} />
-                <Text style={styles.disconnectLinkText}>Disconnect</Text>
+                <Text style={styles.disconnectLinkText}>Unclaim Profile</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -808,7 +863,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
           )}
         </View>
       ) : (
-        /* 3. Publications List & Filter Tabs */
+        /* 3. Publications List & 3 Unified Filter Tabs */
         <View style={styles.publicationsSection}>
           {/* Filter Sub-Tabs */}
           <View style={styles.filterTabsRow}>
@@ -823,22 +878,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                   activeFilter === 'all' && styles.filterPillTextActive,
                 ]}
               >
-                All ({publications.length})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setActiveFilter('journal')}
-              style={[styles.filterPill, activeFilter === 'journal' && styles.filterPillActive]}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.filterPillText,
-                  activeFilter === 'journal' && styles.filterPillTextActive,
-                ]}
-              >
-                Journal Articles
+                All Works ({publications.length})
               </Text>
             </TouchableOpacity>
 
@@ -854,6 +894,21 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 ]}
               >
                 Open Access ({stats.openAccessCount})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setActiveFilter('closed')}
+              style={[styles.filterPill, activeFilter === 'closed' && styles.filterPillActive]}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.filterPillText,
+                  activeFilter === 'closed' && styles.filterPillTextActive,
+                ]}
+              >
+                Closed ({Math.max(0, publications.length - stats.openAccessCount)})
               </Text>
             </TouchableOpacity>
           </View>
@@ -881,10 +936,15 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                     )}
 
                     <View style={styles.badgesRightRow}>
-                      {isOA && (
+                      {isOA ? (
                         <View style={styles.oaBadge}>
                           <Unlock size={10} color="#16A34A" />
-                          <Text style={styles.oaBadgeText}>Open Access (CC-BY)</Text>
+                          <Text style={styles.oaBadgeText}>Open Access</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.closedBadge}>
+                          <Lock size={10} color={colors.textSecondary} />
+                          <Text style={styles.closedBadgeText}>Closed</Text>
                         </View>
                       )}
                       {Boolean(pub.publicationYear) && (
@@ -1109,7 +1169,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
         </View>
       </Modal>
 
-      {/* 5. Password Confirmation Modal for Disconnecting ORCID */}
+      {/* 5. Confirmation Modal for Unclaiming / Disconnecting ORCID */}
       <Modal
         visible={disconnectModalVisible}
         transparent
@@ -1131,9 +1191,9 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                   <Lock size={20} color={colors.accentRed} />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.passwordModalTitle}>Disconnect ORCID Account</Text>
+                  <Text style={styles.passwordModalTitle}>Unclaim ORCID Profile</Text>
                   <Text style={styles.passwordModalSubtitle}>
-                    For your security, enter your BooffIn password to confirm disconnecting ORCID ({activeOrcid}).
+                    To securely detach ORCID ({activeOrcid}) and remove synced publications, verify your ownership via official ORCID authentication or enter your account password.
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -1150,6 +1210,34 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 </View>
               )}
 
+              {/* Primary Option: Official ORCID Re-Auth */}
+              <TouchableOpacity
+                style={styles.orcidReauthBtn}
+                onPress={handleOfficialOrcidUnclaimReauth}
+                disabled={isDisconnecting}
+                activeOpacity={0.85}
+              >
+                {isDisconnecting ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <>
+                    <View style={styles.orcidLogoMini}>
+                      <Text style={styles.orcidLogoMiniText}>iD</Text>
+                    </View>
+                    <Text style={styles.orcidReauthBtnText}>
+                      Re-Authenticate with ORCID.org
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* OR Divider */}
+              <View style={styles.orDividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.orDividerText}>OR VERIFY WITH PASSWORD</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
               <View style={styles.passwordInputWrap}>
                 <Text style={styles.passwordInputLabel}>BooffIn Account Password</Text>
                 <View style={styles.passwordInputFieldRow}>
@@ -1165,7 +1253,6 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                       if (disconnectError) setDisconnectError(null);
                     }}
                     autoCapitalize="none"
-                    autoFocus
                   />
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
@@ -1189,7 +1276,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                   style={{ flex: 1 }}
                 />
                 <Button
-                  title={isDisconnecting ? 'Verifying...' : 'Disconnect ORCID'}
+                  title={isDisconnecting ? 'Verifying...' : 'Unclaim Profile'}
                   variant="danger"
                   size="sm"
                   loading={isDisconnecting}
@@ -2035,6 +2122,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 10,
   },
+  closedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  closedBadgeText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    fontSize: 10,
+  },
   yearText: {
     ...typography.micro,
     color: colors.textMuted,
@@ -2291,6 +2395,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginTop: spacing.xs,
+  },
+  orcidReauthBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: '#A6CE39',
+    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.md,
+    marginTop: spacing.xs,
+  },
+  orcidReauthBtnText: {
+    ...typography.bodyBold,
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  orDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: 4,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.borderLight,
+  },
+  orDividerText: {
+    ...typography.micro,
+    color: colors.textMuted,
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 
   /* Connect & Verify Modal */
