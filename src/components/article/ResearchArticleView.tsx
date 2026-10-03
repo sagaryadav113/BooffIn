@@ -24,6 +24,7 @@ import {
   Clock,
   CheckCircle2,
   Edit3,
+  Activity,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -34,6 +35,7 @@ import { DiscussionComposer, DiscussionTypePills } from '../discussion';
 import { CommentCard } from '../cards/CommentCard';
 import { EmptyState } from '../feedback/EmptyState';
 import { ArticleComposer } from '../composer/ArticleComposer';
+import { PostImpactModal } from '../post/PostImpactModal';
 import { usePostStore } from '../../store/usePostStore';
 
 export interface ResearchArticleViewProps {
@@ -74,6 +76,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
   const article: ArticleData | undefined = post.article;
   const [viewMode, setViewMode] = useState<'article' | 'pdf'>('article');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isImpactModalOpen, setIsImpactModalOpen] = useState(false);
   const [isSavingArticle, setIsSavingArticle] = useState(false);
   const updatePost = usePostStore((s) => s.updatePost);
 
@@ -380,18 +383,39 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
 
           {/* Section Header */}
           <View style={styles.discussionHeader}>
-            <View style={styles.discussionTitleRow}>
-              <DiscussionIcon size={20} color={colors.textPrimary} />
-              <Text style={styles.discussionTitleText}>Discussion & Peer Review</Text>
-              <View style={styles.discussionCountBadge}>
-                <Text style={styles.discussionCountBadgeText}>
-                  {totalDiscussionCount ?? (comments?.length || 0)}
+            <View style={styles.discussionHeaderMainRow}>
+              <View style={styles.discussionTitleCol}>
+                <View style={styles.discussionTitleRow}>
+                  <DiscussionIcon size={20} color={colors.textPrimary} />
+                  <Text style={styles.discussionTitleText}>Discussion & Peer Review</Text>
+                  <View style={styles.discussionCountBadge}>
+                    <Text style={styles.discussionCountBadgeText}>
+                      {totalDiscussionCount ?? (comments?.length || 0)}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.discussionSubtitleText}>
+                  Constructive scientific inquiry, questions & methodology review
                 </Text>
               </View>
+
+              {/* Impact Button (Author Only) */}
+              {isAuthor && (
+                <TouchableOpacity
+                  style={styles.impactButton}
+                  onPress={() => {
+                    try {
+                      Haptics.selectionAsync();
+                    } catch {}
+                    setIsImpactModalOpen(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Activity size={14} color="#FFFFFF" />
+                  <Text style={styles.impactButtonText}>Impact</Text>
+                </TouchableOpacity>
+              )}
             </View>
-            <Text style={styles.discussionSubtitleText}>
-              Constructive scientific inquiry, questions & methodology review
-            </Text>
           </View>
 
           {/* Discussion Type Filter Pills */}
@@ -494,6 +518,15 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
             />
           </SafeAreaView>
         </Modal>
+      )}
+
+      {/* Post Impact Modal (Author Only) */}
+      {isAuthor && (
+        <PostImpactModal
+          visible={isImpactModalOpen}
+          postId={post.id}
+          onClose={() => setIsImpactModalOpen(false)}
+        />
       )}
     </View>
   );
@@ -790,6 +823,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
+  discussionHeaderMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  discussionTitleCol: {
+    flex: 1,
+  },
   discussionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -819,6 +861,26 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 13,
+  },
+  impactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: radii.full,
+    shadowColor: '#064E3B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  impactButtonText: {
+    ...typography.captionBold,
+    fontSize: 12.5,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   filterPillsWrapper: {
     paddingHorizontal: spacing.lg,

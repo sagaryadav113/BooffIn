@@ -9,10 +9,12 @@ import {
   Alert,
   RefreshControl,
   Text,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { Activity } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { DiscussionIcon } from '../../components/core/DiscussionIcon';
@@ -21,6 +23,7 @@ import { CommentCard } from '../../components/cards/CommentCard';
 import { DiscussionComposer, DiscussionTypePills } from '../../components/discussion';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { ResearchArticleView } from '../../components/article/ResearchArticleView';
+import { PostImpactModal } from '../../components/post/PostImpactModal';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Comment, DiscussionType, Post } from '../../types';
@@ -45,6 +48,7 @@ export default function PostDetailScreen() {
   const [post, setPost] = useState<Post | null>(getPostById(postId) || null);
   const [isLoading, setIsLoading] = useState(!post);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isImpactModalVisible, setIsImpactModalVisible] = useState(false);
 
   const comments = useMemo(() => {
     return postId ? getCommentsForPost(postId) : [];
@@ -111,6 +115,14 @@ export default function PostDetailScreen() {
 
   const storePost = usePostStore((s) => s.getPostById(postId));
   const activePost = storePost || post;
+
+  const isPostAuthor = Boolean(
+    currentUser?.id &&
+      activePost &&
+      (activePost.author?.id === currentUser.id ||
+        (activePost as any).author_id === currentUser.id ||
+        (activePost as any).authorId === currentUser.id)
+  );
 
   // Total discussions including all recursive nested replies
   const totalDiscussionCount = useMemo(() => {
@@ -329,18 +341,39 @@ export default function PostDetailScreen() {
 
           {/* Section Header */}
           <View style={styles.discussionHeader}>
-            <View style={styles.discussionTitleRow}>
-              <DiscussionIcon size={20} color={colors.textPrimary} />
-              <Text style={styles.discussionTitleText}>Discussion</Text>
-              <View style={styles.discussionCountBadge}>
-                <Text style={styles.discussionCountBadgeText}>
-                  {totalDiscussionCount}
+            <View style={styles.discussionHeaderMainRow}>
+              <View style={styles.discussionTitleCol}>
+                <View style={styles.discussionTitleRow}>
+                  <DiscussionIcon size={20} color={colors.textPrimary} />
+                  <Text style={styles.discussionTitleText}>Discussion</Text>
+                  <View style={styles.discussionCountBadge}>
+                    <Text style={styles.discussionCountBadgeText}>
+                      {totalDiscussionCount}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.discussionSubtitleText}>
+                  Constructive scientific inquiry & insights
                 </Text>
               </View>
+
+              {/* Impact Button (Author Only) */}
+              {isPostAuthor && (
+                <TouchableOpacity
+                  style={styles.impactButton}
+                  onPress={() => {
+                    try {
+                      Haptics.selectionAsync();
+                    } catch {}
+                    setIsImpactModalVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Activity size={14} color="#FFFFFF" />
+                  <Text style={styles.impactButtonText}>Impact</Text>
+                </TouchableOpacity>
+              )}
             </View>
-            <Text style={styles.discussionSubtitleText}>
-              Constructive scientific inquiry & insights
-            </Text>
           </View>
 
           {/* Discussion Type Filter Pills */}
@@ -386,6 +419,15 @@ export default function PostDetailScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Post Impact Modal (Author-Only) */}
+      {isPostAuthor && activePost && (
+        <PostImpactModal
+          visible={isImpactModalVisible}
+          postId={activePost.id}
+          onClose={() => setIsImpactModalVisible(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -407,6 +449,15 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.xs,
     backgroundColor: colors.background,
+  },
+  discussionHeaderMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  discussionTitleCol: {
+    flex: 1,
   },
   discussionTitleRow: {
     flexDirection: 'row',
@@ -439,6 +490,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: spacing.xs,
   },
+  impactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: radii.full,
+    shadowColor: '#064E3B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  impactButtonText: {
+    ...typography.captionBold,
+    fontSize: 12.5,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   composerWrapper: {
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
@@ -450,3 +521,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
 });
+

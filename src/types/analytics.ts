@@ -78,3 +78,40 @@ export interface UserAnalyticsSummary {
   }[];
 }
 
+export interface PostImpactSummary {
+  postId: string;
+  authorId: string;
+  createdAt: string;
+  content: string;
+  postType: string;
+  
+  // Impressions & Reach (Instagram-Style)
+  totalImpressions: number;
+  uniqueReach: number; // Distinct individual researchers reached
+  engagedScholars: number; // Distinct researchers who actively engaged
+  
+  // Follower vs Discovery Split
+  followerReachPercent: number; // % of reach from followers
+  nonFollowerReachPercent: number; // % of reach from non-followers / discovery
+  
+  // Interaction Breakdown
+  likesCount: number;
+  discussionsCount: number;
+  sharesCount: number;
+  savesCount: number;
+  totalEngagement: number; // likes + comments + shares + saves
+  postClicks: number; // Deep reads / DOI clicks
+  
+  // Impact Rate
+  engagementRate: number; // %
+  
+  // Audience Demographics
+  topDisciplines: DisciplineBreakdown[];
+  topInstitutions: InstitutionBreakdown[];
+  
+  // Profile Activity Generated
+  profileVisits: number;
+  followsGained: number;
+}
+
+
