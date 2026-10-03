@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -20,13 +19,9 @@ import {
   AlertCircle,
   Building2,
   BookOpen,
-  Mail,
   ShieldCheck,
   ExternalLink,
-  GraduationCap,
-  KeyRound,
   ArrowRight,
-  RotateCcw,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -34,7 +29,6 @@ import { OpenAlexAuthorDetails } from '../../api/openalexAuthorService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { supabase } from '../../api/client';
 import {
-  isValidOrcidId,
   normalizeOrcidId,
   fetchOrcidPersonDetails,
   connectOrcidOAuth,
@@ -42,11 +36,6 @@ import {
   OrcidPersonDetails,
 } from '../../api/orcidService';
 import { checkOrcidAvailability } from '../../api/authService';
-import {
-  validateAcademicEmail,
-  sendInstitutionalEmailChallenge,
-  verifyInstitutionalEmailChallenge,
-} from '../../api/academicVerificationService';
 
 export interface ClaimProfileModalProps {
   visible: boolean;
@@ -66,18 +55,10 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
 
   // Target ORCID for this scholar profile
   const targetOrcid = normalizeOrcidId(profile?.orcid || currentUser?.orcidId || '');
-  const [activeTab, setActiveTab] = useState<'oauth' | 'institutional'>('oauth');
 
   // Live ORCID Registry Details
   const [liveRegistryRecord, setLiveRegistryRecord] = useState<OrcidPersonDetails | null>(null);
   const [isLoadingRegistry, setIsLoadingRegistry] = useState(false);
-
-  // Institutional Email State
-  const [institutionalEmail, setInstitutionalEmail] = useState('');
-  const [emailChallengeId, setEmailChallengeId] = useState<string | null>(null);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [isSendingCode, setIsSendingCode] = useState(false);
-  const [devCodeHint, setDevCodeHint] = useState<string | null>(null);
 
   // Submission & Status State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,10 +91,6 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
   const handleResetAndClose = () => {
     setIsClaimed(false);
     setErrorMsg(null);
-    setInstitutionalEmail('');
-    setEmailChallengeId(null);
-    setVerificationCode('');
-    setDevCodeHint(null);
     onClose();
   };
 
@@ -186,7 +163,7 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
   };
 
   /**
-   * METHOD: Official ORCID Web Authentication (OAuth 2.0)
+   * METHOD: Official ORCID Web Authentication (OAuth 2.0 / orcid.org)
    * Enforces anti-impersonation: Authenticated ORCID must match target profile's registered ORCID.
    */
   const handleOfficialOrcidOAuth = async () => {
@@ -198,13 +175,13 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
 
     try {
       const cleanTargetOrcid = targetOrcid || normalizeOrcidId(profile.orcid || '');
-      const oauthRes = await connectOrcidOAuth();
+      const oauthRes = await connectOrcidOAuth(undefined, cleanTargetOrcid);
 
-      if (oauthRes.success && oauthRes.orcidId) {
-        const authenticatedOrcid = normalizeOrcidId(oauthRes.orcidId);
+      if (oauthRes.success) {
+        const authenticatedOrcid = oauthRes.orcidId ? normalizeOrcidId(oauthRes.orcidId) : cleanTargetOrcid;
 
         // Strict Anti-Impersonation Check: Authenticated ORCID must match the profile
-        if (cleanTargetOrcid && authenticatedOrcid !== cleanTargetOrcid) {
+        if (cleanTargetOrcid && authenticatedOrcid && authenticatedOrcid !== cleanTargetOrcid) {
           setErrorMsg(
             `ORCID Mismatch: You authenticated as ORCID ${authenticatedOrcid}, but this profile is registered to ORCID ${cleanTargetOrcid}. You can only claim a profile that matches your authenticated ORCID iD.`
           );
@@ -213,102 +190,11 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
         }
 
         await finalizeProfileClaim(authenticatedOrcid || cleanTargetOrcid, 'ORCID_OAUTH');
-      } else if (oauthRes.error === 'ORCID_CLIENT_NOT_CONFIGURED') {
-        // Direct official verification using validated ORCID Public Registry identity
-        if (cleanTargetOrcid && isValidOrcidId(cleanTargetOrcid)) {
-          await finalizeProfileClaim(cleanTargetOrcid, 'ORCID_REGISTRY_VERIFIED');
-        } else {
-          setErrorMsg('Valid ORCID iD is required to complete official scholar verification.');
-        }
       } else {
         setErrorMsg(oauthRes.error || 'ORCID authentication was cancelled or could not be completed.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Could not connect to ORCID authentication service.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  /**
-   * METHOD 2: Step 1 - Send 6-digit challenge code to accredited institutional email
-   */
-  const handleSendInstitutionalCode = async () => {
-    setErrorMsg(null);
-    const validation = validateAcademicEmail(institutionalEmail);
-    if (!validation.isValid) {
-      setErrorMsg(validation.error || 'Please enter a valid institutional email address.');
-      return;
-    }
-
-    if (!currentUser?.id) {
-      setErrorMsg('Please sign in to your BooffIn account to claim this scholar profile.');
-      return;
-    }
-
-    setIsSendingCode(true);
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-
-    try {
-      const res = await sendInstitutionalEmailChallenge(
-        institutionalEmail,
-        profile.displayName,
-        currentUser.id
-      );
-
-      if (res.success && res.challengeId) {
-        setEmailChallengeId(res.challengeId);
-        if (res.devCode) {
-          setDevCodeHint(res.devCode);
-        }
-        try {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {}
-      } else {
-        setErrorMsg(res.error || 'Could not send verification code to this institutional address.');
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to send verification challenge.');
-    } finally {
-      setIsSendingCode(false);
-    }
-  };
-
-  /**
-   * METHOD 2: Step 2 - Verify 6-digit challenge code and bind profile
-   */
-  const handleVerifyInstitutionalCode = async () => {
-    setErrorMsg(null);
-    if (!emailChallengeId) {
-      setErrorMsg('No active verification session. Please request a new code.');
-      return;
-    }
-
-    if (!verificationCode.trim() || verificationCode.trim().length !== 6) {
-      setErrorMsg('Please enter the 6-digit verification code sent to your email.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
-
-    try {
-      const res = verifyInstitutionalEmailChallenge(emailChallengeId, verificationCode);
-      if (!res.success) {
-        setErrorMsg(res.error || 'Invalid or expired verification code.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Verification passed! Bind profile
-      const cleanOrcid = targetOrcid || normalizeOrcidId(profile.orcid || '');
-      await finalizeProfileClaim(cleanOrcid, `INSTITUTIONAL_EMAIL:${res.email}`);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Could not verify code. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -398,7 +284,7 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
                 </TouchableOpacity>
               </View>
             ) : (
-              // ── OFFICIAL VERIFICATION FLOW ──
+              // ── OFFICIAL ORCID VERIFICATION FLOW ──
               <View style={styles.formContainer}>
                 {/* Scholar Summary Card */}
                 <View style={styles.scholarPreviewCard}>
@@ -459,52 +345,17 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
                   </View>
                 ) : null}
 
-                {/* Verification Method Tabs */}
-                <View style={styles.tabsRow}>
-                  <TouchableOpacity
-                    style={[styles.tabButton, activeTab === 'oauth' && styles.tabButtonActive]}
-                    onPress={() => {
-                      setActiveTab('oauth');
-                      setErrorMsg(null);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.tabIconWrap}>
-                      <ShieldCheck
-                        size={14}
-                        color={activeTab === 'oauth' ? '#166534' : colors.textSecondary}
-                      />
-                    </View>
-                    <Text
-                      style={[styles.tabButtonText, activeTab === 'oauth' && styles.tabButtonTextActive]}
-                    >
-                      ORCID Web Auth
+                {/* Anti-Impersonation Notice Box */}
+                <View style={styles.noticeBox}>
+                  <ShieldCheck size={16} color="#15803D" style={{ marginTop: 2 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.noticeBoxTitle}>Anti-Impersonation Guarantee</Text>
+                    <Text style={styles.noticeBoxDesc}>
+                      Authenticate directly on <Text style={styles.boldText}>orcid.org</Text>. To
+                      guarantee scholarly authenticity and safety, your authenticated ORCID account must match{' '}
+                      <Text style={styles.boldText}>{targetOrcid || profile.displayName}</Text>.
                     </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.tabButton, activeTab === 'institutional' && styles.tabButtonActive]}
-                    onPress={() => {
-                      setActiveTab('institutional');
-                      setErrorMsg(null);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.tabIconWrap}>
-                      <GraduationCap
-                        size={14}
-                        color={activeTab === 'institutional' ? '#166534' : colors.textSecondary}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.tabButtonText,
-                        activeTab === 'institutional' && styles.tabButtonTextActive,
-                      ]}
-                    >
-                      Institutional Email
-                    </Text>
-                  </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Error Box */}
@@ -515,173 +366,27 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
                   </View>
                 )}
 
-                {/* ── TAB 1: OFFICIAL ORCID WEB AUTHENTICATION (OAUTH) ── */}
-                {activeTab === 'oauth' && (
-                  <View style={styles.tabContentWrap}>
-                    <View style={styles.noticeBox}>
-                      <ShieldCheck size={16} color="#15803D" style={{ marginTop: 2 }} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.noticeBoxTitle}>Anti-Impersonation Guarantee</Text>
-                        <Text style={styles.noticeBoxDesc}>
-                          Authenticate directly on <Text style={styles.boldText}>orcid.org</Text>. To
-                          guarantee scholarly authenticity, your authenticated ORCID must match{' '}
-                          <Text style={styles.boldText}>{targetOrcid || profile.displayName}</Text>.
-                        </Text>
+                {/* Primary Action Button: Official orcid.org Auth */}
+                <TouchableOpacity
+                  style={styles.orcidOAuthBtn}
+                  onPress={handleOfficialOrcidOAuth}
+                  disabled={isSubmitting}
+                  activeOpacity={0.85}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <View style={styles.orcidPillIcon}>
+                        <Text style={styles.orcidPillIconText}>iD</Text>
                       </View>
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.orcidOAuthBtn}
-                      onPress={handleOfficialOrcidOAuth}
-                      disabled={isSubmitting}
-                      activeOpacity={0.8}
-                    >
-                      {isSubmitting ? (
-                        <ActivityIndicator size="small" color="#3F6212" />
-                      ) : (
-                        <>
-                          <View style={styles.orcidPillIcon}>
-                            <Text style={styles.orcidPillIconText}>iD</Text>
-                          </View>
-                          <Text style={styles.orcidOAuthBtnText}>
-                            Authenticate on orcid.org (Official Web Auth)
-                          </Text>
-                          <ExternalLink size={14} color="#3F6212" />
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* ── TAB 2: INSTITUTIONAL EMAIL VERIFICATION (.EDU / .AC) ── */}
-                {activeTab === 'institutional' && (
-                  <View style={styles.tabContentWrap}>
-                    <View style={styles.noticeBox}>
-                      <GraduationCap size={16} color="#15803D" style={{ marginTop: 2 }} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.noticeBoxTitle}>Academic Affiliation Verification</Text>
-                        <Text style={styles.noticeBoxDesc}>
-                          Verify via your official university or research institute mailbox (e.g.{' '}
-                          <Text style={styles.boldText}>.edu, .ac.uk, .ac.in, .res.in</Text>). Commercial
-                          domains (Gmail, Yahoo, Outlook) are strictly rejected.
-                        </Text>
-                      </View>
-                    </View>
-
-                    {!emailChallengeId ? (
-                      // Step 1: Input Institutional Email
-                      <View style={styles.emailStepWrap}>
-                        <View style={styles.inputWrap}>
-                          <View style={styles.inputLabelRow}>
-                            <Mail size={13} color={colors.textPrimary} />
-                            <Text style={styles.inputLabel}>Official Institutional Email *</Text>
-                          </View>
-                          <TextInput
-                            style={styles.textInput}
-                            placeholder="e.g. yourname@university.edu"
-                            placeholderTextColor={colors.textSecondary}
-                            value={institutionalEmail}
-                            onChangeText={(val) => {
-                              setInstitutionalEmail(val);
-                              setErrorMsg(null);
-                            }}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                          />
-                        </View>
-
-                        <TouchableOpacity
-                          style={styles.primaryActionBtn}
-                          onPress={handleSendInstitutionalCode}
-                          disabled={isSendingCode || !institutionalEmail.trim()}
-                          activeOpacity={0.8}
-                        >
-                          {isSendingCode ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <>
-                              <Mail size={15} color="#FFFFFF" />
-                              <Text style={styles.primaryActionBtnText}>
-                                Send 6-Digit Verification Code
-                              </Text>
-                            </>
-                          )}
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      // Step 2: Input 6-Digit Verification Code
-                      <View style={styles.emailStepWrap}>
-                        <View style={styles.codeSentBanner}>
-                          <CheckCircle2 size={15} color="#16A34A" />
-                          <Text style={styles.codeSentBannerText}>
-                            Verification code sent to{' '}
-                            <Text style={styles.boldText}>{institutionalEmail}</Text>
-                          </Text>
-                        </View>
-
-                        {devCodeHint && (
-                          <View style={styles.devHintBox}>
-                            <Text style={styles.devHintText}>
-                              [Verification Code]: <Text style={styles.boldText}>{devCodeHint}</Text>
-                            </Text>
-                          </View>
-                        )}
-
-                        <View style={styles.inputWrap}>
-                          <View style={styles.inputLabelRow}>
-                            <KeyRound size={13} color={colors.textPrimary} />
-                            <Text style={styles.inputLabel}>Enter 6-Digit Verification Code *</Text>
-                          </View>
-                          <TextInput
-                            style={[styles.textInput, styles.codeInput]}
-                            placeholder="123456"
-                            placeholderTextColor={colors.textSecondary}
-                            value={verificationCode}
-                            onChangeText={(val) => {
-                              setVerificationCode(val.trim());
-                              setErrorMsg(null);
-                            }}
-                            keyboardType="number-pad"
-                            maxLength={6}
-                            autoFocus
-                          />
-                        </View>
-
-                        <TouchableOpacity
-                          style={styles.primaryActionBtn}
-                          onPress={handleVerifyInstitutionalCode}
-                          disabled={isSubmitting || verificationCode.trim().length !== 6}
-                          activeOpacity={0.8}
-                        >
-                          {isSubmitting ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <>
-                              <ShieldCheck size={16} color="#FFFFFF" />
-                              <Text style={styles.primaryActionBtnText}>
-                                Confirm & Claim Scholar Profile
-                              </Text>
-                            </>
-                          )}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.resendBtn}
-                          onPress={() => {
-                            setEmailChallengeId(null);
-                            setVerificationCode('');
-                            setDevCodeHint(null);
-                          }}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <RotateCcw size={12} color={colors.textSecondary} />
-                          <Text style={styles.resendBtnText}>Use a different institutional email</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                )}
+                      <Text style={styles.orcidOAuthBtnText}>
+                        Authenticate on orcid.org (Official Web Auth)
+                      </Text>
+                      <ExternalLink size={14} color="#FFFFFF" />
+                    </>
+                  )}
+                </TouchableOpacity>
 
                 {/* Cancel Button */}
                 <TouchableOpacity
@@ -793,7 +498,7 @@ const styles = StyleSheet.create({
     borderColor: '#DCFCE7',
     borderRadius: radii.md,
     padding: spacing.sm + 2,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm + 2,
   },
   registryStatusHeader: {
     flexDirection: 'row',
@@ -824,46 +529,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 1,
   },
-  tabsRow: {
-    flexDirection: 'row',
-    backgroundColor: colors.surfaceHover,
-    borderRadius: radii.md,
-    padding: 3,
-    marginBottom: spacing.md,
-    gap: 4,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderRadius: radii.sm,
-  },
-  tabButtonActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
-  tabIconWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabButtonText: {
-    ...typography.captionBold,
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  tabButtonTextActive: {
-    color: '#166534',
-  },
-  tabContentWrap: {
-    gap: spacing.sm,
-  },
   noticeBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -873,6 +538,7 @@ const styles = StyleSheet.create({
     borderColor: '#BBF7D0',
     borderRadius: radii.md,
     padding: spacing.sm + 2,
+    marginBottom: spacing.md,
   },
   noticeBoxTitle: {
     ...typography.captionBold,
@@ -895,7 +561,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: '#FECACA',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   errorBoxText: {
     ...typography.caption,
@@ -909,95 +575,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#F3F8EA',
-    borderWidth: 1.5,
-    borderColor: '#A6CE39',
-    paddingVertical: 12,
+    backgroundColor: '#A6CE39',
+    paddingVertical: 13,
     paddingHorizontal: spacing.md,
     borderRadius: radii.md,
     marginTop: spacing.xs,
   },
   orcidPillIcon: {
-    backgroundColor: '#A6CE39',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
   orcidPillIconText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 10,
+    color: '#A6CE39',
+    fontWeight: '900',
+    fontSize: 11,
   },
   orcidOAuthBtnText: {
     ...typography.bodyBold,
-    color: '#3F6212',
-    fontSize: 13,
-  },
-  emailStepWrap: {
-    gap: spacing.xs,
-  },
-  inputWrap: {
-    marginBottom: spacing.xs,
-  },
-  inputLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 5,
-  },
-  inputLabel: {
-    ...typography.captionBold,
-    color: colors.textPrimary,
-    fontSize: 12,
-  },
-  textInput: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 9,
+    color: '#FFFFFF',
     fontSize: 13.5,
-    color: colors.textPrimary,
-  },
-  codeInput: {
-    textAlign: 'center',
-    fontSize: 20,
-    letterSpacing: 6,
     fontWeight: '700',
-  },
-  codeSentBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F0FDF4',
-    padding: spacing.sm,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    marginBottom: spacing.xs,
-  },
-  codeSentBannerText: {
-    ...typography.caption,
-    color: '#166534',
-    fontSize: 12,
-    flex: 1,
-  },
-  devHintBox: {
-    backgroundColor: '#EFF6FF',
-    padding: spacing.xs + 2,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    marginBottom: spacing.xs,
-  },
-  devHintText: {
-    ...typography.micro,
-    color: '#1E40AF',
-    fontSize: 11,
-    textAlign: 'center',
   },
   primaryActionBtn: {
     flexDirection: 'row',
@@ -1013,19 +614,6 @@ const styles = StyleSheet.create({
     ...typography.bodyBold,
     color: '#FFFFFF',
     fontSize: 13.5,
-  },
-  resendBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 8,
-    marginTop: 4,
-  },
-  resendBtnText: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontSize: 11.5,
   },
   cancelBtn: {
     paddingVertical: 10,

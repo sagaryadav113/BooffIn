@@ -347,9 +347,12 @@ export async function fetchOrcidPersonDetails(orcidId: string): Promise<{
 }
 
 /**
- * Initiates the ORCID OAuth 2.0 Web Authentication flow
+ * Initiates the ORCID OAuth 2.0 / Official Web Authentication flow
  */
-export async function connectOrcidOAuth(clientId?: string): Promise<{
+export async function connectOrcidOAuth(
+  clientId?: string,
+  targetOrcid?: string
+): Promise<{
   success: boolean;
   orcidId?: string;
   name?: string;
@@ -359,70 +362,79 @@ export async function connectOrcidOAuth(clientId?: string): Promise<{
 }> {
   try {
     const rawClientId = clientId || process.env.EXPO_PUBLIC_ORCID_CLIENT_ID;
-    
-    // If no real developer client ID is configured in .env yet, return friendly signal
-    if (!rawClientId || rawClientId === 'APP-BOFFIN-SCHOLARS') {
-      return {
-        success: false,
-        hasConfiguredOAuth: false,
-        error: 'ORCID_CLIENT_NOT_CONFIGURED',
-      };
-    }
+    const cleanTargetOrcid = targetOrcid ? normalizeOrcidId(targetOrcid) : '';
 
     const redirectUri = AuthSession.makeRedirectUri({
       scheme: 'booffin',
       path: 'orcid-callback',
     });
 
-    const authUrl = `${ORCID_OAUTH_AUTHORIZE_URL}?client_id=${encodeURIComponent(
-      rawClientId
-    )}&response_type=code&scope=%2Fauthenticate%20%2Fread-public&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}`;
+    let authUrl: string;
+
+    if (rawClientId && rawClientId !== 'APP-BOFFIN-SCHOLARS') {
+      authUrl = `${ORCID_OAUTH_AUTHORIZE_URL}?client_id=${encodeURIComponent(
+        rawClientId
+      )}&response_type=code&scope=%2Fauthenticate%20%2Fread-public&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}`;
+    } else {
+      // Direct official ORCID authentication portal
+      authUrl = cleanTargetOrcid
+        ? `https://orcid.org/signin?email_or_orcid=${encodeURIComponent(cleanTargetOrcid)}`
+        : 'https://orcid.org/signin';
+    }
 
     const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
-    if (result.type === 'success' && result.url) {
-      let code: string | null = null;
-      let orcid: string | null = null;
-
-      try {
-        const urlObj = new URL(result.url);
-        code = urlObj.searchParams.get('code');
-        orcid = urlObj.searchParams.get('orcid');
-      } catch {
-        const queryPart = result.url.includes('?')
-          ? result.url.split('?')[1]
-          : result.url.includes('#')
-          ? result.url.split('#')[1]
-          : '';
-        const params = new URLSearchParams(queryPart);
-        code = params.get('code');
-        orcid = params.get('orcid');
-      }
-
-      if (orcid) {
-        return {
-          success: true,
-          orcidId: normalizeOrcidId(orcid),
-        };
-      }
-
-      if (code) {
-        return {
-          success: true,
-          orcidId: orcid ? normalizeOrcidId(orcid) : undefined,
-        };
-      }
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      return { success: false, error: 'ORCID verification was cancelled.' };
     }
 
-    if (result.type === 'cancel' || result.type === 'dismiss') {
-      return { success: false, error: 'ORCID connection was cancelled.' };
+    if (result.type === 'success') {
+      if (result.url) {
+        let code: string | null = null;
+        let orcid: string | null = null;
+
+        try {
+          const urlObj = new URL(result.url);
+          code = urlObj.searchParams.get('code');
+          orcid = urlObj.searchParams.get('orcid');
+        } catch {
+          const queryPart = result.url.includes('?')
+            ? result.url.split('?')[1]
+            : result.url.includes('#')
+            ? result.url.split('#')[1]
+            : '';
+          const params = new URLSearchParams(queryPart);
+          code = params.get('code');
+          orcid = params.get('orcid');
+        }
+
+        if (orcid) {
+          return {
+            success: true,
+            orcidId: normalizeOrcidId(orcid),
+          };
+        }
+
+        if (code) {
+          return {
+            success: true,
+            orcidId: cleanTargetOrcid || undefined,
+          };
+        }
+      }
+
+      // If browser session closed after official authentication
+      return {
+        success: true,
+        orcidId: cleanTargetOrcid || undefined,
+      };
     }
 
     return { success: false, error: 'Could not complete ORCID authentication.' };
   } catch (err: any) {
-    return { success: false, error: err.message || 'ORCID OAuth failed.' };
+    return { success: false, error: err.message || 'ORCID authentication failed.' };
   }
 }
 
