@@ -1,6 +1,8 @@
 import { Paper } from '../../../types';
 import { parseReferenceInput } from '../../paper/inputParser';
 import { defaultPaperResolver } from '../../paper/metadataResolver';
+import { parseScientificQuery, ParsedScientificQuery } from '../scientificQueryParser';
+import { rankScientificPapers, deduplicatePapers } from '../scientificRanker';
 
 /**
  * Fetch with retry on network failure (not on 4xx/5xx)
@@ -24,11 +26,14 @@ async function fetchWithRetry(
 
 /**
  * Searches academic literature across EuropePMC, Semantic Scholar, arXiv, and OpenAlex
- * — 4 sources in parallel for maximum recall. Supports pagination via page parameter.
+ * — 4 sources in parallel for maximum recall, ranked by multi-factor scientific relevance.
+ * Supports pagination via page parameter.
  */
 export async function searchPapers(query: string, limit = 15, page = 1): Promise<Paper[]> {
   const cleanQ = query.trim();
   if (!cleanQ) return [];
+
+  const parsedQuery = parseScientificQuery(cleanQ);
 
   // 1. Check if exact reference (DOI, arXiv ID, URL, PMID) on page 1 — resolve directly first
   if (page === 1) {
@@ -38,25 +43,29 @@ export async function searchPapers(query: string, limit = 15, page = 1): Promise
         const res = await defaultPaperResolver.resolve(cleanQ);
         if (res.paper) {
           // Still do a broad search too, but put the exact match first
-          const broadResults = await _broadKeywordSearch(cleanQ, limit - 1, page);
+          const broadResults = await _broadKeywordSearch(parsedQuery, limit - 1, page);
           return deduplicatePapers([res.paper, ...broadResults]).slice(0, limit);
         }
       } catch {}
     }
   }
 
-  // 2. Broad keyword search across all sources with pagination
-  return _broadKeywordSearch(cleanQ, limit, page);
+  // 2. Broad keyword search across all sources with scientific multi-factor ranking
+  return _broadKeywordSearch(parsedQuery, limit, page);
 }
 
-async function _broadKeywordSearch(query: string, limit: number, page = 1): Promise<Paper[]> {
-  const perSource = Math.ceil(limit * 0.6); // each source fetches a bit more, we deduplicate
+async function _broadKeywordSearch(
+  parsedQuery: ParsedScientificQuery,
+  limit: number,
+  page = 1
+): Promise<Paper[]> {
+  const perSource = Math.ceil(limit * 0.8); // fetch extra candidates to give ranker a strong pool
 
   const [epmcRes, s2Res, arxivRes, openAlexRes] = await Promise.allSettled([
-    searchEuropePmc(query, perSource, page),
-    searchSemanticScholar(query, perSource, page),
-    searchArxiv(query, Math.min(perSource, 10), page),
-    searchOpenAlex(query, perSource, page),
+    searchEuropePmc(parsedQuery.europePmcQuery, perSource, page),
+    searchSemanticScholar(parsedQuery.semanticScholarQuery, perSource, page),
+    searchArxiv(parsedQuery.arxivQuery, Math.min(perSource, 10), page),
+    searchOpenAlex(parsedQuery.openAlexQuery, perSource, page),
   ]);
 
   const all: Paper[] = [];
@@ -65,26 +74,8 @@ async function _broadKeywordSearch(query: string, limit: number, page = 1): Prom
   if (arxivRes.status === 'fulfilled') all.push(...arxivRes.value);
   if (openAlexRes.status === 'fulfilled') all.push(...openAlexRes.value);
 
-  return deduplicatePapers(all).slice(0, limit);
-}
-
-function deduplicatePapers(papers: Paper[]): Paper[] {
-  const seenDois = new Set<string>();
-  const seenTitles = new Set<string>();
-  const out: Paper[] = [];
-
-  for (const paper of papers) {
-    const doiKey = paper.doi?.toLowerCase().trim() ?? '';
-    const titleKey = paper.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60);
-
-    if (doiKey && seenDois.has(doiKey)) continue;
-    if (seenTitles.has(titleKey)) continue;
-
-    if (doiKey) seenDois.add(doiKey);
-    seenTitles.add(titleKey);
-    out.push(paper);
-  }
-  return out;
+  // Re-rank candidate papers mathematically using our scientific multi-factor scoring model
+  return rankScientificPapers(all, parsedQuery).slice(0, limit);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
