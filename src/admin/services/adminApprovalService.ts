@@ -39,7 +39,7 @@ export const adminApprovalService = {
 
       let query = supabase
         .from('admin_approval_requests')
-        .select(APPROVAL_SELECT_FIELDS, { count: 'exact' });
+        .select('*', { count: 'exact' });
 
       if (options?.status) {
         query = query.eq('status', options.status);

@@ -36,7 +36,7 @@ export const adminReportService = {
 
       let query = supabase
         .from('content_reports')
-        .select(REPORT_SELECT_FIELDS, { count: 'exact' });
+        .select('*', { count: 'exact' });
 
       if (options?.status) {
         query = query.eq('status', options.status);

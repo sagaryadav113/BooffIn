@@ -33,7 +33,7 @@ export const adminAuditService = {
 
       let query = supabase
         .from('admin_audit_logs')
-        .select(AUDIT_SELECT_FIELDS, { count: 'exact' });
+        .select('*', { count: 'exact' });
 
       if (filter?.action) {
         query = query.eq('action', filter.action);

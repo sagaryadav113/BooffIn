@@ -61,6 +61,7 @@ export const adminUserService = {
         institution: u.institution || u.academic_title || 'Researcher',
         field_of_study: u.field_of_study || (Array.isArray(u.research_interests) ? u.research_interests.join(', ') : 'Academic Research'),
         is_orcid_verified: Boolean(u.orcid_verified || u.is_orcid_verified || u.orcid_id),
+        is_private: Boolean(u.is_private),
       }));
 
       return {

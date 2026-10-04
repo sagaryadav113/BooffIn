@@ -28,7 +28,7 @@ export const adminSecurityService = {
     try {
       const { data, error } = await supabase
         .from('admin_members')
-        .select(ADMIN_MEMBER_SELECT_FIELDS)
+        .select('*')
         .order('created_at', { ascending: true });
 
       if (error) return { members: [], error: new Error(error.message) };
