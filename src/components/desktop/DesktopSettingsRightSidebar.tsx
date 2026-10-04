@@ -28,7 +28,17 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
   }, [currentUser?.id]);
 
   return (
-    <aside style={{ width: 320, minWidth: 320 }}>
+    <aside
+      style={{
+        width: 320,
+        minWidth: 320,
+        position: 'sticky',
+        top: 68,
+        height: 'calc(100vh - 68px)',
+        alignSelf: 'flex-start',
+        overflowY: 'auto',
+      }}
+    >
       <View style={styles.container}>
         {/* User Real Profile Preview Card */}
         <View style={styles.profileCard}>
@@ -98,7 +108,7 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
             {/* Impact Bar */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => router.push('/(tabs)/profile')}
+              onPress={() => router.push('/profile/analytics')}
               style={styles.impactBar}
             >
               <View style={styles.impactLeft}>

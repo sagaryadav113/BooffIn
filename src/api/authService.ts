@@ -953,23 +953,34 @@ export async function verifyPasswordAndDisconnectOrcid(
       }
     }
 
-    // 3. Clear ORCID credentials on profiles database table
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        orcid_id: null,
-        orcid_verified: false,
-      })
-      .eq('id', userId);
-
-    if (updateError) {
-      return { success: false, error: updateError.message };
-    }
-
-    // 4. Remove cached publications for this user
+    // 3. Clear ORCID credentials on database using atomic RPC
     try {
-      await supabase.from('scholar_publications').delete().eq('user_id', userId);
-    } catch {}
+      const { data: rpcRes, error: rpcError } = await supabase.rpc('unclaim_orcid_profile', {
+        p_user_id: userId,
+      });
+      if (rpcError) {
+        // Fallback to direct table updates if RPC is not deployed yet
+        await supabase
+          .from('profiles')
+          .update({
+            orcid_id: null,
+            orcid_verified: false,
+          })
+          .eq('id', userId);
+        await supabase.from('scholar_publications').delete().eq('user_id', userId);
+      }
+    } catch {
+      await supabase
+        .from('profiles')
+        .update({
+          orcid_id: null,
+          orcid_verified: false,
+        })
+        .eq('id', userId);
+      try {
+        await supabase.from('scholar_publications').delete().eq('user_id', userId);
+      } catch {}
+    }
 
     // 5. Update stored local session
     const session = getStoredLocalSession();

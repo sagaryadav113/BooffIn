@@ -146,7 +146,7 @@ export const SCIENTIFIC_DOMAINS: Record<
  */
 export function isPaperInDomain(paper: Paper, domain: string): boolean {
   const normDomain = domain.trim().toLowerCase();
-  if (normDomain === 'for you' || normDomain === 'all' || !normDomain) {
+  if (normDomain === 'for you' || normDomain === 'all' || normDomain === 'hyped' || !normDomain) {
     return true;
   }
 
@@ -338,15 +338,17 @@ export async function getHypedDomainData(
 
   let finalPapers: Paper[] = [];
 
-  // CASE 1: Personalized "For You" Feed across all user added interests
-  if (normDomain === 'for you' || normDomain === 'all') {
+  // CASE 1: Personalized "For You" Feed across all user added interests, or global "Hyped" feed
+  if (normDomain === 'for you' || normDomain === 'all' || normDomain === 'hyped') {
     const interests =
-      userInterests.length > 0
+      normDomain === 'hyped'
+        ? ['Neuroscience', 'Artificial Intelligence', 'Biomedical Engineering', 'Biotech', 'Physics']
+        : userInterests.length > 0
         ? userInterests
         : ['Neuroscience', 'Artificial Intelligence', 'Biotech'];
 
     const subFeeds = await Promise.all(
-      interests.slice(0, 4).map((interest) =>
+      interests.slice(0, 5).map((interest) =>
         fetchSingleDomainHyped(interest, timeframe, 4)
       )
     );

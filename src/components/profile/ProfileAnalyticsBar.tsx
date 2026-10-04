@@ -10,6 +10,7 @@ import {
   Activity,
   ChevronRight,
 } from 'lucide-react-native';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 
@@ -41,6 +42,8 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
     } catch {}
     if (onPress) {
       onPress();
+    } else {
+      router.push('/profile/analytics');
     }
   };
 

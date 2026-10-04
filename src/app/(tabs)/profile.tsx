@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   MapPin,
   Globe,
@@ -95,8 +95,21 @@ export default function CurrentUserProfileScreen() {
   const allPosts = usePostStore((s) => s.posts);
   const papers = usePaperStore((s) => s.papers);
   const savedPaperIds = usePaperStore((s) => s.savedPaperIds);
+  const params = useLocalSearchParams<{ openAnalytics?: string; tab?: string; subFilter?: string }>();
 
-  const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Saved' | 'Scholars' | 'Cited' | 'Activity'>('Posts');
+  const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Saved' | 'Scholars' | 'Cited' | 'Activity'>(() => {
+    if (params.tab) {
+      const lower = params.tab.toLowerCase();
+      if (lower === 'articles' || lower === 'article' || lower === 'hyped' || lower === 'shared' || lower === 'posts' || lower === 'post') {
+        return 'Posts';
+      }
+      if (lower === 'saved') return 'Saved';
+      if (lower === 'scholars' || lower === 'scholar') return 'Scholars';
+      if (lower === 'cited') return 'Cited';
+      if (lower === 'activity') return 'Activity';
+    }
+    return 'Posts';
+  });
   const [collaborationRequests, setCollaborationRequests] = useState<{
     incoming: CollaborationRequest[];
     outgoing: CollaborationRequest[];
@@ -109,6 +122,92 @@ export default function CurrentUserProfileScreen() {
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
+
+  // Automatically sync sub-tab or open research analytics modal if navigated via URL params (e.g. ?tab=Saved or ?tab=Articles)
+  useEffect(() => {
+    if (params.tab) {
+      const lower = params.tab.toLowerCase();
+      if (lower === 'articles' || lower === 'article') {
+        setActiveSubTab('Posts');
+        setPostsSubFilter('Articles');
+      } else if (lower === 'hyped') {
+        setActiveSubTab('Posts');
+        setPostsSubFilter('Hyped');
+      } else if (lower === 'shared') {
+        setActiveSubTab('Posts');
+        setPostsSubFilter('Shared');
+      } else if (lower === 'saved') {
+        setActiveSubTab('Saved');
+      } else if (lower === 'scholars' || lower === 'scholar') {
+        setActiveSubTab('Scholars');
+      } else if (lower === 'posts' || lower === 'post') {
+        setActiveSubTab('Posts');
+      } else if (lower === 'cited') {
+        setActiveSubTab('Cited');
+      } else if (lower === 'activity') {
+        setActiveSubTab('Activity');
+      } else if (lower === 'analytics') {
+        setAnalyticsModalOpen(true);
+      }
+    }
+
+    if (params.subFilter) {
+      const sfLower = params.subFilter.toLowerCase();
+      if (sfLower === 'articles' || sfLower === 'article') {
+        setActiveSubTab('Posts');
+        setPostsSubFilter('Articles');
+      } else if (sfLower === 'hyped') {
+        setActiveSubTab('Posts');
+        setPostsSubFilter('Hyped');
+      } else if (sfLower === 'shared') {
+        setActiveSubTab('Posts');
+        setPostsSubFilter('Shared');
+      } else if (sfLower === 'all') {
+        setPostsSubFilter('All');
+      }
+    }
+
+    if (
+      params.openAnalytics === 'true' ||
+      params.tab === 'Analytics' ||
+      params.tab === 'analytics'
+    ) {
+      setAnalyticsModalOpen(true);
+    }
+  }, [params.openAnalytics, params.tab, params.subFilter]);
+
+  // Support immediate in-page tab switching from desktop sidebars
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleCustomTab = (e: any) => {
+        if (e.detail) {
+          const lower = String(e.detail).toLowerCase();
+          if (lower === 'activity') {
+            setActiveSubTab('Activity');
+          } else if (lower === 'articles' || lower === 'article') {
+            setActiveSubTab('Posts');
+            setPostsSubFilter('Articles');
+          } else if (lower === 'hyped') {
+            setActiveSubTab('Posts');
+            setPostsSubFilter('Hyped');
+          } else if (lower === 'shared') {
+            setActiveSubTab('Posts');
+            setPostsSubFilter('Shared');
+          } else if (lower === 'saved') {
+            setActiveSubTab('Saved');
+          } else if (lower === 'scholars') {
+            setActiveSubTab('Scholars');
+          } else if (lower === 'posts') {
+            setActiveSubTab('Posts');
+          } else if (lower === 'cited') {
+            setActiveSubTab('Cited');
+          }
+        }
+      };
+      window.addEventListener('booffin:set-profile-tab', handleCustomTab);
+      return () => window.removeEventListener('booffin:set-profile-tab', handleCustomTab);
+    }
+  }, []);
 
   const [cropperState, setCropperState] = useState<{
     visible: boolean;
@@ -205,6 +304,20 @@ export default function CurrentUserProfileScreen() {
   const [savedPapersDb, setSavedPapersDb] = useState<Paper[]>([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
   const [savedSubFilter, setSavedSubFilter] = useState<'All' | 'Posts' | 'Papers'>('All');
+  const [postsSubFilter, setPostsSubFilter] = useState<'All' | 'Hyped' | 'Articles' | 'Shared'>(() => {
+    const tabLower = (params.tab || '').toLowerCase();
+    const sfLower = (params.subFilter || '').toLowerCase();
+    if (tabLower === 'articles' || tabLower === 'article' || sfLower === 'articles' || sfLower === 'article') {
+      return 'Articles';
+    }
+    if (tabLower === 'hyped' || sfLower === 'hyped') {
+      return 'Hyped';
+    }
+    if (tabLower === 'shared' || sfLower === 'shared') {
+      return 'Shared';
+    }
+    return 'All';
+  });
   const [userComments, setUserComments] = useState<UserCommentActivity[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [activitySubFilter, setActivitySubFilter] = useState<'All' | 'Discussions' | 'Questions' | 'Replies'>('All');
@@ -320,6 +433,62 @@ export default function CurrentUserProfileScreen() {
     }
     return allPosts.filter((p) => p.author.id === user.id || (p.isReposted && p.author.id !== user.id));
   }, [userPosts, allPosts, user?.id]);
+
+  // Helper to check if a post is a shared research paper or repost
+  const isSharedPost = (p: Post) =>
+    p.postType === 'research_share' ||
+    Boolean(p.paper) ||
+    Boolean(p.repostedBy) ||
+    Boolean(p.isReposted);
+
+  // Compute posts filtered by sub-section ("All", "Hyped", "Articles", "Shared")
+  const displayFilteredPosts = useMemo(() => {
+    if (!posts || posts.length === 0) return [];
+    if (postsSubFilter === 'Hyped') {
+      // Only authored posts ranked by engagement (excluding shared papers/reposts)
+      const authored = posts.filter((p) => !isSharedPost(p));
+      return authored.sort((a, b) => {
+        const scoreA =
+          (a.likesCount || 0) * 3 +
+          (a.commentsCount || 0) * 5 +
+          (a.repostsCount || 0) * 4 +
+          (a.savesCount || 0) * 2;
+        const scoreB =
+          (b.likesCount || 0) * 3 +
+          (b.commentsCount || 0) * 5 +
+          (b.repostsCount || 0) * 4 +
+          (b.savesCount || 0) * 2;
+        return scoreB - scoreA;
+      });
+    }
+    if (postsSubFilter === 'Articles') {
+      // Only long-form articles written by author (excluding shared/reposted)
+      return posts.filter(
+        (p) =>
+          (p.postType === 'article' || Boolean(p.article)) &&
+          !p.repostedBy &&
+          !p.isReposted
+      );
+    }
+    if (postsSubFilter === 'Shared') {
+      return posts.filter((p) => isSharedPost(p));
+    }
+    return posts;
+  }, [posts, postsSubFilter]);
+
+  const postCounts = useMemo(() => {
+    return {
+      all: posts.length,
+      hyped: posts.filter((p) => !isSharedPost(p)).length,
+      articles: posts.filter(
+        (p) =>
+          (p.postType === 'article' || Boolean(p.article)) &&
+          !p.repostedBy &&
+          !p.isReposted
+      ).length,
+      shared: posts.filter((p) => isSharedPost(p)).length,
+    };
+  }, [posts]);
 
   // Combine database saved posts with any in-store saved posts
   const displaySavedPosts = useMemo(() => {
@@ -813,6 +982,55 @@ export default function CurrentUserProfileScreen() {
         {/* Tab Content */}
         {activeSubTab === 'Posts' && (
           <View style={styles.postsList}>
+            {/* Filter Chips: All | Hyped | Articles | Shared */}
+            <View style={styles.savedFilterRow}>
+              {(['All', 'Hyped', 'Articles', 'Shared'] as const).map((filter) => {
+                const count =
+                  filter === 'All'
+                    ? postCounts.all
+                    : filter === 'Hyped'
+                    ? postCounts.hyped
+                    : filter === 'Articles'
+                    ? postCounts.articles
+                    : postCounts.shared;
+                return (
+                  <TouchableOpacity
+                    key={filter}
+                    style={[
+                      styles.savedFilterChip,
+                      postsSubFilter === filter && styles.savedFilterChipActive,
+                    ]}
+                    onPress={() => setPostsSubFilter(filter)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.savedFilterChipText,
+                        postsSubFilter === filter && styles.savedFilterChipTextActive,
+                      ]}
+                    >
+                      {filter}
+                    </Text>
+                    <View
+                      style={[
+                        styles.savedFilterCountBadge,
+                        postsSubFilter === filter && styles.savedFilterCountBadgeActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.savedFilterCountText,
+                          postsSubFilter === filter && styles.savedFilterCountTextActive,
+                        ]}
+                      >
+                        {count}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             {isLoadingPosts && posts.length === 0 ? (
               <View style={{ paddingVertical: spacing.xl * 2, alignItems: 'center', justifyContent: 'center' }}>
                 <ActivityIndicator size="small" color={colors.accentBlue} />
@@ -820,15 +1038,31 @@ export default function CurrentUserProfileScreen() {
                   Loading discussions & shares...
                 </Text>
               </View>
-            ) : posts.length > 0 ? (
-              posts.map((p) => <PostCard key={p.id} post={p} />)
+            ) : displayFilteredPosts.length > 0 ? (
+              displayFilteredPosts.map((p) => <PostCard key={p.id} post={p} />)
             ) : (
               <EmptyState
                 icon="Discussion"
-                title="No posts published yet"
-                description="Share research insights, preprints, or methodology questions with the scientific community."
-                actionTitle="Create First Post"
-                onAction={() => router.push('/(tabs)/create')}
+                title={
+                  postsSubFilter === 'Articles'
+                    ? 'No articles published yet'
+                    : postsSubFilter === 'Shared'
+                    ? 'No shared research posts yet'
+                    : postsSubFilter === 'Hyped'
+                    ? 'No hyped posts yet'
+                    : 'No posts published yet'
+                }
+                description={
+                  postsSubFilter === 'Articles'
+                    ? 'Long-form research articles and reviews you publish will appear here.'
+                    : postsSubFilter === 'Shared'
+                    ? 'Research papers, DOI preprints, and posts you share will appear here.'
+                    : postsSubFilter === 'Hyped'
+                    ? 'Posts with the highest impact and engagement will be ranked here.'
+                    : 'Share research insights, preprints, or methodology questions with the scientific community.'
+                }
+                actionTitle={postsSubFilter === 'All' ? 'Create First Post' : undefined}
+                onAction={postsSubFilter === 'All' ? () => router.push('/(tabs)/create') : undefined}
               />
             )}
           </View>

@@ -53,8 +53,8 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
   const currentUser = useAuthStore((s) => s.user);
   const updateProfile = useAuthStore((s) => s.updateProfile);
 
-  // Target ORCID for this scholar profile
-  const targetOrcid = normalizeOrcidId(profile?.orcid || currentUser?.orcidId || '');
+  // Target ORCID for this scholar profile (strictly from the viewed profile record)
+  const targetOrcid = normalizeOrcidId(profile?.orcid || '');
 
   // Live ORCID Registry Details
   const [liveRegistryRecord, setLiveRegistryRecord] = useState<OrcidPersonDetails | null>(null);
@@ -168,20 +168,28 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
    */
   const handleOfficialOrcidOAuth = async () => {
     setErrorMsg(null);
+
+    const cleanTargetOrcid = normalizeOrcidId(profile.orcid || '');
+    if (!cleanTargetOrcid) {
+      setErrorMsg(
+        'This researcher record does not have a registered ORCID iD in OpenAlex and cannot be claimed directly via ORCID. You can connect your ORCID directly in your Profile > Scholar section.'
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
     try {
-      const cleanTargetOrcid = targetOrcid || normalizeOrcidId(profile.orcid || '');
       const oauthRes = await connectOrcidOAuth(undefined, cleanTargetOrcid);
 
-      if (oauthRes.success) {
-        const authenticatedOrcid = oauthRes.orcidId ? normalizeOrcidId(oauthRes.orcidId) : cleanTargetOrcid;
+      if (oauthRes.success && oauthRes.orcidId) {
+        const authenticatedOrcid = normalizeOrcidId(oauthRes.orcidId);
 
         // Strict Anti-Impersonation Check: Authenticated ORCID must match the profile
-        if (cleanTargetOrcid && authenticatedOrcid && authenticatedOrcid !== cleanTargetOrcid) {
+        if (authenticatedOrcid !== cleanTargetOrcid) {
           setErrorMsg(
             `ORCID Mismatch: You authenticated as ORCID ${authenticatedOrcid}, but this profile is registered to ORCID ${cleanTargetOrcid}. You can only claim a profile that matches your authenticated ORCID iD.`
           );
@@ -189,7 +197,7 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
           return;
         }
 
-        await finalizeProfileClaim(authenticatedOrcid || cleanTargetOrcid, 'ORCID_OAUTH');
+        await finalizeProfileClaim(authenticatedOrcid, 'ORCID_OAUTH');
       } else {
         setErrorMsg(oauthRes.error || 'ORCID authentication was cancelled or could not be completed.');
       }
@@ -346,14 +354,25 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
                 ) : null}
 
                 {/* Anti-Impersonation Notice Box */}
-                <View style={styles.noticeBox}>
-                  <ShieldCheck size={16} color="#15803D" style={{ marginTop: 2 }} />
+                <View style={targetOrcid ? styles.noticeBox : styles.noticeBoxWarning}>
+                  {targetOrcid ? (
+                    <ShieldCheck size={16} color="#15803D" style={{ marginTop: 2 }} />
+                  ) : (
+                    <AlertCircle size={16} color="#D97706" style={{ marginTop: 2 }} />
+                  )}
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.noticeBoxTitle}>Anti-Impersonation Guarantee</Text>
+                    <Text style={styles.noticeBoxTitle}>
+                      {targetOrcid ? 'Anti-Impersonation Guarantee' : 'ORCID iD Not Linked'}
+                    </Text>
                     <Text style={styles.noticeBoxDesc}>
-                      Authenticate directly on <Text style={styles.boldText}>orcid.org</Text>. To
-                      guarantee scholarly authenticity and safety, your authenticated ORCID account must match{' '}
-                      <Text style={styles.boldText}>{targetOrcid || profile.displayName}</Text>.
+                      {targetOrcid ? (
+                        <>
+                          Authenticate directly on <Text style={styles.boldText}>orcid.org</Text>. To guarantee scholarly authenticity, your authenticated ORCID account must match{' '}
+                          <Text style={styles.boldText}>{targetOrcid}</Text>.
+                        </>
+                      ) : (
+                        'This OpenAlex researcher record does not have a public ORCID iD linked to it. To verify your identity as an author, you can connect your ORCID directly in your Profile > Scholar section.'
+                      )}
                     </Text>
                   </View>
                 </View>
@@ -366,27 +385,40 @@ export const ClaimProfileModal: React.FC<ClaimProfileModalProps> = ({
                   </View>
                 )}
 
-                {/* Primary Action Button: Official orcid.org Auth */}
-                <TouchableOpacity
-                  style={styles.orcidOAuthBtn}
-                  onPress={handleOfficialOrcidOAuth}
-                  disabled={isSubmitting}
-                  activeOpacity={0.85}
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <View style={styles.orcidPillIcon}>
-                        <Text style={styles.orcidPillIconText}>iD</Text>
-                      </View>
-                      <Text style={styles.orcidOAuthBtnText}>
-                        Authenticate on orcid.org (Official Web Auth)
-                      </Text>
-                      <ExternalLink size={14} color="#FFFFFF" />
-                    </>
-                  )}
-                </TouchableOpacity>
+                {/* Primary Action Button */}
+                {targetOrcid ? (
+                  <TouchableOpacity
+                    style={styles.orcidOAuthBtn}
+                    onPress={handleOfficialOrcidOAuth}
+                    disabled={isSubmitting}
+                    activeOpacity={0.85}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <View style={styles.orcidPillIcon}>
+                          <Text style={styles.orcidPillIconText}>iD</Text>
+                        </View>
+                        <Text style={styles.orcidOAuthBtnText}>
+                          Authenticate on orcid.org (Official Web Auth)
+                        </Text>
+                        <ExternalLink size={14} color="#FFFFFF" />
+                      </>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.primaryActionBtn, { marginTop: spacing.sm }]}
+                    onPress={() => {
+                      handleResetAndClose();
+                      router.push('/(tabs)/profile');
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.primaryActionBtnText}>{'Go to Profile > Scholar Section'}</Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Cancel Button */}
                 <TouchableOpacity
@@ -536,6 +568,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
     borderWidth: 1,
     borderColor: '#BBF7D0',
+    borderRadius: radii.md,
+    padding: spacing.sm + 2,
+    marginBottom: spacing.md,
+  },
+  noticeBoxWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs + 4,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
     borderRadius: radii.md,
     padding: spacing.sm + 2,
     marginBottom: spacing.md,

@@ -18,6 +18,8 @@ import { fetchUserAnalytics } from '../../api/analyticsService';
 import { UserAnalyticsSummary } from '../../types/analytics';
 import { supabase } from '../../api/client';
 import { toggleFollowUserRpc } from '../../api/socialService';
+import { getHypedDomainData } from '../../api/hypedFeedService';
+import { Paper } from '../../types';
 
 interface SuggestedResearcher {
   id: string;
@@ -37,9 +39,16 @@ export const DesktopRightSidebar: React.FC = () => {
   const [analytics, setAnalytics] = useState<UserAnalyticsSummary | null>(null);
   const [suggestedResearchers, setSuggestedResearchers] = useState<SuggestedResearcher[]>([]);
   const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
+  const [hypedPapers, setHypedPapers] = useState<Paper[]>([]);
 
   useEffect(() => {
     fetchPapers();
+
+    getHypedDomainData('Hyped', '48h').then((res) => {
+      if (res?.papers && res.papers.length > 0) {
+        setHypedPapers(res.papers.slice(0, 5));
+      }
+    }).catch(() => {});
 
     if (currentUser?.id) {
       fetchUserAnalytics(currentUser.id, '28d').then(({ summary }) => {
@@ -95,12 +104,13 @@ export const DesktopRightSidebar: React.FC = () => {
     }
   };
 
-  const topPapers = useMemo(() => {
+  const displayHypedPapers = useMemo(() => {
+    if (hypedPapers.length > 0) return hypedPapers;
     if (!papers || papers.length === 0) return [];
     return [...papers]
       .sort((a, b) => (b.citationCount || 0) - (a.citationCount || 0) || (b.likesCount || 0) - (a.likesCount || 0))
       .slice(0, 5);
-  }, [papers]);
+  }, [hypedPapers, papers]);
 
   const sparklineData = analytics?.dailySeries && analytics.dailySeries.length > 0
     ? analytics.dailySeries.slice(-14)
@@ -108,7 +118,17 @@ export const DesktopRightSidebar: React.FC = () => {
   const maxViews = Math.max(...sparklineData.map((d) => d.views || 0), 1);
 
   return (
-    <aside style={{ width: 340, minWidth: 340 }}>
+    <aside
+      style={{
+        width: 340,
+        minWidth: 340,
+        position: 'sticky',
+        top: 68,
+        height: 'calc(100vh - 68px)',
+        alignSelf: 'flex-start',
+        overflowY: 'auto',
+      }}
+    >
       <View style={styles.container}>
         {/* 1. Real Researcher Impact / Analytics Card */}
         <View style={styles.card}>
@@ -121,11 +141,11 @@ export const DesktopRightSidebar: React.FC = () => {
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => router.push('/(tabs)/profile')}
+              onPress={() => router.push('/profile/analytics')}
               style={styles.viewAnalyticsBtn}
             >
               <Text style={styles.viewAnalyticsText}>View Analytics</Text>
-              <ArrowRight size={12} color="#064E3B" />
+              <ArrowRight size={12} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
@@ -170,16 +190,21 @@ export const DesktopRightSidebar: React.FC = () => {
           )}
         </View>
 
-        {/* 2. Trending Papers Section (Ranked 1 to 5) */}
+        {/* 2. Hyped Papers Section (Ranked 1 to 5) */}
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.headerLeft}>
               <TrendingUp size={16} color="#DC2626" strokeWidth={2.4} />
-              <Text style={styles.cardTitle}>Trending Papers</Text>
+              <Text style={styles.cardTitle}>Hyped Papers</Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => router.push('/(tabs)/explore')}
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)/explore',
+                  params: { tab: 'Hyped' },
+                })
+              }
               style={styles.seeAllRow}
             >
               <Text style={styles.seeAllText}>See all</Text>
@@ -188,8 +213,8 @@ export const DesktopRightSidebar: React.FC = () => {
           </View>
 
           <View style={styles.trendingPapersList}>
-            {topPapers.length > 0 ? (
-              topPapers.map((paper, idx) => (
+            {displayHypedPapers.length > 0 ? (
+              displayHypedPapers.map((paper, idx) => (
                 <TouchableOpacity
                   key={paper.id}
                   activeOpacity={0.75}
@@ -222,7 +247,7 @@ export const DesktopRightSidebar: React.FC = () => {
               <View style={{ paddingVertical: 14, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color="#064E3B" />
                 <Text style={{ fontSize: 12, color: '#64748B', marginTop: 6 }}>
-                  Loading top papers...
+                  Loading hyped papers...
                 </Text>
               </View>
             )}
@@ -340,15 +365,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#EAF3EE',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
     borderRadius: radii.full,
   },
   viewAnalyticsText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#064E3B',
+    color: '#FFFFFF',
   },
   impactBody: {
     marginBottom: 12,

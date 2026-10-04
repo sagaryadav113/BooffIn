@@ -165,6 +165,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               postsCount: 0,
               savedCount: 0,
               joinedDate: 'Just now',
+              researchInterests: [],
             };
 
             try {

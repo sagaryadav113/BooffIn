@@ -3,7 +3,13 @@ import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-nativ
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { supabase } from '../../api/client';
-import { fetchUserProfile, setStoredLocalSession, getStoredLocalSession, getInitialAuthSession } from '../../api/authService';
+import {
+  fetchUserProfile,
+  setStoredLocalSession,
+  getStoredLocalSession,
+  getInitialAuthSession,
+  isProfileComplete,
+} from '../../api/authService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { BooffinLogo } from '../../components/core/BooffinLogo';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -110,7 +116,11 @@ export default function AuthCallbackScreen() {
                 isLoading: false,
                 authError: null,
               });
-              router.replace('/(tabs)');
+              if (isProfileComplete(initialUser)) {
+                router.replace('/(tabs)');
+              } else {
+                router.replace('/(auth)/onboarding');
+              }
               return;
             }
           }
@@ -120,8 +130,13 @@ export default function AuthCallbackScreen() {
         if (!activeSession?.user) {
           const storeUser = useAuthStore.getState().user;
           const storedProfile = getStoredLocalSession();
-          if (storeUser?.id || storedProfile?.id) {
-            router.replace('/(tabs)');
+          const fallbackUser = storeUser?.id ? storeUser : storedProfile;
+          if (fallbackUser?.id) {
+            if (isProfileComplete(fallbackUser)) {
+              router.replace('/(tabs)');
+            } else {
+              router.replace('/(auth)/onboarding');
+            }
             return;
           }
 
@@ -167,6 +182,7 @@ export default function AuthCallbackScreen() {
             postsCount: 0,
             savedCount: 0,
             joinedDate: 'Just now',
+            researchInterests: [],
           };
 
           try {
@@ -196,13 +212,7 @@ export default function AuthCallbackScreen() {
         });
 
         // If existing user has complete profile, enter home, otherwise onboarding
-        const isComplete = Boolean(
-          profile &&
-          profile.researchInterests &&
-          profile.researchInterests.length > 0 &&
-          profile.fullName &&
-          profile.fullName.toLowerCase() !== 'researcher'
-        );
+        const isComplete = isProfileComplete(profile);
 
         if (isComplete) {
           router.replace('/(tabs)');

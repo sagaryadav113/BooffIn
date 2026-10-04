@@ -366,7 +366,6 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
 
             {/* Verification Status */}
             <View style={styles.sourcePill}>
-              <Sparkles size={11} color={colors.accentLink} />
               <Text style={styles.sourcePillText}>OpenAlex Verified Scholar Index</Text>
             </View>
           </View>
@@ -430,9 +429,9 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
               style={styles.orcidBadgeBtn}
               activeOpacity={0.8}
             >
-              <Award size={13} color="#A6CE39" />
+              <Award size={13} color="#FFFFFF" />
               <Text style={styles.orcidText}>{profile.orcid}</Text>
-              <ExternalLink size={11} color="#4D6B18" />
+              <ExternalLink size={11} color="#FFFFFF" />
             </TouchableOpacity>
           ) : null}
 
@@ -901,20 +900,18 @@ const styles = StyleSheet.create({
   sourcePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     alignSelf: 'flex-start',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
     borderRadius: radii.full,
     marginTop: 6,
-    borderWidth: 0.5,
-    borderColor: '#BFDBFE',
   },
   sourcePillText: {
     ...typography.microBold,
-    color: '#1D4ED8',
+    color: '#FFFFFF',
     fontSize: 10.5,
+    fontWeight: '700',
   },
   affiliationsWrap: {
     marginTop: spacing.md,
@@ -965,18 +962,17 @@ const styles = StyleSheet.create({
   orcidBadgeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F3F8EA',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    gap: 5,
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
     borderRadius: radii.full,
-    borderWidth: 0.8,
-    borderColor: '#D4E8B0',
   },
   orcidText: {
     ...typography.microBold,
-    color: '#4D6B18',
+    color: '#FFFFFF',
     fontSize: 11,
+    fontWeight: '700',
   },
   openAlexIdBtn: {
     flexDirection: 'row',
@@ -1299,15 +1295,18 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   citationsPill: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
     borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   citationsPillText: {
     ...typography.microBold,
-    color: '#92400E',
+    color: '#64748B',
     fontSize: 10.5,
+    fontWeight: '600',
   },
   badgesRow: {
     flexDirection: 'row',
@@ -1381,7 +1380,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    backgroundColor: '#16A34A',
+    backgroundColor: '#064E3B',
     paddingVertical: 8,
     paddingHorizontal: spacing.sm,
     borderRadius: radii.md,
@@ -1390,6 +1389,7 @@ const styles = StyleSheet.create({
     ...typography.captionBold,
     color: '#FFFFFF',
     fontSize: 12.5,
+    fontWeight: '700',
   },
   discussBtn: {
     flex: 1,
@@ -1427,17 +1427,15 @@ const styles = StyleSheet.create({
   },
   claimProfileTopBtn: {
     paddingVertical: 5,
-    paddingHorizontal: 11,
+    paddingHorizontal: 12,
     borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: '#1B4D3E',
-    backgroundColor: '#EAF3EE',
+    backgroundColor: '#064E3B',
     alignSelf: 'flex-start',
     marginTop: 2,
   },
   claimProfileTopText: {
     ...typography.captionBold,
-    color: '#1B4D3E',
+    color: '#FFFFFF',
     fontSize: 11.5,
     fontWeight: '700',
   },

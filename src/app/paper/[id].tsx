@@ -1068,16 +1068,23 @@ export default function PaperDetailScreen() {
           /* ==================================================================== */
           /* VIEW MODE 2: ORIGINAL OPEN ACCESS PDF DOCUMENT / PUBLISHER PORTAL    */
           /* ==================================================================== */
-          <View style={styles.pdfStandaloneContainer}>
-            <InAppPaperPdfViewer
-              paper={paper}
-              pdfUrl={resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl || paper.canonicalUrl || ''}
-              isDirectPdf={Boolean(resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl)}
-              isArxivPdf={isArxivPdf || (paper.doi ? paper.doi.includes('arxiv') : false) || Boolean(bestOpenUrl && bestOpenUrl.includes('arxiv.org'))}
-              onSwitchToArticleView={() => setViewMode('article')}
-              onRatingUpdated={(newMetrics) => setPaperMetrics(newMetrics)}
-            />
-          </View>
+          <ScrollView
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: 160 }]}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.pdfStandaloneContainer}>
+              <InAppPaperPdfViewer
+                paper={paper}
+                pdfUrl={resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl || paper.canonicalUrl || ''}
+                isDirectPdf={Boolean(resolvedPdfUrl || bestOpenUrl || paper.openAccessUrl)}
+                isArxivPdf={isArxivPdf || (paper.doi ? paper.doi.includes('arxiv') : false) || Boolean(bestOpenUrl && bestOpenUrl.includes('arxiv.org'))}
+                onSwitchToArticleView={() => setViewMode('article')}
+                onRatingUpdated={(newMetrics) => setPaperMetrics(newMetrics)}
+              />
+            </View>
+          </ScrollView>
         ) : (
           <ScrollView
             ref={scrollViewRef}

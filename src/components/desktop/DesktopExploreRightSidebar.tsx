@@ -98,7 +98,17 @@ export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProp
   const displayTopics = topics.slice(0, 6);
 
   return (
-    <aside style={{ width: 320, minWidth: 320 }}>
+    <aside
+      style={{
+        width: 320,
+        minWidth: 320,
+        position: 'sticky',
+        top: 68,
+        height: 'calc(100vh - 68px)',
+        alignSelf: 'flex-start',
+        overflowY: 'auto',
+      }}
+    >
       <View style={styles.container}>
         {/* 1. Real Research Topics / Fields */}
         <View style={styles.card}>

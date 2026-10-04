@@ -58,7 +58,6 @@ import {
   connectOrcidOAuth,
   fetchOrcidPersonDetails,
   OrcidPersonDetails,
-  unclaimOrcidProfileWithReauth,
 } from '../../api/orcidService';
 import {
   verifyPasswordAndDisconnectOrcid,
@@ -337,67 +336,6 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
       );
     } else {
       setConnectStepError(syncRes.error || 'Failed to sync publications from ORCID.');
-    }
-  };
-
-  /**
-   * Official ORCID OAuth Re-authentication to Unclaim Profile
-   */
-  const handleOfficialOrcidUnclaimReauth = async () => {
-    setIsDisconnecting(true);
-    setDisconnectError(null);
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
-
-    try {
-      const oauthRes = await connectOrcidOAuth();
-      if (oauthRes.success && oauthRes.orcidId) {
-        const authedOrcid = normalizeOrcidId(oauthRes.orcidId);
-        if (activeOrcid && authedOrcid !== normalizeOrcidId(activeOrcid)) {
-          setIsDisconnecting(false);
-          setDisconnectError(
-            `ORCID Mismatch: You authenticated as ${authedOrcid}, but this profile is registered to ${activeOrcid}.`
-          );
-          return;
-        }
-      }
-
-      // Execute unclaim & publication purge
-      const res = await unclaimOrcidProfileWithReauth(userId, activeOrcid);
-      setIsDisconnecting(false);
-
-      if (res.success) {
-        setDisconnectModalVisible(false);
-        setDisconnectPassword('');
-        setPublications([]);
-        setStats({
-          totalPublications: 0,
-          totalCitations: 0,
-          openAccessCount: 0,
-          isVerified: false,
-          orcidId: undefined,
-        });
-
-        await updateProfile({
-          orcidId: undefined,
-          orcidVerified: false,
-        });
-
-        try {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {}
-
-        Alert.alert(
-          'Profile Unclaimed',
-          'Your ORCID profile and publications have been safely unlinked and removed.'
-        );
-      } else {
-        setDisconnectError(res.error || 'Could not unclaim profile.');
-      }
-    } catch (err: any) {
-      setIsDisconnecting(false);
-      setDisconnectError(err.message || 'Could not complete ORCID re-authentication.');
     }
   };
 
@@ -1193,7 +1131,7 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.passwordModalTitle}>Unclaim ORCID Profile</Text>
                   <Text style={styles.passwordModalSubtitle}>
-                    To securely detach ORCID ({activeOrcid}) and remove synced publications, verify your ownership via official ORCID authentication or enter your account password.
+                    To securely detach ORCID ({activeOrcid}) and remove synced publications from your scholar profile, please enter your BooffIn account password.
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -1209,34 +1147,6 @@ export const BooffInScholarsTab: React.FC<BooffInScholarsTabProps> = ({
                   <Text style={styles.passwordErrorText}>{disconnectError}</Text>
                 </View>
               )}
-
-              {/* Primary Option: Official ORCID Re-Auth */}
-              <TouchableOpacity
-                style={styles.orcidReauthBtn}
-                onPress={handleOfficialOrcidUnclaimReauth}
-                disabled={isDisconnecting}
-                activeOpacity={0.85}
-              >
-                {isDisconnecting ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <>
-                    <View style={styles.orcidLogoMini}>
-                      <Text style={styles.orcidLogoMiniText}>iD</Text>
-                    </View>
-                    <Text style={styles.orcidReauthBtnText}>
-                      Re-Authenticate with ORCID.org
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              {/* OR Divider */}
-              <View style={styles.orDividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.orDividerText}>OR VERIFY WITH PASSWORD</Text>
-                <View style={styles.dividerLine} />
-              </View>
 
               <View style={styles.passwordInputWrap}>
                 <Text style={styles.passwordInputLabel}>BooffIn Account Password</Text>

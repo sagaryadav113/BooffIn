@@ -64,7 +64,17 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
   const maxViews = Math.max(...sparklineData.map((d) => d.views || 0), 1);
 
   return (
-    <aside style={{ width: 320, minWidth: 320 }}>
+    <aside
+      style={{
+        width: 320,
+        minWidth: 320,
+        position: 'sticky',
+        top: 68,
+        height: 'calc(100vh - 68px)',
+        alignSelf: 'flex-start',
+        overflowY: 'auto',
+      }}
+    >
       <View style={styles.container}>
         {/* 1. Real Research Impact Card */}
         <View style={styles.card}>
@@ -77,11 +87,17 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={onOpenAnalytics || (() => router.push('/(tabs)/profile'))}
+              onPress={() => {
+                if (onOpenAnalytics) {
+                  onOpenAnalytics();
+                } else {
+                  router.push('/profile/analytics');
+                }
+              }}
               style={styles.viewAnalyticsBtn}
             >
               <Text style={styles.viewAnalyticsText}>View Analytics</Text>
-              <ArrowRight size={12} color="#064E3B" />
+              <ArrowRight size={12} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
@@ -238,7 +254,12 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
             <Text style={styles.cardTitle}>Recent Activity</Text>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => router.push('/(tabs)/profile?tab=Activity')}
+              onPress={() => {
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('booffin:set-profile-tab', { detail: 'Activity' }));
+                }
+                router.push('/(tabs)/profile?tab=Activity');
+              }}
               style={styles.seeAllRow}
             >
               <Text style={styles.seeAllText}>View all</Text>
@@ -317,15 +338,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#EAF3EE',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
     borderRadius: radii.full,
   },
   viewAnalyticsText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#064E3B',
+    color: '#FFFFFF',
   },
   impactBody: {
     marginBottom: 12,

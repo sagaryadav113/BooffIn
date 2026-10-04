@@ -373,12 +373,15 @@ export async function connectOrcidOAuth(
     const redirectUri =
       process.env.EXPO_PUBLIC_ORCID_REDIRECT_URI || DEFAULT_ORCID_REDIRECT_URI;
     const cleanTargetOrcid = targetOrcid ? normalizeOrcidId(targetOrcid) : '';
+    const emailParam = cleanTargetOrcid
+      ? `&email_or_orcid=${encodeURIComponent(cleanTargetOrcid)}&show_login=true`
+      : '';
 
     const authUrl = `${ORCID_OAUTH_AUTHORIZE_URL}?client_id=${encodeURIComponent(
       rawClientId
     )}&response_type=code&scope=%2Fauthenticate%20%2Fread-public&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}`;
+    )}${emailParam}`;
 
     // On web, also listen for postMessage and localStorage events from popup
     let messageCleanup: (() => void) | undefined;
@@ -472,54 +475,80 @@ export async function connectOrcidOAuth(
       };
     }
 
-    if (code && clientSecret) {
+    if (code) {
+      // 1. Try serverless backend token exchange (avoids CORS)
       try {
-        const tokenRes = await fetch(ORCID_OAUTH_TOKEN_URL, {
+        const backendEndpoint =
+          Platform.OS === 'web' && typeof window !== 'undefined'
+            ? '/api/orcid-token'
+            : 'https://booff-in.vercel.app/api/orcid-token';
+
+        const backendRes = await fetch(backendEndpoint, {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             Accept: 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: new URLSearchParams({
-            client_id: rawClientId || '',
-            client_secret: clientSecret,
-            grant_type: 'authorization_code',
+          body: JSON.stringify({
             code,
             redirect_uri: redirectUri,
-          }).toString(),
+          }),
         });
 
-        if (tokenRes.ok) {
-          const tokenData = await tokenRes.json();
-          if (tokenData.orcid) {
+        if (backendRes.ok) {
+          const backendData = await backendRes.json();
+          if (backendData.orcid) {
             return {
               success: true,
-              orcidId: normalizeOrcidId(tokenData.orcid),
-              name: tokenData.name,
-              accessToken: tokenData.access_token,
+              orcidId: normalizeOrcidId(backendData.orcid),
+              name: backendData.name,
+              accessToken: backendData.access_token,
             };
           }
         }
-      } catch (tokenErr) {
-        console.warn('ORCID token exchange error:', tokenErr);
+      } catch (backendErr) {
+        console.warn('Backend ORCID token exchange error:', backendErr);
+      }
+
+      // 2. Direct client token exchange attempt
+      if (clientSecret) {
+        try {
+          const tokenRes = await fetch(ORCID_OAUTH_TOKEN_URL, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              client_id: rawClientId || '',
+              client_secret: clientSecret,
+              grant_type: 'authorization_code',
+              code,
+              redirect_uri: redirectUri,
+            }).toString(),
+          });
+
+          if (tokenRes.ok) {
+            const tokenData = await tokenRes.json();
+            if (tokenData.orcid) {
+              return {
+                success: true,
+                orcidId: normalizeOrcidId(tokenData.orcid),
+                name: tokenData.name,
+                accessToken: tokenData.access_token,
+              };
+            }
+          }
+        } catch (tokenErr) {
+          console.warn('Direct ORCID token exchange error:', tokenErr);
+        }
       }
     }
 
-    if (code) {
-      return {
-        success: true,
-        orcidId: cleanTargetOrcid || undefined,
-      };
-    }
-
-    if (cleanTargetOrcid) {
-      return {
-        success: true,
-        orcidId: cleanTargetOrcid,
-      };
-    }
-
-    return { success: false, error: 'Could not complete ORCID authentication.' };
+    return {
+      success: false,
+      error: 'ORCID verification was not completed or could not verify the authenticated ORCID iD.',
+    };
   } catch (err: any) {
     return { success: false, error: err.message || 'ORCID authentication failed.' };
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -89,6 +89,7 @@ export default function OtherResearcherProfileScreen() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Scholars' | 'Activity'>('Posts');
+  const [postsSubFilter, setPostsSubFilter] = useState<'All' | 'Hyped' | 'Articles' | 'Shared'>('All');
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
@@ -203,6 +204,62 @@ export default function OtherResearcherProfileScreen() {
     }
     return allPosts.filter((p) => p.author.id === researcher.id || (p.isReposted && p.author.id !== researcher.id));
   }, [researcherPosts, allPosts, researcher]);
+
+  // Helper to check if a post is a shared research paper or repost
+  const isSharedPost = (p: Post) =>
+    p.postType === 'research_share' ||
+    Boolean(p.paper) ||
+    Boolean(p.repostedBy) ||
+    Boolean(p.isReposted);
+
+  // Compute posts filtered by sub-section ("All", "Hyped", "Articles", "Shared")
+  const displayFilteredPosts = useMemo(() => {
+    if (!posts || posts.length === 0) return [];
+    if (postsSubFilter === 'Hyped') {
+      // Only authored posts ranked by engagement (excluding shared papers/reposts)
+      const authored = posts.filter((p) => !isSharedPost(p));
+      return authored.sort((a, b) => {
+        const scoreA =
+          (a.likesCount || 0) * 3 +
+          (a.commentsCount || 0) * 5 +
+          (a.repostsCount || 0) * 4 +
+          (a.savesCount || 0) * 2;
+        const scoreB =
+          (b.likesCount || 0) * 3 +
+          (b.commentsCount || 0) * 5 +
+          (b.repostsCount || 0) * 4 +
+          (b.savesCount || 0) * 2;
+        return scoreB - scoreA;
+      });
+    }
+    if (postsSubFilter === 'Articles') {
+      // Only long-form articles written by author (excluding shared/reposted)
+      return posts.filter(
+        (p) =>
+          (p.postType === 'article' || Boolean(p.article)) &&
+          !p.repostedBy &&
+          !p.isReposted
+      );
+    }
+    if (postsSubFilter === 'Shared') {
+      return posts.filter((p) => isSharedPost(p));
+    }
+    return posts;
+  }, [posts, postsSubFilter]);
+
+  const postCounts = useMemo(() => {
+    return {
+      all: posts.length,
+      hyped: posts.filter((p) => !isSharedPost(p)).length,
+      articles: posts.filter(
+        (p) =>
+          (p.postType === 'article' || Boolean(p.article)) &&
+          !p.repostedBy &&
+          !p.isReposted
+      ).length,
+      shared: posts.filter((p) => isSharedPost(p)).length,
+    };
+  }, [posts]);
 
   const paperPosts = React.useMemo(() => {
     return posts.filter((p) => !!p.paper);
@@ -694,6 +751,55 @@ export default function OtherResearcherProfileScreen() {
             {/* Tab Content */}
             {activeSubTab === 'Posts' && (
               <View style={styles.postsList}>
+                {/* Filter Chips: All | Hyped | Articles | Shared */}
+                <View style={styles.filterRow}>
+                  {(['All', 'Hyped', 'Articles', 'Shared'] as const).map((filter) => {
+                    const count =
+                      filter === 'All'
+                        ? postCounts.all
+                        : filter === 'Hyped'
+                        ? postCounts.hyped
+                        : filter === 'Articles'
+                        ? postCounts.articles
+                        : postCounts.shared;
+                    return (
+                      <TouchableOpacity
+                        key={filter}
+                        style={[
+                          styles.filterChip,
+                          postsSubFilter === filter && styles.filterChipActive,
+                        ]}
+                        onPress={() => setPostsSubFilter(filter)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            postsSubFilter === filter && styles.filterChipTextActive,
+                          ]}
+                        >
+                          {filter}
+                        </Text>
+                        <View
+                          style={[
+                            styles.filterCountBadge,
+                            postsSubFilter === filter && styles.filterCountBadgeActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.filterCountText,
+                              postsSubFilter === filter && styles.filterCountTextActive,
+                            ]}
+                          >
+                            {count}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
                 {isLoadingPosts && posts.length === 0 ? (
                   <View style={{ paddingVertical: spacing.xl * 2, alignItems: 'center', justifyContent: 'center' }}>
                     <ActivityIndicator size="small" color={colors.accentBlue} />
@@ -701,13 +807,29 @@ export default function OtherResearcherProfileScreen() {
                       Loading posts & shares...
                     </Text>
                   </View>
-                ) : posts.length > 0 ? (
-                  posts.map((p) => <PostCard key={p.id} post={p} />)
+                ) : displayFilteredPosts.length > 0 ? (
+                  displayFilteredPosts.map((p: Post) => <PostCard key={p.id} post={p} />)
                 ) : (
                   <EmptyState
                     icon="Discussion"
-                    title="No posts yet"
-                    description="This researcher hasn't shared any public research thoughts or questions yet."
+                    title={
+                      postsSubFilter === 'Articles'
+                        ? 'No articles published yet'
+                        : postsSubFilter === 'Shared'
+                        ? 'No shared research posts yet'
+                        : postsSubFilter === 'Hyped'
+                        ? 'No hyped posts yet'
+                        : 'No posts yet'
+                    }
+                    description={
+                      postsSubFilter === 'Articles'
+                        ? 'This researcher has not published any long-form research articles yet.'
+                        : postsSubFilter === 'Shared'
+                        ? 'This researcher has not shared any research papers or DOI preprints yet.'
+                        : postsSubFilter === 'Hyped'
+                        ? 'Posts ranked by engagement, discussion, and impact will appear here.'
+                        : "This researcher hasn't shared any public research thoughts or questions yet."
+                    }
                   />
                 )}
               </View>
@@ -1051,6 +1173,60 @@ const styles = StyleSheet.create({
   },
   postsList: {
     width: '100%',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.full,
+    gap: 6,
+  },
+  filterChipActive: {
+    backgroundColor: colors.black,
+    borderColor: colors.black,
+  },
+  filterChipText: {
+    ...typography.captionBold,
+    color: colors.textSecondary,
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: colors.white,
+    fontWeight: '700',
+  },
+  filterCountBadge: {
+    backgroundColor: colors.borderLight,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: radii.full,
+  },
+  filterCountBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  filterCountText: {
+    ...typography.micro,
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  filterCountTextActive: {
+    color: colors.white,
+    fontWeight: '700',
   },
   papersList: {
     padding: spacing.lg,

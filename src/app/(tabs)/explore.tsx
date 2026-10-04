@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   TrendingUp,
   Sparkles,
@@ -43,6 +43,7 @@ import { Paper, UserProfile } from '../../types';
 
 export default function ExploreScreen() {
   const { isDesktop } = useResponsiveLayout();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const {
     searchQuery,
     activeCategory,
@@ -86,8 +87,8 @@ export default function ExploreScreen() {
     return Array.from(new Set(list));
   }, [currentUser]);
 
-  // Active top navigation tab
-  const [activeTab, setActiveTab] = useState<string>('Neuroscience');
+  // Active top navigation tab (Default to "For You" or URL param)
+  const [activeTab, setActiveTab] = useState<string>(params.tab || 'For You');
 
   // Timeframe filter state (Default to last 48 hours)
   const [timeframe, setTimeframe] = useState<'48h' | 'week' | 'all'>('48h');
@@ -100,19 +101,25 @@ export default function ExploreScreen() {
   const [isLoadingHyped, setIsLoadingHyped] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Synchronize activeTab if navigated with params
+  useEffect(() => {
+    if (params.tab) {
+      setActiveTab(params.tab);
+    }
+  }, [params.tab]);
+
   // Synchronize initial activeTab with user interests
   useEffect(() => {
-    if (userInterests.length > 0 && activeTab !== 'For You' && activeTab !== 'Following') {
+    if (params.tab) return;
+    if (userInterests.length > 0 && activeTab !== 'For You' && activeTab !== 'Hyped') {
       if (!userInterests.includes(activeTab)) {
-        setActiveTab(userInterests[0]);
+        setActiveTab('For You');
       }
     }
-  }, [userInterests, activeTab]);
+  }, [userInterests, activeTab, params.tab]);
 
   // Load domain-specific or personalized hyped feed
   const loadHypedFeed = useCallback(async (domain: string, tf: '48h' | 'week' | 'all') => {
-    if (domain === 'Following') return;
-
     setIsLoadingHyped(true);
     try {
       const data = await getHypedDomainData(domain, tf, userInterests);
@@ -125,17 +132,13 @@ export default function ExploreScreen() {
   }, [userInterests]);
 
   useEffect(() => {
-    if (activeTab !== 'Following') {
-      loadHypedFeed(activeTab, timeframe);
-    }
+    loadHypedFeed(activeTab, timeframe);
   }, [activeTab, timeframe, loadHypedFeed]);
 
   // Dynamically update explore hyped feed when a paper is read
   useEffect(() => {
     const unsubscribe = subscribeToPaperRead(() => {
-      if (activeTab !== 'Following') {
-        loadHypedFeed(activeTab, timeframe);
-      }
+      loadHypedFeed(activeTab, timeframe);
     });
     return () => {
       unsubscribe();
@@ -148,9 +151,7 @@ export default function ExploreScreen() {
         fetchPapers(),
         fetchTopics(currentUser?.id),
         fetchFeed('For You', currentUser?.id),
-        activeTab !== 'Following'
-          ? loadHypedFeed(activeTab, timeframe)
-          : Promise.resolve(),
+        loadHypedFeed(activeTab, timeframe),
       ]);
     } catch {}
   }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed, activeTab, timeframe, loadHypedFeed]);
@@ -340,7 +341,7 @@ export default function ExploreScreen() {
           </View>
 
           <Text style={styles.hypedSubtitle}>
-            Top papers in {activeTab === 'For You' ? 'your personalized feed' : activeTab} {timeframe === '48h' ? 'in the last 48 hours' : timeframe === 'week' ? 'this week' : 'of all time'}, ranked by HYPE
+            Top papers in {activeTab === 'For You' ? 'your personalized feed' : activeTab === 'Hyped' ? 'science today' : activeTab} {timeframe === '48h' ? 'in the last 48 hours' : timeframe === 'week' ? 'this week' : 'of all time'}, ranked by HYPE
           </Text>
 
           {/* Timeframe Filter Selector */}
@@ -421,7 +422,7 @@ export default function ExploreScreen() {
           </View>
 
           <Text style={styles.hypedSubtitle}>
-            Most hyped researchers in {activeTab} this week
+            Most hyped researchers in {activeTab === 'For You' || activeTab === 'Hyped' ? 'science' : activeTab} this week
           </Text>
 
           {/* Horizontal Researcher Carousel */}
@@ -500,7 +501,7 @@ export default function ExploreScreen() {
             contentContainerStyle={styles.topTabsContent}
           >
             {/* Standard Feeds */}
-            {['For You', 'Following'].map((tab) => {
+            {['For You', 'Hyped'].map((tab) => {
               const isActive = activeTab === tab;
               return (
                 <TouchableOpacity

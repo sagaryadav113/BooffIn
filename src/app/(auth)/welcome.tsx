@@ -19,6 +19,7 @@ import { colors, radii, spacing, typography, layout } from '../../theme';
 import { GoogleIcon } from '../../components/core/GoogleIcon';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
+import { isProfileComplete } from '../../api/authService';
 
 const WELCOME_HERO_BG = require('../../../assets/images/welcome-hero.jpg');
 
@@ -35,7 +36,12 @@ export default function WelcomeScreen() {
 
     const success = await signInWithGoogle();
     if (success) {
-      router.replace('/(tabs)');
+      const activeUser = useAuthStore.getState().user;
+      if (isProfileComplete(activeUser)) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/onboarding');
+      }
     }
   };
 

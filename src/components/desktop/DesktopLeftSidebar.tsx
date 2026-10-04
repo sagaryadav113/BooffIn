@@ -126,12 +126,22 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
       label: 'My Articles',
       icon: FileText,
       isActive: false,
-      onPress: () => router.push('/(tabs)/profile?tab=Posts'),
+      onPress: () => router.push('/(tabs)/profile?tab=Articles'),
     },
   ];
 
   return (
-    <aside style={{ width: 240, minWidth: 240, height: '100%' }}>
+    <aside
+      style={{
+        width: 240,
+        minWidth: 240,
+        position: 'sticky',
+        top: 68,
+        height: 'calc(100vh - 68px)',
+        alignSelf: 'flex-start',
+        overflowY: 'auto',
+      }}
+    >
       <View style={styles.container}>
         {/* Main Navigation Group */}
         <View style={styles.navGroup}>

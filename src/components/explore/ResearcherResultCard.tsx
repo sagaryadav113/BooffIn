@@ -58,7 +58,7 @@ export const ResearcherResultCard: React.FC<ResearcherResultCardProps> = ({
           </Text>
           {researcher.orcidVerified && (
             <View style={styles.orcidBadge}>
-              <Award size={12} color="#A6CE39" />
+              <Award size={11} color="#FFFFFF" />
               <Text style={styles.orcidBadgeText}>ORCID</Text>
             </View>
           )}
@@ -121,17 +121,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#F3F8EA',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: radii.full,
-    borderWidth: 0.5,
-    borderColor: '#D4E8B0',
   },
   orcidBadgeText: {
     ...typography.microBold,
-    color: '#4D6B18',
+    color: '#FFFFFF',
     fontSize: 10,
+    fontWeight: '700',
   },
   handleText: {
     ...typography.caption,

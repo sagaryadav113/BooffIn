@@ -517,22 +517,32 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             src={effectiveStreamUrl}
             style={{
               width: '100%',
-              height: 980,
+              height: 850,
+              minHeight: 700,
               border: 'none',
               backgroundColor: '#525659',
               display: 'block',
+              borderRadius: 6,
             }}
             title={paper.title}
             allow="fullscreen"
             loading="eager"
           />
 
-          <FloatingRatingDock
-            paperId={paper.id}
-            paperTitle={paper.title}
-            onRatingUpdated={onRatingUpdated}
-            style={styles.floatingDockInPdf}
-          />
+          {/* Rating Section Below PDF Viewer */}
+          <View style={styles.ratingSectionBelowPdf}>
+            <View style={styles.ratingSectionHeader}>
+              <Text style={styles.ratingSectionTitle}>Paper Peer Evaluation & Hype Score</Text>
+              <Text style={styles.ratingSectionSubtitle}>
+                Rate this publication on clarity, impact, and visuals to contribute to its community score.
+              </Text>
+            </View>
+            <FloatingRatingDock
+              paperId={paper.id}
+              paperTitle={paper.title}
+              onRatingUpdated={onRatingUpdated}
+            />
+          </View>
         </View>
       ) : (
         <View style={styles.nativeViewerWrapper}>
@@ -613,13 +623,20 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             </>
           )}
 
-          {/* Floating Rating Dock anchored over PDF */}
-          <FloatingRatingDock
-            paperId={paper.id}
-            paperTitle={paper.title}
-            onRatingUpdated={onRatingUpdated}
-            style={styles.nativeFloatingDock}
-          />
+          {/* Rating Section Below PDF Viewer */}
+          <View style={styles.ratingSectionBelowPdf}>
+            <View style={styles.ratingSectionHeader}>
+              <Text style={styles.ratingSectionTitle}>Paper Peer Evaluation & Hype Score</Text>
+              <Text style={styles.ratingSectionSubtitle}>
+                Rate this publication on clarity, impact, and visuals to contribute to its community score.
+              </Text>
+            </View>
+            <FloatingRatingDock
+              paperId={paper.id}
+              paperTitle={paper.title}
+              onRatingUpdated={onRatingUpdated}
+            />
+          </View>
         </View>
       )}
     </View>
@@ -713,9 +730,10 @@ const styles = StyleSheet.create({
   },
   webPdfWrapper: {
     flex: 1,
-    minHeight: 900,
     backgroundColor: '#525659',
     position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
   },
   nativeViewerWrapper: {
     flex: 1,
@@ -724,23 +742,34 @@ const styles = StyleSheet.create({
   },
   webView: {
     flex: 1,
+    minHeight: 650,
     backgroundColor: '#525659',
   },
-  floatingDockInPdf: {
-    position: 'absolute',
-    bottom: 24,
-    left: 0,
-    right: 0,
+  ratingSectionBelowPdf: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
-    zIndex: 50,
+    width: '100%',
+    gap: spacing.sm,
   },
-  nativeFloatingDock: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
+  ratingSectionHeader: {
     alignItems: 'center',
-    zIndex: 50,
+    marginBottom: spacing.xs,
+  },
+  ratingSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  ratingSectionSubtitle: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    maxWidth: 420,
   },
   loadingContainer: {
     position: 'absolute',
