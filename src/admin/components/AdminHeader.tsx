@@ -4,30 +4,15 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
-import { ADMIN_COLORS } from '../lib/constants';
-import { AdminBadge } from './AdminBadge';
 import { useAdminAuth } from '../hooks/useAdminAuth';
-import { Search, Bell, Sun, Maximize2, LogOut, ShieldCheck, User } from 'lucide-react-native';
+import { Search, LogOut } from 'lucide-react-native';
 
 interface AdminHeaderProps {
   title: string;
 }
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ title }) => {
-  const { email, role, aal, signOut } = useAdminAuth();
-
-  const getRoleBadgeVariant = () => {
-    switch (role) {
-      case 'SUPER_ADMIN':
-        return 'emerald';
-      case 'ADMIN':
-        return 'info';
-      case 'MODERATOR':
-        return 'warning';
-      default:
-        return 'neutral';
-    }
-  };
+  const { email, signOut } = useAdminAuth();
 
   const getInitials = () => {
     if (!email) return 'AD';
@@ -51,37 +36,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ title }) => {
         />
       </View>
 
-      {/* 3. Right Utility Tools & User Identity */}
+      {/* 3. Right User Identity & Actions */}
       <View style={styles.rightSection}>
-        {/* Quick Tools */}
-        <TouchableOpacity style={styles.iconButton}>
-          <Sun size={17} color="#64748B" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.iconButton}>
-          <Maximize2 size={16} color="#64748B" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.iconButton}>
-          <Bell size={17} color="#64748B" />
-          <View style={styles.notificationDot} />
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        {/* Badges */}
-        {role ? (
-          <AdminBadge label={role} variant={getRoleBadgeVariant()} size="sm" />
-        ) : null}
-
-        {aal ? (
-          <AdminBadge
-            label={aal.toUpperCase()}
-            variant={aal === 'aal2' ? 'emerald' : 'warning'}
-            size="sm"
-          />
-        ) : null}
-
         {/* User Avatar & Info */}
         <View style={styles.userProfile}>
           <View style={styles.avatar}>
@@ -157,32 +113,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  iconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#EF4444',
-  },
-  divider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: 4,
   },
   userProfile: {
     flexDirection: 'row',
