@@ -55,7 +55,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
             >
               <Typography
                 variant="captionBold"
-                color={document.id === 'privacy' ? colors.primary : colors.textSecondary}
+                color={document.id === 'privacy' ? colors.brandGreen : colors.textSecondary}
               >
                 Privacy
               </Typography>
@@ -66,7 +66,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
             >
               <Typography
                 variant="captionBold"
-                color={document.id === 'terms' ? colors.primary : colors.textSecondary}
+                color={document.id === 'terms' ? colors.brandGreen : colors.textSecondary}
               >
                 Terms
               </Typography>
@@ -77,7 +77,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
             >
               <Typography
                 variant="captionBold"
-                color={document.id === 'guidelines' ? colors.primary : colors.textSecondary}
+                color={document.id === 'guidelines' ? colors.brandGreen : colors.textSecondary}
               >
                 Guidelines
               </Typography>
@@ -96,7 +96,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
           {/* Header Badge */}
           <View style={styles.metaRow}>
             <View style={styles.badge}>
-              <Typography variant="microBold" color={colors.primary}>
+              <Typography variant="microBold" color={colors.brandGreen}>
                 OFFICIAL POLICY v{document.version}
               </Typography>
             </View>
@@ -129,7 +129,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
                 OFFICIAL INQUIRIES
               </Typography>
               <TouchableOpacity onPress={() => handleEmailPress(document.supportEmail)}>
-                <Typography variant="captionBold" color={colors.primary}>
+                <Typography variant="captionBold" color={colors.accentBlue}>
                   {document.supportEmail}
                 </Typography>
               </TouchableOpacity>
@@ -139,7 +139,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
                 PRIVACY & DPO
               </Typography>
               <TouchableOpacity onPress={() => handleEmailPress(document.privacyEmail)}>
-                <Typography variant="captionBold" color={colors.primary}>
+                <Typography variant="captionBold" color={colors.accentBlue}>
                   {document.privacyEmail}
                 </Typography>
               </TouchableOpacity>
@@ -175,7 +175,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
               For general support or research partnership inquiries, please contact{' '}
               <Typography
                 variant="captionBold"
-                color={colors.primary}
+                color={colors.accentBlue}
                 onPress={() => handleEmailPress('support@letsbooffin.com')}
               >
                 support@letsbooffin.com
@@ -183,7 +183,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
               {' '}or{' '}
               <Typography
                 variant="captionBold"
-                color={colors.primary}
+                color={colors.accentBlue}
                 onPress={() => handleEmailPress('admin@letsbooffin.com')}
               >
                 admin@letsbooffin.com
