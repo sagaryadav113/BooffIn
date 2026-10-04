@@ -1,5 +1,17 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, TextInput, Alert, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  TextInput,
+  Alert,
+  Platform,
+  Linking,
+  ScrollView,
+} from 'react-native';
+import { useRouter } from 'expo-router';
 import { colors, radii, spacing } from '../../theme';
 import { SettingsLayout } from '../../components/settings/SettingsLayout';
 import { SettingsCardGroup } from '../../components/settings/SettingsCardGroup';
@@ -11,15 +23,24 @@ import { Button } from '../../components/core/Button';
 import { Icon } from '../../components/core/Icon';
 import { reportContent } from '../../api/moderationService';
 import { env } from '../../config/env';
+import {
+  TERMS_OF_SERVICE,
+  PRIVACY_POLICY,
+  COMMUNITY_GUIDELINES,
+  LEGAL_CONTACTS,
+} from '../../constants/legalPolicies';
 
 export default function HelpSettingsScreen() {
+  const router = useRouter();
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<string | null>(null);
 
-  const [activePolicyModal, setActivePolicyModal] = useState<'fair_use' | 'guidelines' | 'privacy' | 'terms' | null>(null);
+  const [activePolicyModal, setActivePolicyModal] = useState<
+    'fair_use' | 'guidelines' | 'privacy' | 'terms' | null
+  >(null);
 
   const handleSubmitReport = async () => {
     if (!reportReason.trim()) {
@@ -47,10 +68,14 @@ export default function HelpSettingsScreen() {
     }
   };
 
+  const handleEmailPress = (email: string) => {
+    Linking.openURL(`mailto:${email}`);
+  };
+
   return (
     <SettingsLayout
       title="Help & About"
-      subtitle="Academic policies, open access governance, terms of service, and support."
+      subtitle="Academic policies, open access governance, terms of service, and official support."
     >
       {submitFeedback ? (
         <View style={styles.feedbackBanner}>
@@ -81,21 +106,35 @@ export default function HelpSettingsScreen() {
         <SettingsRow
           icon="FileText"
           title="Terms of Service"
-          subtitle="User agreement and platform responsibilities"
+          subtitle="User agreement and platform responsibilities (v2.0)"
           onPress={() => setActivePolicyModal('terms')}
         />
         <Divider />
         <SettingsRow
           icon="Lock"
           title="Privacy Policy"
-          subtitle="How your academic data and credentials are protected"
+          subtitle="How your academic data and credentials are protected (v2.0)"
           onPress={() => setActivePolicyModal('privacy')}
         />
       </SettingsCardGroup>
 
-      {/* 2. Support & Feedback */}
-      <SettingsSectionHeader title="Support & Feedback" />
+      {/* 2. Official Contact & Support */}
+      <SettingsSectionHeader title="Official Support & Contact" />
       <SettingsCardGroup>
+        <SettingsRow
+          icon="Mail"
+          title="General & Researcher Support"
+          subtitle={LEGAL_CONTACTS.support}
+          onPress={() => handleEmailPress(LEGAL_CONTACTS.support)}
+        />
+        <Divider />
+        <SettingsRow
+          icon="Shield"
+          title="Privacy & Data Protection Officer"
+          subtitle={LEGAL_CONTACTS.privacy}
+          onPress={() => handleEmailPress(LEGAL_CONTACTS.privacy)}
+        />
+        <Divider />
         <SettingsRow
           icon="AlertTriangle"
           title="Report a Problem / Submit Feedback"
@@ -122,7 +161,7 @@ export default function HelpSettingsScreen() {
             App Version: 1.0.0 ({env.APP_ENV})
           </Typography>
           <Typography variant="micro" color={colors.textMuted}>
-            Build: Production Ready
+            Controller: BooffIn Technologies
           </Typography>
         </View>
       </SettingsCardGroup>
@@ -196,30 +235,122 @@ export default function HelpSettingsScreen() {
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
               <View style={styles.policyModalCard}>
-                <Typography variant="h3" color={colors.textPrimary} style={{ marginBottom: spacing.md }}>
+                <Typography variant="h3" color={colors.textPrimary} style={{ marginBottom: spacing.sm }}>
                   {activePolicyModal === 'fair_use' && 'Open Access Fair Use Policy'}
-                  {activePolicyModal === 'guidelines' && 'Academic Community Guidelines'}
-                  {activePolicyModal === 'terms' && 'Terms of Service'}
-                  {activePolicyModal === 'privacy' && 'Privacy Policy'}
+                  {activePolicyModal === 'guidelines' && COMMUNITY_GUIDELINES.title}
+                  {activePolicyModal === 'terms' && TERMS_OF_SERVICE.title}
+                  {activePolicyModal === 'privacy' && PRIVACY_POLICY.title}
                 </Typography>
 
-                <Typography variant="caption" color={colors.textSecondary} style={{ lineHeight: 22 }}>
-                  {activePolicyModal === 'fair_use' &&
-                    'BooffIn connects researchers to published and preprint literature via persistent DOIs, arXiv identifiers, and Open Access metadata. BooffIn does not host or distribute copyrighted publisher PDF documents. All user discussions, highlights, and annotations represent original academic commentary.'}
-                  {activePolicyModal === 'guidelines' &&
-                    'BooffIn is dedicated to professional, respectful, and constructive scientific discourse. Harassment, academic dishonesty, plagiarism, unverified defamation, or impersonation of scholars is strictly prohibited and results in immediate account suspension.'}
-                  {activePolicyModal === 'terms' &&
-                    'By utilizing BooffIn, you agree to comply with all applicable research ethics standards, copyright laws, and intellectual property rights. Users retain ownership of their original research notes and commentaries.'}
-                  {activePolicyModal === 'privacy' &&
-                    'BooffIn protects your personal email, credentials, and settings using Supabase Row Level Security (RLS). We never sell user data, research topics, or browsing patterns to third-party advertising brokers.'}
-                </Typography>
+                <ScrollView style={{ maxHeight: 380, marginVertical: spacing.sm }} showsVerticalScrollIndicator={true}>
+                  {activePolicyModal === 'fair_use' && (
+                    <Typography variant="caption" color={colors.textSecondary} style={{ lineHeight: 22 }}>
+                      BooffIn connects researchers to published and preprint literature via persistent DOIs, arXiv identifiers, and Open Access metadata. BooffIn does not host or distribute copyrighted publisher PDF documents. All user discussions, highlights, and annotations represent original academic commentary.
+                    </Typography>
+                  )}
 
-                <Button
-                  title="Close"
-                  variant="secondary"
-                  onPress={() => setActivePolicyModal(null)}
-                  style={{ marginTop: spacing.lg }}
-                />
+                  {activePolicyModal === 'guidelines' && (
+                    <View>
+                      <Typography variant="caption" color={colors.textSecondary} style={{ lineHeight: 22, marginBottom: 8 }}>
+                        {COMMUNITY_GUIDELINES.summary}
+                      </Typography>
+                      {COMMUNITY_GUIDELINES.sections.map((sec, idx) => (
+                        <View key={idx} style={{ marginTop: 8 }}>
+                          <Typography variant="captionBold" color={colors.textPrimary}>
+                            {sec.title}
+                          </Typography>
+                          {sec.content.map((p, pIdx) => (
+                            <Typography key={pIdx} variant="micro" color={colors.textSecondary} style={{ lineHeight: 18, marginTop: 2 }}>
+                              • {p}
+                            </Typography>
+                          ))}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {activePolicyModal === 'terms' && (
+                    <View>
+                      <Typography variant="caption" color={colors.textSecondary} style={{ lineHeight: 22, marginBottom: 8 }}>
+                        {TERMS_OF_SERVICE.summary}
+                      </Typography>
+                      {TERMS_OF_SERVICE.sections.map((sec, idx) => (
+                        <View key={idx} style={{ marginTop: 8 }}>
+                          <Typography variant="captionBold" color={colors.textPrimary}>
+                            {sec.title}
+                          </Typography>
+                          {sec.content.map((p, pIdx) => (
+                            <Typography key={pIdx} variant="micro" color={colors.textSecondary} style={{ lineHeight: 18, marginTop: 2 }}>
+                              {p}
+                            </Typography>
+                          ))}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {activePolicyModal === 'privacy' && (
+                    <View>
+                      <Typography variant="caption" color={colors.textSecondary} style={{ lineHeight: 22, marginBottom: 8 }}>
+                        {PRIVACY_POLICY.summary}
+                      </Typography>
+                      {PRIVACY_POLICY.sections.map((sec, idx) => (
+                        <View key={idx} style={{ marginTop: 8 }}>
+                          <Typography variant="captionBold" color={colors.textPrimary}>
+                            {sec.title}
+                          </Typography>
+                          {sec.content.map((p, pIdx) => (
+                            <Typography key={pIdx} variant="micro" color={colors.textSecondary} style={{ lineHeight: 18, marginTop: 2 }}>
+                              {p}
+                            </Typography>
+                          ))}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </ScrollView>
+
+                <View style={styles.modalBtnRow}>
+                  {activePolicyModal === 'privacy' && (
+                    <Button
+                      title="Open Web Page"
+                      variant="outline"
+                      onPress={() => {
+                        setActivePolicyModal(null);
+                        router.push('/privacy');
+                      }}
+                      style={{ flex: 1, marginRight: spacing.sm }}
+                    />
+                  )}
+                  {activePolicyModal === 'terms' && (
+                    <Button
+                      title="Open Web Page"
+                      variant="outline"
+                      onPress={() => {
+                        setActivePolicyModal(null);
+                        router.push('/terms');
+                      }}
+                      style={{ flex: 1, marginRight: spacing.sm }}
+                    />
+                  )}
+                  {activePolicyModal === 'guidelines' && (
+                    <Button
+                      title="Open Web Page"
+                      variant="outline"
+                      onPress={() => {
+                        setActivePolicyModal(null);
+                        router.push('/guidelines');
+                      }}
+                      style={{ flex: 1, marginRight: spacing.sm }}
+                    />
+                  )}
+                  <Button
+                    title="Close"
+                    variant="secondary"
+                    onPress={() => setActivePolicyModal(null)}
+                    style={{ flex: 1 }}
+                  />
+                </View>
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -263,7 +394,7 @@ const styles = StyleSheet.create({
   },
   policyModalCard: {
     width: '100%',
-    maxWidth: 520,
+    maxWidth: 600,
     backgroundColor: colors.cardBackground,
     borderRadius: radii.lg,
     padding: spacing.lg,
@@ -294,5 +425,6 @@ const styles = StyleSheet.create({
   },
   modalBtnRow: {
     flexDirection: 'row',
+    marginTop: spacing.md,
   },
 });
