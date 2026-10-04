@@ -84,6 +84,12 @@ export default function RootLayout() {
           animation: 'slide_from_right',
         }}
       />
+      <Stack.Screen
+        name="admin/index"
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 

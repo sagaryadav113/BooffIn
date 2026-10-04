@@ -21,8 +21,8 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
   const pathname = usePathname();
   const currentUser = useAuthStore((s) => s.user);
 
-  // If on mobile (APK or mobile screen width), render directly without desktop shell
-  if (!isDesktop) {
+  // If on mobile (APK or mobile screen width) or on Admin Portal, render directly without public desktop shell
+  if (!isDesktop || pathname.includes('/admin') || pathname === '/admin') {
     return <>{children}</>;
   }
 
