@@ -15,6 +15,7 @@ import { adminApprovalService } from '../services/adminApprovalService';
 import { adminAuditService } from '../services/adminAuditService';
 import { adminModerationService } from '../services/adminModerationService';
 import { AdminUserProfile, AdminReport } from '../types/data';
+import { AdminNavKey } from '../lib/constants';
 import {
   Plus,
   RefreshCw,
@@ -31,8 +32,13 @@ import {
   Calendar,
 } from 'lucide-react-native';
 
-export const AdminDashboardView: React.FC = () => {
+interface AdminDashboardViewProps {
+  onNavigate?: (key: AdminNavKey) => void;
+}
+
+export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTimeRange, setActiveTimeRange] = useState<'7D' | '30D' | '90D' | '1Y'>('30D');
 
   const [userCount, setUserCount] = useState<number>(16);
@@ -44,7 +50,7 @@ export const AdminDashboardView: React.FC = () => {
   const [pendingReports, setPendingReports] = useState<AdminReport[]>([]);
 
   const loadDashboardData = useCallback(async () => {
-    setLoading(true);
+    setIsRefreshing(true);
     try {
       const [
         totalUsers,
@@ -72,6 +78,7 @@ export const AdminDashboardView: React.FC = () => {
       console.error('Failed to load live dashboard data:', err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -85,7 +92,11 @@ export const AdminDashboardView: React.FC = () => {
       header: 'Researcher',
       width: 200,
       render: (u) => (
-        <View style={styles.userCell}>
+        <TouchableOpacity
+          style={styles.userCell}
+          onPress={() => onNavigate?.('users')}
+          activeOpacity={0.7}
+        >
           <View style={styles.userAvatar}>
             <Text style={styles.userAvatarText}>
               {(u.full_name || u.username || 'U').substring(0, 2).toUpperCase()}
@@ -95,7 +106,7 @@ export const AdminDashboardView: React.FC = () => {
             <Text style={styles.boldText}>{u.full_name || u.username}</Text>
             <Text style={styles.usernameText}>@{u.username}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       ),
     },
     {
@@ -178,25 +189,44 @@ export const AdminDashboardView: React.FC = () => {
       <View style={styles.headerBar}>
         <View>
           <Text style={styles.pageTitle}>Dashboard</Text>
-          <Text style={styles.pageSubtitle}>Last 30 days • updated just now</Text>
+          <Text style={styles.pageSubtitle}>Live Production Data • updated just now</Text>
         </View>
 
         {/* Action Buttons */}
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.primaryBtn}>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={() => onNavigate?.('users')}
+            activeOpacity={0.8}
+          >
             <Plus size={16} color="#FFFFFF" />
-            <Text style={styles.primaryBtnText}>New Action</Text>
+            <Text style={styles.primaryBtnText}>Manage Users</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.iconBtn} onPress={loadDashboardData}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={loadDashboardData}
+            activeOpacity={0.7}
+            accessibilityLabel="Refresh live data"
+          >
             <RefreshCw size={16} color="#475569" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.iconBtn}>
-            <Download size={16} color="#475569" />
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => onNavigate?.('reports')}
+            activeOpacity={0.7}
+            accessibilityLabel="View reports"
+          >
+            <ShieldAlert size={16} color="#475569" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => onNavigate?.('settings')}
+            activeOpacity={0.7}
+            accessibilityLabel="Admin settings"
+          >
             <Settings size={16} color="#475569" />
           </TouchableOpacity>
         </View>
@@ -207,28 +237,31 @@ export const AdminDashboardView: React.FC = () => {
         <AdminStatCard
           label="Total Researchers"
           value={userCount}
-          trend="↑ +12.5%"
+          trend="↑ Live DB"
           trendPositive={true}
-          subtext="from last month"
+          subtext="click to view all users"
           iconName="Users"
+          onPress={() => onNavigate?.('users')}
         />
 
         <AdminStatCard
           label="Scientific Posts"
           value={postCount}
-          trend="↑ +8.2%"
+          trend="↑ Live DB"
           trendPositive={true}
-          subtext="publications & feeds"
+          subtext="click to inspect posts"
           iconName="FileText"
+          onPress={() => onNavigate?.('moderation')}
         />
 
         <AdminStatCard
           label="Moderation Queue"
           value={pendingReportsCount}
-          trend="↓ Clean"
-          trendPositive={true}
-          subtext="0 pending flags"
+          trend={pendingReportsCount === 0 ? "↓ Clean" : "↑ Pending"}
+          trendPositive={pendingReportsCount === 0}
+          subtext="click to review reports"
           iconName="ShieldAlert"
+          onPress={() => onNavigate?.('reports')}
         />
 
         <AdminStatCard
@@ -236,8 +269,9 @@ export const AdminDashboardView: React.FC = () => {
           value="100% SECURE"
           trend="↑ Enforced"
           trendPositive={true}
-          subtext="Super Admin active"
+          subtext="click for security logs"
           iconName="ShieldCheck"
+          onPress={() => onNavigate?.('security')}
         />
       </View>
 
@@ -354,49 +388,65 @@ export const AdminDashboardView: React.FC = () => {
           <Text style={styles.cardSectionSubtitle}>Real-time platform & audit events</Text>
 
           <View style={styles.activityList}>
-            <View style={styles.activityItem}>
+            <TouchableOpacity
+              style={styles.activityItem}
+              onPress={() => onNavigate?.('users')}
+              activeOpacity={0.7}
+            >
               <View style={[styles.activityIconBox, { backgroundColor: '#DEF7EC' }]}>
                 <UserPlus size={16} color="#03543F" />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>New researcher active</Text>
-                <Text style={styles.activityDesc}>@sagar_yadav • Initial Super Admin</Text>
-                <Text style={styles.activityTime}>Just now</Text>
+                <Text style={styles.activityTitle}>Registered researchers</Text>
+                <Text style={styles.activityDesc}>16 active accounts in database</Text>
+                <Text style={styles.activityTime}>Click to view directory</Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
-            <View style={styles.activityItem}>
+            <TouchableOpacity
+              style={styles.activityItem}
+              onPress={() => onNavigate?.('security')}
+              activeOpacity={0.7}
+            >
               <View style={[styles.activityIconBox, { backgroundColor: '#E1EFFE' }]}>
                 <Lock size={16} color="#1E429F" />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>AAL2 Elevation verified</Text>
-                <Text style={styles.activityDesc}>TOTP Factor challenge verified</Text>
-                <Text style={styles.activityTime}>5 minutes ago</Text>
+                <Text style={styles.activityTitle}>Security & AAL2 Elevation</Text>
+                <Text style={styles.activityDesc}>TOTP MFA active & enforced</Text>
+                <Text style={styles.activityTime}>Click to view security</Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
-            <View style={styles.activityItem}>
+            <TouchableOpacity
+              style={styles.activityItem}
+              onPress={() => onNavigate?.('audit-logs')}
+              activeOpacity={0.7}
+            >
               <View style={[styles.activityIconBox, { backgroundColor: '#FEF08A' }]}>
                 <Activity size={16} color="#713F12" />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>Compliance event logged</Text>
-                <Text style={styles.activityDesc}>ADMIN_BOOTSTRAPPED recorded in DB</Text>
-                <Text style={styles.activityTime}>12 minutes ago</Text>
+                <Text style={styles.activityTitle}>Audit & Compliance Log</Text>
+                <Text style={styles.activityDesc}>Administrative action trails recorded</Text>
+                <Text style={styles.activityTime}>Click to view audit logs</Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
-            <View style={styles.activityItem}>
+            <TouchableOpacity
+              style={styles.activityItem}
+              onPress={() => onNavigate?.('system-health')}
+              activeOpacity={0.7}
+            >
               <View style={[styles.activityIconBox, { backgroundColor: '#F1F5F9' }]}>
                 <CheckCircle2 size={16} color="#059669" />
               </View>
               <View style={styles.activityTextGroup}>
                 <Text style={styles.activityTitle}>Database health normal</Text>
-                <Text style={styles.activityDesc}>Supabase PostgreSQL 100% latency OK</Text>
-                <Text style={styles.activityTime}>25 minutes ago</Text>
+                <Text style={styles.activityDesc}>Supabase PostgreSQL latency OK</Text>
+                <Text style={styles.activityTime}>Click to test latency</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
       </View>

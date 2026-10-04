@@ -15,6 +15,7 @@ interface AdminStatCardProps {
   trendPositive?: boolean;
   iconName?: keyof typeof Icons;
   variant?: 'default' | 'emerald' | 'warning' | 'danger' | 'info';
+  onPress?: () => void;
 }
 
 export const AdminStatCard: React.FC<AdminStatCardProps> = ({
@@ -25,37 +26,51 @@ export const AdminStatCard: React.FC<AdminStatCardProps> = ({
   trendPositive = true,
   iconName,
   variant = 'default',
+  onPress,
 }) => {
   // Resolve Lucide Icon
   const IconComponent = iconName && (Icons[iconName] as any) ? (Icons[iconName] as any) : null;
 
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardContent}>
-        {IconComponent ? (
-          <View style={styles.iconBox}>
-            <IconComponent size={20} color={ADMIN_COLORS.emeraldDark} />
-          </View>
-        ) : null}
+  const content = (
+    <View style={styles.cardContent}>
+      {IconComponent ? (
+        <View style={styles.iconBox}>
+          <IconComponent size={20} color={ADMIN_COLORS.emeraldDark} />
+        </View>
+      ) : null}
 
-        <View style={styles.textContainer}>
-          <Text style={styles.label}>{label}</Text>
-          <Text style={styles.value}>{value}</Text>
-          
-          <View style={styles.footerRow}>
-            {trend ? (
-              <View style={styles.trendRow}>
-                <Text style={[styles.trendText, trendPositive ? styles.trendUp : styles.trendDown]}>
-                  {trend}
-                </Text>
-              </View>
-            ) : null}
-            {subtext ? <Text style={styles.subtext} numberOfLines={1}>{subtext}</Text> : null}
-          </View>
+      <View style={styles.textContainer}>
+        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.value}>{value}</Text>
+        
+        <View style={styles.footerRow}>
+          {trend ? (
+            <View style={styles.trendRow}>
+              <Text style={[styles.trendText, trendPositive ? styles.trendUp : styles.trendDown]}>
+                {trend}
+              </Text>
+            </View>
+          ) : null}
+          {subtext ? <Text style={styles.subtext} numberOfLines={1}>{subtext}</Text> : null}
         </View>
       </View>
     </View>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        style={[styles.card, styles.cardInteractive]}
+        onPress={onPress}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+      >
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return <View style={styles.card}>{content}</View>;
 };
 
 const styles = StyleSheet.create({
@@ -72,6 +87,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 3,
     elevation: 1,
+  },
+  cardInteractive: {
+    cursor: 'pointer' as any,
+    borderColor: '#CBD5E1',
   },
   cardContent: {
     flexDirection: 'row',

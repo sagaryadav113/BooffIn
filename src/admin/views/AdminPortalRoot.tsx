@@ -79,7 +79,7 @@ export const AdminPortalRoot: React.FC = () => {
   const renderActiveView = () => {
     switch (activeKey) {
       case 'dashboard':
-        return <AdminDashboardView />;
+        return <AdminDashboardView onNavigate={setActiveKey} />;
       case 'users':
         return <AdminUsersView />;
       case 'reports':
