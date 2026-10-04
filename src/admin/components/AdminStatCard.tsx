@@ -3,7 +3,7 @@
 // ============================================================================
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { ADMIN_COLORS } from '../lib/constants';
 import * as Icons from 'lucide-react-native';
 
