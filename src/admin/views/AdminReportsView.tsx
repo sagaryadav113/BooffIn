@@ -122,7 +122,7 @@ export const AdminReportsView: React.FC = () => {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.pageTitle}>User & Content Reports</Text>
-          <Text style={styles.pageSubtitle}>Authoritative data from public.content_reports</Text>
+          <Text style={styles.pageSubtitle}>Authoritative data from public.reports</Text>
         </View>
 
         <TouchableOpacity style={styles.refreshBtn} onPress={() => loadReports(statusFilter)}>

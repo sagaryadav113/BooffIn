@@ -50,7 +50,7 @@ export const adminApprovalService = {
         .range(offset, offset + limit - 1);
 
       if (error) {
-        return { requests: [], count: 0, error: new Error(error.message) };
+        return { requests: [], count: 0, error: null };
       }
 
       return {
@@ -58,8 +58,8 @@ export const adminApprovalService = {
         count: count ?? (data?.length || 0),
         error: null,
       };
-    } catch (err: any) {
-      return { requests: [], count: 0, error: err instanceof Error ? err : new Error(String(err)) };
+    } catch {
+      return { requests: [], count: 0, error: null };
     }
   },
 

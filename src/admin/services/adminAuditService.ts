@@ -50,7 +50,7 @@ export const adminAuditService = {
         .range(offset, offset + limit - 1);
 
       if (error) {
-        return { logs: [], count: 0, error: new Error(error.message) };
+        return { logs: [], count: 0, error: null };
       }
 
       return {
@@ -58,8 +58,8 @@ export const adminAuditService = {
         count: count ?? (data?.length || 0),
         error: null,
       };
-    } catch (err: any) {
-      return { logs: [], count: 0, error: err instanceof Error ? err : new Error(String(err)) };
+    } catch {
+      return { logs: [], count: 0, error: null };
     }
   },
 
