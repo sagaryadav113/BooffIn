@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — MODERATION SERVICE (STAGE 2 REAL DATA WIRING)
+// BOOFFIN ADMIN PORTAL — MODERATION SERVICE (SCHEMA ALIGNED)
 // ============================================================================
 
 import { supabase } from '../../api/client';
@@ -22,12 +22,14 @@ export const adminModerationService = {
         .from('posts')
         .select(`
           id,
-          user_id,
+          author_id,
           content,
           created_at,
-          profiles:user_id (
+          author:profiles!author_id (
+            id,
             username,
-            display_name
+            full_name,
+            avatar_url
           )
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
@@ -37,8 +39,18 @@ export const adminModerationService = {
         return { posts: [], count: 0, error: new Error(error.message) };
       }
 
+      const mappedPosts = (data || []).map((p: any) => ({
+        id: p.id,
+        content: p.content,
+        created_at: p.created_at,
+        user_id: p.author_id,
+        author_name: p.author?.full_name || p.author?.username || 'Researcher',
+        author_username: p.author?.username || 'anonymous',
+        avatar_url: p.author?.avatar_url,
+      }));
+
       return {
-        posts: data || [],
+        posts: mappedPosts,
         count: count ?? (data?.length || 0),
         error: null,
       };
@@ -56,7 +68,7 @@ export const adminModerationService = {
       // 1. Verify target post exists
       const { data: targetPost, error: fetchErr } = await supabase
         .from('posts')
-        .select('id, user_id')
+        .select('id, author_id')
         .eq('id', postId)
         .maybeSingle();
 
@@ -83,7 +95,7 @@ export const adminModerationService = {
         targetType: 'POST',
         targetId: postId,
         reason: reason || 'Violation of academic platform community standards',
-        metadata: { author_user_id: targetPost.user_id },
+        metadata: { author_user_id: targetPost.author_id },
       });
 
       return { error: null };

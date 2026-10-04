@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — USERS DIRECTORY VIEW (STAGE 2)
+// BOOFFIN ADMIN PORTAL — USERS DIRECTORY VIEW (LIGHT SAAS METIS STYLE)
 // ============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -9,6 +9,7 @@ import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminUserService } from '../services/adminUserService';
 import { AdminUserProfile } from '../types/data';
+import { Search, RotateCcw, UserCheck, Shield, Lock, Award, Mail } from 'lucide-react-native';
 
 export const AdminUsersView: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -21,7 +22,7 @@ export const AdminUsersView: React.FC = () => {
     setLoading(true);
     setErrorMessage(null);
 
-    const res = await adminUserService.listUsers({ search: query, limit: 25 });
+    const res = await adminUserService.listUsers({ search: query, limit: 50 });
     if (res.error) {
       setErrorMessage(`Authorization / Query Error: ${res.error.message}`);
       setUsers([]);
@@ -42,55 +43,111 @@ export const AdminUsersView: React.FC = () => {
   };
 
   const columns: ColumnDef<AdminUserProfile>[] = [
-    { key: 'username', header: 'User', width: 180, render: (u) => (
-      <View>
-        <Text style={styles.usernameText}>@{u.username}</Text>
-        <Text style={styles.nameText}>{u.display_name || 'No Name'}</Text>
-      </View>
-    )},
-    { key: 'institution', header: 'Institution', width: 160, render: (u) => (
-      <Text style={styles.cellText}>{u.institution || '—'}</Text>
-    )},
-    { key: 'field_of_study', header: 'Field of Study', width: 160, render: (u) => (
-      <Text style={styles.cellText}>{u.field_of_study || '—'}</Text>
-    )},
-    { key: 'is_orcid_verified', header: 'ORCID Verified', width: 130, render: (u) => (
-      <AdminBadge
-        label={u.is_orcid_verified ? 'VERIFIED' : 'UNLINKED'}
-        variant={u.is_orcid_verified ? 'emerald' : 'neutral'}
-        size="sm"
-      />
-    )},
-    { key: 'is_private', header: 'Privacy', width: 100, render: (u) => (
-      <AdminBadge
-        label={u.is_private ? 'PRIVATE' : 'PUBLIC'}
-        variant={u.is_private ? 'warning' : 'info'}
-        size="sm"
-      />
-    )},
-    { key: 'created_at', header: 'Registered', width: 120, render: (u) => (
-      <Text style={styles.cellMuted}>{new Date(u.created_at).toLocaleDateString()}</Text>
-    )},
+    {
+      key: 'username',
+      header: 'Researcher Profile',
+      width: 220,
+      render: (u) => (
+        <View style={styles.userCell}>
+          <View style={styles.userAvatar}>
+            <Text style={styles.userAvatarText}>
+              {(u.full_name || u.username || 'U').substring(0, 2).toUpperCase()}
+            </Text>
+          </View>
+          <View>
+            <Text style={styles.nameText}>{u.full_name || u.username}</Text>
+            <Text style={styles.usernameText}>@{u.username}</Text>
+          </View>
+        </View>
+      ),
+    },
+    {
+      key: 'institution',
+      header: 'Institution',
+      width: 180,
+      render: (u) => <Text style={styles.cellText}>{u.institution || '—'}</Text>,
+    },
+    {
+      key: 'field_of_study',
+      header: 'Field of Study',
+      width: 180,
+      render: (u) => <Text style={styles.cellText}>{u.field_of_study || '—'}</Text>,
+    },
+    {
+      key: 'is_orcid_verified',
+      header: 'ORCID Verified',
+      width: 140,
+      render: (u) => (
+        <AdminBadge
+          label={u.is_orcid_verified ? 'VERIFIED' : 'UNLINKED'}
+          variant={u.is_orcid_verified ? 'emerald' : 'neutral'}
+          size="sm"
+        />
+      ),
+    },
+    {
+      key: 'is_private',
+      header: 'Privacy',
+      width: 110,
+      render: (u) => (
+        <AdminBadge
+          label={u.is_private ? 'PRIVATE' : 'PUBLIC'}
+          variant={u.is_private ? 'warning' : 'info'}
+          size="sm"
+        />
+      ),
+    },
+    {
+      key: 'created_at',
+      header: 'Registered At',
+      width: 130,
+      render: (u) => (
+        <Text style={styles.cellMuted}>
+          {new Date(u.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+        </Text>
+      ),
+    },
   ];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Search and Filters */}
-      <View style={styles.searchBar}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by username or display name..."
-          placeholderTextColor={ADMIN_COLORS.textMuted}
-          value={search}
-          onChangeText={setSearch}
-          onSubmitEditing={handleSearch}
-        />
-        <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-          <Text style={styles.searchBtnText}>Search</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.resetBtn} onPress={() => { setSearch(''); loadUsers(''); }}>
-          <Text style={styles.resetBtnText}>Reset</Text>
-        </TouchableOpacity>
+      {/* Header section */}
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.pageTitle}>Researchers Directory</Text>
+          <Text style={styles.pageSubtitle}>Authoritative profiles from public.profiles ({totalCount} total)</Text>
+        </View>
+      </View>
+
+      {/* Search and Filters Bar */}
+      <View style={styles.searchCard}>
+        <View style={styles.searchInputGroup}>
+          <Search size={16} color="#94A3B8" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search researchers by username or full name..."
+            placeholderTextColor="#94A3B8"
+            value={search}
+            onChangeText={setSearch}
+            onSubmitEditing={handleSearch}
+          />
+        </View>
+
+        <View style={styles.buttonGroup}>
+          <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+            <Text style={styles.searchBtnText}>Search</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.resetBtn}
+            onPress={() => {
+              setSearch('');
+              loadUsers('');
+            }}
+          >
+            <RotateCcw size={14} color="#475569" />
+            <Text style={styles.resetBtnText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {errorMessage ? (
@@ -99,19 +156,20 @@ export const AdminUsersView: React.FC = () => {
         </View>
       ) : null}
 
-      {/* Summary Header */}
-      <View style={styles.headerInfo}>
-        <Text style={styles.headerTitle}>Platform Users ({totalCount})</Text>
-        <Text style={styles.headerSubtitle}>Authoritative data from public.profiles</Text>
+      {/* Table Section */}
+      <View style={styles.tableCard}>
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#059669" />
+          </View>
+        ) : (
+          <AdminDataTable
+            columns={columns}
+            data={users}
+            emptyMessage="No researcher profiles match your search."
+          />
+        )}
       </View>
-
-      {loading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={ADMIN_COLORS.emeraldPrimary} />
-        </View>
-      ) : (
-        <AdminDataTable columns={columns} data={users} emptyMessage={errorMessage ? 'Data inaccessible due to authorization error.' : 'No matching users found in database.'} />
-      )}
     </ScrollView>
   );
 };
@@ -119,90 +177,156 @@ export const AdminUsersView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  searchBar: {
-    flexDirection: 'row',
-    gap: 10,
+  headerRow: {
     marginBottom: 20,
+  },
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+  },
+  pageSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  searchCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 20,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+  },
+  searchInputGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 40,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    backgroundColor: ADMIN_COLORS.bgCard,
-    borderWidth: 1,
-    borderColor: ADMIN_COLORS.borderSubtle,
-    borderRadius: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: ADMIN_COLORS.textPrimary,
     fontSize: 13,
+    color: '#0F172A',
+    padding: 0,
+    outlineStyle: 'none' as any,
+  },
+  buttonGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   searchBtn: {
-    backgroundColor: ADMIN_COLORS.emeraldPrimary,
-    paddingHorizontal: 18,
-    borderRadius: 6,
-    justifyContent: 'center',
+    backgroundColor: '#059669',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
   searchBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
     fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   resetBtn: {
-    backgroundColor: ADMIN_COLORS.bgHover,
-    borderColor: ADMIN_COLORS.borderStrong,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
+    borderColor: '#E2E8F0',
     paddingHorizontal: 14,
-    borderRadius: 6,
-    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 8,
   },
   resetBtnText: {
-    color: ADMIN_COLORS.textSecondary,
-    fontSize: 12,
-  },
-  errorBox: {
-    backgroundColor: ADMIN_COLORS.dangerBg,
-    borderColor: ADMIN_COLORS.dangerBorder,
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: ADMIN_COLORS.danger,
-    fontSize: 12,
-  },
-  headerInfo: {
-    marginBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: ADMIN_COLORS.textPrimary,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: ADMIN_COLORS.textMuted,
-    marginTop: 2,
-  },
-  usernameText: {
-    fontWeight: '600',
-    color: ADMIN_COLORS.textPrimary,
     fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  tableCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 30,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+  },
+  centerContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  userAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#DEF7EC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BCF0DA',
+  },
+  userAvatarText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#03543F',
   },
   nameText: {
-    color: ADMIN_COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  usernameText: {
+    fontSize: 11,
+    color: '#64748B',
   },
   cellText: {
-    color: ADMIN_COLORS.textPrimary,
     fontSize: 13,
+    color: '#334155',
   },
   cellMuted: {
-    color: ADMIN_COLORS.textMuted,
     fontSize: 12,
+    color: '#64748B',
   },
-  loader: {
-    padding: 40,
-    alignItems: 'center',
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#991B1B',
+    fontWeight: '500',
   },
 });

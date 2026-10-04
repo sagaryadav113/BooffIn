@@ -140,19 +140,19 @@ export const AdminSystemHealthView: React.FC = () => {
     { key: 'service', header: 'Subsystem / Service', width: 220, render: (m) => (
       <Text style={styles.boldText}>{m.service}</Text>
     )},
-    { key: 'status', header: 'Health Status', width: 120, render: (m) => (
+    { key: 'status', header: 'Health Status', width: 130, render: (m) => (
       <AdminBadge
         label={m.status}
         variant={m.status === 'HEALTHY' ? 'emerald' : m.status === 'DEGRADED' ? 'warning' : 'danger'}
         size="sm"
       />
     )},
-    { key: 'latencyMs', header: 'Latency', width: 100, render: (m) => (
+    { key: 'latencyMs', header: 'Latency', width: 110, render: (m) => (
       <Text style={[styles.cellText, m.status !== 'HEALTHY' && { color: ADMIN_COLORS.warning }]}>
         {m.latencyMs} ms
       </Text>
     )},
-    { key: 'details', header: 'Operational Details', width: 300, render: (m) => (
+    { key: 'details', header: 'Operational Details', width: 320, render: (m) => (
       <Text style={styles.cellSecondary} numberOfLines={1}>{m.details || '—'}</Text>
     )},
   ];
@@ -162,7 +162,7 @@ export const AdminSystemHealthView: React.FC = () => {
       <View style={styles.headerRow}>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle}>Backend Services & API Subsystems</Text>
-          <Text style={styles.headerSubtitle}>Real-time heartbeat & infrastructure connectivity monitoring (Environment: TEST)</Text>
+          <Text style={styles.headerSubtitle}>Real-time heartbeat & infrastructure connectivity monitoring (Environment: Production)</Text>
         </View>
         <TouchableOpacity style={styles.refreshBtn} onPress={checkSubsystemHealth}>
           <Text style={styles.refreshBtnText}>Run Health Check</Text>
@@ -194,25 +194,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: ADMIN_COLORS.textPrimary,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     color: ADMIN_COLORS.textMuted,
     marginTop: 2,
   },
   refreshBtn: {
-    backgroundColor: ADMIN_COLORS.bgHover,
-    borderWidth: 1,
-    borderColor: ADMIN_COLORS.borderStrong,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    backgroundColor: ADMIN_COLORS.actionBlue,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
   refreshBtnText: {
-    color: ADMIN_COLORS.textPrimary,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -222,16 +220,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   cellText: {
-    color: ADMIN_COLORS.emeraldLight,
+    color: ADMIN_COLORS.emeraldPrimary,
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 13,
   },
   cellSecondary: {
     color: ADMIN_COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
   },
   loader: {
-    padding: 40,
+    padding: 60,
     alignItems: 'center',
   },
 });
+

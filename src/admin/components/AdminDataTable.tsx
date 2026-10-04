@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — HIGH-DENSITY DATA TABLE COMPONENT
+// BOOFFIN ADMIN PORTAL — HIGH-DENSITY DATA TABLE (LIGHT SAAS THEME)
 // ============================================================================
 
 import React from 'react';
@@ -54,6 +54,7 @@ export function AdminDataTable<T extends Record<string, any>>({
                 key={item.id ?? rowIndex}
                 style={[
                   styles.bodyRow,
+                  rowIndex === data.length - 1 && styles.lastRow,
                   rowIndex % 2 === 1 && styles.alternateRow,
                 ]}
               >
@@ -85,59 +86,69 @@ export function AdminDataTable<T extends Record<string, any>>({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: ADMIN_COLORS.bgCard,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.borderSubtle,
-    borderRadius: 8,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
     overflow: 'hidden',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
   },
   table: {
     minWidth: '100%',
   },
   headerRow: {
     flexDirection: 'row',
-    backgroundColor: ADMIN_COLORS.bgSecondary,
+    backgroundColor: '#F8FAFC',
     borderBottomWidth: 1,
-    borderBottomColor: ADMIN_COLORS.borderSubtle,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    borderBottomColor: '#E2E8F0',
   },
   headerCell: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     justifyContent: 'center',
   },
   headerText: {
     fontSize: 11,
     fontWeight: '700',
-    color: ADMIN_COLORS.textSecondary,
+    color: '#64748B',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   bodyRow: {
     flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: ADMIN_COLORS.borderSubtle,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    borderBottomColor: '#F1F5F9',
   },
   alternateRow: {
-    backgroundColor: 'rgba(255, 255, 255, 0.015)',
+    backgroundColor: '#FAFAFA',
+  },
+  lastRow: {
+    borderBottomWidth: 0,
   },
   bodyCell: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     justifyContent: 'center',
   },
   cellText: {
     fontSize: 13,
-    color: ADMIN_COLORS.textPrimary,
+    color: '#1E293B',
+    fontWeight: '500',
   },
   emptyContainer: {
-    padding: 32,
+    paddingVertical: 36,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyText: {
     fontSize: 13,
-    color: ADMIN_COLORS.textMuted,
+    color: '#94A3B8',
+    fontStyle: 'normal',
+    fontWeight: '500',
   },
 });

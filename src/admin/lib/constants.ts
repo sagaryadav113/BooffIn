@@ -1,57 +1,66 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — CONSTANTS & STYLING TOKENS
+// BOOFFIN ADMIN PORTAL — CONSTANTS & STYLING TOKENS (LIGHT SAAS THEME)
 // ============================================================================
 
 export const ADMIN_COLORS = {
-  // Foundation (Black & White)
-  bgPrimary: '#0A0A0C',
-  bgSecondary: '#121316',
-  bgCard: '#18191E',
-  bgHover: '#202228',
-  bgActive: '#262932',
+  // Light SaaS Canvas & Surfaces
+  bgPrimary: '#F8FAFC',       // Slate 50 clean background
+  bgSecondary: '#FFFFFF',     // Pure white surface
+  bgCard: '#FFFFFF',          // Elevated white card
+  bgHover: '#F1F5F9',         // Slate 100 on hover
+  bgActive: '#ECFDF5',        // Emerald 50 on active
+  bgSidebar: '#FFFFFF',       // Clean white sidebar
+  bgHeader: '#FFFFFF',        // Clean white top bar
   
-  // Borders
-  borderSubtle: '#272A34',
-  borderStrong: '#3A3F4D',
+  // Clean Borders & Dividers
+  borderSubtle: '#E2E8F0',    // Slate 200 light border
+  borderStrong: '#CBD5E1',    // Slate 300 focus/active border
   
-  // Typography
-  textPrimary: '#FFFFFF',
-  textSecondary: '#94A3B8',
-  textMuted: '#64748B',
+  // High-Contrast Typography
+  textPrimary: '#0F172A',     // Slate 900 primary heading & body
+  textSecondary: '#475569',   // Slate 600 descriptive text
+  textMuted: '#94A3B8',       // Slate 400 captions & placeholders
   
-  // BooffIn Emerald Accent
-  emeraldPrimary: '#059669',
-  emeraldDark: '#064E3B',
-  emeraldLight: '#10B981',
-  emeraldBg: 'rgba(5, 150, 105, 0.12)',
-  emeraldBorder: 'rgba(5, 150, 105, 0.3)',
+  // BooffIn Emerald Accents
+  emeraldPrimary: '#059669',  // Primary Emerald
+  emeraldDark: '#064E3B',    // Deep Emerald (BooffIn Brand)
+  emeraldLight: '#10B981',   // Vibrant Emerald
+  emeraldBg: '#ECFDF5',      // Soft Emerald surface
+  emeraldBorder: '#A7F3D0',  // Emerald border pill
   
-  // Status Accents
+  // Action & Status Accents
+  actionBlue: '#2563EB',      // Modern Blue action button
+  actionBlueHover: '#1D4ED8',
+  actionBlueBg: '#EFF6FF',
+  
   danger: '#EF4444',
-  dangerBg: 'rgba(239, 68, 68, 0.12)',
-  dangerBorder: 'rgba(239, 68, 68, 0.3)',
+  dangerBg: '#FEF2F2',
+  dangerBorder: '#FECACA',
   
   warning: '#F59E0B',
-  warningBg: 'rgba(245, 158, 11, 0.12)',
-  warningBorder: 'rgba(245, 158, 11, 0.3)',
+  warningBg: '#FFFBEB',
+  warningBorder: '#FDE68A',
   
-  info: '#3B82F6',
-  infoBg: 'rgba(59, 130, 246, 0.12)',
-  infoBorder: 'rgba(59, 130, 246, 0.3)',
+  info: '#2563EB',
+  infoBg: '#EFF6FF',
+  infoBorder: '#BFDBFE',
+  
+  neutralBg: '#F1F5F9',
+  neutralBorder: '#E2E8F0',
 };
 
 export const ADMIN_NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid', permission: null },
-  { key: 'users', label: 'Users', icon: 'users', permission: 'users.read' },
-  { key: 'reports', label: 'Reports', icon: 'flag', permission: 'reports.read' },
-  { key: 'moderation', label: 'Moderation', icon: 'shield', permission: 'posts.read' },
-  { key: 'approvals', label: 'Approvals', icon: 'check-circle', permission: 'approvals.read' },
-  { key: 'team', label: 'Team', icon: 'user-check', permission: 'admins.read' },
-  { key: 'audit-logs', label: 'Audit Logs', icon: 'file-text', permission: 'audit_logs.read' },
-  { key: 'security', label: 'Security', icon: 'lock', permission: 'security.read' },
-  { key: 'analytics', label: 'Analytics', icon: 'bar-chart', permission: null },
-  { key: 'system-health', label: 'System Health', icon: 'activity', permission: 'system_health.read' },
-  { key: 'settings', label: 'Settings', icon: 'settings', permission: null },
+  { key: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', permission: null },
+  { key: 'users', label: 'Users', icon: 'Users', permission: 'users.read' },
+  { key: 'reports', label: 'Reports', icon: 'Flag', permission: 'reports.read' },
+  { key: 'moderation', label: 'Moderation', icon: 'ShieldAlert', permission: 'posts.read' },
+  { key: 'approvals', label: 'Approvals', icon: 'CheckSquare', permission: 'approvals.read' },
+  { key: 'team', label: 'Team', icon: 'UserCheck', permission: 'admins.read' },
+  { key: 'audit-logs', label: 'Audit Logs', icon: 'FileText', permission: 'audit_logs.read' },
+  { key: 'security', label: 'Security', icon: 'ShieldCheck', permission: 'security.read' },
+  { key: 'analytics', label: 'Analytics', icon: 'TrendingUp', permission: null },
+  { key: 'system-health', label: 'System Health', icon: 'Activity', permission: 'system_health.read' },
+  { key: 'settings', label: 'Settings', icon: 'Settings', permission: null },
 ] as const;
 
 export type AdminNavKey = typeof ADMIN_NAV_ITEMS[number]['key'];

@@ -5,14 +5,15 @@
 export interface AdminUserProfile {
   id: string;
   username: string;
-  display_name: string;
+  full_name: string | null;
+  display_name?: string | null;
   email?: string;
-  bio?: string;
-  avatar_url?: string;
+  bio?: string | null;
+  avatar_url?: string | null;
   is_private: boolean;
-  institution?: string;
-  field_of_study?: string;
-  orcid?: string;
+  institution?: string | null;
+  field_of_study?: string | null;
+  orcid?: string | null;
   is_orcid_verified?: boolean;
   followers_count?: number;
   following_count?: number;

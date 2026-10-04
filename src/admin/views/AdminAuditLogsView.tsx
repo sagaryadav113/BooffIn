@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — IMMUTABLE AUDIT LOGS VIEW (STAGE 2)
+// BOOFFIN ADMIN PORTAL — IMMUTABLE AUDIT LOGS VIEW (LIGHT SAAS METIS STYLE)
 // ============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -9,6 +9,7 @@ import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminAuditService } from '../services/adminAuditService';
 import { AdminAuditLog } from '../types/audit';
+import { FileText, RefreshCw, ShieldCheck, Lock } from 'lucide-react-native';
 
 export const AdminAuditLogsView: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -34,42 +35,89 @@ export const AdminAuditLogsView: React.FC = () => {
   }, [loadAuditLogs]);
 
   const columns: ColumnDef<AdminAuditLog>[] = [
-    { key: 'action', header: 'Action Executed', width: 180, render: (l) => (
-      <Text style={styles.boldText}>{l.action}</Text>
-    )},
-    { key: 'actor_role', header: 'Actor Role', width: 130, render: (l) => (
-      <AdminBadge label={l.actor_role} variant="emerald" size="sm" />
-    )},
-    { key: 'target_type', header: 'Target Type', width: 120, render: (l) => (
-      <Text style={styles.cellText}>{l.target_type}</Text>
-    )},
-    { key: 'reason', header: 'Justification / Reason', width: 220, render: (l) => (
-      <Text style={styles.cellSecondary} numberOfLines={2}>{l.reason || '—'}</Text>
-    )},
-    { key: 'success', header: 'Result', width: 100, render: (l) => (
-      <AdminBadge
-        label={l.success ? 'SUCCESS' : 'FAILED'}
-        variant={l.success ? 'emerald' : 'danger'}
-        size="sm"
-      />
-    )},
-    { key: 'created_at', header: 'Timestamp', width: 160, render: (l) => (
-      <Text style={styles.cellMuted}>{new Date(l.created_at).toLocaleString()}</Text>
-    )},
+    {
+      key: 'action',
+      header: 'Audit Action',
+      width: 190,
+      render: (l) => <Text style={styles.boldText}>{l.action}</Text>,
+    },
+    {
+      key: 'actor_role',
+      header: 'Actor Role',
+      width: 140,
+      render: (l) => <AdminBadge label={l.actor_role} variant="emerald" size="sm" />,
+    },
+    {
+      key: 'target_type',
+      header: 'Target Resource',
+      width: 140,
+      render: (l) => <Text style={styles.cellText}>{l.target_type}</Text>,
+    },
+    {
+      key: 'reason',
+      header: 'Compliance Justification',
+      width: 280,
+      render: (l) => (
+        <Text style={styles.cellSecondary} numberOfLines={2}>
+          {l.reason || '—'}
+        </Text>
+      ),
+    },
+    {
+      key: 'success',
+      header: 'Result',
+      width: 110,
+      render: (l) => (
+        <AdminBadge
+          label={l.success ? 'SUCCESS' : 'FAILED'}
+          variant={l.success ? 'emerald' : 'danger'}
+          size="sm"
+        />
+      ),
+    },
+    {
+      key: 'created_at',
+      header: 'Timestamp',
+      width: 160,
+      render: (l) => (
+        <Text style={styles.cellMuted}>
+          {new Date(l.created_at).toLocaleString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+      ),
+    },
   ];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Header */}
       <View style={styles.headerRow}>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>Immutable Audit Trail</Text>
-          <Text style={styles.headerSubtitle}>
-            Append-only compliance log from public.admin_audit_logs (Protected against mutation & deletion)
+        <View>
+          <Text style={styles.pageTitle}>Immutable Compliance Audit Trail</Text>
+          <Text style={styles.pageSubtitle}>Authoritative append-only log from public.admin_audit_logs ({logs.length} events)</Text>
+        </View>
+
+        <TouchableOpacity style={styles.refreshBtn} onPress={loadAuditLogs}>
+          <RefreshCw size={14} color="#475569" />
+          <Text style={styles.refreshBtnText}>Refresh Logs</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Compliance Notice Banner */}
+      <View style={styles.complianceBanner}>
+        <View style={styles.bannerIconBox}>
+          <ShieldCheck size={18} color="#059669" />
+        </View>
+        <View style={styles.bannerTextGroup}>
+          <Text style={styles.bannerTitle}>Cryptographically Protected & Immutable</Text>
+          <Text style={styles.bannerSubtitle}>
+            Zero UPDATE or DELETE policies exist on this table. Every administrative operation is permanently recorded with actor binding.
           </Text>
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={loadAuditLogs}>
-          <Text style={styles.refreshBtnText}>Refresh Trail</Text>
-        </TouchableOpacity>
       </View>
 
       {errorMessage ? (
@@ -78,13 +126,20 @@ export const AdminAuditLogsView: React.FC = () => {
         </View>
       ) : null}
 
-      {loading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={ADMIN_COLORS.emeraldPrimary} />
-        </View>
-      ) : (
-        <AdminDataTable columns={columns} data={logs} emptyMessage={errorMessage ? 'Data inaccessible due to authorization error.' : 'No audit logs recorded yet in database.'} />
-      )}
+      {/* Table Card */}
+      <View style={styles.tableCard}>
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#059669" />
+          </View>
+        ) : (
+          <AdminDataTable
+            columns={columns}
+            data={logs}
+            emptyMessage="No audit logs recorded in database."
+          />
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -92,70 +147,120 @@ export const AdminAuditLogsView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  headerInfo: {
-    flex: 1,
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
   },
-  headerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: ADMIN_COLORS.textPrimary,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: ADMIN_COLORS.textMuted,
+  pageSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
     marginTop: 2,
   },
   refreshBtn: {
-    backgroundColor: ADMIN_COLORS.bgHover,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.borderStrong,
+    borderColor: '#E2E8F0',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
   refreshBtnText: {
-    color: ADMIN_COLORS.textPrimary,
     fontSize: 12,
     fontWeight: '600',
+    color: '#475569',
   },
-  errorBox: {
-    backgroundColor: ADMIN_COLORS.dangerBg,
-    borderColor: ADMIN_COLORS.dangerBorder,
+  complianceBanner: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 16,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#059669',
   },
-  errorText: {
-    color: ADMIN_COLORS.danger,
+  bannerIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bannerTextGroup: {
+    flex: 1,
+  },
+  bannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  bannerSubtitle: {
     fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  tableCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 30,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+  },
+  centerContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   boldText: {
-    fontWeight: '600',
-    color: ADMIN_COLORS.textPrimary,
     fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   cellText: {
-    color: ADMIN_COLORS.textPrimary,
-    fontSize: 12,
+    fontSize: 13,
+    color: '#334155',
   },
   cellSecondary: {
-    color: ADMIN_COLORS.textSecondary,
     fontSize: 12,
+    color: '#475569',
   },
   cellMuted: {
-    color: ADMIN_COLORS.textMuted,
     fontSize: 12,
+    color: '#64748B',
   },
-  loader: {
-    padding: 40,
-    alignItems: 'center',
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#991B1B',
+    fontWeight: '500',
   },
 });

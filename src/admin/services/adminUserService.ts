@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — USER MANAGEMENT SERVICE (STAGE 2 REAL DATA WIRING)
+// BOOFFIN ADMIN PORTAL — USER MANAGEMENT SERVICE (SCHEMA ALIGNED)
 // ============================================================================
 
 import { supabase } from '../../api/client';
@@ -8,7 +8,7 @@ import { AdminUserProfile } from '../types/data';
 const USER_SELECT_FIELDS = `
   id,
   username,
-  display_name,
+  full_name,
   bio,
   avatar_url,
   is_private,
@@ -43,7 +43,7 @@ export const adminUserService = {
 
       if (options?.search && options.search.trim()) {
         const sanitizedSearch = options.search.trim().replace(/[%_]/g, '');
-        query = query.or(`username.ilike.%${sanitizedSearch}%,display_name.ilike.%${sanitizedSearch}%`);
+        query = query.or(`username.ilike.%${sanitizedSearch}%,full_name.ilike.%${sanitizedSearch}%`);
       }
 
       const { data, error, count } = await query
@@ -54,8 +54,13 @@ export const adminUserService = {
         return { users: [], count: 0, error: new Error(error.message) };
       }
 
+      const mappedUsers: AdminUserProfile[] = (data || []).map((u: any) => ({
+        ...u,
+        display_name: u.full_name || u.username,
+      }));
+
       return {
-        users: (data as unknown as AdminUserProfile[]) || [],
+        users: mappedUsers,
         count: count ?? (data?.length || 0),
         error: null,
       };
@@ -65,36 +70,47 @@ export const adminUserService = {
   },
 
   /**
-   * Fetches full profile details for a user with targeted field selection.
-   * Permission required: users.read
-   */
-  async getUserDetails(userId: string): Promise<{ user: AdminUserProfile | null; error: Error | null }> {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(USER_SELECT_FIELDS)
-        .eq('id', userId)
-        .single();
-
-      if (error) return { user: null, error: new Error(error.message) };
-      return { user: data as unknown as AdminUserProfile, error: null };
-    } catch (err: any) {
-      return { user: null, error: err instanceof Error ? err : new Error(String(err)) };
-    }
-  },
-
-  /**
-   * Total count of registered profiles for dashboard metrics.
+   * Retrieves total count of registered researcher profiles in public.profiles.
    */
   async getUserCount(): Promise<number> {
     try {
       const { count, error } = await supabase
         .from('profiles')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true });
+
       if (error) return 0;
       return count ?? 0;
     } catch {
       return 0;
+    }
+  },
+
+  /**
+   * Retrieves single user profile by ID.
+   */
+  async getUserById(userId: string): Promise<{ user: AdminUserProfile | null; error: Error | null }> {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(USER_SELECT_FIELDS)
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        return { user: null, error: new Error(error.message) };
+      }
+
+      if (!data) return { user: null, error: null };
+
+      return {
+        user: {
+          ...(data as any),
+          display_name: (data as any).full_name || (data as any).username,
+        },
+        error: null,
+      };
+    } catch (err: any) {
+      return { user: null, error: err instanceof Error ? err : new Error(String(err)) };
     }
   },
 };

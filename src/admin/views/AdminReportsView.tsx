@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — REPORTS QUEUE VIEW (STAGE 2)
+// BOOFFIN ADMIN PORTAL — REPORTS QUEUE VIEW (LIGHT SAAS METIS STYLE)
 // ============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -9,6 +9,7 @@ import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminReportService } from '../services/adminReportService';
 import { AdminReport } from '../types/data';
+import { CheckCircle2, XCircle, Flag, RefreshCw } from 'lucide-react-native';
 
 export const AdminReportsView: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -43,81 +44,122 @@ export const AdminReportsView: React.FC = () => {
     if (res.error) {
       setErrorMessage(`Failed to update report: ${res.error.message}`);
     } else {
-      setActionSuccessMessage(`Report ${reportId.slice(0, 8)}... successfully marked as ${status}.`);
+      setActionSuccessMessage(`Report successfully marked as ${status}.`);
       loadReports(statusFilter);
     }
   };
 
   const columns: ColumnDef<AdminReport>[] = [
-    { key: 'reason', header: 'Violation Reason', width: 160, render: (r) => (
-      <Text style={styles.boldText}>{r.reason}</Text>
-    )},
-    { key: 'details', header: 'Details / Description', width: 220, render: (r) => (
-      <Text style={styles.cellText} numberOfLines={2}>{r.details || 'No additional details provided.'}</Text>
-    )},
-    { key: 'status', header: 'Status', width: 110, render: (r) => (
-      <AdminBadge
-        label={r.status}
-        variant={r.status === 'PENDING' ? 'warning' : 'emerald'}
-        size="sm"
-      />
-    )},
-    { key: 'created_at', header: 'Submitted At', width: 130, render: (r) => (
-      <Text style={styles.cellMuted}>{new Date(r.created_at).toLocaleDateString()}</Text>
-    )},
-    { key: 'actions', header: 'Actions', width: 180, render: (r) => (
-      <View style={styles.actionRow}>
-        {r.status === 'PENDING' ? (
-          <>
-            <TouchableOpacity style={styles.resolveBtn} onPress={() => handleResolve(r.id, 'RESOLVED')}>
+    {
+      key: 'reason',
+      header: 'Violation Reason',
+      width: 180,
+      render: (r) => <Text style={styles.boldText}>{r.reason}</Text>,
+    },
+    {
+      key: 'details',
+      header: 'Details / Context',
+      width: 260,
+      render: (r) => (
+        <Text style={styles.cellText} numberOfLines={2}>
+          {r.details || 'No additional text description provided.'}
+        </Text>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: 130,
+      render: (r) => (
+        <AdminBadge
+          label={r.status}
+          variant={r.status === 'PENDING' ? 'warning' : 'emerald'}
+          size="sm"
+        />
+      ),
+    },
+    {
+      key: 'created_at',
+      header: 'Submitted At',
+      width: 150,
+      render: (r) => (
+        <Text style={styles.cellMuted}>
+          {new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+        </Text>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      width: 180,
+      render: (r) =>
+        r.status === 'PENDING' ? (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.resolveBtn}
+              onPress={() => handleResolve(r.id, 'RESOLVED')}
+            >
+              <CheckCircle2 size={13} color="#03543F" />
               <Text style={styles.resolveBtnText}>Resolve</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.dismissBtn} onPress={() => handleResolve(r.id, 'DISMISSED')}>
+            <TouchableOpacity
+              style={styles.dismissBtn}
+              onPress={() => handleResolve(r.id, 'DISMISSED')}
+            >
+              <XCircle size={13} color="#475569" />
               <Text style={styles.dismissBtnText}>Dismiss</Text>
             </TouchableOpacity>
-          </>
+          </View>
         ) : (
-          <Text style={styles.cellMuted}>Archived ({r.status})</Text>
-        )}
-      </View>
-    )},
+          <Text style={styles.resolvedText}>— Resolved —</Text>
+        ),
+    },
   ];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Filter Tabs */}
-      <View style={styles.tabRow}>
+      {/* Header */}
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.pageTitle}>User & Content Reports</Text>
+          <Text style={styles.pageSubtitle}>Authoritative data from public.content_reports</Text>
+        </View>
+
+        <TouchableOpacity style={styles.refreshBtn} onPress={() => loadReports(statusFilter)}>
+          <RefreshCw size={14} color="#475569" />
+          <Text style={styles.refreshBtnText}>Refresh</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Tabs Row */}
+      <View style={styles.tabsRow}>
         <TouchableOpacity
-          style={[styles.tab, statusFilter === 'PENDING' && styles.tabActive]}
+          style={[styles.tabBtn, statusFilter === 'PENDING' && styles.tabBtnActive]}
           onPress={() => setStatusFilter('PENDING')}
         >
-          <Text style={[styles.tabText, statusFilter === 'PENDING' && styles.tabTextActive]}>
+          <Text style={[styles.tabBtnText, statusFilter === 'PENDING' && styles.tabBtnTextActive]}>
             Pending Review
           </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tab, statusFilter === 'RESOLVED' && styles.tabActive]}
+          style={[styles.tabBtn, statusFilter === 'RESOLVED' && styles.tabBtnActive]}
           onPress={() => setStatusFilter('RESOLVED')}
         >
-          <Text style={[styles.tabText, statusFilter === 'RESOLVED' && styles.tabTextActive]}>
+          <Text style={[styles.tabBtnText, statusFilter === 'RESOLVED' && styles.tabBtnTextActive]}>
             Resolved
           </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tab, statusFilter === undefined && styles.tabActive]}
+          style={[styles.tabBtn, statusFilter === undefined && styles.tabBtnActive]}
           onPress={() => setStatusFilter(undefined)}
         >
-          <Text style={[styles.tabText, statusFilter === undefined && styles.tabTextActive]}>
+          <Text style={[styles.tabBtnText, statusFilter === undefined && styles.tabBtnTextActive]}>
             All Reports
           </Text>
         </TouchableOpacity>
       </View>
-
-      {errorMessage ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
-        </View>
-      ) : null}
 
       {actionSuccessMessage ? (
         <View style={styles.successBox}>
@@ -125,19 +167,30 @@ export const AdminReportsView: React.FC = () => {
         </View>
       ) : null}
 
-      {/* Header Info */}
-      <View style={styles.headerInfo}>
-        <Text style={styles.headerTitle}>User & Content Reports</Text>
-        <Text style={styles.headerSubtitle}>Authoritative data from public.reports table</Text>
-      </View>
-
-      {loading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={ADMIN_COLORS.emeraldPrimary} />
+      {errorMessage ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
-      ) : (
-        <AdminDataTable columns={columns} data={reports} emptyMessage={errorMessage ? 'Data inaccessible due to authorization error.' : 'No reports matching filter.'} />
-      )}
+      ) : null}
+
+      {/* Table Card */}
+      <View style={styles.tableCard}>
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#059669" />
+          </View>
+        ) : (
+          <AdminDataTable
+            columns={columns}
+            data={reports}
+            emptyMessage={
+              statusFilter === 'PENDING'
+                ? 'No active pending moderation reports in queue. Platform is clean!'
+                : 'No reports found.'
+            }
+          />
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -145,116 +198,164 @@ export const AdminReportsView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  tabRow: {
+  headerRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 18,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 6,
-    backgroundColor: ADMIN_COLORS.bgCard,
-    borderWidth: 1,
-    borderColor: ADMIN_COLORS.borderSubtle,
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
   },
-  tabActive: {
-    backgroundColor: ADMIN_COLORS.bgHover,
-    borderColor: ADMIN_COLORS.emeraldPrimary,
-  },
-  tabText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: ADMIN_COLORS.textSecondary,
-  },
-  tabTextActive: {
-    color: ADMIN_COLORS.textPrimary,
-    fontWeight: '600',
-  },
-  errorBox: {
-    backgroundColor: ADMIN_COLORS.dangerBg,
-    borderColor: ADMIN_COLORS.dangerBorder,
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: ADMIN_COLORS.danger,
-    fontSize: 12,
-  },
-  successBox: {
-    backgroundColor: ADMIN_COLORS.emeraldBg,
-    borderColor: ADMIN_COLORS.emeraldBorder,
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 16,
-  },
-  successText: {
-    color: ADMIN_COLORS.emeraldLight,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  headerInfo: {
-    marginBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: ADMIN_COLORS.textPrimary,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: ADMIN_COLORS.textMuted,
+  pageSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
     marginTop: 2,
   },
-  boldText: {
+  refreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  refreshBtnText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: ADMIN_COLORS.textPrimary,
+    color: '#475569',
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 4,
+    alignSelf: 'flex-start',
+    gap: 4,
+    marginBottom: 20,
+  },
+  tabBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  tabBtnActive: {
+    backgroundColor: '#ECFDF5',
+  },
+  tabBtnText: {
     fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  tabBtnTextActive: {
+    color: '#059669',
+    fontWeight: '700',
+  },
+  tableCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 30,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+  },
+  centerContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  boldText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   cellText: {
-    color: ADMIN_COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
+    color: '#334155',
   },
   cellMuted: {
-    color: ADMIN_COLORS.textMuted,
     fontSize: 12,
+    color: '#64748B',
   },
   actionRow: {
     flexDirection: 'row',
     gap: 6,
   },
   resolveBtn: {
-    backgroundColor: ADMIN_COLORS.emeraldBg,
-    borderColor: ADMIN_COLORS.emeraldBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DEF7EC',
     borderWidth: 1,
+    borderColor: '#BCF0DA',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   resolveBtnText: {
-    color: ADMIN_COLORS.emeraldLight,
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#03543F',
   },
   dismissBtn: {
-    backgroundColor: ADMIN_COLORS.bgHover,
-    borderColor: ADMIN_COLORS.borderStrong,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
+    borderColor: '#E2E8F0',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   dismissBtnText: {
-    color: ADMIN_COLORS.textSecondary,
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#475569',
   },
-  loader: {
-    padding: 40,
-    alignItems: 'center',
+  resolvedText: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    color: '#94A3B8',
+  },
+  successBox: {
+    backgroundColor: '#DEF7EC',
+    borderWidth: 1,
+    borderColor: '#BCF0DA',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  successText: {
+    fontSize: 12,
+    color: '#03543F',
+    fontWeight: '600',
+  },
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#991B1B',
+    fontWeight: '500',
   },
 });

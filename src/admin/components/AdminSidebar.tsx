@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — HIGH-DENSITY SIDEBAR NAVIGATION
+// BOOFFIN ADMIN PORTAL — SIDEBAR NAVIGATION (LIGHT SAAS METIS STYLE)
 // ============================================================================
 
 import React from 'react';
@@ -7,6 +7,35 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { ADMIN_COLORS, ADMIN_NAV_ITEMS, AdminNavKey } from '../lib/constants';
 import { useAdminPermissions } from '../hooks/useAdminPermissions';
 import { AdminPermission } from '../types/roles';
+import {
+  LayoutDashboard,
+  Users,
+  Flag,
+  ShieldAlert,
+  CheckSquare,
+  UserCheck,
+  FileText,
+  ShieldCheck,
+  TrendingUp,
+  Activity,
+  Settings,
+  Sparkles,
+  ChevronRight,
+} from 'lucide-react-native';
+
+const NAV_ICON_MAP: Record<string, React.FC<any>> = {
+  LayoutDashboard,
+  Users,
+  Flag,
+  ShieldAlert,
+  CheckSquare,
+  UserCheck,
+  FileText,
+  ShieldCheck,
+  TrendingUp,
+  Activity,
+  Settings,
+};
 
 interface AdminSidebarProps {
   activeKey: AdminNavKey;
@@ -21,23 +50,25 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
   return (
     <View style={styles.sidebar}>
-      {/* Brand Header */}
+      {/* 1. Brand Logo Header */}
       <View style={styles.brandContainer}>
         <View style={styles.logoBadge}>
           <Text style={styles.logoBadgeText}>B</Text>
         </View>
-        <View>
+        <View style={styles.brandTextGroup}>
           <Text style={styles.brandTitle}>BooffIn</Text>
-          <Text style={styles.brandSubtitle}>Admin Console v1.0</Text>
+          <Text style={styles.brandSubtitle}>Admin Console</Text>
         </View>
       </View>
 
-      {/* Navigation List */}
+      {/* 2. Navigation Items List */}
       <ScrollView style={styles.navList} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionHeader}>Console Navigation</Text>
+
         {ADMIN_NAV_ITEMS.map((item) => {
           const isAllowed = !item.permission || hasPermission(item.permission as AdminPermission);
           const isActive = activeKey === item.key;
+          const IconComponent = NAV_ICON_MAP[item.icon] || LayoutDashboard;
 
           if (!isAllowed) return null;
 
@@ -50,24 +81,39 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               ]}
               onPress={() => onSelect(item.key)}
             >
-              <View style={[styles.navIndicator, isActive && styles.navIndicatorActive]} />
-              <Text
-                style={[
-                  styles.navLabel,
-                  isActive ? styles.navLabelActive : styles.navLabelInactive,
-                ]}
-              >
-                {item.label}
-              </Text>
+              <View style={styles.navItemLeft}>
+                <IconComponent
+                  size={18}
+                  color={isActive ? '#059669' : '#64748B'}
+                  strokeWidth={isActive ? 2.3 : 1.8}
+                />
+                <Text
+                  style={[
+                    styles.navLabel,
+                    isActive ? styles.navLabelActive : styles.navLabelInactive,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </View>
+
+              {item.key === 'security' ? (
+                <View style={styles.badgePill}>
+                  <Text style={styles.badgePillText}>AAL2</Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
-      {/* Footer Info */}
+      {/* 3. Footer Environment Indicator */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>STAGE 1 TEST MODE</Text>
-        <Text style={styles.footerSubtext}>DB: Supabase (Isolated)</Text>
+        <View style={styles.statusDot} />
+        <View style={styles.footerTextContainer}>
+          <Text style={styles.footerTitle}>Production Connected</Text>
+          <Text style={styles.footerSubtitle}>BooffIn Security v1.0</Text>
+        </View>
       </View>
     </View>
   );
@@ -76,9 +122,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 const styles = StyleSheet.create({
   sidebar: {
     width: 240,
-    backgroundColor: ADMIN_COLORS.bgSecondary,
+    backgroundColor: '#FFFFFF',
     borderRightWidth: 1,
-    borderRightColor: ADMIN_COLORS.borderSubtle,
+    borderRightColor: '#E2E8F0',
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
@@ -86,98 +132,123 @@ const styles = StyleSheet.create({
   brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: ADMIN_COLORS.borderSubtle,
+    borderBottomColor: '#E2E8F0',
     gap: 12,
   },
   logoBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: ADMIN_COLORS.emeraldPrimary,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#059669',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   logoBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
     fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  brandTextGroup: {
+    flexDirection: 'column',
   },
   brandTitle: {
-    color: ADMIN_COLORS.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.4,
   },
   brandSubtitle: {
-    color: ADMIN_COLORS.textMuted,
-    fontSize: 10,
-    fontWeight: '500',
-    textTransform: 'uppercase',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    letterSpacing: 0.2,
   },
   navList: {
     flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingTop: 16,
   },
   sectionHeader: {
     fontSize: 10,
     fontWeight: '700',
-    color: ADMIN_COLORS.textMuted,
+    color: '#94A3B8',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    marginBottom: 10,
   },
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 6,
-    marginVertical: 1,
+    borderRadius: 8,
+    marginBottom: 4,
   },
   navItemActive: {
-    backgroundColor: ADMIN_COLORS.bgHover,
+    backgroundColor: '#ECFDF5',
   },
-  navIndicator: {
-    width: 3,
-    height: 14,
-    borderRadius: 2,
-    backgroundColor: 'transparent',
-    marginRight: 10,
-  },
-  navIndicatorActive: {
-    backgroundColor: ADMIN_COLORS.emeraldPrimary,
+  navItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   navLabel: {
     fontSize: 13,
-    fontWeight: '500',
   },
   navLabelActive: {
-    color: ADMIN_COLORS.textPrimary,
-    fontWeight: '600',
+    color: '#059669',
+    fontWeight: '700',
   },
   navLabelInactive: {
-    color: ADMIN_COLORS.textSecondary,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  badgePill: {
+    backgroundColor: '#DEF7EC',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  badgePillText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#03543F',
   },
   footer: {
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: ADMIN_COLORS.borderSubtle,
-    backgroundColor: ADMIN_COLORS.bgPrimary,
+    borderTopColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
   },
-  footerText: {
-    fontSize: 10,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  footerTextContainer: {
+    flex: 1,
+  },
+  footerTitle: {
+    fontSize: 11,
     fontWeight: '700',
-    color: ADMIN_COLORS.warning,
-    letterSpacing: 0.5,
+    color: '#0F172A',
   },
-  footerSubtext: {
+  footerSubtitle: {
     fontSize: 10,
-    color: ADMIN_COLORS.textMuted,
-    marginTop: 2,
+    color: '#64748B',
   },
 });

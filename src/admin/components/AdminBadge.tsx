@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — ADMIN BADGE COMPONENT
+// BOOFFIN ADMIN PORTAL — ADMIN BADGE PILL (LIGHT SAAS THEME)
 // ============================================================================
 
 import React from 'react';
@@ -20,15 +20,15 @@ export const AdminBadge: React.FC<AdminBadgeProps> = ({
   const getColors = () => {
     switch (variant) {
       case 'emerald':
-        return { bg: ADMIN_COLORS.emeraldBg, border: ADMIN_COLORS.emeraldBorder, text: ADMIN_COLORS.emeraldLight };
+        return { bg: '#DEF7EC', border: '#BCF0DA', text: '#03543F' };
       case 'danger':
-        return { bg: ADMIN_COLORS.dangerBg, border: ADMIN_COLORS.dangerBorder, text: ADMIN_COLORS.danger };
+        return { bg: '#FDE8E8', border: '#FBD5D5', text: '#9B1C1C' };
       case 'warning':
-        return { bg: ADMIN_COLORS.warningBg, border: ADMIN_COLORS.warningBorder, text: ADMIN_COLORS.warning };
+        return { bg: '#FEF08A', border: '#FDE047', text: '#713F12' };
       case 'info':
-        return { bg: ADMIN_COLORS.infoBg, border: ADMIN_COLORS.infoBorder, text: ADMIN_COLORS.info };
+        return { bg: '#E1EFFE', border: '#C3DDFD', text: '#1E429F' };
       default:
-        return { bg: ADMIN_COLORS.bgHover, border: ADMIN_COLORS.borderSubtle, text: ADMIN_COLORS.textSecondary };
+        return { bg: '#F1F5F9', border: '#E2E8F0', text: '#475569' };
     }
   };
 
@@ -52,23 +52,23 @@ export const AdminBadge: React.FC<AdminBadgeProps> = ({
 const styles = StyleSheet.create({
   badge: {
     borderWidth: 1,
-    borderRadius: 4,
+    borderRadius: 9999,
     alignSelf: 'flex-start',
     justifyContent: 'center',
     alignItems: 'center',
   },
   badgeSm: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
   },
   badgeMd: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   text: {
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   textSm: {
     fontSize: 10,

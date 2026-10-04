@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — REPORT MANAGEMENT SERVICE (STAGE 2 REAL DATA WIRING)
+// BOOFFIN ADMIN PORTAL — REPORT MANAGEMENT SERVICE (SCHEMA ALIGNED)
 // ============================================================================
 
 import { supabase } from '../../api/client';
@@ -22,7 +22,7 @@ const REPORT_SELECT_FIELDS = `
 
 export const adminReportService = {
   /**
-   * Fetches user reports with optional status filtering.
+   * Fetches user reports with optional status filtering from public.content_reports.
    * Permission required: reports.read
    */
   async listReports(options?: {
@@ -35,7 +35,7 @@ export const adminReportService = {
       const offset = options?.offset ?? 0;
 
       let query = supabase
-        .from('reports')
+        .from('content_reports')
         .select(REPORT_SELECT_FIELDS, { count: 'exact' });
 
       if (options?.status) {
@@ -76,7 +76,7 @@ export const adminReportService = {
       }
 
       const { error: updateError } = await supabase
-        .from('reports')
+        .from('content_reports')
         .update({
           status,
           resolved_by: user.id,
@@ -109,7 +109,7 @@ export const adminReportService = {
   async getPendingReportsCount(): Promise<number> {
     try {
       const { count, error } = await supabase
-        .from('reports')
+        .from('content_reports')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'PENDING');
       if (error) return 0;

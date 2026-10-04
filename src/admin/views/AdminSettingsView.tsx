@@ -16,13 +16,13 @@ export const AdminSettingsView: React.FC = () => {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Backend Environment Configuration</Text>
-          <AdminBadge label="ISOLATED TEST" variant="warning" size="sm" />
+          <AdminBadge label="PRODUCTION" variant="emerald" size="sm" />
         </View>
         <Text style={styles.cardText}>
-          Connected Backend: BooffIn Test Supabase (Isolated Instance)
+          Connected Backend: BooffIn Production Supabase (`lvstuqhrmagzqkgwlisl`)
         </Text>
         <Text style={styles.cardSubtext}>
-          Production Database Safety: All production databases and services are strictly READ-ONLY. Zero production mutation permitted.
+          Production Database Protection: Strict zero-trust RBAC and AAL2 TOTP validation active on all administrative endpoints.
         </Text>
       </View>
 
@@ -67,25 +67,29 @@ const styles = StyleSheet.create({
     backgroundColor: ADMIN_COLORS.bgCard,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.borderSubtle,
-    borderRadius: 8,
-    padding: 18,
-    marginBottom: 14,
+    borderRadius: 12,
+    padding: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   cardTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: ADMIN_COLORS.textPrimary,
   },
   cardText: {
     fontSize: 13,
     color: ADMIN_COLORS.textPrimary,
-    lineHeight: 20,
+    lineHeight: 22,
     marginBottom: 4,
   },
   cardSubtext: {
@@ -95,3 +99,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+
