@@ -329,13 +329,29 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               <SvgText x="15" y="195" fontSize="10" fill="#94A3B8" fontWeight="600">5</SvgText>
               <SvgText x="15" y="235" fontSize="10" fill="#94A3B8" fontWeight="600">0</SvgText>
 
-              {/* Blue Curve (Publications) Area & Stroke */}
+              {/* Blue Curve (Publications / Posts) Area & Stroke */}
               <Path
-                d="M 50 170 C 120 160, 180 185, 230 145 C 290 95, 340 120, 390 75 C 450 60, 500 110, 550 65 C 600 170, 630 150, 660 135 L 660 230 L 50 230 Z"
+                d={
+                  activeTimeRange === '7D'
+                    ? "M 50 190 C 120 180, 220 160, 320 120 C 420 80, 520 100, 660 70 L 660 230 L 50 230 Z"
+                    : activeTimeRange === '30D'
+                    ? "M 50 170 C 120 160, 180 185, 230 145 C 290 95, 340 120, 390 75 C 450 60, 500 110, 550 65 C 600 170, 630 150, 660 135 L 660 230 L 50 230 Z"
+                    : activeTimeRange === '90D'
+                    ? "M 50 200 C 150 180, 300 130, 450 90 C 550 70, 600 60, 660 45 L 660 230 L 50 230 Z"
+                    : "M 50 215 C 180 200, 320 140, 480 80 C 580 50, 620 45, 660 40 L 660 230 L 50 230 Z"
+                }
                 fill="url(#blueGrad)"
               />
               <Path
-                d="M 50 170 C 120 160, 180 185, 230 145 C 290 95, 340 120, 390 75 C 450 60, 500 110, 550 65 C 600 170, 630 150, 660 135"
+                d={
+                  activeTimeRange === '7D'
+                    ? "M 50 190 C 120 180, 220 160, 320 120 C 420 80, 520 100, 660 70"
+                    : activeTimeRange === '30D'
+                    ? "M 50 170 C 120 160, 180 185, 230 145 C 290 95, 340 120, 390 75 C 450 60, 500 110, 550 65 C 600 170, 630 150, 660 135"
+                    : activeTimeRange === '90D'
+                    ? "M 50 200 C 150 180, 300 130, 450 90 C 550 70, 600 60, 660 45"
+                    : "M 50 215 C 180 200, 320 140, 480 80 C 580 50, 620 45, 660 40"
+                }
                 fill="none"
                 stroke="#2563EB"
                 strokeWidth="2.5"
@@ -343,40 +359,78 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
 
               {/* Emerald Curve (Researchers) Area & Stroke */}
               <Path
-                d="M 50 210 C 110 205, 170 195, 220 180 C 280 160, 330 190, 390 150 C 450 140, 500 160, 560 130 C 610 145, 635 155, 660 160 L 660 230 L 50 230 Z"
+                d={
+                  activeTimeRange === '7D'
+                    ? "M 50 210 C 120 200, 220 185, 320 160 C 420 140, 520 130, 660 110 L 660 230 L 50 230 Z"
+                    : activeTimeRange === '30D'
+                    ? "M 50 210 C 110 205, 170 195, 220 180 C 280 160, 330 190, 390 150 C 450 140, 500 160, 560 130 C 610 145, 635 155, 660 160 L 660 230 L 50 230 Z"
+                    : activeTimeRange === '90D'
+                    ? "M 50 220 C 150 210, 300 170, 450 140 C 550 120, 600 110, 660 95 L 660 230 L 50 230 Z"
+                    : "M 50 225 C 180 215, 320 170, 480 130 C 580 100, 620 90, 660 85 L 660 230 L 50 230 Z"
+                }
                 fill="url(#emeraldGrad)"
               />
               <Path
-                d="M 50 210 C 110 205, 170 195, 220 180 C 280 160, 330 190, 390 150 C 450 140, 500 160, 560 130 C 610 145, 635 155, 660 160"
+                d={
+                  activeTimeRange === '7D'
+                    ? "M 50 210 C 120 200, 220 185, 320 160 C 420 140, 520 130, 660 110"
+                    : activeTimeRange === '30D'
+                    ? "M 50 210 C 110 205, 170 195, 220 180 C 280 160, 330 190, 390 150 C 450 140, 500 160, 560 130 C 610 145, 635 155, 660 160"
+                    : activeTimeRange === '90D'
+                    ? "M 50 220 C 150 210, 300 170, 450 140 C 550 120, 600 110, 660 95"
+                    : "M 50 225 C 180 215, 320 170, 480 130 C 580 100, 620 90, 660 85"
+                }
                 fill="none"
                 stroke="#059669"
                 strokeWidth="2.5"
               />
 
-              {/* Active Point Indicators */}
-              <Circle cx="390" cy="75" r="4.5" fill="#2563EB" stroke="#FFFFFF" strokeWidth="2" />
-              <Circle cx="560" cy="130" r="4.5" fill="#059669" stroke="#FFFFFF" strokeWidth="2" />
-
-              {/* X Axis Month Labels */}
-              <SvgText x="50" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Nov</SvgText>
-              <SvgText x="140" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Dec</SvgText>
-              <SvgText x="230" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Jan</SvgText>
-              <SvgText x="320" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Feb</SvgText>
-              <SvgText x="410" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Mar</SvgText>
-              <SvgText x="500" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Apr</SvgText>
-              <SvgText x="590" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">May</SvgText>
-              <SvgText x="650" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Jun</SvgText>
+              {/* Dynamic X-Axis Labels based on Time Range */}
+              {activeTimeRange === '7D' && (
+                <>
+                  <SvgText x="50" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Mon</SvgText>
+                  <SvgText x="150" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Tue</SvgText>
+                  <SvgText x="250" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Wed</SvgText>
+                  <SvgText x="350" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Thu</SvgText>
+                  <SvgText x="450" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Fri</SvgText>
+                  <SvgText x="550" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Sat</SvgText>
+                  <SvgText x="650" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Sun</SvgText>
+                </>
+              )}
+              {activeTimeRange === '30D' && (
+                <>
+                  <SvgText x="80" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Week 1</SvgText>
+                  <SvgText x="260" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Week 2</SvgText>
+                  <SvgText x="440" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Week 3</SvgText>
+                  <SvgText x="620" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Week 4</SvgText>
+                </>
+              )}
+              {activeTimeRange === '90D' && (
+                <>
+                  <SvgText x="100" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Month 1</SvgText>
+                  <SvgText x="350" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Month 2</SvgText>
+                  <SvgText x="600" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Month 3</SvgText>
+                </>
+              )}
+              {activeTimeRange === '1Y' && (
+                <>
+                  <SvgText x="80" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Q1</SvgText>
+                  <SvgText x="260" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Q2</SvgText>
+                  <SvgText x="440" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Q3</SvgText>
+                  <SvgText x="620" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Q4</SvgText>
+                </>
+              )}
             </Svg>
 
             {/* Legend */}
             <View style={styles.chartLegend}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#2563EB' }]} />
-                <Text style={styles.legendText}>Scientific Posts & Papers</Text>
+                <Text style={styles.legendText}>Scientific Posts & Papers ({postCount})</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#059669' }]} />
-                <Text style={styles.legendText}>Registered Researchers</Text>
+                <Text style={styles.legendText}>Registered Researchers ({userCount})</Text>
               </View>
             </View>
           </View>

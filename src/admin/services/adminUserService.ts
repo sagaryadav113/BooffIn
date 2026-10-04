@@ -39,7 +39,7 @@ export const adminUserService = {
 
       let query = supabase
         .from('profiles')
-        .select(USER_SELECT_FIELDS, { count: 'exact' });
+        .select('*', { count: 'exact' });
 
       if (options?.search && options.search.trim()) {
         const sanitizedSearch = options.search.trim().replace(/[%_]/g, '');
@@ -51,12 +51,16 @@ export const adminUserService = {
         .range(offset, offset + limit - 1);
 
       if (error) {
+        console.warn('adminUserService listUsers error:', error.message);
         return { users: [], count: 0, error: new Error(error.message) };
       }
 
       const mappedUsers: AdminUserProfile[] = (data || []).map((u: any) => ({
         ...u,
         display_name: u.full_name || u.username,
+        institution: u.institution || u.academic_title || 'Researcher',
+        field_of_study: u.field_of_study || (Array.isArray(u.research_interests) ? u.research_interests.join(', ') : 'Academic Research'),
+        is_orcid_verified: Boolean(u.orcid_verified || u.is_orcid_verified || u.orcid_id),
       }));
 
       return {
@@ -92,7 +96,7 @@ export const adminUserService = {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select(USER_SELECT_FIELDS)
+        .select('*')
         .eq('id', userId)
         .maybeSingle();
 
@@ -106,6 +110,9 @@ export const adminUserService = {
         user: {
           ...(data as any),
           display_name: (data as any).full_name || (data as any).username,
+          institution: (data as any).institution || (data as any).academic_title || 'Researcher',
+          field_of_study: (data as any).field_of_study || (Array.isArray((data as any).research_interests) ? (data as any).research_interests.join(', ') : 'Academic Research'),
+          is_orcid_verified: Boolean((data as any).orcid_verified || (data as any).is_orcid_verified || (data as any).orcid_id),
         },
         error: null,
       };
