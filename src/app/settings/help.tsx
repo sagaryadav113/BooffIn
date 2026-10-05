@@ -30,6 +30,8 @@ import {
   LEGAL_CONTACTS,
 } from '../../constants/legalPolicies';
 
+import { supabase } from '../../api/client';
+
 export default function HelpSettingsScreen() {
   const router = useRouter();
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -55,13 +57,31 @@ export default function HelpSettingsScreen() {
       reason: reportReason.trim(),
       details: reportDetails.trim(),
     });
+
+    // Mirror submission to public.support_tickets for the Support Desk
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('support_tickets').insert({
+        sender_email: user?.email || 'app_user@letsbooffin.com',
+        sender_name: user?.user_metadata?.full_name || user?.user_metadata?.username || 'App Researcher',
+        user_id: user?.id || null,
+        category: 'BUG_REPORT',
+        subject: reportReason.trim(),
+        message_body: reportDetails.trim() || reportReason.trim(),
+        priority: 'NORMAL',
+        status: 'NEW',
+      });
+    } catch {
+      // Non-blocking fallback
+    }
+
     setIsSubmitting(false);
 
     if (res.success) {
       setReportReason('');
       setReportDetails('');
       setReportModalOpen(false);
-      setSubmitFeedback('Thank you. Your report has been submitted to the BooffIn team.');
+      setSubmitFeedback('Thank you. Your inquiry has been routed to the BooffIn Support Desk.');
       setTimeout(() => setSubmitFeedback(null), 5000);
     } else {
       Alert.alert('Error', res.error || 'Failed to submit report. Please try again.');

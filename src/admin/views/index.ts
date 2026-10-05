@@ -11,4 +11,6 @@ export * from './AdminSecurityView';
 export * from './AdminAnalyticsView';
 export * from './AdminSystemHealthView';
 export * from './AdminSettingsView';
+export * from './AdminSupportView';
+export * from './AdminOpsChatView';
 export * from './AdminPortalRoot';

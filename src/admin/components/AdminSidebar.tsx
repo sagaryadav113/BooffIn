@@ -21,10 +21,14 @@ import {
   Settings,
   Sparkles,
   ChevronRight,
+  LifeBuoy,
+  MessagesSquare,
 } from 'lucide-react-native';
 
 const NAV_ICON_MAP: Record<string, React.FC<any>> = {
   LayoutDashboard,
+  LifeBuoy,
+  MessagesSquare,
   Users,
   Flag,
   ShieldAlert,

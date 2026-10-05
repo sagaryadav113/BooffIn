@@ -51,6 +51,8 @@ export const ADMIN_COLORS = {
 
 export const ADMIN_NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', permission: null },
+  { key: 'support', label: 'Support Desk', icon: 'LifeBuoy', permission: null },
+  { key: 'team-chat', label: 'Team Chat', icon: 'MessagesSquare', permission: null },
   { key: 'users', label: 'Users', icon: 'Users', permission: 'users.read' },
   { key: 'reports', label: 'Reports', icon: 'Flag', permission: 'reports.read' },
   { key: 'moderation', label: 'Moderation', icon: 'ShieldAlert', permission: 'posts.read' },
