@@ -21,7 +21,6 @@ import { Divider } from '../../components/core/Divider';
 import { Typography } from '../../components/core/Typography';
 import { Button } from '../../components/core/Button';
 import { Icon } from '../../components/core/Icon';
-import { reportContent } from '../../api/moderationService';
 import { env } from '../../config/env';
 import {
   TERMS_OF_SERVICE,
@@ -52,17 +51,10 @@ export default function HelpSettingsScreen() {
     }
 
     setIsSubmitting(true);
-    const res = await reportContent({
-      reportedType: 'system_issue',
-      reportedId: 'general_feedback',
-      reason: reportReason.trim(),
-      details: reportDetails.trim(),
-    });
 
-    // Mirror submission to public.support_tickets for the Support Desk
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('support_tickets').insert({
+      const { error } = await supabase.from('support_tickets').insert({
         sender_email: user?.email || 'app_user@letsbooffin.com',
         sender_name: user?.user_metadata?.full_name || user?.user_metadata?.username || 'App Researcher',
         user_id: user?.id || null,
@@ -72,22 +64,23 @@ export default function HelpSettingsScreen() {
         priority: 'NORMAL',
         status: 'NEW',
       });
-    } catch {
-      // Non-blocking fallback
-    }
 
-    setIsSubmitting(false);
+      setIsSubmitting(false);
 
-    if (res.success) {
-      setReportReason('');
-      setReportDetails('');
-      setIsSubmittedSuccess(true);
-      setTimeout(() => {
-        setIsSubmittedSuccess(false);
-        setReportModalOpen(false);
-      }, 3500);
-    } else {
-      Alert.alert('Error', res.error || 'Failed to submit report. Please try again.');
+      if (error) {
+        Alert.alert('Error', error.message || 'Failed to submit feedback. Please try again.');
+      } else {
+        setReportReason('');
+        setReportDetails('');
+        setIsSubmittedSuccess(true);
+        setTimeout(() => {
+          setIsSubmittedSuccess(false);
+          setReportModalOpen(false);
+        }, 3500);
+      }
+    } catch (err: any) {
+      setIsSubmitting(false);
+      Alert.alert('Error', err?.message || 'Failed to submit feedback. Please try again.');
     }
   };
 
