@@ -15,7 +15,7 @@ import {
 import { ADMIN_COLORS } from '../lib/constants';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminChatService } from '../services/adminChatService';
-import { adminTeamService } from '../services/adminTeamService';
+import { adminSecurityService } from '../services/adminSecurityService';
 import { useAdminAuth } from '../hooks/useAdminAuth';
 import { AdminChatMessage, AdminChatChannel } from '../types/chat';
 import {
@@ -39,7 +39,7 @@ const CHANNELS: { key: AdminChatChannel; label: string; desc: string; icon: stri
 ];
 
 export const AdminOpsChatView: React.FC = () => {
-  const { userId, userEmail } = useAdminAuth();
+  const { userId, email } = useAdminAuth();
   const [activeChannel, setActiveChannel] = useState<AdminChatChannel>('general-ops');
   const [messages, setMessages] = useState<AdminChatMessage[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -225,7 +225,7 @@ export const AdminOpsChatView: React.FC = () => {
               </View>
             ) : (
               messages.map((msg) => {
-                const isMe = msg.sender_id === userId || msg.sender_email === userEmail;
+                const isMe = msg.sender_id === userId || msg.sender_email === email;
 
                 return (
                   <View

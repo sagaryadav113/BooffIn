@@ -18,7 +18,7 @@ import { ADMIN_COLORS } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminSupportService } from '../services/adminSupportService';
-import { adminTeamService } from '../services/adminTeamService';
+import { adminSecurityService } from '../services/adminSecurityService';
 import { SupportTicket, SupportStatus, SupportPriority, SupportCategory } from '../types/support';
 import {
   Inbox,
