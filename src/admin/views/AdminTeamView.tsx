@@ -33,13 +33,12 @@ import {
   Lock, 
   Crown, 
   Award, 
-  UserX, 
-  UserCheck,
+  RotateCcw,
   Check
 } from 'lucide-react-native';
 
 export const AdminTeamView: React.FC = () => {
-  const { userId: currentUserId, role: currentUserRole } = useAdminAuth();
+  const { userId: currentUserId } = useAdminAuth();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<(AdminMember & { email?: string; fullName?: string })[]>([]);
   
@@ -51,8 +50,6 @@ export const AdminTeamView: React.FC = () => {
   const [provisionFullName, setProvisionFullName] = useState('');
   const [provisionUsername, setProvisionUsername] = useState('');
   const [provisionRole, setProvisionRole] = useState<AdminRole>('SUPER_ADMIN');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [mfaCode, setMfaCode] = useState('');
   const [isSubmittingProvision, setIsSubmittingProvision] = useState(false);
 
   // 2. Credentials Success Card State
@@ -65,6 +62,49 @@ export const AdminTeamView: React.FC = () => {
   const [selectedMember, setSelectedMember] = useState<(AdminMember & { email?: string; fullName?: string }) | null>(null);
   const [editRole, setEditRole] = useState<AdminRole>('ADMIN');
   const [isSubmittingRoleChange, setIsSubmittingRoleChange] = useState(false);
+
+  // 4. View / Reset Credentials Recovery Modal State
+  const [recoveryMember, setRecoveryMember] = useState<(AdminMember & { email?: string; fullName?: string }) | null>(null);
+  const [generatedRecoveryPassword, setGeneratedRecoveryPassword] = useState<string | null>(null);
+  const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
+  const [copiedRecoveryEmail, setCopiedRecoveryEmail] = useState(false);
+  const [copiedRecoveryPassword, setCopiedRecoveryPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  // Cross-platform Clipboard Copy Helper
+  const copyTextToClipboard = async (text: string, type: 'email' | 'password' | 'recEmail' | 'recPass') => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else if (typeof document !== 'undefined') {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+    } catch (err) {
+      console.warn('Clipboard write warning:', err);
+    }
+
+    if (type === 'email') {
+      setCopiedEmail(true);
+      setTimeout(() => setCopiedEmail(false), 2000);
+    } else if (type === 'password') {
+      setCopiedPassword(true);
+      setTimeout(() => setCopiedPassword(false), 2000);
+    } else if (type === 'recEmail') {
+      setCopiedRecoveryEmail(true);
+      setTimeout(() => setCopiedRecoveryEmail(false), 2000);
+    } else if (type === 'recPass') {
+      setCopiedRecoveryPassword(true);
+      setTimeout(() => setCopiedRecoveryPassword(false), 2000);
+    }
+  };
 
   const loadMembers = useCallback(async () => {
     setLoading(true);
@@ -88,8 +128,6 @@ export const AdminTeamView: React.FC = () => {
     setProvisionFullName('');
     setProvisionUsername('');
     setProvisionRole('SUPER_ADMIN');
-    setAdminPassword('');
-    setMfaCode('');
     setErrorMessage(null);
     setIsProvisionModalOpen(true);
   };
@@ -125,6 +163,37 @@ export const AdminTeamView: React.FC = () => {
     setSelectedMember(member);
     setEditRole(member.role);
     setErrorMessage(null);
+  };
+
+  const handleOpenRecoveryModal = (member: AdminMember & { email?: string; fullName?: string }) => {
+    setRecoveryMember(member);
+    setGeneratedRecoveryPassword(null);
+    setShowRecoveryPassword(false);
+    setCopiedRecoveryEmail(false);
+    setCopiedRecoveryPassword(false);
+    setErrorMessage(null);
+  };
+
+  const handleGenerateNewPassword = async () => {
+    if (!recoveryMember) return;
+    setIsResettingPassword(true);
+    setErrorMessage(null);
+
+    const res = await adminSecurityService.resetMemberPassword({
+      targetUserId: recoveryMember.user_id,
+      targetEmail: recoveryMember.email || `${recoveryMember.user_id}@letsbooffin.com`,
+      targetFullName: recoveryMember.fullName || 'Team Member',
+    });
+
+    setIsResettingPassword(false);
+
+    if (res.error) {
+      setErrorMessage(`Failed to reset password: ${res.error.message}`);
+    } else if (res.newPassword) {
+      setGeneratedRecoveryPassword(res.newPassword);
+      setShowRecoveryPassword(true);
+      setActionSuccessMessage(`New temporary password generated for ${recoveryMember.fullName || 'member'}.`);
+    }
   };
 
   const handleExecuteRoleChange = async () => {
@@ -174,7 +243,7 @@ export const AdminTeamView: React.FC = () => {
     {
       key: 'user_id',
       header: 'Team Member / Co-Admin',
-      width: 260,
+      width: 250,
       render: (m) => (
         <View style={styles.memberCell}>
           <View style={[styles.memberAvatar, m.role === 'SUPER_ADMIN' && styles.superAdminAvatar]}>
@@ -187,7 +256,9 @@ export const AdminTeamView: React.FC = () => {
               <Text style={styles.nameText}>{m.fullName || 'Administrator'}</Text>
               {m.role === 'SUPER_ADMIN' && <Crown size={12} color="#D97706" />}
             </View>
-            <Text style={styles.emailText}>{m.email || `${m.user_id.slice(0, 10)}...`}</Text>
+            <Text style={styles.emailText}>
+              {m.email || `${m.user_id.slice(0, 8)}...@letsbooffin.com`}
+            </Text>
           </View>
         </View>
       ),
@@ -207,7 +278,7 @@ export const AdminTeamView: React.FC = () => {
     {
       key: 'status',
       header: 'Status',
-      width: 120,
+      width: 110,
       render: (m) => (
         <AdminBadge
           label={m.status}
@@ -219,7 +290,7 @@ export const AdminTeamView: React.FC = () => {
     {
       key: 'created_at',
       header: 'Provisioned Date',
-      width: 150,
+      width: 140,
       render: (m) => (
         <Text style={styles.cellMuted}>
           {new Date(m.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -229,7 +300,7 @@ export const AdminTeamView: React.FC = () => {
     {
       key: 'actions',
       header: 'Manage Authority',
-      width: 160,
+      width: 140,
       render: (m) => (
         <TouchableOpacity
           style={styles.manageBtn}
@@ -237,6 +308,20 @@ export const AdminTeamView: React.FC = () => {
         >
           <Key size={12} color={ADMIN_COLORS.textSecondary} />
           <Text style={styles.manageBtnText}>Edit Authority</Text>
+        </TouchableOpacity>
+      ),
+    },
+    {
+      key: 'id',
+      header: 'Credentials & Recovery',
+      width: 170,
+      render: (m) => (
+        <TouchableOpacity
+          style={styles.recoveryBtn}
+          onPress={() => handleOpenRecoveryModal(m)}
+        >
+          <Lock size={12} color="#059669" />
+          <Text style={styles.recoveryBtnText}>View / Reset Credentials</Text>
         </TouchableOpacity>
       ),
     },
@@ -296,7 +381,7 @@ export const AdminTeamView: React.FC = () => {
           </View>
 
           <Text style={styles.credentialsSub}>
-            Share these generated credentials with your team member. On first login, they will be prompted to scan their Google Authenticator QR code.
+            Share these generated credentials with your team member. On first login, they will scan their Google Authenticator QR code.
           </Text>
 
           <View style={styles.credRowsBox}>
@@ -306,10 +391,7 @@ export const AdminTeamView: React.FC = () => {
               <Text style={styles.credValue}>{credentialsResult.email}</Text>
               <TouchableOpacity
                 style={styles.copyBtn}
-                onPress={() => {
-                  setCopiedEmail(true);
-                  setTimeout(() => setCopiedEmail(false), 2000);
-                }}
+                onPress={() => copyTextToClipboard(credentialsResult.email, 'email')}
               >
                 {copiedEmail ? <Check size={12} color="#059669" /> : <Copy size={12} color="#475569" />}
                 <Text style={styles.copyBtnText}>{copiedEmail ? 'Copied' : 'Copy'}</Text>
@@ -330,10 +412,7 @@ export const AdminTeamView: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.copyBtn}
-                onPress={() => {
-                  setCopiedPassword(true);
-                  setTimeout(() => setCopiedPassword(false), 2000);
-                }}
+                onPress={() => copyTextToClipboard(credentialsResult.password, 'password')}
               >
                 {copiedPassword ? <Check size={12} color="#059669" /> : <Copy size={12} color="#475569" />}
                 <Text style={styles.copyBtnText}>{copiedPassword ? 'Copied' : 'Copy'}</Text>
@@ -454,7 +533,7 @@ export const AdminTeamView: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Security Re-Auth Check */}
+                {/* Security Box */}
                 <View style={styles.securityBox}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                     <Lock size={14} color="#059669" />
@@ -598,6 +677,114 @@ export const AdminTeamView: React.FC = () => {
                   ) : (
                     <Text style={styles.confirmProvisionBtnText}>Save Role Authority</Text>
                   )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Modal 3: View / Reset Credentials & Recovery Drawer */}
+      {recoveryMember && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setRecoveryMember(null)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Lock size={18} color="#059669" />
+                  <Text style={styles.modalTitle}>
+                    Credentials Recovery: {recoveryMember.fullName || 'Member'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setRecoveryMember(null)} style={styles.closeBtn}>
+                  <Text style={styles.closeBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.editMemberSub}>
+                Retrieve official login credentials or generate a new temporary password if this team member lost their access.
+              </Text>
+
+              {/* Member Work Email Box */}
+              <View style={styles.recoveryCredBox}>
+                <View style={styles.credRow}>
+                  <Text style={styles.credLabel}>Official Work Email:</Text>
+                  <Text style={styles.credValue}>
+                    {recoveryMember.email || `${recoveryMember.user_id}@letsbooffin.com`}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.copyBtn}
+                    onPress={() => copyTextToClipboard(recoveryMember.email || `${recoveryMember.user_id}@letsbooffin.com`, 'recEmail')}
+                  >
+                    {copiedRecoveryEmail ? <Check size={12} color="#059669" /> : <Copy size={12} color="#475569" />}
+                    <Text style={styles.copyBtnText}>{copiedRecoveryEmail ? 'Copied' : 'Copy'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.credRow}>
+                  <Text style={styles.credLabel}>Role Authority:</Text>
+                  <AdminBadge label={recoveryMember.role} variant="emerald" size="sm" />
+                </View>
+              </View>
+
+              {/* Password Recovery Section */}
+              <View style={styles.passwordResetSection}>
+                <View style={styles.resetHeaderRow}>
+                  <View>
+                    <Text style={styles.resetTitle}>Generate New Temporary Password</Text>
+                    <Text style={styles.resetSubtitle}>
+                      Creates a new 16-character password and logs the action to audit trail.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.generateBtn}
+                    onPress={handleGenerateNewPassword}
+                    disabled={isResettingPassword}
+                  >
+                    <RotateCcw size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                    <Text style={styles.generateBtnText}>
+                      {isResettingPassword ? 'Generating...' : 'Generate New Password'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {generatedRecoveryPassword && (
+                  <View style={styles.generatedPasswordBox}>
+                    <View style={styles.credRow}>
+                      <Text style={styles.credLabel}>New Password:</Text>
+                      <Text style={styles.credValue}>
+                        {showRecoveryPassword ? generatedRecoveryPassword : '••••••••••••••••'}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.revealBtn}
+                        onPress={() => setShowRecoveryPassword(!showRecoveryPassword)}
+                      >
+                        {showRecoveryPassword ? <EyeOff size={12} color="#475569" /> : <Eye size={12} color="#475569" />}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.copyBtn}
+                        onPress={() => copyTextToClipboard(generatedRecoveryPassword, 'recPass')}
+                      >
+                        {copiedRecoveryPassword ? <Check size={12} color="#059669" /> : <Copy size={12} color="#475569" />}
+                        <Text style={styles.copyBtnText}>{copiedRecoveryPassword ? 'Copied' : 'Copy'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Modal Footer */}
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setRecoveryMember(null)}
+                >
+                  <Text style={styles.cancelBtnText}>Close Recovery</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -843,6 +1030,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#475569',
   },
+  recoveryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DEF7EC',
+    borderWidth: 1,
+    borderColor: '#BCF0DA',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  recoveryBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#03543F',
+  },
 
   // Modal
   modalBackdrop: {
@@ -854,7 +1058,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    maxWidth: 560,
+    maxWidth: 580,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 24,
@@ -1032,5 +1236,60 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#03543F',
+  },
+
+  // Recovery Modal
+  recoveryCredBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 14,
+    gap: 10,
+    marginBottom: 16,
+  },
+  passwordResetSection: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+  },
+  resetHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  resetTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  resetSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  generateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  generateBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  generatedPasswordBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
 });

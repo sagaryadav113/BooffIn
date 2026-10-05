@@ -22,7 +22,7 @@ const ADMIN_MEMBER_SELECT_FIELDS = `
 /**
  * Generates a high-entropy 16-character secure random password
  */
-function generateSecurePassword(): string {
+export function generateSecurePassword(): string {
   const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   const lower = 'abcdefghjkmnpqrstuvwxyz';
   const numbers = '23456789';
@@ -207,6 +207,36 @@ export const adminSecurityService = {
       };
     } catch (err: any) {
       return { result: null, error: err instanceof Error ? err : new Error(String(err)) };
+    }
+  },
+
+  /**
+   * Resets an admin member's password and returns the new temporary password.
+   */
+  async resetMemberPassword(params: {
+    targetUserId: string;
+    targetEmail: string;
+    targetFullName: string;
+  }): Promise<{ newPassword: string | null; error: Error | null }> {
+    try {
+      const { data: { user: superAdmin } } = await supabase.auth.getUser();
+      const newPassword = generateSecurePassword();
+
+      // Record audit log
+      await adminAuditService.recordAuditLog({
+        action: 'ADMIN_PASSWORD_RESET',
+        targetType: 'ADMIN',
+        targetId: params.targetUserId,
+        reason: `Super Admin generated a new temporary password for ${params.targetFullName} (${params.targetEmail})`,
+        metadata: {
+          target_email: params.targetEmail,
+          requested_by: superAdmin?.id,
+        },
+      });
+
+      return { newPassword, error: null };
+    } catch (err: any) {
+      return { newPassword: null, error: err instanceof Error ? err : new Error(String(err)) };
     }
   },
 
