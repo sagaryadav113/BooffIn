@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import { SaveIcon } from '../core/SaveIcon';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { blockUser } from '../../api/moderationService';
+import { ContentReportModal } from './ContentReportModal';
 
 export interface PostOptionsModalProps {
   visible: boolean;
@@ -47,6 +48,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
   const currentUser = useAuthStore((s) => s.user);
   const deletePost = usePostStore((s) => s.deletePost);
   const toggleSave = usePostStore((s) => s.toggleSavePost);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
 
   const isAuthor = currentUser?.id === post.author.id;
 
@@ -287,12 +289,10 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => {
-                    onClose();
-                    Alert.alert(
-                      'Report Post',
-                      'Thank you for helping keep BooffIn a safe research environment. Our academic review team has been notified.',
-                      [{ text: 'OK' }]
-                    );
+                    try {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    } catch {}
+                    setReportModalVisible(true);
                   }}
                   activeOpacity={0.7}
                 >
@@ -377,6 +377,24 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Structured Content Report Modal */}
+      <ContentReportModal
+        visible={reportModalVisible}
+        onClose={() => {
+          setReportModalVisible(false);
+          onClose();
+        }}
+        reportedType="post"
+        reportedId={post.id}
+        targetTitle={post.content}
+        targetAuthorName={post.author.handle || post.author.fullName}
+        targetAuthorId={post.author.id}
+        onReportSuccess={() => {
+          setReportModalVisible(false);
+          onClose();
+        }}
+      />
     </Modal>
   );
 };

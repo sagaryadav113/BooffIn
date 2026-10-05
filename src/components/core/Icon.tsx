@@ -76,6 +76,7 @@ export type IconName =
   | 'Award'
   | 'UserCheck'
   | 'UserX'
+  | 'Flag'
   | 'Database'
   | 'AtSign'
   | 'Link'

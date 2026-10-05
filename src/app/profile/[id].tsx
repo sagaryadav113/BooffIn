@@ -30,6 +30,7 @@ import {
   UserPlus,
   Lock,
   UserX,
+  Flag,
 } from 'lucide-react-native';
 import { blockUser, unblockUser } from '../../api/moderationService';
 import * as Haptics from 'expo-haptics';
@@ -43,6 +44,7 @@ import { PostCard } from '../../components/cards/PostCard';
 import { TrendingPaperCard } from '../../components/cards/TrendingPaperCard';
 import { ProfileAnalyticsBar } from '../../components/profile/ProfileAnalyticsBar';
 import { ProfileAnalyticsModal } from '../../components/profile/ProfileAnalyticsModal';
+import { ContentReportModal } from '../../components/modals/ContentReportModal';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 import {
@@ -93,6 +95,7 @@ export default function OtherResearcherProfileScreen() {
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
 
   const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
   const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
@@ -525,14 +528,29 @@ export default function OtherResearcherProfileScreen() {
 
             <View style={{ flexDirection: 'row', gap: spacing.xs }}>
               {!isOwnProfile && (
-                <IconButton
-                  icon={researcher.isBlocked ? 'UserCheck' : 'UserX'}
-                  size="sm"
-                  variant="filled"
-                  color={researcher.isBlocked ? colors.accentGreen : colors.white}
-                  onPress={handleBlockToggle}
-                  style={styles.bannerIconButton}
-                />
+                <>
+                  <IconButton
+                    icon="Flag"
+                    size="sm"
+                    variant="filled"
+                    color={colors.white}
+                    onPress={() => {
+                      try {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      } catch {}
+                      setReportModalVisible(true);
+                    }}
+                    style={styles.bannerIconButton}
+                  />
+                  <IconButton
+                    icon={researcher.isBlocked ? 'UserCheck' : 'UserX'}
+                    size="sm"
+                    variant="filled"
+                    color={researcher.isBlocked ? colors.accentGreen : colors.white}
+                    onPress={handleBlockToggle}
+                    style={styles.bannerIconButton}
+                  />
+                </>
               )}
               <IconButton
                 icon="Share2"
@@ -874,6 +892,20 @@ export default function OtherResearcherProfileScreen() {
           userId={researcher.id}
           userFullName={researcher.fullName}
           onClose={() => setAnalyticsModalOpen(false)}
+        />
+      )}
+
+      {/* Structured Researcher Profile Report Modal */}
+      {!isOwnProfile && (
+        <ContentReportModal
+          visible={reportModalVisible}
+          onClose={() => setReportModalVisible(false)}
+          reportedType="profile"
+          reportedId={researcher.id}
+          targetTitle={researcher.fullName}
+          targetAuthorName={researcher.handle || researcher.fullName}
+          targetAuthorId={researcher.id}
+          onReportSuccess={() => setReportModalVisible(false)}
         />
       )}
     </SafeAreaView>
