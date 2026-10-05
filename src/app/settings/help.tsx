@@ -38,6 +38,7 @@ export default function HelpSettingsScreen() {
   const [reportDetails, setReportDetails] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [submitFeedback, setSubmitFeedback] = useState<string | null>(null);
 
   const [activePolicyModal, setActivePolicyModal] = useState<
@@ -45,8 +46,9 @@ export default function HelpSettingsScreen() {
   >(null);
 
   const handleSubmitReport = async () => {
+    setModalError(null);
     if (!reportReason.trim()) {
-      Alert.alert('Error', 'Please describe the problem or feedback.');
+      setModalError('Please enter a summary or subject for your feedback.');
       return;
     }
 
@@ -68,10 +70,12 @@ export default function HelpSettingsScreen() {
       setIsSubmitting(false);
 
       if (error) {
-        Alert.alert('Error', error.message || 'Failed to submit feedback. Please try again.');
+        console.warn('support_tickets insert error:', error.message);
+        setModalError(error.message || 'Failed to submit feedback. Please try again.');
       } else {
         setReportReason('');
         setReportDetails('');
+        setModalError(null);
         setIsSubmittedSuccess(true);
         setTimeout(() => {
           setIsSubmittedSuccess(false);
@@ -80,7 +84,7 @@ export default function HelpSettingsScreen() {
       }
     } catch (err: any) {
       setIsSubmitting(false);
-      Alert.alert('Error', err?.message || 'Failed to submit feedback. Please try again.');
+      setModalError(err?.message || 'Failed to submit feedback. Please try again.');
     }
   };
 
@@ -204,6 +208,15 @@ export default function HelpSettingsScreen() {
                     <Typography variant="body" color="#065F46" style={styles.successSubline}>
                       thank you for trusting BooffIn support
                     </Typography>
+                    <Button
+                      title="Done"
+                      variant="primary"
+                      onPress={() => {
+                        setIsSubmittedSuccess(false);
+                        setReportModalOpen(false);
+                      }}
+                      style={{ marginTop: spacing.md, minWidth: 120, backgroundColor: '#064E3B' }}
+                    />
                   </View>
                 ) : (
                   <>
@@ -213,6 +226,15 @@ export default function HelpSettingsScreen() {
                     <Typography variant="caption" color={colors.textSecondary} style={{ marginTop: 4, marginBottom: spacing.md }}>
                       Help us improve BooffIn for the scientific community.
                     </Typography>
+
+                    {modalError && (
+                      <View style={styles.modalErrorBox}>
+                        <Icon name="AlertTriangle" size="sm" color="#991B1B" />
+                        <Typography variant="caption" color="#991B1B" style={{ flex: 1, marginLeft: 6 }}>
+                          {modalError}
+                        </Typography>
+                      </View>
+                    )}
 
                     <TextInput
                       style={styles.reasonInput}
@@ -236,7 +258,10 @@ export default function HelpSettingsScreen() {
                       <Button
                         title="Cancel"
                         variant="secondary"
-                        onPress={() => setReportModalOpen(false)}
+                        onPress={() => {
+                          setModalError(null);
+                          setReportModalOpen(false);
+                        }}
                         style={{ flex: 1, marginRight: spacing.sm }}
                         disabled={isSubmitting}
                       />
@@ -458,6 +483,16 @@ const styles = StyleSheet.create({
   modalBtnRow: {
     flexDirection: 'row',
     marginTop: spacing.md,
+  },
+  modalErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: radii.md,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
   },
   successWrapper: {
     alignItems: 'center',
