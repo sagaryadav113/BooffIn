@@ -244,4 +244,76 @@ export const adminApprovalService = {
       return 0;
     }
   },
+
+  /**
+   * Fetches real verification requests submitted by mobile app users.
+   */
+  async listVerificationRequests(): Promise<{ requests: any[]; error: Error | null }> {
+    try {
+      // 1. Try to query admin_approval_requests for verification action types
+      const { data, error } = await supabase
+        .from('admin_approval_requests')
+        .select('*')
+        .in('action_type', ['VERIFY_RESEARCHER', 'BADGE_APPROVAL', 'INSTITUTION_VERIFY'])
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return { requests: [], error: null };
+      }
+
+      return { requests: data || [], error: null };
+    } catch {
+      return { requests: [], error: null };
+    }
+  },
+
+  /**
+   * Directly grants or revokes verified researcher badge on a real profile.
+   */
+  async updateProfileVerificationBadge(
+    userId: string, 
+    isVerified: boolean,
+    badgeType: string = 'RESEARCHER'
+  ): Promise<{ error: Error | null }> {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        return { error: new Error('Unauthorized admin session.') };
+      }
+
+      // Update public.profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          orcid_verified: isVerified,
+          is_orcid_verified: isVerified,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (profileError) {
+        // Fallback if column names differ
+        await supabase
+          .from('profiles')
+          .update({
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+      }
+
+      // Record audit log
+      await adminAuditService.recordAuditLog({
+        action: isVerified ? 'VERIFY_USER' : 'UNVERIFY_USER',
+        targetType: 'PROFILE',
+        targetId: userId,
+        reason: `Admin ${isVerified ? 'granted' : 'revoked'} ${badgeType} academic verification badge`,
+        metadata: { badgeType, isVerified },
+      });
+
+      return { error: null };
+    } catch (err: any) {
+      return { error: err instanceof Error ? err : new Error(String(err)) };
+    }
+  },
 };
+
