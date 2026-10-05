@@ -56,7 +56,7 @@ export const AdminOpsChatView: React.FC = () => {
 
     const [msgRes, teamRes] = await Promise.all([
       adminChatService.listMessages(activeChannel),
-      adminSecurityService.listAdmins(),
+      adminSecurityService.listAdminMembers(),
     ]);
 
     if (msgRes.error) {
@@ -66,8 +66,8 @@ export const AdminOpsChatView: React.FC = () => {
       setMessages(msgRes.messages);
     }
 
-    if (!teamRes.error && teamRes.admins) {
-      setTeamMembers(teamRes.admins);
+    if (!teamRes.error && teamRes.members) {
+      setTeamMembers(teamRes.members);
     }
 
     setLoading(false);

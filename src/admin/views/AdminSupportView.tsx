@@ -65,7 +65,7 @@ export const AdminSupportView: React.FC = () => {
         search: search.trim() || undefined,
         limit: 50,
       }),
-      adminSecurityService.listAdmins(),
+      adminSecurityService.listAdminMembers(),
     ]);
 
     if (ticketRes.error) {
@@ -77,8 +77,8 @@ export const AdminSupportView: React.FC = () => {
       setTotalCount(ticketRes.count);
     }
 
-    if (!teamRes.error && teamRes.admins) {
-      setTeamMembers(teamRes.admins);
+    if (!teamRes.error && teamRes.members) {
+      setTeamMembers(teamRes.members);
     }
 
     setLoading(false);
@@ -101,7 +101,7 @@ export const AdminSupportView: React.FC = () => {
     setErrorMessage(null);
 
     const assignedMember = teamMembers.find((m) => m.user_id === selectedAssignee);
-    const assignedName = assignedMember?.full_name || (selectedAssignee ? 'Co-Admin' : null);
+    const assignedName = assignedMember?.fullName || assignedMember?.full_name || (selectedAssignee ? 'Co-Admin' : null);
 
     const res = await adminSupportService.updateTicket({
       ticketId: selectedTicket.id,
@@ -374,7 +374,7 @@ export const AdminSupportView: React.FC = () => {
                         onPress={() => setSelectedAssignee(m.user_id)}
                       >
                         <Text style={[styles.assigneeChipText, selectedAssignee === m.user_id && styles.assigneeChipTextActive]}>
-                          {m.full_name || m.email?.split('@')[0]} ({m.role})
+                          {m.fullName || m.full_name || m.email?.split('@')[0]} ({m.role})
                         </Text>
                       </TouchableOpacity>
                     ))}
