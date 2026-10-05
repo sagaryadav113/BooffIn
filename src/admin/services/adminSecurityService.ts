@@ -6,19 +6,6 @@ import { supabase } from '../../api/client';
 import { AdminMember, AdminRole, AdminStatus } from '../types/roles';
 import { adminAuditService } from './adminAuditService';
 
-const ADMIN_MEMBER_SELECT_FIELDS = `
-  id,
-  user_id,
-  role,
-  status,
-  invited_by,
-  created_at,
-  updated_at,
-  activated_at,
-  deactivated_at,
-  last_seen_at
-`;
-
 /**
  * Generates a high-entropy 16-character secure random password
  */
@@ -54,15 +41,7 @@ export const adminSecurityService = {
     try {
       const { data, error } = await supabase
         .from('admin_members')
-        .select(`
-          id,
-          user_id,
-          role,
-          status,
-          invited_by,
-          created_at,
-          updated_at
-        `)
+        .select('*')
         .order('created_at', { ascending: true });
 
       if (!error && data && data.length > 0) {
@@ -75,8 +54,31 @@ export const adminSecurityService = {
 
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
+        // Also fetch recent audit logs to find provisioned email/name metadata fallback
+        const { data: auditLogs } = await supabase
+          .from('admin_audit_logs')
+          .select('target_id, metadata, reason')
+          .eq('action', 'ADMIN_PROVISIONED');
+
+        const auditMap = new Map((auditLogs || []).map((a: any) => [a.target_id, a.metadata]));
+
         const mapped = data.map((d: any) => {
           const prof = profileMap.get(d.user_id);
+          const auditMeta = auditMap.get(d.user_id) as any;
+
+          const fullName = 
+            d.full_name || 
+            prof?.full_name || 
+            prof?.username || 
+            (auditMeta?.provisioned_email ? auditMeta.provisioned_email.split('@')[0] : undefined) || 
+            'Administrator';
+
+          const email = 
+            d.email || 
+            (prof?.username ? `${prof.username}@letsbooffin.com` : undefined) || 
+            auditMeta?.provisioned_email || 
+            `${d.user_id.slice(0, 8)}@letsbooffin.com`;
+
           return {
             id: d.id,
             user_id: d.user_id,
@@ -85,8 +87,8 @@ export const adminSecurityService = {
             invited_by: d.invited_by,
             created_at: d.created_at,
             updated_at: d.updated_at,
-            fullName: prof?.full_name || prof?.username || 'Team Member',
-            email: prof?.username ? `${prof.username}@letsbooffin.com` : undefined,
+            fullName,
+            email,
           };
         });
 
@@ -158,7 +160,7 @@ export const adminSecurityService = {
         return { result: null, error: new Error('Failed to obtain new user identifier from auth provider.') };
       }
 
-      // 2. Register in public.admin_members table
+      // 2. Register in public.admin_members table (with full_name and email columns)
       const { error: memberError } = await supabase
         .from('admin_members')
         .upsert({
@@ -166,11 +168,22 @@ export const adminSecurityService = {
           role: params.role,
           status: 'ACTIVE',
           invited_by: superAdmin.id,
+          full_name: params.fullName.trim(),
+          email: email,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
 
       if (memberError) {
-        console.warn('admin_members upsert notice:', memberError.message);
+        // If full_name/email columns don't exist yet, retry with base columns
+        await supabase
+          .from('admin_members')
+          .upsert({
+            user_id: newUserId,
+            role: params.role,
+            status: 'ACTIVE',
+            invited_by: superAdmin.id,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id' });
       }
 
       // 3. Ensure profile record exists
@@ -191,6 +204,7 @@ export const adminSecurityService = {
         reason: `Super Admin provisioned team member ${params.fullName} (${email}) with role ${params.role}`,
         metadata: {
           provisioned_email: email,
+          provisioned_name: params.fullName.trim(),
           assigned_role: params.role,
           provisioned_by: superAdmin.id,
         },
