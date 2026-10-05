@@ -1,10 +1,8 @@
 -- ============================================================================
 -- BOOFFIN PLATFORM: CONTENT & USER MODERATION REPORTS SYSTEM
 -- ============================================================================
--- Enables mobile & web users to submit structured reports for posts, comments,
--- and profiles, and routes them to the BooffIn Admin Control Center.
 
--- 1. Ensure admin_members table exists for RBAC
+-- 1. Ensure admin_members table exists
 CREATE TABLE IF NOT EXISTS public.admin_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -15,7 +13,24 @@ CREATE TABLE IF NOT EXISTS public.admin_members (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 2. Create reports table
+-- 2. Create SECURITY DEFINER helper to prevent infinite RLS recursion
+CREATE OR REPLACE FUNCTION public.is_admin(p_user_id UUID DEFAULT auth.uid())
+RETURNS BOOLEAN AS $$
+BEGIN
+  IF p_user_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+  RETURN EXISTS (
+    SELECT 1 FROM public.admin_members
+    WHERE user_id = p_user_id AND status = 'ACTIVE'
+  );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp;
+
+REVOKE ALL ON FUNCTION public.is_admin(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_admin(UUID) TO anon, authenticated;
+
+-- 3. Create reports table
 CREATE TABLE IF NOT EXISTS public.reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     reporter_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -52,7 +67,7 @@ WITH CHECK (
     auth.uid() = reporter_id
 );
 
--- Policy 2: Users can view their own filed reports
+-- Policy 2: Users can view their own reports & Admins can view all reports (via is_admin function)
 DROP POLICY IF EXISTS "Users can view their own reports" ON public.reports;
 CREATE POLICY "Users can view their own reports"
 ON public.reports
@@ -60,11 +75,7 @@ FOR SELECT
 TO authenticated
 USING (
     auth.uid() = reporter_id
-    OR EXISTS (
-        SELECT 1 FROM public.admin_members
-        WHERE admin_members.user_id = auth.uid()
-        AND admin_members.status = 'ACTIVE'
-    )
+    OR public.is_admin(auth.uid())
 );
 
 -- Policy 3: Platform Administrators can update / resolve reports
@@ -74,21 +85,13 @@ ON public.reports
 FOR UPDATE
 TO authenticated
 USING (
-    EXISTS (
-        SELECT 1 FROM public.admin_members
-        WHERE admin_members.user_id = auth.uid()
-        AND admin_members.status = 'ACTIVE'
-    )
+    public.is_admin(auth.uid())
 )
 WITH CHECK (
-    EXISTS (
-        SELECT 1 FROM public.admin_members
-        WHERE admin_members.user_id = auth.uid()
-        AND admin_members.status = 'ACTIVE'
-    )
+    public.is_admin(auth.uid())
 );
 
--- Policy 4: Admin members read policy
+-- Policy 4: Direct, non-recursive select policy for admin_members
 DROP POLICY IF EXISTS "Admins can read admin_members" ON public.admin_members;
 CREATE POLICY "Admins can read admin_members"
 ON public.admin_members
@@ -96,9 +99,4 @@ FOR SELECT
 TO authenticated
 USING (
     user_id = auth.uid()
-    OR EXISTS (
-        SELECT 1 FROM public.admin_members am
-        WHERE am.user_id = auth.uid()
-        AND am.status = 'ACTIVE'
-    )
 );
