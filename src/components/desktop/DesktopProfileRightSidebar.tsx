@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, ActivityIndicator, Platform } from 'react-native';
 import { router } from 'expo-router';
 import {
   Activity,
@@ -255,7 +255,7 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
-                if (typeof window !== 'undefined') {
+                if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
                   window.dispatchEvent(new CustomEvent('booffin:set-profile-tab', { detail: 'Activity' }));
                 }
                 router.push('/(tabs)/profile?tab=Activity');

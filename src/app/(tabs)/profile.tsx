@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -176,9 +177,9 @@ export default function CurrentUserProfileScreen() {
     }
   }, [params.openAnalytics, params.tab, params.subFilter]);
 
-  // Support immediate in-page tab switching from desktop sidebars
+  // Support immediate in-page tab switching from desktop sidebars (Web only)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       const handleCustomTab = (e: any) => {
         if (e.detail) {
           const lower = String(e.detail).toLowerCase();
@@ -205,7 +206,11 @@ export default function CurrentUserProfileScreen() {
         }
       };
       window.addEventListener('booffin:set-profile-tab', handleCustomTab);
-      return () => window.removeEventListener('booffin:set-profile-tab', handleCustomTab);
+      return () => {
+        if (typeof window.removeEventListener === 'function') {
+          window.removeEventListener('booffin:set-profile-tab', handleCustomTab);
+        }
+      };
     }
   }, []);
 
