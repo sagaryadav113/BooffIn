@@ -56,7 +56,7 @@ export const AdminOpsChatView: React.FC = () => {
 
     const [msgRes, teamRes] = await Promise.all([
       adminChatService.listMessages(activeChannel),
-      adminTeamService.listAdmins(),
+      adminSecurityService.listAdmins(),
     ]);
 
     if (msgRes.error) {

@@ -65,7 +65,7 @@ export const AdminSupportView: React.FC = () => {
         search: search.trim() || undefined,
         limit: 50,
       }),
-      adminTeamService.listAdmins(),
+      adminSecurityService.listAdmins(),
     ]);
 
     if (ticketRes.error) {
