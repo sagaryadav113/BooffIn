@@ -38,6 +38,7 @@ export default function HelpSettingsScreen() {
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<string | null>(null);
 
   const [activePolicyModal, setActivePolicyModal] = useState<
@@ -80,9 +81,11 @@ export default function HelpSettingsScreen() {
     if (res.success) {
       setReportReason('');
       setReportDetails('');
-      setReportModalOpen(false);
-      setSubmitFeedback('Thank you. Your inquiry has been routed to the BooffIn Support Desk.');
-      setTimeout(() => setSubmitFeedback(null), 5000);
+      setIsSubmittedSuccess(true);
+      setTimeout(() => {
+        setIsSubmittedSuccess(false);
+        setReportModalOpen(false);
+      }, 3500);
     } else {
       Alert.alert('Error', res.error || 'Failed to submit report. Please try again.');
     }
@@ -197,47 +200,63 @@ export default function HelpSettingsScreen() {
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
               <View style={styles.reportModalCard}>
-                <Typography variant="h3" color={colors.textPrimary}>
-                  Report a Problem or Feedback
-                </Typography>
-                <Typography variant="caption" color={colors.textSecondary} style={{ marginTop: 4, marginBottom: spacing.md }}>
-                  Help us improve BooffIn for the scientific community.
-                </Typography>
+                {isSubmittedSuccess ? (
+                  <View style={styles.successWrapper}>
+                    <View style={styles.darkGreenTickCircle}>
+                      <Icon name="Check" size="lg" color="#FFFFFF" />
+                    </View>
+                    <Typography variant="h3" color="#064E3B" style={styles.successHeadline}>
+                      your feedback has been recorded
+                    </Typography>
+                    <Typography variant="body" color="#065F46" style={styles.successSubline}>
+                      thank you for trusting BooffIn support
+                    </Typography>
+                  </View>
+                ) : (
+                  <>
+                    <Typography variant="h3" color={colors.textPrimary}>
+                      Report a Problem or Feedback
+                    </Typography>
+                    <Typography variant="caption" color={colors.textSecondary} style={{ marginTop: 4, marginBottom: spacing.md }}>
+                      Help us improve BooffIn for the scientific community.
+                    </Typography>
 
-                <TextInput
-                  style={styles.reasonInput}
-                  placeholder="Subject / Summary of issue..."
-                  placeholderTextColor={colors.textMuted}
-                  value={reportReason}
-                  onChangeText={setReportReason}
-                />
+                    <TextInput
+                      style={styles.reasonInput}
+                      placeholder="Subject / Summary of issue..."
+                      placeholderTextColor={colors.textMuted}
+                      value={reportReason}
+                      onChangeText={setReportReason}
+                    />
 
-                <TextInput
-                  style={styles.detailsInput}
-                  placeholder="Additional details, error messages, or suggestions..."
-                  placeholderTextColor={colors.textMuted}
-                  value={reportDetails}
-                  onChangeText={setReportDetails}
-                  multiline
-                  numberOfLines={4}
-                />
+                    <TextInput
+                      style={styles.detailsInput}
+                      placeholder="Additional details, error messages, or suggestions..."
+                      placeholderTextColor={colors.textMuted}
+                      value={reportDetails}
+                      onChangeText={setReportDetails}
+                      multiline
+                      numberOfLines={4}
+                    />
 
-                <View style={styles.modalBtnRow}>
-                  <Button
-                    title="Cancel"
-                    variant="secondary"
-                    onPress={() => setReportModalOpen(false)}
-                    style={{ flex: 1, marginRight: spacing.sm }}
-                    disabled={isSubmitting}
-                  />
-                  <Button
-                    title={isSubmitting ? "Submitting..." : "Submit Report"}
-                    variant="primary"
-                    onPress={handleSubmitReport}
-                    loading={isSubmitting}
-                    style={{ flex: 2 }}
-                  />
-                </View>
+                    <View style={styles.modalBtnRow}>
+                      <Button
+                        title="Cancel"
+                        variant="secondary"
+                        onPress={() => setReportModalOpen(false)}
+                        style={{ flex: 1, marginRight: spacing.sm }}
+                        disabled={isSubmitting}
+                      />
+                      <Button
+                        title={isSubmitting ? "Submitting..." : "Submit Report"}
+                        variant="primary"
+                        onPress={handleSubmitReport}
+                        loading={isSubmitting}
+                        style={{ flex: 2 }}
+                      />
+                    </View>
+                  </>
+                )}
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -446,5 +465,36 @@ const styles = StyleSheet.create({
   modalBtnRow: {
     flexDirection: 'row',
     marginTop: spacing.md,
+  },
+  successWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.md,
+  },
+  darkGreenTickCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#064E3B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+    shadowColor: '#064E3B',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  successHeadline: {
+    textAlign: 'center',
+    fontWeight: '800',
+    fontSize: 17,
+    letterSpacing: -0.2,
+    marginBottom: 6,
+  },
+  successSubline: {
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
