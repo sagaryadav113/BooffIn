@@ -421,7 +421,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               <Text style={styles.histLabel}>06:00</Text>
               <Text style={styles.histLabel}>12:00</Text>
               <Text style={styles.histLabel}>18:00</Text>
-              <Text style={styles.histLabel}>23:00</Text>
+              <Text style={styles.histLabel}>23:00 IST</Text>
             </View>
           </View>
         </View>

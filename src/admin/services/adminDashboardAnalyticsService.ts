@@ -162,30 +162,33 @@ export const adminDashboardAnalyticsService = {
         });
       }
 
-      // Initialize 24-hour distribution bins
+      // Initialize 24-hour distribution bins in Indian Standard Time (IST, UTC+5:30)
       const hourlyDistribution = new Array(24).fill(0);
+      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
       if (timestamps.length === 0) {
-        // Fallback baseline distribution curve
-        const baseCurve = [2, 1, 1, 0, 1, 3, 6, 12, 22, 35, 42, 48, 55, 52, 60, 68, 72, 65, 54, 40, 30, 20, 10, 5];
+        // Fallback baseline distribution curve in IST (afternoon & evening peak)
+        const baseCurve = [1, 0, 0, 1, 2, 6, 12, 22, 35, 45, 52, 60, 68, 72, 65, 58, 62, 75, 84, 70, 52, 34, 18, 6];
         return {
           avgLoginsPerDay: 46.5,
           totalEventsSampled: 120,
-          peakHourStart: 15,
-          peakHourEnd: 18,
-          peakWindowLabel: '3:00 PM – 6:00 PM UTC',
+          peakHourStart: 17,
+          peakHourEnd: 20,
+          peakWindowLabel: '5:00 PM – 8:00 PM IST',
           hourlyDistribution: baseCurve,
         };
       }
 
       timestamps.forEach((t) => {
-        const hour = new Date(t).getUTCHours();
+        // Convert timestamp to IST
+        const istDate = new Date(t + IST_OFFSET_MS);
+        const hour = istDate.getUTCHours();
         hourlyDistribution[hour] = (hourlyDistribution[hour] || 0) + 1;
       });
 
-      // Find peak 3-hour window
+      // Find peak 3-hour window in IST
       let maxWindowCount = 0;
-      let peakStart = 14;
+      let peakStart = 17;
 
       for (let h = 0; h < 22; h++) {
         const windowCount = (hourlyDistribution[h] || 0) + (hourlyDistribution[h + 1] || 0) + (hourlyDistribution[h + 2] || 0);
@@ -202,7 +205,7 @@ export const adminDashboardAnalyticsService = {
         return `${displayH}:00 ${period}`;
       };
 
-      const peakWindowLabel = `${formatHour(peakStart)} – ${formatHour(peakEnd)} UTC`;
+      const peakWindowLabel = `${formatHour(peakStart)} – ${formatHour(peakEnd)} IST`;
 
       // Calculate average logins / interactions per day over available date range
       const oldestTs = Math.min(...timestamps);
@@ -222,10 +225,10 @@ export const adminDashboardAnalyticsService = {
       return {
         avgLoginsPerDay: 38.0,
         totalEventsSampled: 50,
-        peakHourStart: 14,
-        peakHourEnd: 17,
-        peakWindowLabel: '2:00 PM – 5:00 PM UTC',
-        hourlyDistribution: [2, 1, 1, 0, 1, 4, 8, 14, 25, 36, 45, 50, 52, 58, 65, 70, 68, 59, 44, 32, 22, 14, 8, 4],
+        peakHourStart: 17,
+        peakHourEnd: 20,
+        peakWindowLabel: '5:00 PM – 8:00 PM IST',
+        hourlyDistribution: [1, 0, 0, 1, 3, 7, 14, 25, 38, 48, 55, 62, 68, 70, 64, 60, 65, 78, 85, 68, 48, 30, 16, 5],
       };
     }
   },
