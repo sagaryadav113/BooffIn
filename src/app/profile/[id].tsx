@@ -96,6 +96,7 @@ export default function OtherResearcherProfileScreen() {
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [postsRenderLimit, setPostsRenderLimit] = useState(12);
 
   const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
   const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
@@ -826,7 +827,20 @@ export default function OtherResearcherProfileScreen() {
                     </Text>
                   </View>
                 ) : displayFilteredPosts.length > 0 ? (
-                  displayFilteredPosts.map((p: Post) => <PostCard key={p.id} post={p} />)
+                  <>
+                    {displayFilteredPosts.slice(0, postsRenderLimit).map((p: Post) => <PostCard key={p.id} post={p} />)}
+                    {displayFilteredPosts.length > postsRenderLimit && (
+                      <TouchableOpacity
+                        style={styles.loadMoreButton}
+                        onPress={() => setPostsRenderLimit((prev) => prev + 12)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.loadMoreButtonText}>
+                          Show more posts ({displayFilteredPosts.length - postsRenderLimit} remaining)
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
                 ) : (
                   <EmptyState
                     icon="Discussion"
@@ -877,16 +891,18 @@ export default function OtherResearcherProfileScreen() {
       </ScrollView>
 
       {/* Followers & Following List Modal */}
-      <FollowListModal
-        visible={followModalVisible}
-        onClose={() => setFollowModalVisible(false)}
-        userId={researcher.id}
-        type={followModalType}
-        userName={researcher.fullName}
-      />
+      {followModalVisible && (
+        <FollowListModal
+          visible={followModalVisible}
+          onClose={() => setFollowModalVisible(false)}
+          userId={researcher.id}
+          type={followModalType}
+          userName={researcher.fullName}
+        />
+      )}
 
       {/* Comprehensive Profile Analytics Modal (Private to Account Owner Only) */}
-      {isOwnProfile && (
+      {isOwnProfile && analyticsModalOpen && (
         <ProfileAnalyticsModal
           visible={analyticsModalOpen}
           userId={researcher.id}
@@ -896,7 +912,7 @@ export default function OtherResearcherProfileScreen() {
       )}
 
       {/* Structured Researcher Profile Report Modal */}
-      {!isOwnProfile && (
+      {!isOwnProfile && reportModalVisible && (
         <ContentReportModal
           visible={reportModalVisible}
           onClose={() => setReportModalVisible(false)}
@@ -1298,6 +1314,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 280,
     lineHeight: 18,
+  },
+  loadMoreButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    marginHorizontal: spacing.lg,
+  },
+  loadMoreButtonText: {
+    ...typography.captionBold,
+    color: colors.accentBlue,
+    fontSize: 13,
   },
 });
 

@@ -327,6 +327,13 @@ export default function CurrentUserProfileScreen() {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [activitySubFilter, setActivitySubFilter] = useState<'All' | 'Discussions' | 'Questions' | 'Replies'>('All');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [postsRenderLimit, setPostsRenderLimit] = useState(12);
+  const [activityRenderLimit, setActivityRenderLimit] = useState(15);
+
+  const loadedTabsRef = React.useRef<{ saved: boolean; activity: boolean }>({
+    saved: false,
+    activity: false,
+  });
 
   const loadRequests = React.useCallback(async () => {
     if (!user?.id) return;
@@ -381,25 +388,45 @@ export default function CurrentUserProfileScreen() {
     setIsLoadingSaved(false);
   }, [user?.id]);
 
+  // Initial mount: load only active/primary post feed & collaboration requests to keep UI thread nimble
   React.useEffect(() => {
     loadRequests();
     loadUserPosts();
-    loadUserComments();
-    loadSavedItems();
-  }, [loadRequests, loadUserPosts, loadUserComments, loadSavedItems]);
+  }, [loadRequests, loadUserPosts]);
+
+  // Lazy-load Saved items only when user navigates to Saved tab
+  React.useEffect(() => {
+    if (activeSubTab === 'Saved' && !loadedTabsRef.current.saved) {
+      loadedTabsRef.current.saved = true;
+      loadSavedItems();
+    }
+  }, [activeSubTab, loadSavedItems]);
+
+  // Lazy-load Activity comments only when user navigates to Activity tab
+  React.useEffect(() => {
+    if (activeSubTab === 'Activity' && !loadedTabsRef.current.activity) {
+      loadedTabsRef.current.activity = true;
+      loadUserComments();
+    }
+  }, [activeSubTab, loadUserComments]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    await Promise.all([
+    const promises: Promise<any>[] = [
       refreshCurrentUserProfile(),
       loadUserPosts(),
-      loadUserComments(),
       loadRequests(),
-      loadSavedItems(),
-    ]);
+    ];
+    if (activeSubTab === 'Saved' || loadedTabsRef.current.saved) {
+      promises.push(loadSavedItems());
+    }
+    if (activeSubTab === 'Activity' || loadedTabsRef.current.activity) {
+      promises.push(loadUserComments());
+    }
+    await Promise.all(promises);
     setIsRefreshing(false);
   };
 
@@ -1044,7 +1071,20 @@ export default function CurrentUserProfileScreen() {
                 </Text>
               </View>
             ) : displayFilteredPosts.length > 0 ? (
-              displayFilteredPosts.map((p) => <PostCard key={p.id} post={p} />)
+              <>
+                {displayFilteredPosts.slice(0, postsRenderLimit).map((p) => <PostCard key={p.id} post={p} />)}
+                {displayFilteredPosts.length > postsRenderLimit && (
+                  <TouchableOpacity
+                    style={styles.loadMoreButton}
+                    onPress={() => setPostsRenderLimit((prev) => prev + 12)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.loadMoreButtonText}>
+                      Show more posts ({displayFilteredPosts.length - postsRenderLimit} remaining)
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
             ) : (
               <EmptyState
                 icon="Discussion"
@@ -1290,7 +1330,7 @@ export default function CurrentUserProfileScreen() {
               />
             ) : (
               <View style={styles.activityItemsList}>
-                {filteredActivities.map((item) => {
+                {filteredActivities.slice(0, activityRenderLimit).map((item) => {
                   if (item.kind === 'reply') {
                     const c = item.comment;
                     return (
@@ -1479,6 +1519,17 @@ export default function CurrentUserProfileScreen() {
                     </TouchableOpacity>
                   );
                 })}
+                {filteredActivities.length > activityRenderLimit && (
+                  <TouchableOpacity
+                    style={styles.loadMoreButton}
+                    onPress={() => setActivityRenderLimit((prev) => prev + 15)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.loadMoreButtonText}>
+                      Show more activity ({filteredActivities.length - activityRenderLimit} remaining)
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
@@ -2448,6 +2499,24 @@ const styles = StyleSheet.create({
     ...typography.captionBold,
     color: colors.textPrimary,
     fontSize: 14,
+  },
+  loadMoreButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: radii.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    marginHorizontal: spacing.lg,
+  },
+  loadMoreButtonText: {
+    ...typography.captionBold,
+    color: colors.accentBlue,
+    fontSize: 13,
   },
 });
 
