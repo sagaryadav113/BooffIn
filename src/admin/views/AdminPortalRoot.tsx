@@ -13,6 +13,7 @@ import { AdminMfaView } from './AdminMfaView';
 
 // 11 Core Console Views
 import { AdminDashboardView } from './AdminDashboardView';
+import { AdminCalendarView } from './AdminCalendarView';
 import { AdminSupportView } from './AdminSupportView';
 import { AdminOpsChatView } from './AdminOpsChatView';
 import { AdminUsersView } from './AdminUsersView';
@@ -82,6 +83,8 @@ export const AdminPortalRoot: React.FC = () => {
     switch (activeKey) {
       case 'dashboard':
         return <AdminDashboardView onNavigate={setActiveKey} />;
+      case 'calendar':
+        return <AdminCalendarView />;
       case 'support':
         return <AdminSupportView />;
       case 'team-chat':

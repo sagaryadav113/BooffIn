@@ -9,6 +9,7 @@ import { useAdminPermissions } from '../hooks/useAdminPermissions';
 import { AdminPermission } from '../types/roles';
 import {
   LayoutDashboard,
+  Calendar,
   Users,
   Flag,
   ShieldAlert,
@@ -27,6 +28,7 @@ import {
 
 const NAV_ICON_MAP: Record<string, React.FC<any>> = {
   LayoutDashboard,
+  Calendar,
   LifeBuoy,
   MessagesSquare,
   Users,

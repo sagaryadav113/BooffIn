@@ -13,4 +13,5 @@ export * from './AdminSystemHealthView';
 export * from './AdminSettingsView';
 export * from './AdminSupportView';
 export * from './AdminOpsChatView';
+export * from './AdminCalendarView';
 export * from './AdminPortalRoot';
