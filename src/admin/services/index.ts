@@ -10,3 +10,4 @@ export * from './adminSupportService';
 export * from './adminChatService';
 export * from './adminCalendarService';
 export * from './adminProfileService';
+export * from './adminDashboardAnalyticsService';
