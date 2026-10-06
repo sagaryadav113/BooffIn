@@ -166,16 +166,16 @@ export const AdminOpsChatView: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.headerRow, isMobile && styles.headerRowMobile]}>
-        <View>
-          <Text style={styles.pageTitle}>Internal Admin Team Comms</Text>
-          <Text style={styles.pageSubtitle}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.pageTitle, isMobile && styles.pageTitleMobile]}>Internal Admin Team Comms</Text>
+          <Text style={[styles.pageSubtitle, isMobile && styles.pageSubtitleMobile]} numberOfLines={1}>
             Encrypted staff operations room • Real-time operational coordination
           </Text>
         </View>
 
         <TouchableOpacity style={styles.refreshBtn} onPress={loadMessages}>
           <RefreshCw size={14} color={ADMIN_COLORS.textSecondary} />
-          <Text style={styles.refreshBtnText}>Sync Chat</Text>
+          {!isMobile && <Text style={styles.refreshBtnText}>Sync Chat</Text>}
         </TouchableOpacity>
       </View>
 
@@ -267,23 +267,14 @@ export const AdminOpsChatView: React.FC = () => {
         )}
 
         {/* Center/Right: Message Feed */}
-        <View style={[styles.feedColumn, isMobile && styles.feedColumnMobile]}>
+        <View style={styles.feedColumn}>
           {/* Channel Header Bar */}
-          <View style={[styles.channelHeaderBar, isMobile && styles.channelHeaderBarMobile]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={styles.whatsappRoomAvatar}>
-                <Hash size={16} color="#FFFFFF" />
-              </View>
-              <View>
-                <Text style={styles.activeChannelTitle}>{currentChannelInfo.label}</Text>
-                <Text style={styles.activeChannelDesc} numberOfLines={1}>
-                  {isMobile ? `${teamMembers.length} team members active` : currentChannelInfo.desc}
-                </Text>
-              </View>
+          <View style={styles.channelHeaderBar}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Hash size={18} color="#059669" />
+              <Text style={styles.activeChannelTitle}>{currentChannelInfo.label}</Text>
             </View>
-            <TouchableOpacity style={styles.mobileSyncIconBtn} onPress={loadMessages}>
-              <RefreshCw size={15} color="#059669" />
-            </TouchableOpacity>
+            <Text style={styles.activeChannelDesc} numberOfLines={1}>{currentChannelInfo.desc}</Text>
           </View>
 
           {/* Error Banner */}
@@ -297,8 +288,8 @@ export const AdminOpsChatView: React.FC = () => {
           {/* Messages Scroll Area */}
           <ScrollView
             ref={scrollViewRef}
-            style={[styles.messagesScroll, isMobile && styles.messagesScrollMobile]}
-            contentContainerStyle={[styles.messagesContent, isMobile && styles.messagesContentMobile]}
+            style={styles.messagesScroll}
+            contentContainerStyle={styles.messagesContent}
           >
             {loading ? (
               <View style={styles.centerLoading}>
@@ -323,32 +314,47 @@ export const AdminOpsChatView: React.FC = () => {
                   <React.Fragment key={msg.id}>
                     {showDateDivider && (
                       <View style={styles.dateDividerRow}>
-                        <View style={styles.dateDividerBadge}>
-                          <Text style={styles.dateDividerText}>
-                            Today, {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
-                        </View>
+                        <View style={styles.dateDividerLine} />
+                        <Text style={styles.dateDividerText}>
+                          Today, {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                        <View style={styles.dateDividerLine} />
                       </View>
                     )}
 
                     {isMe ? (
-                      /* Sent Message (Right Aligned — WhatsApp Green) */
-                      <View style={[styles.sentMessageContainer, isMobile && styles.sentMessageContainerMobile]}>
-                        <View style={[styles.sentBubble, isMobile && styles.sentBubbleMobile, msg.is_pinned && styles.pinnedMessageBubble]}>
-                          <Text style={[styles.sentMessageText, isMobile && styles.sentMessageTextMobile]}>
-                            {msg.message}
-                          </Text>
-                          <View style={styles.bubbleMetaRow}>
+                      /* Sent Message (Right Aligned) */
+                      <View style={styles.sentMessageContainer}>
+                        <Text style={styles.senderHeaderRight}>You</Text>
+                        <View style={styles.sentBubbleRow}>
+                          <View style={[styles.sentBubble, msg.is_pinned && styles.pinnedMessageBubble]}>
+                            <Text style={styles.sentMessageText}>{msg.message}</Text>
                             <Text style={styles.sentTimestamp}>
                               {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </Text>
-                            <Text style={styles.doubleCheckmark}>✓✓</Text>
+                          </View>
+
+                          <View style={styles.avatarWrapper}>
+                            <View
+                              style={[
+                                styles.avatarPill,
+                                { backgroundColor: avatarTheme.bg, borderColor: avatarTheme.border },
+                              ]}
+                            >
+                              <Text style={[styles.avatarPillText, { color: avatarTheme.text }]}>
+                                {displayName.substring(0, 2).toUpperCase()}
+                              </Text>
+                            </View>
+                            <View style={styles.avatarOnlineDot} />
                           </View>
                         </View>
                       </View>
                     ) : (
-                      /* Received Message (Left Aligned — WhatsApp White) */
-                      <View style={[styles.receivedMessageContainer, isMobile && styles.receivedMessageContainerMobile]}>
+                      /* Received Message (Left Aligned) */
+                      <View style={styles.receivedMessageContainer}>
+                        <Text style={[styles.senderHeaderLeft, { color: avatarTheme.text }]}>
+                          {displayName}
+                        </Text>
                         <View style={styles.receivedBubbleRow}>
                           <View style={styles.avatarWrapper}>
                             <View
@@ -361,20 +367,14 @@ export const AdminOpsChatView: React.FC = () => {
                                 {displayName.substring(0, 2).toUpperCase()}
                               </Text>
                             </View>
+                            <View style={styles.avatarOnlineDot} />
                           </View>
 
-                          <View style={[styles.receivedBubble, isMobile && styles.receivedBubbleMobile, msg.is_pinned && styles.pinnedMessageBubble]}>
-                            <Text style={[styles.senderHeaderLeft, { color: avatarTheme.text }]}>
-                              {displayName}
+                          <View style={[styles.receivedBubble, msg.is_pinned && styles.pinnedMessageBubble]}>
+                            <Text style={styles.receivedMessageText}>{msg.message}</Text>
+                            <Text style={styles.receivedTimestamp}>
+                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </Text>
-                            <Text style={[styles.receivedMessageText, isMobile && styles.receivedMessageTextMobile]}>
-                              {msg.message}
-                            </Text>
-                            <View style={styles.bubbleMetaRowLeft}>
-                              <Text style={styles.receivedTimestamp}>
-                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </Text>
-                            </View>
                           </View>
                         </View>
                       </View>
@@ -385,96 +385,66 @@ export const AdminOpsChatView: React.FC = () => {
             )}
           </ScrollView>
 
-          {/* Bottom Floating Message Input Bar (WhatsApp UI/UX) */}
+          {/* Bottom Floating Message Input Bar (Modern Pill Design) */}
           <View style={[styles.inputContainerOuter, isMobile && styles.inputContainerOuterMobile]}>
-            {isMobile ? (
-              <View style={styles.whatsappInputRowMobile}>
-                {/* White Capsule for Input, Emoji, Attach */}
-                <View style={styles.whatsappCapsule}>
-                  <TouchableOpacity
-                    style={styles.whatsappIconButton}
-                    onPress={() => setInputText((prev) => prev + ' 😊')}
-                  >
-                    <Smile size={20} color="#64748B" />
-                  </TouchableOpacity>
+            <View style={styles.inputBarPill}>
+              {/* Magic/AI Purple Square Chip */}
+              <View style={styles.aiBadgeIcon}>
+                <Sparkles size={14} color="#FFFFFF" />
+              </View>
 
-                  <TextInput
-                    style={styles.whatsappTextInput}
-                    placeholder="Message..."
-                    placeholderTextColor="#94A3B8"
-                    value={inputText}
-                    onChangeText={setInputText}
-                    onSubmitEditing={handleSendMessage}
-                    returnKeyType="send"
-                  />
+              <TextInput
+                style={styles.chatInputPill}
+                placeholder="Write a message..."
+                placeholderTextColor="#94A3B8"
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={handleSendMessage}
+                returnKeyType="send"
+              />
 
-                  <TouchableOpacity
-                    style={styles.whatsappIconButton}
-                    onPress={() => alert('Attachment upload ready.')}
-                  >
-                    <Paperclip size={18} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Circular Green Send Button */}
+              {/* Action Icons: Emoji, Attach, Clock, Send */}
+              <View style={styles.inputIconsGroup}>
                 <TouchableOpacity
-                  style={[styles.whatsappSendBtnCircle, (!inputText.trim() || sending) && styles.whatsappSendBtnDisabled]}
+                  style={styles.inputIconButton}
+                  onPress={() => setInputText((prev) => prev + ' 😊')}
+                >
+                  <Smile size={18} color="#94A3B8" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.inputIconButton}
+                  onPress={() => alert('Document & attachment upload ready.')}
+                >
+                  <Paperclip size={18} color="#94A3B8" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.inputIconButton}
+                  onPress={() =>
+                    setInputText(
+                      (prev) =>
+                        prev +
+                        ` [${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] `
+                    )
+                  }
+                >
+                  <Clock size={18} color="#94A3B8" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.sendPillBtn, (!inputText.trim() || sending) && styles.sendPillBtnDisabled]}
                   onPress={handleSendMessage}
                   disabled={!inputText.trim() || sending}
                 >
                   {sending ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color="#059669" />
                   ) : (
-                    <Send size={18} color="#FFFFFF" style={{ marginLeft: 2 }} />
+                    <Send size={16} color={inputText.trim() ? '#059669' : '#94A3B8'} />
                   )}
                 </TouchableOpacity>
               </View>
-            ) : (
-              /* Desktop Pill Input Bar */
-              <View style={styles.inputBarPill}>
-                <View style={styles.aiBadgeIcon}>
-                  <Sparkles size={14} color="#FFFFFF" />
-                </View>
-
-                <TextInput
-                  style={styles.chatInputPill}
-                  placeholder="Write a message..."
-                  placeholderTextColor="#94A3B8"
-                  value={inputText}
-                  onChangeText={setInputText}
-                  onSubmitEditing={handleSendMessage}
-                  returnKeyType="send"
-                />
-
-                <View style={styles.inputIconsGroup}>
-                  <TouchableOpacity
-                    style={styles.inputIconButton}
-                    onPress={() => setInputText((prev) => prev + ' 😊')}
-                  >
-                    <Smile size={18} color="#94A3B8" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.inputIconButton}
-                    onPress={() => alert('Document & attachment upload ready.')}
-                  >
-                    <Paperclip size={18} color="#94A3B8" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.sendPillBtn, (!inputText.trim() || sending) && styles.sendPillBtnDisabled]}
-                    onPress={handleSendMessage}
-                    disabled={!inputText.trim() || sending}
-                  >
-                    {sending ? (
-                      <ActivityIndicator size="small" color="#059669" />
-                    ) : (
-                      <Send size={16} color={inputText.trim() ? '#059669' : '#94A3B8'} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+            </View>
           </View>
         </View>
       </View>
@@ -494,12 +464,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   headerRowMobile: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 8,
+  },
+  pageTitleMobile: {
+    fontSize: 17,
+  },
+  pageSubtitleMobile: {
+    fontSize: 11,
+    marginTop: 0,
   },
   mobileChannelBarContainer: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   mobileChannelScroll: {
     flexDirection: 'row',
@@ -511,7 +489,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -566,6 +544,10 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     overflow: 'hidden',
     minHeight: 560,
+  },
+  chatLayoutRowMobile: {
+    minHeight: 0,
+    flex: 1,
   },
   channelsColumn: {
     width: 220,
@@ -844,11 +826,16 @@ const styles = StyleSheet.create({
 
   // Floating Input Pill Bar
   inputContainerOuter: {
-    padding: 14,
-    paddingHorizontal: 18,
+    padding: 12,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
+  },
+  inputContainerOuterMobile: {
+    padding: 8,
+    paddingHorizontal: 10,
+    paddingBottom: 8,
   },
   inputBarPill: {
     flexDirection: 'row',
@@ -888,170 +875,5 @@ const styles = StyleSheet.create({
   },
   sendPillBtnDisabled: {
     opacity: 0.4,
-  },
-
-  // WhatsApp Mobile Styles
-  chatLayoutRowMobile: {
-    borderRadius: 0,
-    borderWidth: 0,
-    minHeight: '100%',
-    flex: 1,
-  },
-  feedColumnMobile: {
-    flex: 1,
-  },
-  channelHeaderBarMobile: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  whatsappRoomAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#059669',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mobileSyncIconBtn: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#ECFDF5',
-  },
-  messagesScrollMobile: {
-    backgroundColor: '#EFEAE2', // WhatsApp chat sand wallpaper background
-  },
-  messagesContentMobile: {
-    paddingHorizontal: 10,
-    paddingVertical: 12,
-    paddingBottom: 24,
-    gap: 8,
-  },
-  dateDividerBadge: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  sentMessageContainerMobile: {
-    maxWidth: '85%',
-    alignSelf: 'flex-end',
-    marginBottom: 4,
-  },
-  sentBubbleMobile: {
-    backgroundColor: '#DCF8C6', // WhatsApp sent green
-    borderWidth: 0,
-    borderRadius: 12,
-    borderTopRightRadius: 2,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 1.5,
-    elevation: 1,
-  },
-  sentMessageTextMobile: {
-    fontSize: 14,
-    color: '#111B21',
-    lineHeight: 19,
-  },
-  bubbleMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 4,
-    marginTop: 2,
-  },
-  doubleCheckmark: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#53BDEB', // WhatsApp blue double tick
-  },
-  receivedMessageContainerMobile: {
-    maxWidth: '85%',
-    alignSelf: 'flex-start',
-    marginBottom: 4,
-  },
-  receivedBubbleMobile: {
-    backgroundColor: '#FFFFFF', // WhatsApp received white
-    borderWidth: 0,
-    borderRadius: 12,
-    borderTopLeftRadius: 2,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 1.5,
-    elevation: 1,
-  },
-  receivedMessageTextMobile: {
-    fontSize: 14,
-    color: '#111B21',
-    lineHeight: 19,
-  },
-  bubbleMetaRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 2,
-  },
-  inputContainerOuterMobile: {
-    backgroundColor: '#EFEAE2',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderTopWidth: 0,
-  },
-  whatsappInputRowMobile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  whatsappCapsule: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  whatsappIconButton: {
-    padding: 6,
-  },
-  whatsappTextInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#111B21',
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  whatsappSendBtnCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#059669',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  whatsappSendBtnDisabled: {
-    backgroundColor: '#94A3B8',
   },
 });
