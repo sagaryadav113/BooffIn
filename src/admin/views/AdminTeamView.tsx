@@ -1,7 +1,3 @@
-// ============================================================================
-// BOOFFIN ADMIN PORTAL — TEAM MANAGEMENT & CO-ADMIN PROVISIONING WORKBENCH
-// ============================================================================
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View, 
@@ -11,7 +7,8 @@ import {
   ActivityIndicator, 
   TouchableOpacity, 
   Modal, 
-  TextInput 
+  TextInput,
+  useWindowDimensions 
 } from 'react-native';
 import { ADMIN_COLORS } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
@@ -38,6 +35,9 @@ import {
 } from 'lucide-react-native';
 
 export const AdminTeamView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const { userId: currentUserId } = useAdminAuth();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<(AdminMember & { email?: string; fullName?: string })[]>([]);
@@ -328,20 +328,20 @@ export const AdminTeamView: React.FC = () => {
   ];
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={isMobile && styles.scrollContentMobile}>
       {/* Header */}
-      <View style={styles.headerRow}>
-        <View>
+      <View style={[styles.headerRow, isMobile && styles.headerRowMobile]}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.pageTitle}>Administrative Team & Access Control</Text>
           <Text style={styles.pageSubtitle}>
             Co-Admin provisioning, Role-Based Access Control (RBAC), and team credential governance
           </Text>
         </View>
 
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.provisionBtn} onPress={handleOpenProvisionModal}>
+        <View style={[styles.actionButtons, isMobile && styles.actionButtonsMobile]}>
+          <TouchableOpacity style={[styles.provisionBtn, isMobile && { flex: 1 }]} onPress={handleOpenProvisionModal}>
             <UserPlus size={15} color="#FFFFFF" />
-            <Text style={styles.provisionBtnText}>+ Provision Co-Admin / Member</Text>
+            <Text style={styles.provisionBtnText}>+ Provision Co-Admin</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.refreshBtn} onPress={loadMembers}>
@@ -369,9 +369,9 @@ export const AdminTeamView: React.FC = () => {
       {credentialsResult && (
         <View style={styles.credentialsCard}>
           <View style={styles.credentialsHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
               <CheckCircle2 size={18} color="#059669" />
-              <Text style={styles.credentialsTitle}>
+              <Text style={styles.credentialsTitle} numberOfLines={1}>
                 Account Provisioned for {credentialsResult.fullName}
               </Text>
             </View>
@@ -381,14 +381,14 @@ export const AdminTeamView: React.FC = () => {
           </View>
 
           <Text style={styles.credentialsSub}>
-            Share these generated credentials with your team member. On first login, they will scan their Google Authenticator QR code.
+            Share these generated credentials with your team member. On first login, they will configure their MFA.
           </Text>
 
           <View style={styles.credRowsBox}>
             {/* Email */}
-            <View style={styles.credRow}>
-              <Text style={styles.credLabel}>Login Work Email:</Text>
-              <Text style={styles.credValue}>{credentialsResult.email}</Text>
+            <View style={[styles.credRow, isMobile && styles.credRowMobile]}>
+              <Text style={styles.credLabel}>Login Email:</Text>
+              <Text style={[styles.credValue, isMobile && { flex: 1 }]} numberOfLines={1}>{credentialsResult.email}</Text>
               <TouchableOpacity
                 style={styles.copyBtn}
                 onPress={() => copyTextToClipboard(credentialsResult.email, 'email')}
@@ -399,9 +399,9 @@ export const AdminTeamView: React.FC = () => {
             </View>
 
             {/* Password */}
-            <View style={styles.credRow}>
+            <View style={[styles.credRow, isMobile && styles.credRowMobile]}>
               <Text style={styles.credLabel}>Temporary Password:</Text>
-              <Text style={styles.credValue}>
+              <Text style={[styles.credValue, isMobile && { flex: 1 }]}>
                 {showPassword ? credentialsResult.password : '••••••••••••••••'}
               </Text>
               <TouchableOpacity
@@ -421,18 +421,77 @@ export const AdminTeamView: React.FC = () => {
 
             {/* Role */}
             <View style={styles.credRow}>
-              <Text style={styles.credLabel}>Assigned Authority:</Text>
+              <Text style={styles.credLabel}>Assigned Role:</Text>
               <AdminBadge label={credentialsResult.role} variant="emerald" size="sm" />
             </View>
           </View>
         </View>
       )}
 
-      {/* Team Table Card */}
+      {/* Team Table / Mobile Card Section */}
       <View style={styles.tableCard}>
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color="#059669" />
+          </View>
+        ) : isMobile ? (
+          <View style={styles.mobileCardList}>
+            {members.length === 0 ? (
+              <Text style={styles.emptyMobileText}>No administrators configured in system.</Text>
+            ) : (
+              members.map((m) => (
+                <View key={m.id} style={styles.mobileMemberCard}>
+                  <View style={styles.mobileMemberCardTop}>
+                    <View style={[styles.memberAvatar, m.role === 'SUPER_ADMIN' && styles.superAdminAvatar]}>
+                      <Text style={[styles.memberAvatarText, m.role === 'SUPER_ADMIN' && styles.superAdminAvatarText]}>
+                        {(m.fullName || 'SA').substring(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.nameText}>{m.fullName || 'Administrator'}</Text>
+                        {m.role === 'SUPER_ADMIN' && <Crown size={12} color="#D97706" />}
+                      </View>
+                      <Text style={styles.emailText} numberOfLines={1}>{m.email || `${m.user_id.slice(0, 8)}...@letsbooffin.com`}</Text>
+                    </View>
+                    <AdminBadge
+                      label={m.status}
+                      variant={m.status === 'ACTIVE' ? 'emerald' : 'danger'}
+                      size="sm"
+                    />
+                  </View>
+
+                  <View style={styles.mobileMemberCardMid}>
+                    <AdminBadge
+                      label={m.role === 'SUPER_ADMIN' ? '👑 CO-ADMIN / SUPER' : m.role === 'ADMIN' ? '🛡️ ADMIN' : '👮 MODERATOR'}
+                      variant={m.role === 'SUPER_ADMIN' ? 'emerald' : m.role === 'ADMIN' ? 'info' : 'warning'}
+                      size="sm"
+                    />
+                    <Text style={styles.cellMuted}>
+                      Joined {new Date(m.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </Text>
+                  </View>
+
+                  <View style={styles.mobileMemberCardActions}>
+                    <TouchableOpacity
+                      style={styles.manageBtnMobile}
+                      onPress={() => handleOpenEditModal(m)}
+                    >
+                      <Key size={12} color={ADMIN_COLORS.textSecondary} />
+                      <Text style={styles.manageBtnText}>Edit Authority</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.recoveryBtnMobile}
+                      onPress={() => handleOpenRecoveryModal(m)}
+                    >
+                      <Lock size={12} color="#059669" />
+                      <Text style={styles.recoveryBtnText}>Credentials</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
         ) : (
           <AdminDataTable
@@ -800,11 +859,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  scrollContentMobile: {
+    paddingBottom: 40,
+  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  headerRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   pageTitle: {
     fontSize: 22,
@@ -822,14 +889,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  actionButtonsMobile: {
+    width: '100%',
+  },
   provisionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: '#059669',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 10,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
   provisionBtnText: {
     fontSize: 13,
@@ -839,12 +914,79 @@ const styles = StyleSheet.create({
   refreshBtn: {
     width: 38,
     height: 38,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  credRowMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  mobileCardList: {
+    gap: 12,
+  },
+  mobileMemberCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+  },
+  mobileMemberCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  mobileMemberCardMid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  mobileMemberCardActions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  manageBtnMobile: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  recoveryBtnMobile: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  emptyMobileText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingVertical: 24,
   },
   successBox: {
     flexDirection: 'row',

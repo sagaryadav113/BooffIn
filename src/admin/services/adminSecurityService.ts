@@ -2,9 +2,27 @@
 // BOOFFIN ADMIN PORTAL — SECURITY & TEAM MANAGEMENT SERVICE (ENTERPRISE)
 // ============================================================================
 
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../../api/client';
 import { AdminMember, AdminRole, AdminStatus } from '../types/roles';
 import { adminAuditService } from './adminAuditService';
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://lvstuqhrmagzqkgwlisl.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_fXyEsViLthF0T7A3NHBXpA_UUUVbrbx';
+
+/**
+ * Creates an isolated client without storage persistence so provisioning
+ * doesn't overwrite the active Super Admin's session in local storage.
+ */
+function getIsolatedAuthClient() {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
 
 /**
  * Generates a high-entropy 16-character secure random password
@@ -137,8 +155,9 @@ export const adminSecurityService = {
       const email = `${cleanHandle}@letsbooffin.com`;
       const generatedPassword = generateSecurePassword();
 
-      // 1. Create User in Supabase Auth
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      // 1. Create User in Supabase Auth via isolated client to protect active admin session
+      const isolatedClient = getIsolatedAuthClient();
+      const { data: signUpData, error: signUpError } = await isolatedClient.auth.signUp({
         email,
         password: generatedPassword,
         options: {
