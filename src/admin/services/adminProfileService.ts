@@ -140,7 +140,7 @@ export const adminProfileService = {
       }
 
       // 4. Audit Log
-      await adminAuditService.logAction({
+      await adminAuditService.recordAuditLog({
         action: 'UPDATE_ADMIN_PROFILE',
         targetType: 'ADMIN_MEMBER',
         targetId: user.id,
