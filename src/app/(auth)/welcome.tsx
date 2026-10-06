@@ -31,6 +31,7 @@ import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../constants/legalPolicies'
 
 const WELCOME_FULL_BG = require('../../../assets/images/welcome-bg.png');
 const ABOUT_FULL_BG = require('../../../assets/images/about-bg.png');
+const FEATURES_FULL_BG = require('../../../assets/images/features-bg.png');
 
 type LandingTab = 'welcome' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
 
@@ -255,82 +256,94 @@ export default function WelcomeScreen() {
           </View>
         )}
 
-        {activeTab !== 'welcome' && activeTab !== 'about' && (
-          <View style={styles.mainContainer}>
+        {/* ============================================================ */}
+        {/* TAB 3: FEATURES (FULL COVER BACKGROUND) */}
+        {/* ============================================================ */}
+        {activeTab === 'features' && (
+          <View style={styles.featuresHeroContainer}>
+            {/* Full Screen Background Image */}
+            <Image
+              source={FEATURES_FULL_BG}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              contentPosition="center"
+              priority="high"
+            />
 
-            {/* ============================================================ */}
-            {/* TAB 3: FEATURES (IMAGE 3) */}
-            {/* ============================================================ */}
-            {activeTab === 'features' && (
-              <View style={styles.pageLayout}>
-                <View style={styles.contentBlock}>
-                  <Text style={styles.editorialTitle}>What You Can Do on BooffIn</Text>
-                  <Text style={styles.editorialSubtitle}>
-                    Explore the features that connect researchers with people and ideas
-                  </Text>
+            {/* Content Overlay */}
+            <View style={styles.featuresContentInner}>
+              <View style={styles.featuresContentBlock}>
+                <Text style={styles.editorialTitle}>What You Can Do on BooffIn</Text>
+                <Text style={styles.editorialSubtitle}>
+                  Explore the features that connect researchers with people and ideas
+                </Text>
 
-                  {/* 2x2 Feature Grid */}
-                  <View style={styles.featureGrid}>
-                    <View style={styles.featureGridItem}>
-                      <Text style={styles.featureTitle}>Engage in Discussions</Text>
-                      <Text style={styles.featureDesc}>
-                        Share insights, ask questions, and engage with a global community on biology, AI, and neuroscience.
-                      </Text>
-                    </View>
-
-                    <View style={styles.featureGridItem}>
-                      <Text style={styles.featureTitle}>Discover Content</Text>
-                      <Text style={styles.featureDesc}>
-                        Find articles, post updates, and follow topics like DeepMind's AlphaFold.
-                      </Text>
-                    </View>
-
-                    <View style={styles.featureGridItem}>
-                      <Text style={styles.featureTitle}>Find Your People</Text>
-                      <Text style={styles.featureDesc}>
-                        Build networks with student researchers, academics, and global science enthusiasts.
-                      </Text>
-                    </View>
-
-                    <View style={styles.featureGridItem}>
-                      <Text style={styles.featureTitle}>Filing & Storage</Text>
-                      <Text style={styles.featureDesc}>
-                        Keep track of your research, find academic papers, and organize your bibliography.
-                      </Text>
-                    </View>
+                {/* 2x2 Feature Grid */}
+                <View style={styles.featureGrid}>
+                  <View style={styles.featureGridItem}>
+                    <Text style={styles.featureTitle}>Engage in Discussions</Text>
+                    <Text style={styles.featureDesc}>
+                      Share insights, ask questions, and engage with a global community on biology, AI, and neuroscience.
+                    </Text>
                   </View>
 
-                  {/* Actions */}
-                  <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
-                    <TouchableOpacity 
-                      style={styles.primaryCtaBtn} 
-                      onPress={handleOpenAuthModal}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.primaryCtaBtnText}>Explore All Features</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={styles.secondaryLinkBtn} 
-                      onPress={handleOpenAuthModal}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.secondaryLinkText}>Start For Free</Text>
-                    </TouchableOpacity>
+                  <View style={styles.featureGridItem}>
+                    <Text style={styles.featureTitle}>Discover Content</Text>
+                    <Text style={styles.featureDesc}>
+                      Find articles, post updates, and follow topics like DeepMind's AlphaFold.
+                    </Text>
                   </View>
 
-                  {/* Footer */}
-                  <View style={styles.inlineFooter}>
-                    <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                      <Text style={styles.footerLink}>Privacy Policy</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                      <Text style={styles.footerLink}>Terms of Service</Text>
-                    </TouchableOpacity>
+                  <View style={styles.featureGridItem}>
+                    <Text style={styles.featureTitle}>Find Your People</Text>
+                    <Text style={styles.featureDesc}>
+                      Build networks with student researchers, academics, and global science enthusiasts.
+                    </Text>
+                  </View>
+
+                  <View style={styles.featureGridItem}>
+                    <Text style={styles.featureTitle}>Filing & Storage</Text>
+                    <Text style={styles.featureDesc}>
+                      Keep track of your research, find academic papers, and organize your bibliography.
+                    </Text>
                   </View>
                 </View>
+
+                {/* Actions */}
+                <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
+                  <TouchableOpacity 
+                    style={styles.primaryCtaBtn} 
+                    onPress={handleOpenAuthModal}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.primaryCtaBtnText}>Explore All Features</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.secondaryLinkBtn} 
+                    onPress={handleOpenAuthModal}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.secondaryLinkText}>Start For Free</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Footer */}
+                <View style={styles.inlineFooter}>
+                  <TouchableOpacity onPress={() => setActiveTab('privacy')}>
+                    <Text style={styles.footerLink}>Privacy Policy</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setActiveTab('terms')}>
+                    <Text style={styles.footerLink}>Terms of Service</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            )}
+            </View>
+          </View>
+        )}
+
+        {activeTab !== 'welcome' && activeTab !== 'about' && activeTab !== 'features' && (
+          <View style={styles.mainContainer}>
 
             {/* ============================================================ */}
             {/* TAB 4: COMMUNITY (IMAGE 4) */}
@@ -702,6 +715,28 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   aboutContentBlock: {
+    maxWidth: 620,
+    width: '100%',
+  },
+  featuresHeroContainer: {
+    width: '100%',
+    minHeight: '100vh' as any,
+    height: Platform.OS === 'web' ? ('100vh' as any) : undefined,
+    position: 'relative',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  featuresContentInner: {
+    maxWidth: 1280,
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: 36,
+    paddingVertical: 48,
+    paddingTop: 90,
+    position: 'relative',
+    zIndex: 2,
+  },
+  featuresContentBlock: {
     maxWidth: 620,
     width: '100%',
   },
