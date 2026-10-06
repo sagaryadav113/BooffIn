@@ -238,55 +238,57 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         </View>
       </View>
 
-      {/* Quick Actions 4-Grid (Everyday Essentials - Reference UI style) */}
-      <View style={styles.quickActionsContainer}>
-        <Text style={styles.sectionHeaderLabel}>QUICK ACTIONS</Text>
-        <View style={styles.quickActionsGrid}>
-          <TouchableOpacity
-            style={styles.quickActionItem}
-            onPress={() => onNavigate?.('users')}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.quickActionIconBox, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
-              <Users size={20} color="#059669" strokeWidth={2.2} />
-            </View>
-            <Text style={styles.quickActionLabel}>Researchers</Text>
-          </TouchableOpacity>
+      {/* Quick Actions 4-Grid (Shown only on Mobile App UI) */}
+      {isMobile && (
+        <View style={styles.quickActionsContainer}>
+          <Text style={styles.sectionHeaderLabel}>QUICK ACTIONS</Text>
+          <View style={styles.quickActionsGrid}>
+            <TouchableOpacity
+              style={styles.quickActionItem}
+              onPress={() => onNavigate?.('users')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.quickActionIconBox, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
+                <Users size={20} color="#059669" strokeWidth={2.2} />
+              </View>
+              <Text style={styles.quickActionLabel}>Researchers</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.quickActionItem}
-            onPress={() => onNavigate?.('calendar')}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.quickActionIconBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
-              <Calendar size={20} color="#2563EB" strokeWidth={2.2} />
-            </View>
-            <Text style={styles.quickActionLabel}>Schedule</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickActionItem}
+              onPress={() => onNavigate?.('calendar')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.quickActionIconBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
+                <Calendar size={20} color="#2563EB" strokeWidth={2.2} />
+              </View>
+              <Text style={styles.quickActionLabel}>Schedule</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.quickActionItem}
-            onPress={() => onNavigate?.('reports')}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.quickActionIconBox, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
-              <ShieldAlert size={20} color="#D97706" strokeWidth={2.2} />
-            </View>
-            <Text style={styles.quickActionLabel}>Mod Queue</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickActionItem}
+              onPress={() => onNavigate?.('reports')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.quickActionIconBox, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
+                <ShieldAlert size={20} color="#D97706" strokeWidth={2.2} />
+              </View>
+              <Text style={styles.quickActionLabel}>Mod Queue</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.quickActionItem}
-            onPress={() => onNavigate?.('approvals')}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.quickActionIconBox, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }]}>
-              <ShieldCheck size={20} color="#7C3AED" strokeWidth={2.2} />
-            </View>
-            <Text style={styles.quickActionLabel}>Approvals</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickActionItem}
+              onPress={() => onNavigate?.('approvals')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.quickActionIconBox, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }]}>
+                <ShieldCheck size={20} color="#7C3AED" strokeWidth={2.2} />
+              </View>
+              <Text style={styles.quickActionLabel}>Approvals</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* 2. Top 4 Metric KPI Cards (2x2 Grid on Mobile) */}
       <View style={styles.kpiContainer}>
