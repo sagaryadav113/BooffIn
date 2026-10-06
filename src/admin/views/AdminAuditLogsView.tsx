@@ -12,12 +12,11 @@ import {
   TouchableOpacity,
   useWindowDimensions 
 } from 'react-native';
-import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
+import { ADMIN_COLORS } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
-import { AdminBadge } from '../components/AdminBadge';
 import { adminAuditService } from '../services/adminAuditService';
 import { AdminAuditLog } from '../types/audit';
-import { FileText, RefreshCw, ShieldCheck, Lock, AlertTriangle } from 'lucide-react-native';
+import { RefreshCw, ShieldCheck, AlertTriangle } from 'lucide-react-native';
 
 export const AdminAuditLogsView: React.FC = () => {
   const { width } = useWindowDimensions();
@@ -47,57 +46,59 @@ export const AdminAuditLogsView: React.FC = () => {
 
   const columns: ColumnDef<AdminAuditLog>[] = [
     {
+      key: 'created_at',
+      header: 'TIMESTAMP',
+      width: 140,
+      render: (l) => (
+        <Text style={styles.monoTime}>
+          {new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          {' '}
+          <Text style={styles.dateSub}>
+            {new Date(l.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+          </Text>
+        </Text>
+      ),
+    },
+    {
       key: 'action',
-      header: 'AUDIT ACTION',
-      width: 200,
-      render: (l) => <Text style={styles.boldText} numberOfLines={1}>{l.action}</Text>,
+      header: 'EVENT / ACTION',
+      width: 190,
+      render: (l) => <Text style={styles.monoAction} numberOfLines={1}>{l.action}</Text>,
     },
     {
       key: 'actor_role',
-      header: 'ACTOR ROLE',
-      width: 140,
-      render: (l) => <AdminBadge label={l.actor_role} variant="emerald" size="sm" />,
+      header: 'ACTOR / ROLE',
+      width: 130,
+      render: (l) => (
+        <Text style={styles.actorText}>{l.actor_role}</Text>
+      ),
     },
     {
       key: 'target_type',
       header: 'TARGET RESOURCE',
       width: 140,
-      render: (l) => <Text style={styles.cellText}>{l.target_type}</Text>,
-    },
-    {
-      key: 'reason',
-      header: 'COMPLIANCE JUSTIFICATION',
-      width: 260,
-      render: (l) => (
-        <Text style={styles.cellSecondary} numberOfLines={2}>
-          {l.reason || '—'}
-        </Text>
-      ),
+      render: (l) => <Text style={styles.monoTarget}>{l.target_type}</Text>,
     },
     {
       key: 'success',
-      header: 'RESULT',
-      width: 100,
+      header: 'STATUS',
+      width: 110,
       render: (l) => (
-        <AdminBadge
-          label={l.success ? 'SUCCESS' : 'FAILED'}
-          variant={l.success ? 'emerald' : 'danger'}
-          size="sm"
-        />
+        <View style={styles.statusRow}>
+          <View style={[styles.statusDot, l.success ? styles.dotSuccess : styles.dotDanger]} />
+          <Text style={[styles.statusLabel, l.success ? styles.textSuccess : styles.textDanger]}>
+            {l.success ? 'SUCCESS' : 'FAILED'}
+          </Text>
+        </View>
       ),
     },
     {
-      key: 'created_at',
-      header: 'TIMESTAMP',
-      width: 150,
+      key: 'reason',
+      header: 'DETAILS / PAYLOAD',
+      width: 280,
       render: (l) => (
-        <Text style={styles.cellMuted}>
-          {new Date(l.created_at).toLocaleString(undefined, {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+        <Text style={styles.cellDetails} numberOfLines={2}>
+          {l.reason || '—'}
         </Text>
       ),
     },
@@ -110,22 +111,22 @@ export const AdminAuditLogsView: React.FC = () => {
         <View>
           <Text style={styles.pageTitle}>Immutable Compliance Audit Trail</Text>
           <Text style={styles.pageSubtitle}>
-            Cryptographically sealed activity log from public.admin_audit_logs ({logs.length} events recorded)
+            Authoritative append-only log from public.admin_audit_logs ({logs.length} events)
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.refreshIconBtn} onPress={loadAuditLogs}>
+        <TouchableOpacity style={styles.refreshIconBtn} onPress={loadAuditLogs} activeOpacity={0.7}>
           <RefreshCw size={13} color={ADMIN_COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
 
       {/* Compliance Notice Banner */}
       <View style={styles.complianceBanner}>
-        <ShieldCheck size={16} color={ADMIN_COLORS.emeraldPrimary} />
+        <ShieldCheck size={15} color={ADMIN_COLORS.emeraldPrimary} style={{ marginTop: 1 }} />
         <View style={styles.bannerTextGroup}>
-          <Text style={styles.bannerTitle}>Cryptographically Protected & Append-Only</Text>
+          <Text style={styles.bannerTitle}>Cryptographically Protected & Immutable</Text>
           <Text style={styles.bannerSubtitle}>
-            Zero UPDATE or DELETE policies exist on this audit table. Every operator action is permanently recorded with actor identity binding.
+            Zero UPDATE or DELETE policies exist on this table. Every administrative operation is permanently recorded with actor binding.
           </Text>
         </View>
       </View>
@@ -137,40 +138,58 @@ export const AdminAuditLogsView: React.FC = () => {
         </View>
       )}
 
-      {/* Main Content */}
+      {/* Main Content: Single Consolidated Feed on Mobile vs Dense Table on Desktop */}
       {loading ? (
         <View style={styles.loadingCard}>
           <ActivityIndicator size="small" color={ADMIN_COLORS.emeraldPrimary} />
           <Text style={styles.loadingText}>Verifying audit ledger...</Text>
         </View>
       ) : isMobile ? (
-        <View style={styles.mobileListContainer}>
-          {logs.map((l) => (
-            <View key={l.id} style={styles.recordCard}>
-              <View style={styles.recordHeader}>
-                <Text style={styles.boldText}>{l.action}</Text>
-                <AdminBadge
-                  label={l.success ? 'SUCCESS' : 'FAILED'}
-                  variant={l.success ? 'emerald' : 'danger'}
-                  size="sm"
-                />
-              </View>
-
-              <Text style={styles.cellSecondary}>Target: {l.target_type} • Role: {l.actor_role}</Text>
-              {l.reason && <Text style={styles.cellMuted}>{l.reason}</Text>}
-
-              <View style={styles.recordFooter}>
-                <Text style={styles.cellMuted}>
-                  {new Date(l.created_at).toLocaleString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-              </View>
+        <View style={styles.mobileTimelineCard}>
+          {logs.length === 0 ? (
+            <View style={styles.emptyFeed}>
+              <Text style={styles.emptyTitle}>No audit events recorded</Text>
             </View>
-          ))}
+          ) : (
+            logs.map((l, idx) => (
+              <View 
+                key={l.id || idx} 
+                style={[
+                  styles.mobileTimelineRow,
+                  idx < logs.length - 1 && styles.mobileTimelineDivider
+                ]}
+              >
+                {/* Row 1: Event Action + Status Dot & Timestamp */}
+                <View style={styles.mRow1}>
+                  <View style={styles.mActionGroup}>
+                    <View style={[styles.statusDot, l.success ? styles.dotSuccess : styles.dotDanger]} />
+                    <Text style={styles.mActionText} numberOfLines={1}>{l.action}</Text>
+                  </View>
+                  <Text style={styles.mTimestamp}>
+                    {new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {' · '}
+                    {new Date(l.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                  </Text>
+                </View>
+
+                {/* Row 2: Target & Actor */}
+                <View style={styles.mRow2}>
+                  <Text style={styles.mMetaText}>
+                    Target: <Text style={styles.monoTargetSmall}>{l.target_type}</Text>
+                    {' · '}
+                    Actor: <Text style={styles.mActorText}>{l.actor_role}</Text>
+                  </Text>
+                </View>
+
+                {/* Row 3 (Optional Details) */}
+                {l.reason ? (
+                  <Text style={styles.mDetailsText} numberOfLines={2}>
+                    {l.reason}
+                  </Text>
+                ) : null}
+              </View>
+            ))
+          )}
         </View>
       ) : (
         <View style={styles.tableWrapper}>
@@ -214,13 +233,13 @@ const styles = StyleSheet.create({
     borderColor: ADMIN_COLORS.border,
     backgroundColor: ADMIN_COLORS.bgSurface,
     padding: 7,
-    borderRadius: ADMIN_RADII.button,
+    borderRadius: 6,
   },
   complianceBanner: {
     backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.emeraldBorder,
-    borderRadius: ADMIN_RADII.card,
+    borderRadius: 8,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -250,7 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: ADMIN_COLORS.statusDangerBg,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.statusDangerBorder,
-    borderRadius: ADMIN_RADII.card,
+    borderRadius: 8,
     padding: 10,
     marginBottom: 14,
   },
@@ -263,7 +282,7 @@ const styles = StyleSheet.create({
     backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.card,
+    borderRadius: 8,
     padding: 36,
     alignItems: 'center',
     justifyContent: 'center',
@@ -276,44 +295,131 @@ const styles = StyleSheet.create({
   tableWrapper: {
     marginBottom: 24,
   },
-  boldText: {
-    fontSize: 12,
+  monoTime: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  dateSub: {
+    fontSize: 10,
+    color: ADMIN_COLORS.textMuted,
+  },
+  monoAction: {
+    fontSize: 11,
+    fontFamily: 'monospace',
     fontWeight: '600',
     color: ADMIN_COLORS.textPrimary,
   },
-  cellText: {
-    fontSize: 12,
-    color: ADMIN_COLORS.textPrimary,
-  },
-  cellSecondary: {
+  actorText: {
     fontSize: 11,
     color: ADMIN_COLORS.textSecondary,
+    fontWeight: '500',
   },
-  cellMuted: {
+  monoTarget: {
     fontSize: 11,
-    color: ADMIN_COLORS.textMuted,
+    fontFamily: 'monospace',
+    color: '#475569',
   },
-  mobileListContainer: {
-    gap: 10,
-    marginBottom: 24,
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
-  recordCard: {
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dotSuccess: {
+    backgroundColor: '#10B981',
+  },
+  dotDanger: {
+    backgroundColor: '#EF4444',
+  },
+  statusLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  textSuccess: {
+    color: '#047857',
+  },
+  textDanger: {
+    color: '#B91C1C',
+  },
+  cellDetails: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+    lineHeight: 15,
+  },
+  // Mobile Timeline Styles
+  mobileTimelineCard: {
     backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.card,
-    padding: 12,
-    gap: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 24,
   },
-  recordHeader: {
+  mobileTimelineRow: {
+    padding: 12,
+    gap: 4,
+  },
+  mobileTimelineDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  mRow1: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  recordFooter: {
-    borderTopWidth: 1,
-    borderTopColor: ADMIN_COLORS.borderSubtle,
-    paddingTop: 6,
+  mActionGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  mActionText: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  mTimestamp: {
+    fontSize: 10,
+    color: ADMIN_COLORS.textMuted,
+    fontFamily: 'monospace',
+  },
+  mRow2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mMetaText: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  monoTargetSmall: {
+    fontFamily: 'monospace',
+    color: ADMIN_COLORS.textPrimary,
+    fontWeight: '500',
+  },
+  mActorText: {
+    color: ADMIN_COLORS.textPrimary,
+    fontWeight: '500',
+  },
+  mDetailsText: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textMuted,
+    lineHeight: 15,
     marginTop: 2,
+  },
+  emptyFeed: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
   },
 });

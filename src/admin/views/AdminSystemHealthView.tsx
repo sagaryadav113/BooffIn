@@ -13,21 +13,16 @@ import {
   Modal,
   useWindowDimensions 
 } from 'react-native';
-import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
+import { ADMIN_COLORS } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
-import { AdminBadge } from '../components/AdminBadge';
-import { AdminStatCard } from '../components/AdminStatCard';
 import { supabase } from '../../api/client';
 import { SystemHealthMetric } from '../types/data';
 import { 
-  Activity, 
-  Database, 
   Server, 
   RefreshCw, 
-  CheckCircle2, 
-  AlertTriangle, 
   Terminal, 
-  X
+  X,
+  Activity
 } from 'lucide-react-native';
 
 interface SystemErrorLog {
@@ -80,7 +75,7 @@ export const AdminSystemHealthView: React.FC = () => {
       const dbLatency = Date.now() - dbStart;
       totalLat += dbLatency;
       healthList.push({
-        service: 'Supabase PostgreSQL DB & Connection Pool',
+        service: 'PostgreSQL Database & Connection Pool',
         status: error ? 'DEGRADED' : 'HEALTHY',
         latencyMs: dbLatency,
         lastChecked: new Date().toISOString(),
@@ -88,7 +83,7 @@ export const AdminSystemHealthView: React.FC = () => {
       });
     } catch (err: any) {
       healthList.push({
-        service: 'Supabase PostgreSQL DB & Connection Pool',
+        service: 'PostgreSQL Database & Connection Pool',
         status: 'DOWN',
         latencyMs: Date.now() - dbStart,
         lastChecked: new Date().toISOString(),
@@ -103,7 +98,7 @@ export const AdminSystemHealthView: React.FC = () => {
       const authLatency = Date.now() - authStart;
       totalLat += authLatency;
       healthList.push({
-        service: 'Supabase Auth (GoTrue & TOTP MFA)',
+        service: 'Supabase Auth (GoTrue & TOTP Engine)',
         status: error ? 'DEGRADED' : 'HEALTHY',
         latencyMs: authLatency,
         lastChecked: new Date().toISOString(),
@@ -111,7 +106,7 @@ export const AdminSystemHealthView: React.FC = () => {
       });
     } catch (err: any) {
       healthList.push({
-        service: 'Supabase Auth (GoTrue & TOTP MFA)',
+        service: 'Supabase Auth (GoTrue & TOTP Engine)',
         status: 'DOWN',
         latencyMs: Date.now() - authStart,
         lastChecked: new Date().toISOString(),
@@ -126,7 +121,7 @@ export const AdminSystemHealthView: React.FC = () => {
       const storageLatency = Date.now() - storageStart;
       totalLat += storageLatency;
       healthList.push({
-        service: 'Supabase Cloud Storage (Papers & Media)',
+        service: 'Cloud Storage (Papers, Avatars & Media)',
         status: error ? 'DEGRADED' : 'HEALTHY',
         latencyMs: storageLatency,
         lastChecked: new Date().toISOString(),
@@ -134,7 +129,7 @@ export const AdminSystemHealthView: React.FC = () => {
       });
     } catch (err: any) {
       healthList.push({
-        service: 'Supabase Cloud Storage (Papers & Media)',
+        service: 'Cloud Storage (Papers, Avatars & Media)',
         status: 'DEGRADED',
         latencyMs: Date.now() - storageStart,
         lastChecked: new Date().toISOString(),
@@ -142,7 +137,7 @@ export const AdminSystemHealthView: React.FC = () => {
       });
     }
 
-    // 4. OpenAlex Scholarly Catalog Gateway
+    // 4. OpenAlex Gateway
     const openAlexStart = Date.now();
     try {
       const res = await fetch('https://api.openalex.org', { method: 'HEAD' });
@@ -172,7 +167,7 @@ export const AdminSystemHealthView: React.FC = () => {
       const orcidLatency = Date.now() - orcidStart;
       totalLat += orcidLatency;
       healthList.push({
-        service: 'ORCID Public API & Token Exchange',
+        service: 'ORCID OAuth2 & Identity Exchange',
         status: res.ok || res.status === 404 || res.status === 401 ? 'HEALTHY' : 'DEGRADED',
         latencyMs: orcidLatency,
         lastChecked: new Date().toISOString(),
@@ -180,7 +175,7 @@ export const AdminSystemHealthView: React.FC = () => {
       });
     } catch {
       healthList.push({
-        service: 'ORCID Public API & Token Exchange',
+        service: 'ORCID OAuth2 & Identity Exchange',
         status: 'DEGRADED',
         latencyMs: Date.now() - orcidStart,
         lastChecked: new Date().toISOString(),
@@ -200,34 +195,46 @@ export const AdminSystemHealthView: React.FC = () => {
   const columns: ColumnDef<SystemHealthMetric>[] = [
     { 
       key: 'service', 
-      header: 'MICROSERVICE / SUBSYSTEM', 
-      width: 280, 
+      header: 'SERVICE / SUBSYSTEM', 
+      width: 270, 
       render: (m) => (
         <View style={styles.serviceCell}>
-          <Server size={13} color={ADMIN_COLORS.emeraldPrimary} style={{ marginTop: 2 }} />
-          <Text style={styles.boldText}>{m.service}</Text>
+          <Server size={13} color={ADMIN_COLORS.textSecondary} />
+          <Text style={styles.serviceName}>{m.service}</Text>
         </View>
       )
     },
     { 
       key: 'status', 
-      header: 'HEALTH', 
-      width: 120, 
-      render: (m) => (
-        <AdminBadge
-          label={m.status}
-          variant={m.status === 'HEALTHY' ? 'emerald' : m.status === 'DEGRADED' ? 'warning' : 'danger'}
-          size="sm"
-        />
-      )
+      header: 'HEALTH STATUS', 
+      width: 140, 
+      render: (m) => {
+        const isHealthy = m.status === 'HEALTHY';
+        const isDegraded = m.status === 'DEGRADED';
+
+        return (
+          <View style={styles.statusPill}>
+            <View style={[
+              styles.statusDot,
+              isHealthy ? styles.dotHealthy : isDegraded ? styles.dotDegraded : styles.dotDown
+            ]} />
+            <Text style={[
+              styles.statusText,
+              isHealthy ? styles.textHealthy : isDegraded ? styles.textDegraded : styles.textDown
+            ]}>
+              {isHealthy ? 'Operational' : isDegraded ? 'Degraded' : 'Offline'}
+            </Text>
+          </View>
+        );
+      }
     },
     { 
       key: 'latencyMs', 
-      header: 'LATENCY', 
-      width: 110, 
+      header: 'ROUNDTRIP LATENCY', 
+      width: 150, 
       render: (m) => (
-        <Text style={[styles.monoText, m.status !== 'HEALTHY' && { color: ADMIN_COLORS.statusWarningText }]}>
-          {m.latencyMs} ms
+        <Text style={[styles.monoLatency, m.status !== 'HEALTHY' && { color: '#B45309' }]}>
+          {m.latencyMs <= 0 ? '<1ms' : `${m.latencyMs}ms`}
         </Text>
       )
     },
@@ -236,54 +243,59 @@ export const AdminSystemHealthView: React.FC = () => {
       header: 'TELEMETRY STATUS', 
       width: 320, 
       render: (m) => (
-        <Text style={styles.cellSecondary} numberOfLines={1}>{m.details || '—'}</Text>
+        <Text style={styles.cellDetails} numberOfLines={1}>{m.details || '—'}</Text>
       )
     },
   ];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
+      {/* Header with Top-Right Action Bar */}
       <View style={styles.headerSection}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={styles.pageTitle}>System Health & Observability</Text>
           <Text style={styles.pageSubtitle}>
             Live platform uptime, microservice roundtrip latency, and infrastructure diagnostics
           </Text>
         </View>
-        <TouchableOpacity style={styles.primaryActionBtn} onPress={checkSubsystemHealth} disabled={loading}>
-          <RefreshCw size={12} color={ADMIN_COLORS.textInverse} style={{ marginRight: 5 }} />
-          <Text style={styles.primaryActionBtnText}>{loading ? 'Testing...' : 'Run Diagnostics'}</Text>
+
+        <TouchableOpacity 
+          style={styles.headerActionBtn} 
+          onPress={checkSubsystemHealth} 
+          disabled={loading}
+          activeOpacity={0.75}
+        >
+          <RefreshCw size={12} color="#FFFFFF" style={{ marginRight: 5 }} />
+          <Text style={styles.headerActionBtnText}>{loading ? 'Testing...' : 'Run Diagnostics'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* KPI Overview Grid */}
-      <View style={styles.statsRow}>
-        <AdminStatCard 
-          label="Platform Availability" 
-          value="99.98%" 
-          subtext="Zero P0 downtime in 30 days" 
-          variant="emerald" 
-        />
-        <AdminStatCard 
-          label="Edge Gateway Latency" 
-          value={`${averageLatency || 42} ms`} 
-          subtext="Across global CDN endpoints" 
-          variant="emerald" 
-        />
-        <AdminStatCard 
-          label="Database Pooler" 
-          value="OPERATIONAL" 
-          subtext="Direct PgBouncer pooler active" 
-          variant="default" 
-        />
+      {/* KPI Overview Strip */}
+      <View style={[styles.kpiBar, isMobile && styles.kpiBarMobile]}>
+        <View style={[styles.kpiCell, isMobile ? styles.kpiCellMobile : styles.kpiCellDivider]}>
+          <Text style={styles.kpiLabel}>PLATFORM AVAILABILITY</Text>
+          <Text style={styles.kpiValue}>99.98%</Text>
+          <Text style={styles.kpiSub}>Zero P0 Outages (30d)</Text>
+        </View>
+
+        <View style={[styles.kpiCell, isMobile ? styles.kpiCellMobile : styles.kpiCellDivider]}>
+          <Text style={styles.kpiLabel}>EDGE GATEWAY LATENCY</Text>
+          <Text style={styles.kpiValue}>{averageLatency || 42}ms</Text>
+          <Text style={styles.kpiSub}>Global CDN TLS Edge</Text>
+        </View>
+
+        <View style={[styles.kpiCell, isMobile && styles.kpiCellMobile]}>
+          <Text style={styles.kpiLabel}>DATABASE CONNECTION POOL</Text>
+          <Text style={styles.kpiValue}>OPERATIONAL</Text>
+          <Text style={styles.kpiSub}>PgBouncer 15 Direct</Text>
+        </View>
       </View>
 
-      {/* Services Table Card */}
+      {/* Clean Infrastructure Table Card */}
       <View style={styles.tableCard}>
-        <View style={styles.tableCardHeader}>
-          <Text style={styles.tableCardTitle}>Core Microservices & Gateways</Text>
-          <Text style={styles.tableCardSub}>Live roundtrip health probes to backend infrastructure</Text>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>Core Microservices & Gateways</Text>
+          <Text style={styles.cardSub}>Live roundtrip health probes to backend infrastructure</Text>
         </View>
 
         {loading ? (
@@ -293,27 +305,41 @@ export const AdminSystemHealthView: React.FC = () => {
           </View>
         ) : isMobile ? (
           <View style={styles.mobileListContainer}>
-            {metrics.map((m, idx) => (
-              <View key={idx} style={styles.recordCard}>
-                <View style={styles.recordHeader}>
-                  <View style={styles.serviceCell}>
-                    <Server size={13} color={ADMIN_COLORS.emeraldPrimary} />
-                    <Text style={styles.boldText}>{m.service}</Text>
+            {metrics.map((m, idx) => {
+              const isHealthy = m.status === 'HEALTHY';
+              const isDegraded = m.status === 'DEGRADED';
+
+              return (
+                <View key={idx} style={styles.recordCard}>
+                  <View style={styles.recordHeader}>
+                    <View style={styles.serviceCell}>
+                      <Server size={13} color={ADMIN_COLORS.textSecondary} />
+                      <Text style={styles.serviceName}>{m.service}</Text>
+                    </View>
+                    <View style={styles.statusPill}>
+                      <View style={[
+                        styles.statusDot,
+                        isHealthy ? styles.dotHealthy : isDegraded ? styles.dotDegraded : styles.dotDown
+                      ]} />
+                      <Text style={[
+                        styles.statusText,
+                        isHealthy ? styles.textHealthy : isDegraded ? styles.textDegraded : styles.textDown
+                      ]}>
+                        {isHealthy ? 'Operational' : isDegraded ? 'Degraded' : 'Offline'}
+                      </Text>
+                    </View>
                   </View>
-                  <AdminBadge
-                    label={m.status}
-                    variant={m.status === 'HEALTHY' ? 'emerald' : m.status === 'DEGRADED' ? 'warning' : 'danger'}
-                    size="sm"
-                  />
-                </View>
 
-                <Text style={styles.cellSecondary}>{m.details}</Text>
+                  <Text style={styles.cellDetails}>{m.details}</Text>
 
-                <View style={styles.recordFooter}>
-                  <Text style={styles.cellMuted}>Latency: {m.latencyMs} ms</Text>
+                  <View style={styles.recordFooter}>
+                    <Text style={styles.monoLatency}>
+                      Latency: {m.latencyMs <= 0 ? '<1ms' : `${m.latencyMs}ms`}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         ) : (
           <View style={styles.tableWrapper}>
@@ -322,14 +348,14 @@ export const AdminSystemHealthView: React.FC = () => {
         )}
       </View>
 
-      {/* Edge Diagnostics Feed */}
-      <View style={styles.telemetryCard}>
-        <View style={styles.tableCardHeader}>
+      {/* Terminal Style Worker Diagnostics Feed */}
+      <View style={styles.tableCard}>
+        <View style={styles.cardHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Terminal size={14} color={ADMIN_COLORS.emeraldPrimary} />
-            <Text style={styles.tableCardTitle}>Edge Function & Worker Telemetry Stream</Text>
+            <Text style={styles.cardTitle}>Edge Function & Worker Telemetry Stream</Text>
           </View>
-          <Text style={styles.tableCardSub}>Real-time system diagnostics and worker execution events</Text>
+          <Text style={styles.cardSub}>Real-time system diagnostics and worker execution events</Text>
         </View>
 
         <View style={styles.logsList}>
@@ -338,14 +364,16 @@ export const AdminSystemHealthView: React.FC = () => {
               key={log.id} 
               style={styles.logItem}
               onPress={() => setSelectedLog(log)}
+              activeOpacity={0.7}
             >
               <View style={styles.logTopRow}>
                 <View style={styles.logLeft}>
-                  <AdminBadge 
-                    label={log.level} 
-                    variant={log.level === 'CRITICAL' ? 'danger' : log.level === 'WARN' ? 'warning' : 'info'} 
-                    size="sm" 
-                  />
+                  <Text style={[
+                    styles.monoLevelTag,
+                    log.level === 'CRITICAL' ? styles.tagRed : log.level === 'WARN' ? styles.tagAmber : styles.tagBlue
+                  ]}>
+                    [{log.level}]
+                  </Text>
                   <Text style={styles.logSource}>{log.source}</Text>
                 </View>
                 <Text style={styles.logTime}>{log.timestamp}</Text>
@@ -370,7 +398,7 @@ export const AdminSystemHealthView: React.FC = () => {
 
               <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
                 <View style={styles.metaRow}>
-                  <Text style={styles.metaLabel}>Source Microservice:</Text>
+                  <Text style={styles.metaLabel}>Source Gateway:</Text>
                   <Text style={styles.metaVal}>{selectedLog.source}</Text>
                 </View>
 
@@ -406,6 +434,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
+  headerLeft: {
+    flex: 1,
+    minWidth: 260,
+  },
   pageTitle: {
     fontSize: 20,
     fontWeight: '700',
@@ -417,45 +449,84 @@ const styles = StyleSheet.create({
     color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
   },
-  primaryActionBtn: {
+  headerActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: ADMIN_COLORS.emeraldPrimary,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: ADMIN_RADII.button,
+    borderRadius: 6,
   },
-  primaryActionBtnText: {
+  headerActionBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: ADMIN_COLORS.textInverse,
+    color: '#FFFFFF',
   },
-  statsRow: {
+  // KPI Strip
+  kpiBar: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: 8,
     marginBottom: 16,
+    overflow: 'hidden',
   },
+  kpiBarMobile: {
+    flexDirection: 'column',
+  },
+  kpiCell: {
+    flex: 1,
+    padding: 14,
+    gap: 3,
+  },
+  kpiCellDivider: {
+    borderRightWidth: 1,
+    borderRightColor: ADMIN_COLORS.border,
+  },
+  kpiCellMobile: {
+    borderRightWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: ADMIN_COLORS.border,
+  },
+  kpiLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  kpiValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
+    fontFamily: 'monospace',
+  },
+  kpiSub: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  // Table Card
   tableCard: {
     backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.card,
+    borderRadius: 8,
     padding: 14,
     marginBottom: 16,
   },
-  tableCardHeader: {
+  cardHeader: {
     marginBottom: 12,
   },
-  tableCardTitle: {
-    fontSize: 14,
+  cardTitle: {
+    fontSize: 13,
     fontWeight: '600',
     color: ADMIN_COLORS.textPrimary,
   },
-  tableCardSub: {
-    fontSize: 12,
+  cardSub: {
+    fontSize: 11,
     color: ADMIN_COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
   tableWrapper: {
     marginBottom: 4,
@@ -463,26 +534,54 @@ const styles = StyleSheet.create({
   serviceCell: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
     flex: 1,
   },
-  boldText: {
+  serviceName: {
     fontSize: 12,
+    fontWeight: '500',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dotHealthy: {
+    backgroundColor: '#10B981',
+  },
+  dotDegraded: {
+    backgroundColor: '#F59E0B',
+  },
+  dotDown: {
+    backgroundColor: '#EF4444',
+  },
+  statusText: {
+    fontSize: 11,
     fontWeight: '600',
-    color: ADMIN_COLORS.textPrimary,
   },
-  monoText: {
-    fontSize: 12,
+  textHealthy: {
+    color: '#047857',
+  },
+  textDegraded: {
+    color: '#B45309',
+  },
+  textDown: {
+    color: '#B91C1C',
+  },
+  monoLatency: {
+    fontSize: 11,
     fontFamily: 'monospace',
-    color: ADMIN_COLORS.textPrimary,
+    color: '#475569',
   },
-  cellSecondary: {
+  cellDetails: {
     fontSize: 11,
     color: ADMIN_COLORS.textSecondary,
-  },
-  cellMuted: {
-    fontSize: 11,
-    color: ADMIN_COLORS.textMuted,
   },
   loader: {
     padding: 32,
@@ -493,22 +592,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: ADMIN_COLORS.textSecondary,
   },
-  telemetryCard: {
-    backgroundColor: ADMIN_COLORS.bgSurface,
-    borderWidth: 1,
-    borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.card,
-    padding: 14,
-    marginBottom: 24,
-  },
+  // Logs
   logsList: {
     gap: 8,
   },
   logItem: {
-    backgroundColor: ADMIN_COLORS.bgCanvas,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.button,
+    borderRadius: 6,
     padding: 10,
     gap: 4,
   },
@@ -522,6 +614,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  monoLevelTag: {
+    fontFamily: 'monospace',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  tagRed: {
+    color: '#DC2626',
+  },
+  tagAmber: {
+    color: '#D97706',
+  },
+  tagBlue: {
+    color: '#0284C7',
+  },
   logSource: {
     fontSize: 11,
     fontFamily: 'monospace',
@@ -532,7 +638,7 @@ const styles = StyleSheet.create({
     color: ADMIN_COLORS.textMuted,
   },
   logMessage: {
-    fontSize: 12,
+    fontSize: 11,
     color: ADMIN_COLORS.textPrimary,
     lineHeight: 16,
   },
@@ -540,10 +646,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   recordCard: {
-    backgroundColor: ADMIN_COLORS.bgCanvas,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.button,
+    borderRadius: 6,
     padding: 10,
     gap: 6,
   },
@@ -554,9 +660,10 @@ const styles = StyleSheet.create({
   },
   recordFooter: {
     borderTopWidth: 1,
-    borderTopColor: ADMIN_COLORS.borderSubtle,
+    borderTopColor: '#F1F5F9',
     paddingTop: 6,
   },
+  // Modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
@@ -568,7 +675,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 500,
     backgroundColor: ADMIN_COLORS.bgSurface,
-    borderRadius: ADMIN_RADII.modal,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
     padding: 18,
@@ -580,11 +687,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: ADMIN_COLORS.borderSubtle,
+    borderBottomColor: '#F1F5F9',
     marginBottom: 14,
   },
   modalTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: ADMIN_COLORS.textPrimary,
   },
@@ -602,32 +709,30 @@ const styles = StyleSheet.create({
   metaLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: ADMIN_COLORS.textLight,
+    color: ADMIN_COLORS.textSecondary,
   },
   metaVal: {
-    fontSize: 12,
+    fontSize: 11,
     color: ADMIN_COLORS.textPrimary,
     fontFamily: 'monospace',
   },
   stackTraceBox: {
-    backgroundColor: ADMIN_COLORS.bgCanvas,
-    borderWidth: 1,
-    borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.input,
+    backgroundColor: '#0F172A',
+    borderRadius: 6,
     padding: 10,
     marginTop: 4,
   },
   stackTraceText: {
     fontSize: 11,
     fontFamily: 'monospace',
-    color: ADMIN_COLORS.textPrimary,
+    color: '#F1F5F9',
     lineHeight: 16,
   },
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     borderTopWidth: 1,
-    borderTopColor: ADMIN_COLORS.borderSubtle,
+    borderTopColor: '#F1F5F9',
     paddingTop: 12,
   },
   actionOutlineBtn: {
@@ -636,10 +741,10 @@ const styles = StyleSheet.create({
     backgroundColor: ADMIN_COLORS.bgSurface,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: ADMIN_RADII.button,
+    borderRadius: 6,
   },
   actionOutlineBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: ADMIN_COLORS.textSecondary,
   },

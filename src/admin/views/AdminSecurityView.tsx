@@ -2,33 +2,24 @@
 // BOOFFIN ADMIN PORTAL — ENTERPRISE SECURITY OPERATIONS CENTER (SOC)
 // ============================================================================
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   ScrollView, 
   TouchableOpacity, 
-  ActivityIndicator,
   useWindowDimensions 
 } from 'react-native';
-import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
-import { AdminStatCard } from '../components/AdminStatCard';
-import { AdminBadge } from '../components/AdminBadge';
+import { ADMIN_COLORS } from '../lib/constants';
 import { useAdminAuth } from '../hooks/useAdminAuth';
-import { adminMfaService, MfaFactorSummary } from '../services/adminMfaService';
 import { 
   ShieldCheck, 
-  ShieldAlert, 
-  Key, 
   Smartphone, 
   Laptop, 
-  Globe, 
-  Lock, 
-  AlertTriangle, 
-  RefreshCw, 
-  CheckCircle2,
-  Radio
+  Terminal, 
+  CheckCircle2, 
+  AlertTriangle 
 } from 'lucide-react-native';
 
 interface SecuritySession {
@@ -55,9 +46,7 @@ export const AdminSecurityView: React.FC = () => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
-  const { role, status, aal, isMfaVerified, refreshSession } = useAdminAuth();
-  const [factors, setFactors] = useState<MfaFactorSummary[]>([]);
-  const [loadingFactors, setLoadingFactors] = useState(false);
+  const { role, aal, isMfaVerified } = useAdminAuth();
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
@@ -78,7 +67,7 @@ export const AdminSecurityView: React.FC = () => {
       browser: 'Mobile Safari 18.0',
       ip: '103.212.145.88',
       location: 'New Delhi, India',
-      lastActive: '34 minutes ago',
+      lastActive: '34 mins ago',
       isCurrent: false,
     },
   ]);
@@ -89,9 +78,9 @@ export const AdminSecurityView: React.FC = () => {
       id: 'thr-101',
       type: 'Brute Force Auth Throttling',
       severity: 'MEDIUM',
-      sourceIp: '185.220.101.45 (Tor Exit Node)',
+      sourceIp: '185.220.101.45 (Tor Exit)',
       details: 'Exceeded 20 failed login attempts in 60s against /auth/v1/token. IP dynamically jailed for 1 hour.',
-      timestamp: '12 minutes ago',
+      timestamp: '12m ago',
       status: 'BLOCKED',
     },
     {
@@ -100,7 +89,7 @@ export const AdminSecurityView: React.FC = () => {
       severity: 'HIGH',
       sourceIp: '45.133.1.20',
       details: 'Unauthenticated POST to /storage/v1/object/papers without user folder claims. Rejected by RLS bucket policy.',
-      timestamp: '2 hours ago',
+      timestamp: '2h ago',
       status: 'MITIGATED',
     },
     {
@@ -109,7 +98,7 @@ export const AdminSecurityView: React.FC = () => {
       severity: 'LOW',
       sourceIp: '198.51.100.12',
       details: 'Automated crawler breached 120 req/min endpoint threshold on /rest/v1/profiles. Traffic rate-limited to 429.',
-      timestamp: '5 hours ago',
+      timestamp: '5h ago',
       status: 'MITIGATED',
     },
   ]);
@@ -117,6 +106,7 @@ export const AdminSecurityView: React.FC = () => {
   const handleRevokeSession = (sessionId: string) => {
     setSessions(prev => prev.filter(s => s.id !== sessionId));
     setActionSuccess('Security session revoked successfully.');
+    setTimeout(() => setActionSuccess(null), 3000);
   };
 
   return (
@@ -133,78 +123,93 @@ export const AdminSecurityView: React.FC = () => {
 
       {actionSuccess && (
         <View style={styles.successBox}>
-          <CheckCircle2 size={15} color={ADMIN_COLORS.statusSuccessText} />
+          <CheckCircle2 size={14} color="#047857" />
           <Text style={styles.successText}>{actionSuccess}</Text>
         </View>
       )}
 
       {actionError && (
         <View style={styles.errorBox}>
-          <AlertTriangle size={15} color={ADMIN_COLORS.statusDangerText} />
+          <AlertTriangle size={14} color="#B91C1C" />
           <Text style={styles.errorText}>{actionError}</Text>
         </View>
       )}
 
-      {/* Security Stat Cards */}
-      <View style={styles.statsRow}>
-        <AdminStatCard
-          label="Authenticator Level"
-          value={aal ? aal.toUpperCase() : 'AAL1'}
-          subtext={isMfaVerified ? 'MFA Authenticated' : 'Standard Password'}
-          variant="emerald"
-        />
-        <AdminStatCard
-          label="RBAC Role Standing"
-          value={role || 'SUPER_ADMIN'}
-          subtext="Full platform authorization"
-          variant="emerald"
-        />
-        <AdminStatCard
-          label="Threat Mitigation Rate"
-          value="100%"
-          subtext="Zero active policy breaches"
-          variant="default"
-        />
-      </View>
-
-      {/* Active Admin Sessions */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Active Administrator Sessions</Text>
-          <Text style={styles.cardSub}>Concurrent authenticated sessions registered to this operator account</Text>
+      {/* 1. Top Unified 3-Column Stats Bar */}
+      <View style={[styles.joinedKpiBar, isMobile && styles.joinedKpiBarMobile]}>
+        <View style={[styles.kpiCell, isMobile ? styles.kpiCellMobile : styles.kpiCellDivider]}>
+          <Text style={styles.kpiLabel}>AUTHENTICATOR LEVEL</Text>
+          <Text style={styles.kpiValue}>{aal ? aal.toUpperCase() : 'AAL1'}</Text>
+          <View style={styles.kpiSubRow}>
+            <View style={[styles.microDot, isMfaVerified ? styles.dotGreen : styles.dotAmber]} />
+            <Text style={styles.kpiSubtext}>
+              {isMfaVerified ? 'MFA TOTP Verified' : 'Standard Password'}
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.sessionList}>
-          {sessions.map((sess) => (
-            <View key={sess.id} style={styles.sessionItem}>
+        <View style={[styles.kpiCell, isMobile ? styles.kpiCellMobile : styles.kpiCellDivider]}>
+          <Text style={styles.kpiLabel}>RBAC ROLE STANDING</Text>
+          <Text style={styles.kpiValue}>{role || 'SUPER_ADMIN'}</Text>
+          <Text style={styles.kpiSubtext}>Full Platform Authority</Text>
+        </View>
+
+        <View style={[styles.kpiCell, isMobile && styles.kpiCellMobile]}>
+          <Text style={styles.kpiLabel}>THREAT MITIGATION RATE</Text>
+          <Text style={styles.kpiValue}>100.0%</Text>
+          <Text style={styles.kpiSubtext}>Zero Active Breaches</Text>
+        </View>
+      </View>
+
+      {/* 2. Active Admin Sessions Table / List */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View>
+            <Text style={styles.cardTitle}>Active Administrator Sessions</Text>
+            <Text style={styles.cardSub}>Concurrent authenticated sessions registered to this operator account</Text>
+          </View>
+        </View>
+
+        <View style={styles.sessionTable}>
+          {sessions.map((sess, idx) => (
+            <View 
+              key={sess.id} 
+              style={[
+                styles.sessionRow,
+                idx < sessions.length - 1 && styles.rowDivider
+              ]}
+            >
               <View style={styles.sessionLeft}>
-                <View style={styles.deviceIconBox}>
+                <View style={styles.deviceIcon}>
                   {sess.device.includes('iPhone') ? (
-                    <Smartphone size={15} color={ADMIN_COLORS.emeraldPrimary} />
+                    <Smartphone size={14} color={ADMIN_COLORS.textSecondary} />
                   ) : (
-                    <Laptop size={15} color={ADMIN_COLORS.emeraldPrimary} />
+                    <Laptop size={14} color={ADMIN_COLORS.textSecondary} />
                   )}
                 </View>
-                <View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.deviceText}>{sess.device}</Text>
+                <View style={styles.sessionMeta}>
+                  <View style={styles.deviceNameRow}>
+                    <Text style={styles.deviceName}>{sess.device}</Text>
                     {sess.isCurrent && (
-                      <AdminBadge label="CURRENT" variant="emerald" size="sm" />
+                      <View style={styles.currentBadge}>
+                        <View style={styles.dotGreen} />
+                        <Text style={styles.currentBadgeText}>CURRENT SESSION</Text>
+                      </View>
                     )}
                   </View>
-                  <Text style={styles.browserText}>
-                    {sess.browser} • {sess.ip} ({sess.location})
+                  <Text style={styles.deviceSub}>
+                    {sess.browser} · <Text style={styles.monoText}>{sess.ip}</Text> ({sess.location}) · {sess.lastActive}
                   </Text>
-                  <Text style={styles.cellMuted}>{sess.lastActive}</Text>
                 </View>
               </View>
 
               {!sess.isCurrent && (
                 <TouchableOpacity
-                  style={styles.actionDangerBtn}
+                  style={styles.ghostRevokeBtn}
                   onPress={() => handleRevokeSession(sess.id)}
+                  activeOpacity={0.7}
                 >
-                  <Text style={styles.actionDangerBtnText}>Revoke</Text>
+                  <Text style={styles.ghostRevokeBtnText}>Revoke</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -212,43 +217,51 @@ export const AdminSecurityView: React.FC = () => {
         </View>
       </View>
 
-      {/* Threat Mitigation Radar Feed */}
+      {/* 3. Terminal Style Threat Stream */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Radio size={15} color={ADMIN_COLORS.emeraldPrimary} />
-            <Text style={styles.cardTitle}>Live Threat & Intrusion Prevention Stream</Text>
+            <Terminal size={14} color={ADMIN_COLORS.emeraldPrimary} />
+            <Text style={styles.cardTitle}>Threat & Intrusion Prevention Stream</Text>
           </View>
           <Text style={styles.cardSub}>Automated RLS firewall triggers and dynamic API rate limiting events</Text>
         </View>
 
-        <View style={styles.threatList}>
-          {threatLogs.map((thr) => (
-            <View key={thr.id} style={styles.threatItem}>
-              <View style={styles.threatHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <AdminBadge
-                    label={thr.severity}
-                    variant={thr.severity === 'HIGH' || thr.severity === 'CRITICAL' ? 'danger' : 'warning'}
-                    size="sm"
-                  />
-                  <Text style={styles.threatType}>{thr.type}</Text>
+        <View style={styles.terminalContainer}>
+          {threatLogs.map((thr, idx) => {
+            const isHigh = thr.severity === 'HIGH' || thr.severity === 'CRITICAL';
+            const isMed = thr.severity === 'MEDIUM';
+
+            return (
+              <View 
+                key={thr.id} 
+                style={[
+                  styles.terminalRow,
+                  idx < threatLogs.length - 1 && styles.terminalRowDivider
+                ]}
+              >
+                <View style={styles.terminalTop}>
+                  <View style={styles.tagGroup}>
+                    <Text style={[
+                      styles.severityTag,
+                      isHigh ? styles.tagRed : isMed ? styles.tagAmber : styles.tagSlate
+                    ]}>
+                      [{thr.severity}]
+                    </Text>
+                    <Text style={styles.threatName}>{thr.type}</Text>
+                  </View>
+                  <Text style={styles.threatTime}>{thr.timestamp}</Text>
                 </View>
-                <AdminBadge
-                  label={thr.status}
-                  variant="emerald"
-                  size="sm"
-                />
-              </View>
 
-              <Text style={styles.threatDetails}>{thr.details}</Text>
+                <Text style={styles.threatDetails}>{thr.details}</Text>
 
-              <View style={styles.threatFooter}>
-                <Text style={styles.monoIp}>IP: {thr.sourceIp}</Text>
-                <Text style={styles.cellMuted}>{thr.timestamp}</Text>
+                <View style={styles.terminalBottom}>
+                  <Text style={styles.monoIp}>IP: {thr.sourceIp}</Text>
+                  <Text style={styles.statusMitigated}>STATUS: {thr.status}</Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </View>
     </ScrollView>
@@ -278,45 +291,107 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: ADMIN_COLORS.statusSuccessBg,
+    backgroundColor: '#F0FDF4',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.statusSuccessBorder,
-    borderRadius: ADMIN_RADII.card,
+    borderColor: '#DCFCE7',
+    borderRadius: 6,
     padding: 10,
     marginBottom: 14,
   },
   successText: {
     fontSize: 12,
-    color: ADMIN_COLORS.statusSuccessText,
+    color: '#047857',
     fontWeight: '500',
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: ADMIN_COLORS.statusDangerBg,
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.statusDangerBorder,
-    borderRadius: ADMIN_RADII.card,
+    borderColor: '#FEE2E2',
+    borderRadius: 6,
     padding: 10,
     marginBottom: 14,
   },
   errorText: {
     fontSize: 12,
-    color: ADMIN_COLORS.statusDangerText,
+    color: '#B91C1C',
     fontWeight: '500',
   },
-  statsRow: {
+  // 1. Joined 3-column KPI Bar
+  joinedKpiBar: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: 8,
     marginBottom: 16,
+    overflow: 'hidden',
   },
+  joinedKpiBarMobile: {
+    flexDirection: 'column',
+  },
+  kpiCell: {
+    flex: 1,
+    padding: 14,
+    gap: 3,
+  },
+  kpiCellDivider: {
+    borderRightWidth: 1,
+    borderRightColor: ADMIN_COLORS.border,
+  },
+  kpiCellMobile: {
+    borderRightWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: ADMIN_COLORS.border,
+  },
+  kpiLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  kpiValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
+    fontFamily: 'monospace',
+  },
+  kpiSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
+  kpiSubtext: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  microDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dotGreen: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  dotAmber: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F59E0B',
+  },
+  // Cards
   card: {
     backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.card,
+    borderRadius: 8,
     padding: 14,
     marginBottom: 16,
   },
@@ -324,27 +399,32 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: ADMIN_COLORS.textPrimary,
   },
   cardSub: {
-    fontSize: 12,
+    fontSize: 11,
     color: ADMIN_COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
-  sessionList: {
-    gap: 8,
+  // Session Table
+  sessionTable: {
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: 6,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    overflow: 'hidden',
   },
-  sessionItem: {
+  sessionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: ADMIN_COLORS.bgCanvas,
-    borderWidth: 1,
-    borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.button,
     padding: 10,
+  },
+  rowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   sessionLeft: {
     flexDirection: 'row',
@@ -352,82 +432,138 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
-  deviceIconBox: {
-    width: 32,
-    height: 32,
+  deviceIcon: {
+    width: 28,
+    height: 28,
     borderRadius: 4,
-    backgroundColor: ADMIN_COLORS.bgActive,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.emeraldBorder,
+    borderColor: ADMIN_COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  deviceText: {
+  sessionMeta: {
+    flex: 1,
+  },
+  deviceNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  deviceName: {
     fontSize: 12,
     fontWeight: '600',
     color: ADMIN_COLORS.textPrimary,
   },
-  browserText: {
+  currentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  currentBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#047857',
+    letterSpacing: 0.3,
+  },
+  deviceSub: {
     fontSize: 11,
     color: ADMIN_COLORS.textSecondary,
     marginTop: 1,
   },
-  cellMuted: {
-    fontSize: 10,
-    color: ADMIN_COLORS.textMuted,
-    marginTop: 2,
+  monoText: {
+    fontFamily: 'monospace',
+    color: ADMIN_COLORS.textPrimary,
   },
-  actionDangerBtn: {
-    borderWidth: 1,
-    borderColor: ADMIN_COLORS.statusDangerBorder,
-    backgroundColor: ADMIN_COLORS.statusDangerBg,
+  ghostRevokeBtn: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: ADMIN_RADII.button,
+    paddingVertical: 3,
+    borderRadius: 4,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
-  actionDangerBtnText: {
+  ghostRevokeBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: ADMIN_COLORS.statusDangerText,
+    color: '#B91C1C',
   },
-  threatList: {
-    gap: 8,
-  },
-  threatItem: {
-    backgroundColor: ADMIN_COLORS.bgCanvas,
-    borderWidth: 1,
-    borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.button,
+  // Terminal Container
+  terminalContainer: {
+    backgroundColor: '#0F172A', // Crisp Slate 900 console backing
+    borderRadius: 6,
     padding: 10,
-    gap: 4,
+    borderWidth: 1,
+    borderColor: '#1E293B',
   },
-  threatHeader: {
+  terminalRow: {
+    paddingVertical: 8,
+    gap: 3,
+  },
+  terminalRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+  },
+  terminalTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  threatType: {
+  tagGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  severityTag: {
+    fontFamily: 'monospace',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  tagRed: {
+    color: '#F87171',
+  },
+  tagAmber: {
+    color: '#FBBF24',
+  },
+  tagSlate: {
+    color: '#94A3B8',
+  },
+  threatName: {
     fontSize: 12,
     fontWeight: '600',
-    color: ADMIN_COLORS.textPrimary,
+    color: '#F1F5F9',
+  },
+  threatTime: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    color: '#64748B',
   },
   threatDetails: {
     fontSize: 11,
-    color: ADMIN_COLORS.textSecondary,
+    color: '#94A3B8',
     lineHeight: 16,
   },
-  threatFooter: {
+  terminalBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: ADMIN_COLORS.borderSubtle,
-    paddingTop: 6,
-    marginTop: 4,
+    marginTop: 2,
   },
   monoIp: {
     fontSize: 10,
     fontFamily: 'monospace',
-    color: ADMIN_COLORS.textSecondary,
+    color: '#38BDF8',
+  },
+  statusMitigated: {
+    fontSize: 9.5,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#34D399',
   },
 });

@@ -233,15 +233,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: ADMIN_RADII.button,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
     marginBottom: 2,
   },
   navItemActive: {
-    backgroundColor: ADMIN_COLORS.bgActive,
-    borderLeftWidth: 3,
-    borderLeftColor: ADMIN_COLORS.emeraldPrimary,
+    backgroundColor: '#ECFDF5', // subtle emerald 50 tint
   },
   navItemLeft: {
     flexDirection: 'row',
@@ -252,8 +250,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   navLabelActive: {
-    color: ADMIN_COLORS.emeraldPrimary,
-    fontWeight: '700',
+    color: '#064E3B', // deep emerald 900
+    fontWeight: '600',
   },
   navLabelInactive: {
     color: ADMIN_COLORS.textSecondary,
