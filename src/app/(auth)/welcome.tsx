@@ -180,7 +180,7 @@ export default function WelcomeScreen() {
             styles.welcomeHeroContainer,
             isMobile && { minHeight: Platform.OS === 'web' ? ('100dvh' as any) : 600 }
           ]}>
-            {/* Full Screen Background Image */}
+            {/* Full Screen Background Image (100% Crisp & Visible) */}
             <Image
               source={WELCOME_FULL_BG}
               style={StyleSheet.absoluteFill}
@@ -189,26 +189,19 @@ export default function WelcomeScreen() {
               priority="high"
             />
 
-            {/* Mobile Contrast Layer for crisp readability */}
-            {isMobile && (
-              <View 
-                style={[
-                  StyleSheet.absoluteFill, 
-                  { backgroundColor: 'rgba(250, 251, 249, 0.42)' }
-                ]} 
-                pointerEvents="none" 
-              />
-            )}
-
             {/* Left Content Overlay */}
             <View style={[
               styles.welcomeContentInner,
-              isMobile && { paddingHorizontal: isSmallMobile ? 18 : 24, paddingTop: 76, paddingBottom: 36 }
+              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingTop: 76, paddingBottom: 36 }
             ]}>
-              <View style={styles.welcomeTextCard}>
+              {/* Editorial Plinth Card on Mobile */}
+              <View style={[
+                styles.editorialPlinthCard,
+                isMobile && styles.editorialPlinthCardMobile
+              ]}>
                 <Text style={[
                   styles.heroPreTitle,
-                  isMobile && { fontSize: isSmallMobile ? 22 : 26 }
+                  isMobile && { fontSize: isSmallMobile ? 21 : 24 }
                 ]}>
                   Welcome to BooffIn
                 </Text>
@@ -216,13 +209,13 @@ export default function WelcomeScreen() {
                 <View style={styles.brandTitleBlock}>
                   <Text style={[
                     styles.heroLets,
-                    isMobile && { fontSize: 18 }
+                    isMobile && { fontSize: 17 }
                   ]}>
                     Let’s
                   </Text>
                   <Text style={[
                     styles.heroBrandTitle,
-                    isMobile && { fontSize: isSmallMobile ? 38 : 46 }
+                    isMobile && { fontSize: isSmallMobile ? 36 : 42 }
                   ]}>
                     BooffIn
                   </Text>
@@ -230,26 +223,26 @@ export default function WelcomeScreen() {
 
                 <Text style={[
                   styles.heroTagline,
-                  isMobile && { fontSize: 16.5, marginBottom: 10 }
+                  isMobile && { fontSize: 16, marginBottom: 8 }
                 ]}>
                   Research finds its people.
                 </Text>
 
                 <Text style={[
                   styles.heroDescription,
-                  isMobile && { fontSize: 14, lineHeight: 21, marginBottom: 22 }
+                  isMobile && { fontSize: 13.5, lineHeight: 20, marginBottom: 20 }
                 ]}>
                   Connect our researchers, share insights, and discover the science of finding you platforms.
                 </Text>
 
                 <View style={[
                   styles.heroActionsRow,
-                  isMobile && { gap: 16 }
+                  isMobile && { gap: 14 }
                 ]}>
                   <TouchableOpacity 
                     style={[
                       styles.primaryCtaBtn,
-                      isMobile && { paddingVertical: 11, paddingHorizontal: 22 }
+                      isMobile && { paddingVertical: 11, paddingHorizontal: 20 }
                     ]} 
                     onPress={handleOpenAuthModal}
                     activeOpacity={0.8}
@@ -287,52 +280,49 @@ export default function WelcomeScreen() {
               priority="high"
             />
 
-            {/* Mobile Contrast Layer */}
-            {isMobile && (
-              <View 
-                style={[
-                  StyleSheet.absoluteFill, 
-                  { backgroundColor: 'rgba(250, 251, 249, 0.5)' }
-                ]} 
-                pointerEvents="none" 
-              />
-            )}
-
             {/* Content Overlay */}
             <View style={[
               styles.aboutContentInner,
-              isMobile && { paddingHorizontal: isSmallMobile ? 18 : 24, paddingTop: 76, paddingBottom: 36 }
+              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingTop: 76, paddingBottom: 36 }
             ]}>
               <View style={styles.aboutContentBlock}>
-                <Text style={[
-                  styles.editorialTitle,
-                  isMobile && { fontSize: isSmallMobile ? 26 : 30 }
+                {/* Header Plinth */}
+                <View style={[
+                  styles.editorialPlinthHeader,
+                  isMobile && styles.editorialPlinthHeaderMobile
                 ]}>
-                  About BooffIn
-                </Text>
-                <Text style={[
-                  styles.editorialSubtitle,
-                  isMobile && { fontSize: 14.5, marginBottom: 20 }
-                ]}>
-                  A space where research finds its people
-                </Text>
+                  <Text style={[
+                    styles.editorialTitle,
+                    isMobile && { fontSize: isSmallMobile ? 24 : 26 }
+                  ]}>
+                    About BooffIn
+                  </Text>
+                  <Text style={[
+                    styles.editorialSubtitle,
+                    isMobile && { fontSize: 13.5, marginBottom: 0 }
+                  ]}>
+                    A space where research finds its people
+                  </Text>
+                </View>
 
-                <View style={[styles.sectionBlock, isMobile && { marginBottom: 18 }]}>
-                  <Text style={[styles.sectionHeading, isMobile && { fontSize: 18 }]}>Our Mission</Text>
-                  <Text style={[styles.bodyParagraph, isMobile && { fontSize: 14, lineHeight: 21 }]}>
+                {/* Micro-Panel 1: Mission */}
+                <View style={styles.contentMicroPanel}>
+                  <Text style={styles.sectionHeading}>Our Mission</Text>
+                  <Text style={styles.bodyParagraph}>
                     BooffIn was created to bridge the gap between curiosity and collaboration. We believe that groundbreaking research shouldn't exist in a vacuum, but rather thrive through connection.
                   </Text>
-                  <Text style={[styles.bodyParagraph, isMobile && { fontSize: 14, lineHeight: 21 }, { marginTop: 8 }]}>
+                  <Text style={[styles.bodyParagraph, { marginTop: 8 }]}>
                     Our platform enables student researchers, academics, and science enthusiasts to share insights, engage in meaningful discussions, and push the boundaries of collective knowledge.
                   </Text>
                 </View>
 
-                <View style={[styles.sectionBlock, isMobile && { marginBottom: 18 }]}>
-                  <Text style={[styles.sectionHeading, isMobile && { fontSize: 18 }]}>What We Do</Text>
+                {/* Micro-Panel 2: What We Do */}
+                <View style={styles.contentMicroPanel}>
+                  <Text style={styles.sectionHeading}>What We Do</Text>
                   <View style={styles.bulletList}>
-                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Connect researchers globally</Text>
-                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Facilitate interdisciplinary discussions</Text>
-                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Make scientific insight accessible to everyone</Text>
+                    <Text style={styles.bulletItem}>• Connect researchers globally</Text>
+                    <Text style={styles.bulletItem}>• Facilitate interdisciplinary discussions</Text>
+                    <Text style={styles.bulletItem}>• Make scientific insight accessible to everyone</Text>
                   </View>
                 </View>
 
@@ -367,35 +357,30 @@ export default function WelcomeScreen() {
               priority="high"
             />
 
-            {/* Mobile Contrast Layer */}
-            {isMobile && (
-              <View 
-                style={[
-                  StyleSheet.absoluteFill, 
-                  { backgroundColor: 'rgba(250, 251, 249, 0.52)' }
-                ]} 
-                pointerEvents="none" 
-              />
-            )}
-
             {/* Content Overlay */}
             <View style={[
               styles.featuresContentInner,
-              isMobile && { paddingHorizontal: isSmallMobile ? 18 : 24, paddingTop: 76, paddingBottom: 36 }
+              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingTop: 76, paddingBottom: 36 }
             ]}>
               <View style={styles.featuresContentBlock}>
-                <Text style={[
-                  styles.editorialTitle,
-                  isMobile && { fontSize: isSmallMobile ? 24 : 28 }
+                {/* Header Plinth */}
+                <View style={[
+                  styles.editorialPlinthHeader,
+                  isMobile && styles.editorialPlinthHeaderMobile
                 ]}>
-                  What You Can Do on BooffIn
-                </Text>
-                <Text style={[
-                  styles.editorialSubtitle,
-                  isMobile && { fontSize: 14.5, marginBottom: 18 }
-                ]}>
-                  Explore the features that connect researchers with people and ideas
-                </Text>
+                  <Text style={[
+                    styles.editorialTitle,
+                    isMobile && { fontSize: isSmallMobile ? 22 : 25 }
+                  ]}>
+                    What You Can Do on BooffIn
+                  </Text>
+                  <Text style={[
+                    styles.editorialSubtitle,
+                    isMobile && { fontSize: 13.5, marginBottom: 0 }
+                  ]}>
+                    Explore the features that connect researchers with people and ideas
+                  </Text>
+                </View>
 
                 {/* Feature Grid */}
                 <View style={[
@@ -446,8 +431,8 @@ export default function WelcomeScreen() {
                 {/* Actions */}
                 <View style={[
                   styles.heroActionsRow, 
-                  { marginTop: 20 },
-                  isMobile && { gap: 16 }
+                  { marginTop: 16 },
+                  isMobile && { gap: 14 }
                 ]}>
                   <TouchableOpacity 
                     style={[
@@ -500,56 +485,53 @@ export default function WelcomeScreen() {
               priority="high"
             />
 
-            {/* Mobile Contrast Layer */}
-            {isMobile && (
-              <View 
-                style={[
-                  StyleSheet.absoluteFill, 
-                  { backgroundColor: 'rgba(250, 251, 249, 0.5)' }
-                ]} 
-                pointerEvents="none" 
-              />
-            )}
-
             {/* Content Overlay */}
             <View style={[
               styles.communityContentInner,
-              isMobile && { paddingHorizontal: isSmallMobile ? 18 : 24, paddingTop: 76, paddingBottom: 36 }
+              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingTop: 76, paddingBottom: 36 }
             ]}>
               <View style={styles.communityContentBlock}>
-                <Text style={[
-                  styles.editorialTitle,
-                  isMobile && { fontSize: isSmallMobile ? 24 : 28 }
+                {/* Header Plinth */}
+                <View style={[
+                  styles.editorialPlinthHeader,
+                  isMobile && styles.editorialPlinthHeaderMobile
                 ]}>
-                  Meet the BooffIn Community
-                </Text>
-                <Text style={[
-                  styles.editorialSubtitle,
-                  isMobile && { fontSize: 14.5, marginBottom: 18 }
-                ]}>
-                  Where curious minds, researchers, and creators come together to share the shape of life
-                </Text>
+                  <Text style={[
+                    styles.editorialTitle,
+                    isMobile && { fontSize: isSmallMobile ? 22 : 25 }
+                  ]}>
+                    Meet the BooffIn Community
+                  </Text>
+                  <Text style={[
+                    styles.editorialSubtitle,
+                    isMobile && { fontSize: 13.5, marginBottom: 0 }
+                  ]}>
+                    Where curious minds, researchers, and creators come together to share the shape of life
+                  </Text>
+                </View>
 
-                <View style={[styles.sectionBlock, isMobile && { marginBottom: 18 }]}>
-                  <Text style={[styles.sectionHeading, isMobile && { fontSize: 18 }]}>A Global Network</Text>
-                  <Text style={[styles.bodyParagraph, isMobile && { fontSize: 14, lineHeight: 21 }]}>
+                {/* Micro-Panel 1: Global Network */}
+                <View style={styles.contentMicroPanel}>
+                  <Text style={styles.sectionHeading}>A Global Network</Text>
+                  <Text style={styles.bodyParagraph}>
                     BooffIn is home to thousands of student researchers, PhD candidates, and science enthusiasts who are passionate about sharing knowledge. From late-night breakthrough discussions to collaborative reviews, find your place in a thriving network designed for curious minds.
                   </Text>
                 </View>
 
-                <View style={[styles.sectionBlock, isMobile && { marginBottom: 18 }]}>
-                  <Text style={[styles.sectionHeading, isMobile && { fontSize: 18 }]}>How to Participate</Text>
+                {/* Micro-Panel 2: How to Participate */}
+                <View style={styles.contentMicroPanel}>
+                  <Text style={styles.sectionHeading}>How to Participate</Text>
                   <View style={styles.bulletList}>
-                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Join dedicated interest groups (e.g., AI in Science, Neuroscience)</Text>
-                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Participate in live discussions & Q&As</Text>
-                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Share your latest research & insights with peers</Text>
+                    <Text style={styles.bulletItem}>• Join dedicated interest groups (e.g., AI in Science, Neuroscience)</Text>
+                    <Text style={styles.bulletItem}>• Participate in live discussions & Q&As</Text>
+                    <Text style={styles.bulletItem}>• Share your latest research & insights with peers</Text>
                   </View>
                 </View>
 
                 <View style={[
                   styles.heroActionsRow, 
-                  { marginTop: 20 },
-                  isMobile && { gap: 16 }
+                  { marginTop: 16 },
+                  isMobile && { gap: 14 }
                 ]}>
                   <TouchableOpacity 
                     style={[
@@ -883,6 +865,48 @@ const styles = StyleSheet.create({
   welcomeTextCard: {
     maxWidth: 580,
     width: '100%',
+  },
+  editorialPlinthCard: {
+    maxWidth: 580,
+    width: '100%',
+  },
+  editorialPlinthCardMobile: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+  },
+  editorialPlinthHeader: {
+    marginBottom: 24,
+  },
+  editorialPlinthHeaderMobile: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+  },
+  contentMicroPanel: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 18,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
   },
   aboutHeroContainer: {
     width: '100%',
