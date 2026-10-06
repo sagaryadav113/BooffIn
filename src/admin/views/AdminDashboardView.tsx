@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { ADMIN_COLORS } from '../lib/constants';
+import { supabase } from '../../api/client';
 import { AdminStatCard } from '../components/AdminStatCard';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
@@ -10,7 +11,12 @@ import { adminReportService } from '../services/adminReportService';
 import { adminApprovalService } from '../services/adminApprovalService';
 import { adminAuditService } from '../services/adminAuditService';
 import { adminModerationService } from '../services/adminModerationService';
+import { adminCalendarService } from '../services/adminCalendarService';
+import { adminChatService } from '../services/adminChatService';
 import { AdminUserProfile, AdminReport } from '../types/data';
+import { AdminCalendarEvent } from '../types/calendar';
+import { AdminChatMessage } from '../types/chat';
+import { AdminAuditLog } from '../types/audit';
 import { AdminNavKey } from '../lib/constants';
 import {
   Plus,
@@ -26,6 +32,10 @@ import {
   CheckCircle2,
   Activity,
   Calendar,
+  MessagesSquare,
+  CheckSquare,
+  Radio,
+  Zap,
 } from 'lucide-react-native';
 
 interface AdminDashboardViewProps {
@@ -41,17 +51,73 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTimeRange, setActiveTimeRange] = useState<'7D' | '30D' | '90D' | '1Y'>('30D');
 
-  const [userCount, setUserCount] = useState<number>(16);
-  const [postCount, setPostCount] = useState<number>(28);
+  const [userCount, setUserCount] = useState<number>(18);
+  const [postCount, setPostCount] = useState<number>(29);
   const [pendingReportsCount, setPendingReportsCount] = useState<number>(0);
   const [auditLogsCount, setAuditLogsCount] = useState<number>(1);
+  const [liveUsersCount, setLiveUsersCount] = useState<number>(1);
+
+  // Recent Activity 4 Target Data Items
+  const [upcomingEvent, setUpcomingEvent] = useState<AdminCalendarEvent | null>(null);
+  const [upcomingEventsCount, setUpcomingEventsCount] = useState<number>(0);
+  const [latestChatMessage, setLatestChatMessage] = useState<AdminChatMessage | null>(null);
+  const [latestAuditLog, setLatestAuditLog] = useState<AdminAuditLog | null>(null);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
 
   const [recentUsers, setRecentUsers] = useState<AdminUserProfile[]>([]);
   const [pendingReports, setPendingReports] = useState<AdminReport[]>([]);
 
+  // 1. Realtime Presence Subscription (Live Users Tracking in Realtime)
+  useEffect(() => {
+    let presenceChannel: any = null;
+    try {
+      const channelId = 'booffin-live-presence';
+      presenceChannel = supabase.channel(channelId, {
+        config: {
+          presence: {
+            key: `admin-${Math.random().toString(36).substring(2, 9)}`,
+          },
+        },
+      });
+
+      const updatePresenceCount = () => {
+        if (!presenceChannel) return;
+        const state = presenceChannel.presenceState();
+        const activeCount = Object.keys(state).length;
+        setLiveUsersCount(Math.max(activeCount, 1));
+      };
+
+      presenceChannel
+        .on('presence', { event: 'sync' }, updatePresenceCount)
+        .on('presence', { event: 'join' }, updatePresenceCount)
+        .on('presence', { event: 'leave' }, updatePresenceCount)
+        .subscribe(async (status: string) => {
+          if (status === 'SUBSCRIBED') {
+            await presenceChannel.track({
+              online_at: new Date().toISOString(),
+              client: 'admin_dashboard',
+            });
+            updatePresenceCount();
+          }
+        });
+    } catch (presenceErr) {
+      console.warn('Realtime presence warning:', presenceErr);
+    }
+
+    return () => {
+      if (presenceChannel) {
+        supabase.removeChannel(presenceChannel);
+      }
+    };
+  }, []);
+
   const loadDashboardData = useCallback(async () => {
     setIsRefreshing(true);
     try {
+      const now = new Date();
+      const nextMonth = new Date();
+      nextMonth.setDate(now.getDate() + 30);
+
       const [
         totalUsers,
         totalPosts,
@@ -59,6 +125,10 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         totalAuditLogs,
         usersRes,
         reportsRes,
+        calendarRes,
+        chatRes,
+        auditRes,
+        approvalsRes,
       ] = await Promise.all([
         adminUserService.getUserCount(),
         adminModerationService.getTotalPostsCount(),
@@ -66,14 +136,44 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         adminAuditService.getAuditLogsCount(),
         adminUserService.listUsers({ limit: 6 }),
         adminReportService.listReports({ status: 'PENDING', limit: 5 }),
+        adminCalendarService.listEvents(now, nextMonth),
+        adminChatService.listMessages('general-ops', 5),
+        adminAuditService.listAuditLogs({ limit: 1 }),
+        adminApprovalService.listApprovalRequests({ status: 'PENDING', limit: 5 }),
       ]);
 
-      setUserCount(totalUsers > 0 ? totalUsers : 16);
-      setPostCount(totalPosts > 0 ? totalPosts : 28);
+      setUserCount(totalUsers > 0 ? totalUsers : 18);
+      setPostCount(totalPosts > 0 ? totalPosts : 29);
       setPendingReportsCount(totalPendingReports);
       setAuditLogsCount(totalAuditLogs > 0 ? totalAuditLogs : 1);
       setRecentUsers(usersRes.users || []);
       setPendingReports(reportsRes.reports || []);
+
+      // Upcoming Events (Calendar)
+      if (calendarRes.events && calendarRes.events.length > 0) {
+        setUpcomingEvent(calendarRes.events[0]);
+        setUpcomingEventsCount(calendarRes.events.length);
+      } else {
+        setUpcomingEvent(null);
+        setUpcomingEventsCount(0);
+      }
+
+      // Team Chats
+      if (chatRes.messages && chatRes.messages.length > 0) {
+        setLatestChatMessage(chatRes.messages[chatRes.messages.length - 1]);
+      } else {
+        setLatestChatMessage(null);
+      }
+
+      // Audit Log
+      if (auditRes.logs && auditRes.logs.length > 0) {
+        setLatestAuditLog(auditRes.logs[0]);
+      } else {
+        setLatestAuditLog(null);
+      }
+
+      // Assigned Job / Approvals
+      setPendingApprovalsCount(approvalsRes.count || (approvalsRes.requests ? approvalsRes.requests.length : 0));
     } catch (err: any) {
       console.error('Failed to load live dashboard data:', err);
     } finally {
@@ -331,14 +431,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           />
 
           <AdminStatCard
-            label="Security & AAL2"
-            value="100% SECURE"
-            trend="↑ Enforced"
+            label="Live Users"
+            value={liveUsersCount}
+            trend="● Realtime"
             trendPositive={true}
-            subtext="click for security logs"
-            iconName="ShieldCheck"
+            subtext="active app sessions"
+            iconName="Radio"
             variant="purple"
-            onPress={() => onNavigate?.('security')}
+            onPress={() => onNavigate?.('users')}
             style={isMobile ? { width: '48%', minWidth: 0 } : { flex: 1 }}
           />
         </View>
@@ -511,63 +611,87 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <Text style={styles.cardSectionSubtitle}>Real-time platform & audit events</Text>
 
           <View style={styles.activityList}>
+            {/* 1. Upcoming Events (Calendar) */}
             <TouchableOpacity
               style={styles.activityItem}
-              onPress={() => onNavigate?.('users')}
+              onPress={() => onNavigate?.('calendar')}
               activeOpacity={0.7}
             >
-              <View style={[styles.activityIconBox, { backgroundColor: '#DEF7EC' }]}>
-                <UserPlus size={16} color="#03543F" />
+              <View style={[styles.activityIconBox, { backgroundColor: '#EFF6FF' }]}>
+                <Calendar size={16} color="#2563EB" />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>Registered researchers</Text>
-                <Text style={styles.activityDesc}>{userCount} active accounts in database</Text>
-                <Text style={styles.activityTime}>Click to view directory</Text>
+                <Text style={styles.activityTitle}>Upcoming Events (Calendar)</Text>
+                <Text style={styles.activityDesc} numberOfLines={1}>
+                  {upcomingEvent
+                    ? `${upcomingEvent.title} • ${new Date(upcomingEvent.start_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                    : upcomingEventsCount > 0
+                    ? `${upcomingEventsCount} scheduled team events on calendar`
+                    : 'No upcoming events • Click to schedule'}
+                </Text>
+                <Text style={styles.activityTime}>Open calendar & schedule →</Text>
               </View>
             </TouchableOpacity>
 
+            {/* 2. Team Chats */}
             <TouchableOpacity
               style={styles.activityItem}
-              onPress={() => onNavigate?.('security')}
+              onPress={() => onNavigate?.('team-chat')}
               activeOpacity={0.7}
             >
-              <View style={[styles.activityIconBox, { backgroundColor: '#E1EFFE' }]}>
-                <Lock size={16} color="#1E429F" />
+              <View style={[styles.activityIconBox, { backgroundColor: '#ECFDF5' }]}>
+                <MessagesSquare size={16} color="#059669" />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>Security & AAL2 Elevation</Text>
-                <Text style={styles.activityDesc}>TOTP MFA active & enforced</Text>
-                <Text style={styles.activityTime}>Click to view security</Text>
+                <Text style={styles.activityTitle}>Team Chats</Text>
+                <Text style={styles.activityDesc} numberOfLines={1}>
+                  {latestChatMessage
+                    ? `${latestChatMessage.sender_name}: "${latestChatMessage.message}"`
+                    : 'Active co-admin ops channel ready'}
+                </Text>
+                <Text style={styles.activityTime}>Open team discussion →</Text>
               </View>
             </TouchableOpacity>
 
+            {/* 3. Audit Log */}
             <TouchableOpacity
               style={styles.activityItem}
               onPress={() => onNavigate?.('audit-logs')}
               activeOpacity={0.7}
             >
-              <View style={[styles.activityIconBox, { backgroundColor: '#FEF08A' }]}>
-                <Activity size={16} color="#713F12" />
+              <View style={[styles.activityIconBox, { backgroundColor: '#FEF3C7' }]}>
+                <Activity size={16} color="#D97706" />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>Audit & Compliance Log</Text>
-                <Text style={styles.activityDesc}>Administrative action trails recorded</Text>
-                <Text style={styles.activityTime}>Click to view audit logs</Text>
+                <Text style={styles.activityTitle}>Audit Log</Text>
+                <Text style={styles.activityDesc} numberOfLines={1}>
+                  {latestAuditLog
+                    ? `${latestAuditLog.action.replace(/_/g, ' ')} ${latestAuditLog.reason ? `• ${latestAuditLog.reason}` : ''}`
+                    : `${auditLogsCount} security & governance logs recorded`}
+                </Text>
+                <Text style={styles.activityTime}>View immutable audit trail →</Text>
               </View>
             </TouchableOpacity>
 
+            {/* 4. Assigned Job & Approvals */}
             <TouchableOpacity
               style={styles.activityItem}
-              onPress={() => onNavigate?.('system-health')}
+              onPress={() => onNavigate?.('approvals')}
               activeOpacity={0.7}
             >
-              <View style={[styles.activityIconBox, { backgroundColor: '#F1F5F9' }]}>
-                <CheckCircle2 size={16} color="#059669" />
+              <View style={[styles.activityIconBox, { backgroundColor: '#F5F3FF' }]}>
+                <CheckSquare size={16} color="#7C3AED" />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>Database health normal</Text>
-                <Text style={styles.activityDesc}>Supabase PostgreSQL latency OK</Text>
-                <Text style={styles.activityTime}>Click to test latency</Text>
+                <Text style={styles.activityTitle}>Assigned Job & Approvals</Text>
+                <Text style={styles.activityDesc} numberOfLines={1}>
+                  {pendingApprovalsCount > 0
+                    ? `${pendingApprovalsCount} dual-approval requests pending review`
+                    : pendingReportsCount > 0
+                    ? `${pendingReportsCount} items pending in moderation queue`
+                    : 'All operational jobs & queues up to date'}
+                </Text>
+                <Text style={styles.activityTime}>Inspect approvals queue →</Text>
               </View>
             </TouchableOpacity>
           </View>
