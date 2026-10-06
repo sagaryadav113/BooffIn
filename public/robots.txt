@@ -1,0 +1,13 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /features
+Allow: /community
+Allow: /privacy
+Allow: /terms
+Disallow: /api/
+Disallow: /admin
+
+# Sitemaps
+Sitemap: https://letsbooffin.com/sitemap.xml
