@@ -79,6 +79,7 @@ export const AdminLayoutShell: React.FC<AdminLayoutShellProps> = ({
           title={currentTitle}
           isMobile={isMobile}
           onOpenMenu={() => setMobileDrawerOpen(true)}
+          onNavigateProfile={() => handleSelectNav('profile')}
         />
         <View style={[styles.viewContainer, isMobile && styles.mobileViewContainer]}>
           {children}
@@ -207,10 +208,18 @@ const styles = StyleSheet.create({
     right: 0,
   },
   drawerContent: {
-    width: 280,
-    maxWidth: '85%',
+    width: 270,
+    maxWidth: '82%',
     height: '100%',
     backgroundColor: '#FFFFFF',
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 20,
     zIndex: 10000,
   },
 });

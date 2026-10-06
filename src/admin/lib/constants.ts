@@ -64,6 +64,7 @@ export const ADMIN_NAV_ITEMS = [
   { key: 'analytics', label: 'Analytics', icon: 'TrendingUp', permission: null },
   { key: 'system-health', label: 'System Health', icon: 'Activity', permission: 'system_health.read' },
   { key: 'settings', label: 'Settings', icon: 'Settings', permission: null },
+  { key: 'profile', label: 'My Profile', icon: 'User', permission: null },
 ] as const;
 
 export type AdminNavKey = typeof ADMIN_NAV_ITEMS[number]['key'];

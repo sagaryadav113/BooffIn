@@ -26,6 +26,7 @@ import { AdminSecurityView } from './AdminSecurityView';
 import { AdminAnalyticsView } from './AdminAnalyticsView';
 import { AdminSystemHealthView } from './AdminSystemHealthView';
 import { AdminSettingsView } from './AdminSettingsView';
+import { AdminProfileView } from './AdminProfileView';
 
 export const AdminPortalRoot: React.FC = () => {
   const {
@@ -109,6 +110,8 @@ export const AdminPortalRoot: React.FC = () => {
         return <AdminSystemHealthView />;
       case 'settings':
         return <AdminSettingsView />;
+      case 'profile':
+        return <AdminProfileView onSignOut={signOut} onNavigateBack={() => setActiveKey('dashboard')} />;
       default:
         return <AdminDashboardView />;
     }

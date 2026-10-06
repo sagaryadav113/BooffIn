@@ -57,7 +57,9 @@ export const AdminCalendarView: React.FC = () => {
 
   // 1. Calendar State & Viewport
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [selectedDayDate, setSelectedDayDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
+  const [mobileSubMode, setMobileSubMode] = useState<'agenda' | 'grid'>('agenda');
   const [events, setEvents] = useState<AdminCalendarEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -368,6 +370,32 @@ export const AdminCalendarView: React.FC = () => {
   const timeEvents = useMemo(() => {
     return filteredEvents.filter((e) => !e.is_all_day);
   }, [filteredEvents]);
+
+  // Selected Day Events for Mobile Agenda
+  const selectedDayEvents = useMemo(() => {
+    return filteredEvents
+      .filter((e) => {
+        const eventDate = new Date(e.start_time);
+        return (
+          eventDate.getDate() === selectedDayDate.getDate() &&
+          eventDate.getMonth() === selectedDayDate.getMonth() &&
+          eventDate.getFullYear() === selectedDayDate.getFullYear()
+        );
+      })
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  }, [filteredEvents, selectedDayDate]);
+
+  // Event count helper for date selector dots
+  const getEventCountForDate = (date: Date) => {
+    return filteredEvents.filter((e) => {
+      const eventDate = new Date(e.start_time);
+      return (
+        eventDate.getDate() === date.getDate() &&
+        eventDate.getMonth() === date.getMonth() &&
+        eventDate.getFullYear() === date.getFullYear()
+      );
+    }).length;
+  };
 
   // Toggle participant acceptance
   const toggleParticipant = (member: CalendarParticipant) => {
@@ -691,213 +719,711 @@ export const AdminCalendarView: React.FC = () => {
         </View>
       )}
 
-      {/* 2. MAIN CALENDAR BODY (GRID + RIGHT DRAWER) */}
-      <View style={styles.mainLayout}>
-        {/* Main Grid View (Wraps in horizontal scroll on narrow mobile) */}
-        <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-          <View style={[styles.gridContainer, isMobile && { minWidth: 680 }]}>
-            {/* Day Headers Row */}
-            <View style={styles.daysHeaderRow}>
-              {/* UTC Timezone Tag Box */}
-              <View style={styles.timezoneBox}>
-                <Text style={styles.timezoneText}>UTC +5:30</Text>
-              </View>
+      {/* 2. MOBILE-SPECIFIC DAY SELECTOR & AGENDAR VIEW */}
+      {isMobile ? (
+        <View style={styles.mobileCalendarContainer}>
+          {/* Horizontal 7-Day Date Selector Ribbon */}
+          <View style={styles.mobileDayStrip}>
+            {weekDays.map((dayDate, idx) => {
+              const isSelected =
+                dayDate.getDate() === selectedDayDate.getDate() &&
+                dayDate.getMonth() === selectedDayDate.getMonth() &&
+                dayDate.getFullYear() === selectedDayDate.getFullYear();
+              const isToday =
+                dayDate.getDate() === now.getDate() &&
+                dayDate.getMonth() === now.getMonth() &&
+                dayDate.getFullYear() === now.getFullYear();
+              const count = getEventCountForDate(dayDate);
 
-              {/* 7 Weekday Columns */}
-              {weekDays.map((dayDate, idx) => {
-                const isToday =
-                  dayDate.getDate() === now.getDate() &&
-                  dayDate.getMonth() === now.getMonth() &&
-                  dayDate.getFullYear() === now.getFullYear();
-
-                return (
-                  <View key={idx} style={[styles.dayHeaderCol, isToday && styles.dayHeaderColToday]}>
-                    <Text style={[styles.dayHeaderText, isToday && styles.dayHeaderTextToday]}>
-                      {DAYS_SHORT[dayDate.getDay()]} {dayDate.getDate()}
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    styles.mobileDayPill,
+                    isSelected && styles.mobileDayPillSelected,
+                    isToday && !isSelected && styles.mobileDayPillToday,
+                  ]}
+                  onPress={() => setSelectedDayDate(dayDate)}
+                >
+                  <Text
+                    style={[
+                      styles.mobileDayName,
+                      isSelected && styles.mobileDayNameSelected,
+                      isToday && !isSelected && styles.mobileDayNameToday,
+                    ]}
+                  >
+                    {DAYS_SHORT[dayDate.getDay()]}
+                  </Text>
+                  <View
+                    style={[
+                      styles.mobileDateCircle,
+                      isSelected && styles.mobileDateCircleSelected,
+                      isToday && !isSelected && styles.mobileDateCircleToday,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.mobileDateNumber,
+                        isSelected && styles.mobileDateNumberSelected,
+                        isToday && !isSelected && styles.mobileDateNumberToday,
+                      ]}
+                    >
+                      {dayDate.getDate()}
                     </Text>
                   </View>
-                );
-              })}
+                  {count > 0 && (
+                    <View
+                      style={[
+                        styles.mobileEventDot,
+                        isSelected && { backgroundColor: '#FFFFFF' },
+                      ]}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Sub-view toggle (Agenda vs Week Grid) */}
+          <View style={styles.mobileSubModeRow}>
+            <View style={styles.mobileSubModeTabs}>
+              <TouchableOpacity
+                style={[
+                  styles.mobileSubModeTab,
+                  mobileSubMode === 'agenda' && styles.mobileSubModeTabActive,
+                ]}
+                onPress={() => setMobileSubMode('agenda')}
+              >
+                <Text
+                  style={[
+                    styles.mobileSubModeTabText,
+                    mobileSubMode === 'agenda' && styles.mobileSubModeTabTextActive,
+                  ]}
+                >
+                  Agenda ({selectedDayEvents.length})
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.mobileSubModeTab,
+                  mobileSubMode === 'grid' && styles.mobileSubModeTabActive,
+                ]}
+                onPress={() => setMobileSubMode('grid')}
+              >
+                <Text
+                  style={[
+                    styles.mobileSubModeTabText,
+                    mobileSubMode === 'grid' && styles.mobileSubModeTabTextActive,
+                  ]}
+                >
+                  Time Grid
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {/* All Day Row */}
-            <View style={styles.allDayRow}>
-              <View style={styles.allDayLabelBox}>
-                <Text style={styles.allDayLabel}>All day</Text>
+            <TouchableOpacity
+              style={styles.mobileAddForDayBtn}
+              onPress={() => handleCreateNew(selectedDayDate)}
+            >
+              <Plus size={14} color="#059669" />
+              <Text style={styles.mobileAddForDayText}>Add Event</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Render selected sub-view */}
+          {mobileSubMode === 'agenda' ? (
+            <ScrollView
+              style={styles.mobileAgendaScroll}
+              contentContainerStyle={styles.mobileAgendaContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.mobileAgendaHeader}>
+                <Text style={styles.mobileAgendaDateTitle}>
+                  {selectedDayDate.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+                <Text style={styles.mobileAgendaCountBadge}>
+                  {selectedDayEvents.length}{' '}
+                  {selectedDayEvents.length === 1 ? 'event' : 'events'}
+                </Text>
               </View>
 
-              {weekDays.map((dayDate, idx) => {
-                const dayAllDayEvents = allDayEvents.filter((e) => {
-                  const eventDate = new Date(e.start_time);
-                  return (
-                    eventDate.getDate() === dayDate.getDate() &&
-                    eventDate.getMonth() === dayDate.getMonth()
-                  );
-                });
-
-                return (
-                  <View key={idx} style={styles.allDayCol}>
-                    {dayAllDayEvents.map((evt) => (
-                      <TouchableOpacity
-                        key={evt.id}
-                        style={[
-                          styles.allDayCapsule,
-                          { backgroundColor: evt.color_bg, borderColor: evt.color_border },
-                        ]}
-                        onPress={() => openEventDetails(evt)}
-                      >
-                        <Text
-                          style={[styles.allDayCapsuleText, { color: evt.color_text }]}
-                          numberOfLines={1}
-                        >
-                          {evt.title}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+              {selectedDayEvents.length === 0 ? (
+                <View style={styles.mobileEmptyCard}>
+                  <View style={styles.mobileEmptyIconCircle}>
+                    <CalendarIcon size={26} color="#059669" />
                   </View>
-                );
-              })}
-            </View>
-
-            {/* Hourly Scrollable Grid */}
-            <ScrollView style={styles.gridScrollView} showsVerticalScrollIndicator={true}>
-              <View style={styles.hoursGridWrapper}>
-                {/* Hourly Time Slots */}
-                {HOURS.map((hour) => {
-                  const hourFormatted =
-                    hour === 12
-                      ? '12 PM'
-                      : hour > 12
-                      ? `${hour - 12} PM`
-                      : `${hour} AM`;
-
-                  return (
-                    <View key={hour} style={styles.hourRow}>
-                      <View style={styles.hourLabelBox}>
-                        <Text style={styles.hourLabel}>{hourFormatted}</Text>
-                      </View>
-                      {weekDays.map((dayDate, colIdx) => (
-                        <TouchableOpacity
-                          key={colIdx}
-                          style={styles.hourCell}
-                          onPress={() => handleCreateNew(dayDate, hour)}
-                          activeOpacity={0.7}
-                        />
-                      ))}
-                    </View>
-                  );
-                })}
-
-                {/* Current Live Time Red/Purple Indicator Line */}
-                {isCurrentWeek && currentMinutesOffset >= 0 && currentMinutesOffset <= (HOURS.length * 60) && (
-                  <View style={[styles.currentTimeLine, { top: currentLineTop }]}>
-                    <View style={styles.currentTimeBadge}>
-                      <Text style={styles.currentTimeBadgeText}>
-                        {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </Text>
-                    </View>
-                    <View style={styles.currentTimeBar} />
-                  </View>
-                )}
-
-                {/* Render Absolute Positioned Event Blocks */}
-                {timeEvents.map((evt) => {
+                  <Text style={styles.mobileEmptyTitle}>No events scheduled</Text>
+                  <Text style={styles.mobileEmptySubtitle}>
+                    You have a clear schedule for this day.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.mobileEmptyAddBtn}
+                    onPress={() => handleCreateNew(selectedDayDate)}
+                  >
+                    <Plus size={15} color="#FFFFFF" />
+                    <Text style={styles.mobileEmptyAddBtnText}>Schedule Event</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                selectedDayEvents.map((evt) => {
                   const evtStart = new Date(evt.start_time);
                   const evtEnd = new Date(evt.end_time);
+                  const theme =
+                    CALENDAR_COLOR_PALETTES[evt.color_id] ||
+                    CALENDAR_COLOR_PALETTES.purple;
 
-                  // Find matching day column index
-                  const dayIndex = weekDays.findIndex(
-                    (d) =>
-                      d.getDate() === evtStart.getDate() &&
-                      d.getMonth() === evtStart.getMonth() &&
-                      d.getFullYear() === evtStart.getFullYear()
-                  );
-
-                  if (dayIndex === -1) return null;
-
-                  const startHourFloat = evtStart.getHours() + evtStart.getMinutes() / 60;
-                  const endHourFloat = evtEnd.getHours() + evtEnd.getMinutes() / 60;
-                  const durationHours = Math.max(0.5, endHourFloat - startHourFloat);
-
-                  // Calculate vertical position (80px per 1 hour slot, starting at 8 AM)
-                  const topPos = (startHourFloat - 8) * 80;
-                  const heightPos = Math.max(38, durationHours * 80 - 4);
+                  const timeDisplay = evt.is_all_day
+                    ? 'All Day'
+                    : `${evtStart.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })} - ${evtEnd.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}`;
 
                   return (
                     <TouchableOpacity
                       key={evt.id}
                       style={[
-                        styles.eventBlock,
-                        {
-                          top: topPos + 2,
-                          height: heightPos,
-                          left: `${8.5 + dayIndex * 13.0}%`,
-                          width: '12.3%',
-                          backgroundColor: evt.color_bg,
-                          borderColor: evt.color_border,
-                        },
+                        styles.mobileAgendaCard,
+                        { borderLeftColor: theme.dot },
                       ]}
                       onPress={() => openEventDetails(evt)}
-                      activeOpacity={0.85}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.mobileCardHeader}>
+                        <View style={styles.mobileTimePill}>
+                          <Clock size={12} color="#059669" />
+                          <Text style={styles.mobileTimePillText}>
+                            {timeDisplay}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.mobileCategoryBadge,
+                            { backgroundColor: theme.bg, borderColor: theme.border },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.mobileCategoryText,
+                              { color: theme.text },
+                            ]}
+                          >
+                            {evt.category || 'Operations'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={styles.mobileCardTitle}>{evt.title}</Text>
+
+                      {evt.description ? (
+                        <Text
+                          style={styles.mobileCardDesc}
+                          numberOfLines={2}
+                        >
+                          {evt.description}
+                        </Text>
+                      ) : null}
+
+                      <View style={styles.mobileCardFooter}>
+                        {evt.meeting_link ? (
+                          <View style={styles.mobileMeetBadge}>
+                            <Video size={13} color="#2563EB" />
+                            <Text style={styles.mobileMeetText}>
+                              Video Meet
+                            </Text>
+                          </View>
+                        ) : null}
+
+                        {evt.location ? (
+                          <View style={styles.mobileLocBadge}>
+                            <MapPin size={13} color="#64748B" />
+                            <Text
+                              style={styles.mobileLocText}
+                              numberOfLines={1}
+                            >
+                              {evt.location}
+                            </Text>
+                          </View>
+                        ) : null}
+
+                        {evt.participants && evt.participants.length > 0 && (
+                          <View style={styles.mobileAvatarsGroup}>
+                            {evt.participants.slice(0, 3).map((p, pIdx) => (
+                              <View
+                                key={p.id || pIdx}
+                                style={[
+                                  styles.mobileMiniAvatar,
+                                  { zIndex: 10 - pIdx, marginLeft: pIdx === 0 ? 0 : -6 },
+                                ]}
+                              >
+                                <Text style={styles.mobileMiniAvatarText}>
+                                  {p.name?.charAt(0) || 'A'}
+                                </Text>
+                              </View>
+                            ))}
+                            {evt.participants.length > 3 && (
+                              <Text style={styles.mobileExtraAvatars}>
+                                +{evt.participants.length - 3}
+                              </Text>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          ) : (
+            /* Scrollable Grid View when requested on mobile */
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flex: 1 }}
+            >
+              <View style={[styles.gridContainer, { minWidth: 680 }]}>
+                {/* Day Headers Row */}
+                <View style={styles.daysHeaderRow}>
+                  <View style={styles.timezoneBox}>
+                    <Text style={styles.timezoneText}>UTC +5:30</Text>
+                  </View>
+                  {weekDays.map((dayDate, idx) => {
+                    const isToday =
+                      dayDate.getDate() === now.getDate() &&
+                      dayDate.getMonth() === now.getMonth() &&
+                      dayDate.getFullYear() === now.getFullYear();
+
+                    return (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.dayHeaderCol,
+                          isToday && styles.dayHeaderColToday,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.dayHeaderText,
+                            isToday && styles.dayHeaderTextToday,
+                          ]}
+                        >
+                          {DAYS_SHORT[dayDate.getDay()]} {dayDate.getDate()}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* All Day Row */}
+                <View style={styles.allDayRow}>
+                  <View style={styles.allDayLabelBox}>
+                    <Text style={styles.allDayLabel}>All day</Text>
+                  </View>
+                  {weekDays.map((dayDate, idx) => {
+                    const dayAllDayEvents = allDayEvents.filter((e) => {
+                      const eventDate = new Date(e.start_time);
+                      return (
+                        eventDate.getDate() === dayDate.getDate() &&
+                        eventDate.getMonth() === dayDate.getMonth()
+                      );
+                    });
+
+                    return (
+                      <View key={idx} style={styles.allDayCol}>
+                        {dayAllDayEvents.map((evt) => (
+                          <TouchableOpacity
+                            key={evt.id}
+                            style={[
+                              styles.allDayCapsule,
+                              {
+                                backgroundColor: evt.color_bg,
+                                borderColor: evt.color_border,
+                              },
+                            ]}
+                            onPress={() => openEventDetails(evt)}
+                          >
+                            <Text
+                              style={[
+                                styles.allDayCapsuleText,
+                                { color: evt.color_text },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {evt.title}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Hourly Grid */}
+                <ScrollView
+                  style={styles.gridScrollView}
+                  showsVerticalScrollIndicator={true}
+                >
+                  <View style={styles.hoursGridWrapper}>
+                    {HOURS.map((hour) => {
+                      const hourFormatted =
+                        hour === 12
+                          ? '12 PM'
+                          : hour > 12
+                          ? `${hour - 12} PM`
+                          : `${hour} AM`;
+
+                      return (
+                        <View key={hour} style={styles.hourRow}>
+                          <View style={styles.hourLabelBox}>
+                            <Text style={styles.hourLabel}>{hourFormatted}</Text>
+                          </View>
+                          {weekDays.map((dayDate, colIdx) => (
+                            <TouchableOpacity
+                              key={colIdx}
+                              style={styles.hourCell}
+                              onPress={() => handleCreateNew(dayDate, hour)}
+                              activeOpacity={0.7}
+                            />
+                          ))}
+                        </View>
+                      );
+                    })}
+
+                    {timeEvents.map((evt) => {
+                      const evtStart = new Date(evt.start_time);
+                      const evtEnd = new Date(evt.end_time);
+
+                      const dayIndex = weekDays.findIndex(
+                        (d) =>
+                          d.getDate() === evtStart.getDate() &&
+                          d.getMonth() === evtStart.getMonth() &&
+                          d.getFullYear() === evtStart.getFullYear()
+                      );
+
+                      if (dayIndex === -1) return null;
+
+                      const startHourFloat =
+                        evtStart.getHours() + evtStart.getMinutes() / 60;
+                      const endHourFloat =
+                        evtEnd.getHours() + evtEnd.getMinutes() / 60;
+                      const durationHours = Math.max(
+                        0.5,
+                        endHourFloat - startHourFloat
+                      );
+
+                      const topPos = (startHourFloat - 8) * 80;
+                      const heightPos = Math.max(38, durationHours * 80 - 4);
+
+                      return (
+                        <TouchableOpacity
+                          key={evt.id}
+                          style={[
+                            styles.eventBlock,
+                            {
+                              top: topPos + 2,
+                              height: heightPos,
+                              left: `${8.5 + dayIndex * 13.0}%`,
+                              width: '12.3%',
+                              backgroundColor: evt.color_bg,
+                              borderColor: evt.color_border,
+                            },
+                          ]}
+                          onPress={() => openEventDetails(evt)}
+                          activeOpacity={0.85}
+                        >
+                          <Text
+                            style={[
+                              styles.eventTitle,
+                              { color: evt.color_text },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {evt.title}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.eventTime,
+                              { color: evt.color_text },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {`${
+                              evtStart.getHours() > 12
+                                ? evtStart.getHours() - 12
+                                : evtStart.getHours()
+                            } - ${
+                              evtEnd.getHours() > 12
+                                ? evtEnd.getHours() - 12
+                                : evtEnd.getHours()
+                            } ${evtEnd.getHours() >= 12 ? 'PM' : 'AM'}`}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
+            </ScrollView>
+          )}
+        </View>
+      ) : (
+        /* DESKTOP METIS SAAS GRID */
+        <View style={styles.mainLayout}>
+          <ScrollView
+            horizontal={false}
+            showsHorizontalScrollIndicator={false}
+            style={{ flex: 1 }}
+          >
+            <View style={styles.gridContainer}>
+              {/* Day Headers Row */}
+              <View style={styles.daysHeaderRow}>
+                <View style={styles.timezoneBox}>
+                  <Text style={styles.timezoneText}>UTC +5:30</Text>
+                </View>
+
+                {weekDays.map((dayDate, idx) => {
+                  const isToday =
+                    dayDate.getDate() === now.getDate() &&
+                    dayDate.getMonth() === now.getMonth() &&
+                    dayDate.getFullYear() === now.getFullYear();
+
+                  return (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.dayHeaderCol,
+                        isToday && styles.dayHeaderColToday,
+                      ]}
                     >
                       <Text
-                        style={[styles.eventTitle, { color: evt.color_text }]}
-                        numberOfLines={1}
+                        style={[
+                          styles.dayHeaderText,
+                          isToday && styles.dayHeaderTextToday,
+                        ]}
                       >
-                        {evt.title}
+                        {DAYS_SHORT[dayDate.getDay()]} {dayDate.getDate()}
                       </Text>
-                      <Text
-                        style={[styles.eventTime, { color: evt.color_text }]}
-                        numberOfLines={1}
-                      >
-                        {`${
-                          evtStart.getHours() > 12 ? evtStart.getHours() - 12 : evtStart.getHours()
-                        } - ${
-                          evtEnd.getHours() > 12 ? evtEnd.getHours() - 12 : evtEnd.getHours()
-                        } ${evtEnd.getHours() >= 12 ? 'PM' : 'AM'}`}
-                      </Text>
-                    </TouchableOpacity>
+                    </View>
                   );
                 })}
               </View>
-            </ScrollView>
-          </View>
-        </ScrollView>
 
-        {/* 3. RIGHT-HAND EVENT INSPECTOR & EDITOR PANEL (Desktop Inline) */}
-        {!isMobile && isDrawerOpen && (
-          <View style={styles.rightDrawer}>
-            {renderDrawerContent()}
-          </View>
-        )}
-
-        {/* Mobile Event Editor Modal */}
-        {isMobile && (
-          <Modal
-            visible={isDrawerOpen}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setIsDrawerOpen(false)}
-          >
-            <View style={styles.modalBackdrop}>
-              <TouchableWithoutFeedback onPress={() => setIsDrawerOpen(false)}>
-                <View style={styles.modalOverlay} />
-              </TouchableWithoutFeedback>
-              <View style={styles.modalSheetContainer}>
-                <View style={styles.modalSheetHeader}>
-                  <Text style={styles.modalSheetTitle}>
-                    {isNewEvent ? 'New Team Event' : 'Edit Event'}
-                  </Text>
-                  <TouchableOpacity onPress={() => setIsDrawerOpen(false)} style={styles.modalCloseBtn}>
-                    <X size={18} color="#64748B" />
-                  </TouchableOpacity>
+              {/* All Day Row */}
+              <View style={styles.allDayRow}>
+                <View style={styles.allDayLabelBox}>
+                  <Text style={styles.allDayLabel}>All day</Text>
                 </View>
-                {renderDrawerContent()}
+
+                {weekDays.map((dayDate, idx) => {
+                  const dayAllDayEvents = allDayEvents.filter((e) => {
+                    const eventDate = new Date(e.start_time);
+                    return (
+                      eventDate.getDate() === dayDate.getDate() &&
+                      eventDate.getMonth() === dayDate.getMonth()
+                    );
+                  });
+
+                  return (
+                    <View key={idx} style={styles.allDayCol}>
+                      {dayAllDayEvents.map((evt) => (
+                        <TouchableOpacity
+                          key={evt.id}
+                          style={[
+                            styles.allDayCapsule,
+                            {
+                              backgroundColor: evt.color_bg,
+                              borderColor: evt.color_border,
+                            },
+                          ]}
+                          onPress={() => openEventDetails(evt)}
+                        >
+                          <Text
+                            style={[
+                              styles.allDayCapsuleText,
+                              { color: evt.color_text },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {evt.title}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  );
+                })}
               </View>
+
+              {/* Hourly Scrollable Grid */}
+              <ScrollView
+                style={styles.gridScrollView}
+                showsVerticalScrollIndicator={true}
+              >
+                <View style={styles.hoursGridWrapper}>
+                  {HOURS.map((hour) => {
+                    const hourFormatted =
+                      hour === 12
+                        ? '12 PM'
+                        : hour > 12
+                        ? `${hour - 12} PM`
+                        : `${hour} AM`;
+
+                    return (
+                      <View key={hour} style={styles.hourRow}>
+                        <View style={styles.hourLabelBox}>
+                          <Text style={styles.hourLabel}>{hourFormatted}</Text>
+                        </View>
+                        {weekDays.map((dayDate, colIdx) => (
+                          <TouchableOpacity
+                            key={colIdx}
+                            style={styles.hourCell}
+                            onPress={() => handleCreateNew(dayDate, hour)}
+                            activeOpacity={0.7}
+                          />
+                        ))}
+                      </View>
+                    );
+                  })}
+
+                  {isCurrentWeek &&
+                    currentMinutesOffset >= 0 &&
+                    currentMinutesOffset <= HOURS.length * 60 && (
+                      <View
+                        style={[
+                          styles.currentTimeLine,
+                          { top: currentLineTop },
+                        ]}
+                      >
+                        <View style={styles.currentTimeBadge}>
+                          <Text style={styles.currentTimeBadgeText}>
+                            {now.toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </Text>
+                        </View>
+                        <View style={styles.currentTimeBar} />
+                      </View>
+                    )}
+
+                  {timeEvents.map((evt) => {
+                    const evtStart = new Date(evt.start_time);
+                    const evtEnd = new Date(evt.end_time);
+
+                    const dayIndex = weekDays.findIndex(
+                      (d) =>
+                        d.getDate() === evtStart.getDate() &&
+                        d.getMonth() === evtStart.getMonth() &&
+                        d.getFullYear() === evtStart.getFullYear()
+                    );
+
+                    if (dayIndex === -1) return null;
+
+                    const startHourFloat =
+                      evtStart.getHours() + evtStart.getMinutes() / 60;
+                    const endHourFloat =
+                      evtEnd.getHours() + evtEnd.getMinutes() / 60;
+                    const durationHours = Math.max(
+                      0.5,
+                      endHourFloat - startHourFloat
+                    );
+
+                    const topPos = (startHourFloat - 8) * 80;
+                    const heightPos = Math.max(38, durationHours * 80 - 4);
+
+                    return (
+                      <TouchableOpacity
+                        key={evt.id}
+                        style={[
+                          styles.eventBlock,
+                          {
+                            top: topPos + 2,
+                            height: heightPos,
+                            left: `${8.5 + dayIndex * 13.0}%`,
+                            width: '12.3%',
+                            backgroundColor: evt.color_bg,
+                            borderColor: evt.color_border,
+                          },
+                        ]}
+                        onPress={() => openEventDetails(evt)}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={[
+                            styles.eventTitle,
+                            { color: evt.color_text },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {evt.title}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.eventTime,
+                            { color: evt.color_text },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {`${
+                            evtStart.getHours() > 12
+                              ? evtStart.getHours() - 12
+                              : evtStart.getHours()
+                          } - ${
+                            evtEnd.getHours() > 12
+                              ? evtEnd.getHours() - 12
+                              : evtEnd.getHours()
+                          } ${evtEnd.getHours() >= 12 ? 'PM' : 'AM'}`}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
             </View>
-          </Modal>
-        )}
-      </View>
+          </ScrollView>
+
+          {/* Desktop Inline Drawer */}
+          {isDrawerOpen && (
+            <View style={styles.rightDrawer}>{renderDrawerContent()}</View>
+          )}
+        </View>
+      )}
+
+      {/* Mobile Event Editor Modal */}
+      {isMobile && (
+        <Modal
+          visible={isDrawerOpen}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsDrawerOpen(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <TouchableWithoutFeedback onPress={() => setIsDrawerOpen(false)}>
+              <View style={styles.modalOverlay} />
+            </TouchableWithoutFeedback>
+            <View style={styles.modalSheetContainer}>
+              <View style={styles.modalSheetHeader}>
+                <Text style={styles.modalSheetTitle}>
+                  {isNewEvent ? 'New Team Event' : 'Edit Event'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setIsDrawerOpen(false)}
+                  style={styles.modalCloseBtn}
+                >
+                  <X size={18} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              {renderDrawerContent()}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* 4. FILTER MODAL */}
       {showFilterModal && (
@@ -1673,5 +2199,330 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+
+  // Mobile Specific Calendar Styles
+  mobileCalendarContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  mobileDayStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 4,
+  },
+  mobileDayPill: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+  },
+  mobileDayPillSelected: {
+    backgroundColor: '#ECFDF5', // Soft emerald
+  },
+  mobileDayPillToday: {},
+  mobileDayName: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  mobileDayNameSelected: {
+    color: '#059669',
+    fontWeight: '700',
+  },
+  mobileDayNameToday: {
+    color: '#059669',
+  },
+  mobileDateCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  mobileDateCircleSelected: {
+    backgroundColor: '#059669',
+  },
+  mobileDateCircleToday: {
+    borderWidth: 1.5,
+    borderColor: '#059669',
+  },
+  mobileDateNumber: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  mobileDateNumberSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  mobileDateNumberToday: {
+    color: '#059669',
+    fontWeight: '700',
+  },
+  mobileEventDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#059669',
+    marginTop: 3,
+  },
+  mobileSubModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  mobileSubModeTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    padding: 2,
+    gap: 2,
+  },
+  mobileSubModeTab: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  mobileSubModeTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  mobileSubModeTabText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  mobileSubModeTabTextActive: {
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  mobileAddForDayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  mobileAddForDayText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  mobileAgendaScroll: {
+    flex: 1,
+  },
+  mobileAgendaContent: {
+    padding: 14,
+    gap: 12,
+    paddingBottom: 40,
+  },
+  mobileAgendaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  mobileAgendaDateTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  mobileAgendaCountBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  mobileAgendaCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderLeftWidth: 4,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  mobileCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  mobileTimePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  mobileTimePillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  mobileCategoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  mobileCategoryText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  mobileCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  mobileCardDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+  },
+  mobileCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+  },
+  mobileMeetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  mobileMeetText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#2563EB',
+  },
+  mobileLocBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  mobileLocText: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  mobileAvatarsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+  },
+  mobileMiniAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  mobileMiniAvatarText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  mobileExtraAvatars: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748B',
+    marginLeft: 4,
+  },
+  mobileEmptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    gap: 8,
+    marginTop: 10,
+  },
+  mobileEmptyIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  mobileEmptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  mobileEmptySubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  mobileEmptyAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#059669',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  mobileEmptyAddBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

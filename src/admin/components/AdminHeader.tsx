@@ -13,12 +13,14 @@ interface AdminHeaderProps {
   title: string;
   isMobile?: boolean;
   onOpenMenu?: () => void;
+  onNavigateProfile?: () => void;
 }
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({
   title,
   isMobile,
   onOpenMenu,
+  onNavigateProfile,
 }) => {
   const { email, signOut } = useAdminAuth();
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
@@ -49,6 +51,14 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
   const displayName = profile?.fullName || (email ? email.split('@')[0] : 'Super Admin');
   const displayRole = profile?.role === 'SUPER_ADMIN' ? 'Super Admin' : (profile?.role || 'Admin');
+
+  const handleProfileClick = () => {
+    if (onNavigateProfile) {
+      onNavigateProfile();
+    } else {
+      setShowProfileModal(true);
+    }
+  };
 
   return (
     <>
@@ -82,7 +92,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           {/* User Avatar & Info (Interactive Profile Trigger) */}
           <TouchableOpacity
             style={[styles.userProfileBtn, isMobile && styles.mobileUserProfileBtn]}
-            onPress={() => setShowProfileModal(true)}
+            onPress={handleProfileClick}
             activeOpacity={0.7}
           >
             <View style={styles.avatar}>
@@ -109,7 +119,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         </View>
       </View>
 
-      {/* Super Admin Profile Modal */}
+      {/* Super Admin Profile Modal Fallback */}
       <AdminProfileModal
         visible={showProfileModal}
         onClose={() => setShowProfileModal(false)}

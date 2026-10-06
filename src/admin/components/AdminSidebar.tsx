@@ -149,8 +149,9 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   mobileSidebar: {
-    width: 280,
-    maxWidth: '85%',
+    width: '100%',
+    height: '100%',
+    borderRightWidth: 0,
     shadowColor: '#000',
     shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.15,
