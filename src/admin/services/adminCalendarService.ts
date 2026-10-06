@@ -178,19 +178,23 @@ export const adminCalendarService = {
         }));
       }
 
-      // Fallback default participants if table is empty or loading
-      return [
-        { id: '1', name: 'Nazmi Javier', role: 'SUPER_ADMIN', accepted: true },
-        { id: '2', name: 'Emilia Inder', role: 'MODERATOR', accepted: false },
-        { id: '3', name: 'Sagar Yadav', role: 'SUPER_ADMIN', accepted: true },
-        { id: '4', name: 'Ops Team', role: 'OPERATOR', accepted: true },
-      ];
+      // If no admin_members rows exist, query current authenticated admin user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        return [
+          {
+            id: user.id,
+            name: user.email?.split('@')[0] || 'Super Admin',
+            email: user.email,
+            role: 'SUPER_ADMIN',
+            accepted: true,
+          },
+        ];
+      }
+
+      return [];
     } catch {
-      return [
-        { id: '1', name: 'Nazmi Javier', role: 'SUPER_ADMIN', accepted: true },
-        { id: '2', name: 'Emilia Inder', role: 'MODERATOR', accepted: false },
-        { id: '3', name: 'Sagar Yadav', role: 'SUPER_ADMIN', accepted: true },
-      ];
+      return [];
     }
   },
 

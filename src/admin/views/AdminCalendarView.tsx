@@ -131,271 +131,14 @@ export const AdminCalendarView: React.FC = () => {
 
       setTeamMembers(members);
 
-      if (!eventsRes.error && eventsRes.events.length > 0) {
+      if (!eventsRes.error && eventsRes.events) {
         setEvents(eventsRes.events);
       } else {
-        // Provide sample seed events matching the design screenshot if empty
-        const sampleEvents: AdminCalendarEvent[] = [
-          {
-            id: 'sample-1',
-            title: 'Photo Session',
-            description: 'Creator photoshoot for marketing assets',
-            start_time: new Date(weekDays[0].setHours(0, 0, 0, 0)).toISOString(),
-            end_time: new Date(weekDays[0].setHours(23, 59, 59, 0)).toISOString(),
-            is_all_day: true,
-            is_recurring: false,
-            color_id: 'purple',
-            color_bg: '#EDE9FE',
-            color_border: '#C4B5FD',
-            color_text: '#5B21B6',
-            category: 'Creative',
-            location: 'Studio A',
-            meeting_link: '',
-            reminders: [],
-            participants: [members[0] || { id: '1', name: 'Nazmi Javier', role: 'SUPER_ADMIN' }],
-            creator_name: 'Super Admin',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-2',
-            title: 'Brain Training',
-            description: 'AI Prompt Engineering Team Session',
-            start_time: new Date(weekDays[1].setHours(0, 0, 0, 0)).toISOString(),
-            end_time: new Date(weekDays[1].setHours(23, 59, 59, 0)).toISOString(),
-            is_all_day: true,
-            is_recurring: false,
-            color_id: 'yellow',
-            color_bg: '#FEF08A',
-            color_border: '#FACC15',
-            color_text: '#713F12',
-            category: 'Brainstorm',
-            location: 'Conference Room 2',
-            meeting_link: '',
-            reminders: [],
-            participants: [members[0] || { id: '1', name: 'Nazmi Javier', role: 'SUPER_ADMIN' }],
-            creator_name: 'Super Admin',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-3',
-            title: 'Skill Enhancement',
-            description: 'Trust & Safety Moderator Training',
-            start_time: new Date(weekDays[2].setHours(0, 0, 0, 0)).toISOString(),
-            end_time: new Date(weekDays[2].setHours(23, 59, 59, 0)).toISOString(),
-            is_all_day: true,
-            is_recurring: false,
-            color_id: 'blue',
-            color_bg: '#E0F2FE',
-            color_border: '#7DD3FC',
-            color_text: '#0C4A6E',
-            category: 'Operations',
-            location: 'BooffIn HQ',
-            meeting_link: '',
-            reminders: [],
-            participants: [members[1] || { id: '2', name: 'Emilia Inder', role: 'MODERATOR' }],
-            creator_name: 'Sagar Yadav',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-4',
-            title: 'Lunch',
-            description: 'Team Lunch & Break',
-            start_time: new Date(new Date(weekDays[0]).setHours(12, 0, 0, 0)).toISOString(),
-            end_time: new Date(new Date(weekDays[0]).setHours(13, 0, 0, 0)).toISOString(),
-            is_all_day: false,
-            is_recurring: true,
-            color_id: 'green',
-            color_bg: '#ECFCCB',
-            color_border: '#BEF264',
-            color_text: '#365314',
-            category: 'Break',
-            location: 'Cafeteria',
-            meeting_link: '',
-            reminders: [],
-            participants: [],
-            creator_name: 'Nazmi Javier',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-5',
-            title: 'Lunch',
-            description: 'Team Lunch & Break',
-            start_time: new Date(new Date(weekDays[1]).setHours(12, 0, 0, 0)).toISOString(),
-            end_time: new Date(new Date(weekDays[1]).setHours(13, 0, 0, 0)).toISOString(),
-            is_all_day: false,
-            is_recurring: true,
-            color_id: 'green',
-            color_bg: '#ECFCCB',
-            color_border: '#BEF264',
-            color_text: '#365314',
-            category: 'Break',
-            location: 'Cafeteria',
-            meeting_link: '',
-            reminders: [],
-            participants: [],
-            creator_name: 'Nazmi Javier',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-6',
-            title: 'Lunch with Emma',
-            description: 'Product Growth discussion',
-            start_time: new Date(new Date(weekDays[2]).setHours(12, 0, 0, 0)).toISOString(),
-            end_time: new Date(new Date(weekDays[2]).setHours(13, 0, 0, 0)).toISOString(),
-            is_all_day: false,
-            is_recurring: false,
-            color_id: 'purple',
-            color_bg: '#EDE9FE',
-            color_border: '#C4B5FD',
-            color_text: '#5B21B6',
-            category: 'Meeting',
-            location: 'Central Bistro',
-            meeting_link: '',
-            reminders: [],
-            participants: [members[1] || { id: '2', name: 'Emilia Inder', role: 'MODERATOR' }],
-            creator_name: 'Super Admin',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-7',
-            title: 'Meet with @El',
-            description: 'Security Audit & Compliance check',
-            start_time: new Date(new Date(weekDays[2]).setHours(13, 0, 0, 0)).toISOString(),
-            end_time: new Date(new Date(weekDays[2]).setHours(14, 0, 0, 0)).toISOString(),
-            is_all_day: false,
-            is_recurring: false,
-            color_id: 'purple',
-            color_bg: '#EDE9FE',
-            color_border: '#C4B5FD',
-            color_text: '#5B21B6',
-            category: 'Meeting',
-            location: 'Virtual',
-            meeting_link: 'https://meet.google.com/izp-srsk-kxf',
-            reminders: ['15 mins before'],
-            participants: [
-              { id: '1', name: 'Nazmi Javier', role: 'SUPER_ADMIN', accepted: true },
-              { id: '2', name: 'Emilia Inder', role: 'MODERATOR', accepted: true }
-            ],
-            creator_name: 'Nazmi Javier',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-8',
-            title: 'Networking Event',
-            description: 'Tech Leaders & Community Meetup',
-            start_time: new Date(new Date(weekDays[2]).setHours(14, 0, 0, 0)).toISOString(),
-            end_time: new Date(new Date(weekDays[2]).setHours(16, 0, 0, 0)).toISOString(),
-            is_all_day: false,
-            is_recurring: false,
-            color_id: 'pink',
-            color_bg: '#FCE7F3',
-            color_border: '#F472B6',
-            color_text: '#831843',
-            category: 'Event',
-            location: 'Jakarta, Indonesia',
-            meeting_link: '',
-            reminders: [],
-            participants: [],
-            creator_name: 'Super Admin',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-9',
-            title: 'Team Meeting',
-            description: 'Weekly Sprint & Moderation Sync',
-            start_time: new Date(new Date(weekDays[3]).setHours(14, 0, 0, 0)).toISOString(),
-            end_time: new Date(new Date(weekDays[3]).setHours(15, 0, 0, 0)).toISOString(),
-            is_all_day: false,
-            is_recurring: false,
-            color_id: 'purple',
-            color_bg: '#EDE9FE',
-            color_border: '#C4B5FD',
-            color_text: '#5B21B6',
-            category: 'Meeting',
-            location: 'BooffIn War Room',
-            meeting_link: 'https://meet.google.com/izp-srsk-kxf',
-            reminders: [],
-            participants: [],
-            creator_name: 'Nazmi Javier',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-10',
-            title: 'Creative Brainstorm',
-            description: 'V2 UI/UX Architecture & Gamification',
-            start_time: new Date(new Date(weekDays[1]).setHours(16, 0, 0, 0)).toISOString(),
-            end_time: new Date(new Date(weekDays[1]).setHours(20, 0, 0, 0)).toISOString(),
-            is_all_day: false,
-            is_recurring: false,
-            color_id: 'yellow',
-            color_bg: '#FEF08A',
-            color_border: '#FACC15',
-            color_text: '#713F12',
-            category: 'Ideation',
-            location: 'Innovation Lab',
-            meeting_link: '',
-            reminders: [],
-            participants: [],
-            creator_name: 'Sagar Yadav',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-11',
-            title: 'Project A',
-            description: 'Live production release verification',
-            start_time: new Date(new Date(weekDays[3]).setHours(17, 0, 0, 0)).toISOString(),
-            end_time: new Date(new Date(weekDays[3]).setHours(18, 0, 0, 0)).toISOString(),
-            is_all_day: false,
-            is_recurring: false,
-            color_id: 'blue',
-            color_bg: '#E0F2FE',
-            color_border: '#7DD3FC',
-            color_text: '#0C4A6E',
-            category: 'Engineering',
-            location: 'Remote',
-            meeting_link: '',
-            reminders: [],
-            participants: [],
-            creator_name: 'Super Admin',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'sample-12',
-            title: 'Project Review',
-            description: 'Quarterly OKR alignment',
-            start_time: new Date(new Date(weekDays[4]).setHours(17, 0, 0, 0)).toISOString(),
-            end_time: new Date(new Date(weekDays[4]).setHours(18, 0, 0, 0)).toISOString(),
-            is_all_day: false,
-            is_recurring: false,
-            color_id: 'purple',
-            color_bg: '#EDE9FE',
-            color_border: '#C4B5FD',
-            color_text: '#5B21B6',
-            category: 'Executive',
-            location: 'Virtual Meet',
-            meeting_link: '',
-            reminders: [],
-            participants: [],
-            creator_name: 'Super Admin',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ];
-        setEvents(sampleEvents);
+        setEvents([]);
       }
     } catch (err) {
       console.warn('Error loading calendar data:', err);
+      setEvents([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -499,20 +242,17 @@ export const AdminCalendarView: React.FC = () => {
 
     setSelectedEvent(null);
     setIsNewEvent(true);
-    setFormTitle('Meet with Team');
-    setFormDescription('Operations review and sprint alignment.');
+    setFormTitle('');
+    setFormDescription('');
     setFormDate(start.toISOString().split('T')[0]);
     setFormStartTime(start.toTimeString().slice(0, 5));
     setFormEndTime(end.toTimeString().slice(0, 5));
     setFormIsAllDay(false);
     setFormIsRecurring(false);
     setFormColorId('purple');
-    setFormLocation('Jakarta, Indonesia');
-    setFormMeetingLink('https://meet.google.com/izp-srsk-kxf');
-    setFormParticipants([
-      { id: '1', name: 'Nazmi Javier', role: 'SUPER_ADMIN', accepted: true },
-      { id: '2', name: 'Emilia Inder', role: 'MODERATOR', accepted: false },
-    ]);
+    setFormLocation('');
+    setFormMeetingLink('');
+    setFormParticipants([]);
     setFormReminders(['15 mins before']);
     setIsDrawerOpen(true);
   };
@@ -547,34 +287,16 @@ export const AdminCalendarView: React.FC = () => {
         });
 
         if (error) {
-          // Local fallback addition if DB table not yet migrated
-          const palette = CALENDAR_COLOR_PALETTES[formColorId];
-          const localEvent: AdminCalendarEvent = {
-            id: 'local-' + Date.now(),
-            title: formTitle,
-            description: formDescription,
-            start_time: startDateTime.toISOString(),
-            end_time: endDateTime.toISOString(),
-            is_all_day: formIsAllDay,
-            is_recurring: formIsRecurring,
-            color_id: formColorId,
-            color_bg: palette.bg,
-            color_border: palette.border,
-            color_text: palette.text,
-            category: 'Operations',
-            location: formLocation,
-            meeting_link: formMeetingLink,
-            reminders: formReminders,
-            participants: formParticipants,
-            creator_name: 'Super Admin',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          setEvents((prev) => [...prev, localEvent]);
+          alert('Error saving event: ' + error.message);
+          return;
+        }
+
+        if (event) {
+          setEvents((prev) => [...prev.filter((e) => e.id !== event.id), event]);
         }
       } else {
         const palette = CALENDAR_COLOR_PALETTES[formColorId];
-        await adminCalendarService.updateEvent(selectedEvent.id, {
+        const { event, error } = await adminCalendarService.updateEvent(selectedEvent.id, {
           title: formTitle,
           description: formDescription,
           start_time: startDateTime.toISOString(),
@@ -591,30 +313,15 @@ export const AdminCalendarView: React.FC = () => {
           participants: formParticipants,
         });
 
-        // Update local state directly
-        setEvents((prev) =>
-          prev.map((e) =>
-            e.id === selectedEvent.id
-              ? {
-                  ...e,
-                  title: formTitle,
-                  description: formDescription,
-                  start_time: startDateTime.toISOString(),
-                  end_time: endDateTime.toISOString(),
-                  is_all_day: formIsAllDay,
-                  is_recurring: formIsRecurring,
-                  color_id: formColorId,
-                  color_bg: palette.bg,
-                  color_border: palette.border,
-                  color_text: palette.text,
-                  location: formLocation,
-                  meeting_link: formMeetingLink,
-                  reminders: formReminders,
-                  participants: formParticipants,
-                }
-              : e
-          )
-        );
+        if (error) {
+          alert('Error updating event: ' + error.message);
+          return;
+        }
+
+        // Update local state
+        if (event) {
+          setEvents((prev) => prev.map((e) => (e.id === event.id ? event : e)));
+        }
       }
 
       setSaveSuccessMsg('Event synchronized across all Admin Consoles!');
@@ -1021,25 +728,31 @@ export const AdminCalendarView: React.FC = () => {
 
                 {/* Team member chips */}
                 <View style={styles.participantsList}>
-                  {teamMembers.map((member) => {
-                    const isSelected = formParticipants.some((p) => p.id === member.id);
-                    return (
-                      <TouchableOpacity
-                        key={member.id}
-                        style={[styles.participantRow, isSelected && styles.participantRowActive]}
-                        onPress={() => toggleParticipant(member)}
-                      >
-                        <View style={styles.participantAvatar}>
-                          <Text style={styles.avatarInitial}>{member.name.charAt(0)}</Text>
-                        </View>
-                        <View style={styles.participantInfo}>
-                          <Text style={styles.participantName}>{member.name}</Text>
-                          <Text style={styles.participantRole}>{member.role || 'Admin'}</Text>
-                        </View>
-                        {isSelected && <CheckCircle2 size={16} color="#059669" />}
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {teamMembers.length === 0 ? (
+                    <Text style={{ fontSize: 12, color: ADMIN_COLORS.textMuted, fontStyle: 'italic', paddingVertical: 6 }}>
+                      No team members configured yet.
+                    </Text>
+                  ) : (
+                    teamMembers.map((member) => {
+                      const isSelected = formParticipants.some((p) => p.id === member.id);
+                      return (
+                        <TouchableOpacity
+                          key={member.id}
+                          style={[styles.participantRow, isSelected && styles.participantRowActive]}
+                          onPress={() => toggleParticipant(member)}
+                        >
+                          <View style={styles.participantAvatar}>
+                            <Text style={styles.avatarInitial}>{member.name.charAt(0)}</Text>
+                          </View>
+                          <View style={styles.participantInfo}>
+                            <Text style={styles.participantName}>{member.name}</Text>
+                            <Text style={styles.participantRole}>{member.role || 'Admin'}</Text>
+                          </View>
+                          {isSelected && <CheckCircle2 size={16} color="#059669" />}
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
                 </View>
               </View>
 
