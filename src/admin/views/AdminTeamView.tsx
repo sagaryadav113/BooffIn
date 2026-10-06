@@ -70,6 +70,7 @@ export const AdminTeamView: React.FC = () => {
   const [copiedRecoveryEmail, setCopiedRecoveryEmail] = useState(false);
   const [copiedRecoveryPassword, setCopiedRecoveryPassword] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [recoveryModalError, setRecoveryModalError] = useState<string | null>(null);
 
   // Cross-platform Clipboard Copy Helper
   const copyTextToClipboard = async (text: string, type: 'email' | 'password' | 'recEmail' | 'recPass') => {
@@ -171,28 +172,36 @@ export const AdminTeamView: React.FC = () => {
     setShowRecoveryPassword(false);
     setCopiedRecoveryEmail(false);
     setCopiedRecoveryPassword(false);
+    setIsResettingPassword(false);
+    setRecoveryModalError(null);
     setErrorMessage(null);
   };
 
   const handleGenerateNewPassword = async () => {
     if (!recoveryMember) return;
     setIsResettingPassword(true);
+    setRecoveryModalError(null);
     setErrorMessage(null);
 
-    const res = await adminSecurityService.resetMemberPassword({
-      targetUserId: recoveryMember.user_id,
-      targetEmail: recoveryMember.email || `${recoveryMember.user_id}@letsbooffin.com`,
-      targetFullName: recoveryMember.fullName || 'Team Member',
-    });
+    try {
+      const res = await adminSecurityService.resetMemberPassword({
+        targetUserId: recoveryMember.user_id,
+        targetEmail: recoveryMember.email || `${recoveryMember.user_id}@letsbooffin.com`,
+        targetFullName: recoveryMember.fullName || 'Team Member',
+      });
 
-    setIsResettingPassword(false);
+      setIsResettingPassword(false);
 
-    if (res.error) {
-      setErrorMessage(`Failed to reset password: ${res.error.message}`);
-    } else if (res.newPassword) {
-      setGeneratedRecoveryPassword(res.newPassword);
-      setShowRecoveryPassword(true);
-      setActionSuccessMessage(`New temporary password generated for ${recoveryMember.fullName || 'member'}.`);
+      if (res.error) {
+        setRecoveryModalError(`Failed to reset password: ${res.error.message}`);
+      } else if (res.newPassword) {
+        setGeneratedRecoveryPassword(res.newPassword);
+        setShowRecoveryPassword(true);
+        setActionSuccessMessage(`New temporary password generated for ${recoveryMember.fullName || 'member'}.`);
+      }
+    } catch (err: any) {
+      setIsResettingPassword(false);
+      setRecoveryModalError(err?.message || 'An unexpected error occurred while generating password.');
     }
   };
 
@@ -793,27 +802,37 @@ export const AdminTeamView: React.FC = () => {
 
               {/* Password Recovery Section */}
               <View style={styles.passwordResetSection}>
-                <View style={styles.resetHeaderRow}>
-                  <View style={{ flex: 1, minWidth: 160 }}>
-                    <Text style={styles.resetTitle}>Generate New Temporary Password</Text>
-                    <Text style={styles.resetSubtitle}>
-                      Creates a new 16-character password and logs the action to audit trail.
-                    </Text>
-                  </View>
+                <View style={styles.resetHeaderColumn}>
+                  <Text style={styles.resetTitle}>Generate New Temporary Password</Text>
+                  <Text style={styles.resetSubtitle}>
+                    Creates a new 16-character temporary password and securely logs the action to the audit trail.
+                  </Text>
                   <TouchableOpacity
-                    style={styles.generateBtn}
+                    style={[styles.generateBtn, isResettingPassword && { opacity: 0.7 }]}
                     onPress={handleGenerateNewPassword}
                     disabled={isResettingPassword}
+                    activeOpacity={0.8}
                   >
-                    <RotateCcw size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
+                    <RotateCcw size={13} color="#FFFFFF" style={{ marginRight: 6 }} />
                     <Text style={styles.generateBtnText}>
-                      {isResettingPassword ? 'Generating...' : 'Generate New Password'}
+                      {isResettingPassword ? 'Generating Temporary Password...' : 'Generate New Password'}
                     </Text>
                   </TouchableOpacity>
                 </View>
 
+                {recoveryModalError && (
+                  <View style={styles.modalInlineError}>
+                    <AlertTriangle size={14} color="#DC2626" />
+                    <Text style={styles.modalInlineErrorText}>{recoveryModalError}</Text>
+                  </View>
+                )}
+
                 {generatedRecoveryPassword && (
                   <View style={styles.generatedPasswordBox}>
+                    <View style={styles.generatedSuccessBadge}>
+                      <CheckCircle2 size={12} color="#059669" />
+                      <Text style={styles.generatedSuccessText}>New Password Ready</Text>
+                    </View>
                     <Text style={styles.credFieldLabel}>New Temporary Password</Text>
                     <View style={styles.credInputRow}>
                       <Text style={styles.credPassValue} numberOfLines={1}>
@@ -823,7 +842,7 @@ export const AdminTeamView: React.FC = () => {
                         style={styles.revealBtn}
                         onPress={() => setShowRecoveryPassword(!showRecoveryPassword)}
                       >
-                        {showRecoveryPassword ? <EyeOff size={13} color="#475569" /> : <Eye size={13} color="#475569" />}
+                        {showRecoveryPassword ? <EyeOff size={14} color="#475569" /> : <Eye size={14} color="#475569" />}
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.copyBtn}
@@ -1454,12 +1473,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 10,
   },
-  resetHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
+  resetHeaderColumn: {
+    gap: 8,
   },
   resetTitle: {
     fontSize: 13,
@@ -1469,26 +1484,62 @@ const styles = StyleSheet.create({
   resetSubtitle: {
     fontSize: 11,
     color: '#64748B',
-    marginTop: 2,
+    lineHeight: 16,
   },
   generateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#059669',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 4,
   },
   generateBtnText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  modalInlineError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 6,
+  },
+  modalInlineErrorText: {
+    fontSize: 12,
+    color: '#991B1B',
+    fontWeight: '500',
+    flex: 1,
+  },
   generatedPasswordBox: {
-    marginTop: 4,
+    marginTop: 6,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     gap: 6,
+  },
+  generatedSuccessBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  generatedSuccessText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
   },
 });
