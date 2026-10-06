@@ -10,10 +10,14 @@ import { useAuthStore } from '../store/useAuthStore';
 
 import { DesktopLayoutShell } from '../components/desktop/DesktopLayoutShell';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { useUserPresence } from '../hooks/useUserPresence';
 
 export default function RootLayout() {
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
   const { isDesktop } = useResponsiveLayout();
+
+  // Track live user presence across all active sessions in real-time
+  useUserPresence();
 
   useEffect(() => {
     initializeAuth();
