@@ -7,3 +7,4 @@ export * from './AdminEmptyState';
 export * from './AdminSidebar';
 export * from './AdminHeader';
 export * from './AdminLayoutShell';
+export * from './AdminProfileModal';
