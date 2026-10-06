@@ -754,9 +754,9 @@ export const AdminTeamView: React.FC = () => {
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.modalHeaderLeft}>
                   <Lock size={18} color="#059669" />
-                  <Text style={styles.modalTitle}>
+                  <Text style={styles.modalTitle} numberOfLines={1}>
                     Credentials Recovery: {recoveryMember.fullName || 'Member'}
                   </Text>
                 </View>
@@ -771,9 +771,9 @@ export const AdminTeamView: React.FC = () => {
 
               {/* Member Work Email Box */}
               <View style={styles.recoveryCredBox}>
-                <View style={styles.credRow}>
-                  <Text style={styles.credLabel}>Official Work Email:</Text>
-                  <Text style={styles.credValue}>
+                <Text style={styles.credFieldLabel}>Official Work Email</Text>
+                <View style={styles.credInputRow}>
+                  <Text style={styles.credEmailValue} numberOfLines={1}>
                     {recoveryMember.email || `${recoveryMember.user_id}@letsbooffin.com`}
                   </Text>
                   <TouchableOpacity
@@ -785,8 +785,8 @@ export const AdminTeamView: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.credRow}>
-                  <Text style={styles.credLabel}>Role Authority:</Text>
+                <View style={styles.credRoleRow}>
+                  <Text style={styles.credRoleLabel}>Role Authority:</Text>
                   <AdminBadge label={recoveryMember.role} variant="emerald" size="sm" />
                 </View>
               </View>
@@ -794,7 +794,7 @@ export const AdminTeamView: React.FC = () => {
               {/* Password Recovery Section */}
               <View style={styles.passwordResetSection}>
                 <View style={styles.resetHeaderRow}>
-                  <View>
+                  <View style={{ flex: 1, minWidth: 160 }}>
                     <Text style={styles.resetTitle}>Generate New Temporary Password</Text>
                     <Text style={styles.resetSubtitle}>
                       Creates a new 16-character password and logs the action to audit trail.
@@ -814,16 +814,16 @@ export const AdminTeamView: React.FC = () => {
 
                 {generatedRecoveryPassword && (
                   <View style={styles.generatedPasswordBox}>
-                    <View style={styles.credRow}>
-                      <Text style={styles.credLabel}>New Password:</Text>
-                      <Text style={styles.credValue}>
+                    <Text style={styles.credFieldLabel}>New Temporary Password</Text>
+                    <View style={styles.credInputRow}>
+                      <Text style={styles.credPassValue} numberOfLines={1}>
                         {showRecoveryPassword ? generatedRecoveryPassword : '••••••••••••••••'}
                       </Text>
                       <TouchableOpacity
                         style={styles.revealBtn}
                         onPress={() => setShowRecoveryPassword(!showRecoveryPassword)}
                       >
-                        {showRecoveryPassword ? <EyeOff size={12} color="#475569" /> : <Eye size={12} color="#475569" />}
+                        {showRecoveryPassword ? <EyeOff size={13} color="#475569" /> : <Eye size={13} color="#475569" />}
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.copyBtn}
@@ -1216,6 +1216,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   modalTitle: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: '700',
     color: '#0F172A',
@@ -1381,22 +1383,76 @@ const styles = StyleSheet.create({
   },
 
   // Recovery Modal
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    marginRight: 8,
+  },
   recoveryCredBox: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 10,
-    padding: 14,
+    padding: 12,
     gap: 10,
     marginBottom: 16,
+  },
+  credFieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  credInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  credEmailValue: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: 'monospace',
+    color: '#0F172A',
+  },
+  credPassValue: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    color: '#0F172A',
+    letterSpacing: 1,
+  },
+  credRoleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  credRoleLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
   passwordResetSection: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 10,
-    padding: 14,
+    padding: 12,
     marginBottom: 16,
+    gap: 10,
   },
   resetHeaderRow: {
     flexDirection: 'row',
@@ -1429,9 +1485,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   generatedPasswordBox: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 4,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
+    gap: 6,
   },
 });
