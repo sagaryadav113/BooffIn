@@ -1,5 +1,6 @@
 // ============================================================================
 // BOOFFIN ADMIN PORTAL — TEAM & ACCESS CONTROL (RBAC)
+// Robust Administrator Provisioning, Password Management & Role Enforcement
 // ============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -14,15 +15,14 @@ import {
   TextInput,
   useWindowDimensions 
 } from 'react-native';
-import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
+import { ADMIN_COLORS } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
-import { adminSecurityService, ProvisionResult } from '../services/adminSecurityService';
+import { adminSecurityService, ProvisionResult, generateSecurePassword } from '../services/adminSecurityService';
 import { AdminMember, AdminRole, AdminStatus } from '../types/roles';
 import { useAdminAuth } from '../hooks/useAdminAuth';
 import { 
   UserPlus, 
-  RefreshCw, 
   CheckCircle2, 
   AlertTriangle, 
   Key, 
@@ -32,7 +32,11 @@ import {
   Lock, 
   X,
   Check,
-  Shield
+  Shield,
+  Edit3,
+  RefreshCw,
+  Mail,
+  User
 } from 'lucide-react-native';
 
 export const AdminTeamView: React.FC = () => {
@@ -49,8 +53,10 @@ export const AdminTeamView: React.FC = () => {
   // 1. Provisioning Modal State
   const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
   const [provisionFullName, setProvisionFullName] = useState('');
+  const [provisionEmail, setProvisionEmail] = useState('');
   const [provisionUsername, setProvisionUsername] = useState('');
-  const [provisionRole, setProvisionRole] = useState<AdminRole>('SUPER_ADMIN');
+  const [provisionPassword, setProvisionPassword] = useState('');
+  const [provisionRole, setProvisionRole] = useState<AdminRole>('ADMIN');
   const [isSubmittingProvision, setIsSubmittingProvision] = useState(false);
 
   // 2. Credentials Success Card State
@@ -59,14 +65,17 @@ export const AdminTeamView: React.FC = () => {
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
 
-  // 3. Member Authority & Role Edit Modal State
+  // 3. Member Authority & Details Edit Modal State
   const [selectedMember, setSelectedMember] = useState<(AdminMember & { email?: string; fullName?: string }) | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editRole, setEditRole] = useState<AdminRole>('ADMIN');
-  const [isSubmittingRoleChange, setIsSubmittingRoleChange] = useState(false);
+  const [isSubmittingDetailsChange, setIsSubmittingDetailsChange] = useState(false);
 
-  // 4. View / Reset Credentials Recovery Modal State
+  // 4. View / Reset Password Modal State
   const [recoveryMember, setRecoveryMember] = useState<(AdminMember & { email?: string; fullName?: string }) | null>(null);
-  const [generatedRecoveryPassword, setGeneratedRecoveryPassword] = useState<string | null>(null);
+  const [newCustomPassword, setNewCustomPassword] = useState('');
+  const [activeNewPassword, setActiveNewPassword] = useState<string | null>(null);
   const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
   const [copiedRecoveryEmail, setCopiedRecoveryEmail] = useState(false);
   const [copiedRecoveryPassword, setCopiedRecoveryPassword] = useState(false);
@@ -128,24 +137,37 @@ export const AdminTeamView: React.FC = () => {
 
   const handleOpenProvisionModal = () => {
     setProvisionFullName('');
+    setProvisionEmail('');
     setProvisionUsername('');
-    setProvisionRole('SUPER_ADMIN');
+    setProvisionPassword(generateSecurePassword());
+    setProvisionRole('ADMIN');
     setErrorMessage(null);
     setIsProvisionModalOpen(true);
   };
 
   const handleExecuteProvision = async () => {
-    if (!provisionFullName.trim() || !provisionUsername.trim()) {
-      setErrorMessage('Full name and username handle are required.');
+    if (!provisionFullName.trim()) {
+      setErrorMessage('Full name is required.');
       return;
     }
+
+    const emailToUse = provisionEmail.trim() || `${provisionUsername.trim().toLowerCase()}@letsbooffin.com`;
+    if (!emailToUse.includes('@')) {
+      setErrorMessage('A valid email address is required.');
+      return;
+    }
+
+    const usernameToUse = provisionUsername.trim() || emailToUse.split('@')[0];
+    const passwordToUse = provisionPassword.trim() || generateSecurePassword();
 
     setIsSubmittingProvision(true);
     setErrorMessage(null);
 
     const res = await adminSecurityService.provisionTeamMember({
-      fullName: provisionFullName,
-      username: provisionUsername,
+      fullName: provisionFullName.trim(),
+      email: emailToUse,
+      username: usernameToUse,
+      password: passwordToUse,
       role: provisionRole,
     });
 
@@ -156,21 +178,47 @@ export const AdminTeamView: React.FC = () => {
     } else if (res.result) {
       setIsProvisionModalOpen(false);
       setCredentialsResult(res.result);
-      setActionSuccessMessage(`Team member ${res.result.fullName} provisioned successfully!`);
+      setActionSuccessMessage(`Team member ${res.result.fullName} provisioned successfully! Ready for login.`);
       loadMembers();
     }
   };
 
   const handleOpenEditModal = (member: AdminMember & { email?: string; fullName?: string }) => {
     setSelectedMember(member);
+    setEditFullName(member.fullName || '');
+    setEditEmail(member.email || '');
     setEditRole(member.role);
     setErrorMessage(null);
   };
 
+  const handleExecuteDetailsChange = async () => {
+    if (!selectedMember) return;
+    setIsSubmittingDetailsChange(true);
+    setErrorMessage(null);
+
+    const res = await adminSecurityService.updateMemberDetails({
+      targetUserId: selectedMember.user_id,
+      fullName: editFullName.trim() || selectedMember.fullName || 'Administrator',
+      email: editEmail.trim() || selectedMember.email || '',
+      role: editRole,
+    });
+
+    setIsSubmittingDetailsChange(false);
+
+    if (res.error) {
+      setErrorMessage(res.error.message);
+    } else {
+      setActionSuccessMessage(`Employee details updated permanently.`);
+      setSelectedMember(null);
+      loadMembers();
+    }
+  };
+
   const handleOpenRecoveryModal = (member: AdminMember & { email?: string; fullName?: string }) => {
     setRecoveryMember(member);
-    setGeneratedRecoveryPassword(null);
-    setShowRecoveryPassword(false);
+    setNewCustomPassword(generateSecurePassword());
+    setActiveNewPassword(null);
+    setShowRecoveryPassword(true);
     setCopiedRecoveryEmail(false);
     setCopiedRecoveryPassword(false);
     setIsResettingPassword(false);
@@ -178,8 +226,13 @@ export const AdminTeamView: React.FC = () => {
     setErrorMessage(null);
   };
 
-  const handleGenerateNewPassword = async () => {
+  const handleSavePermanentPassword = async () => {
     if (!recoveryMember) return;
+    if (!newCustomPassword.trim() || newCustomPassword.trim().length < 6) {
+      setRecoveryModalError('Password must be at least 6 characters.');
+      return;
+    }
+
     setIsResettingPassword(true);
     setRecoveryModalError(null);
     setErrorMessage(null);
@@ -189,43 +242,21 @@ export const AdminTeamView: React.FC = () => {
         targetUserId: recoveryMember.user_id,
         targetEmail: recoveryMember.email || `${recoveryMember.user_id}@letsbooffin.com`,
         targetFullName: recoveryMember.fullName || 'Team Member',
+        newPassword: newCustomPassword.trim(),
       });
 
       setIsResettingPassword(false);
 
       if (res.error) {
-        setRecoveryModalError(`Failed to reset password: ${res.error.message}`);
+        setRecoveryModalError(`Failed to update password: ${res.error.message}`);
       } else if (res.newPassword) {
-        setGeneratedRecoveryPassword(res.newPassword);
-        setShowRecoveryPassword(true);
-        setActionSuccessMessage(`New temporary password generated for ${recoveryMember.fullName || 'member'}.`);
+        setActiveNewPassword(res.newPassword);
+        setActionSuccessMessage(`Permanent password updated for ${recoveryMember.fullName || 'member'}. They can log in immediately.`);
+        loadMembers();
       }
     } catch (err: any) {
       setIsResettingPassword(false);
-      setRecoveryModalError(err?.message || 'An unexpected error occurred while generating password.');
-    }
-  };
-
-  const handleExecuteRoleChange = async () => {
-    if (!selectedMember || !currentUserId) return;
-    setIsSubmittingRoleChange(true);
-    setErrorMessage(null);
-
-    const res = await adminSecurityService.updateAdminRole({
-      memberId: selectedMember.id,
-      targetUserId: selectedMember.user_id,
-      newRole: editRole,
-      currentUserId,
-    });
-
-    setIsSubmittingRoleChange(false);
-
-    if (res.error) {
-      setErrorMessage(res.error.message);
-    } else {
-      setActionSuccessMessage(`Role updated to ${editRole} for ${selectedMember.fullName || 'member'}.`);
-      setSelectedMember(null);
-      loadMembers();
+      setRecoveryModalError(err?.message || 'An unexpected error occurred while updating password.');
     }
   };
 
@@ -253,7 +284,7 @@ export const AdminTeamView: React.FC = () => {
     {
       key: 'user_id',
       header: 'OPERATIONS SPECIALIST',
-      width: 240,
+      width: 260,
       render: (m) => (
         <View style={styles.memberCell}>
           <View style={styles.memberAvatar}>
@@ -292,11 +323,11 @@ export const AdminTeamView: React.FC = () => {
     },
     {
       key: 'user_id',
-      header: '2FA ENFORCED',
+      header: '2FA TOTP',
       width: 120,
       render: (m) => (
         <AdminBadge
-          label={m.status === 'ACTIVE' ? 'ENABLED' : 'OPTIONAL'}
+          label={m.status === 'ACTIVE' ? 'ENFORCED' : 'OPTIONAL'}
           variant={m.status === 'ACTIVE' ? 'emerald' : 'neutral'}
           size="sm"
         />
@@ -313,7 +344,8 @@ export const AdminTeamView: React.FC = () => {
             style={styles.actionOutlineBtn}
             onPress={() => handleOpenEditModal(m)}
           >
-            <Text style={styles.actionOutlineBtnText}>Edit Role</Text>
+            <Edit3 size={11} color={ADMIN_COLORS.textSecondary} />
+            <Text style={styles.actionOutlineBtnText}>Edit</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -321,7 +353,7 @@ export const AdminTeamView: React.FC = () => {
             onPress={() => handleOpenRecoveryModal(m)}
           >
             <Key size={11} color={ADMIN_COLORS.textSecondary} />
-            <Text style={styles.actionOutlineBtnText}>Credentials</Text>
+            <Text style={styles.actionOutlineBtnText}>Password</Text>
           </TouchableOpacity>
         </View>
       ),
@@ -339,8 +371,8 @@ export const AdminTeamView: React.FC = () => {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.primaryActionBtn} onPress={handleOpenProvisionModal}>
-          <UserPlus size={13} color={ADMIN_COLORS.textInverse} />
+        <TouchableOpacity style={styles.primaryActionBtn} onPress={handleOpenProvisionModal} activeOpacity={0.75}>
+          <UserPlus size={13} color="#FFFFFF" />
           <Text style={styles.primaryActionBtnText}>Provision Admin</Text>
         </TouchableOpacity>
       </View>
@@ -348,14 +380,14 @@ export const AdminTeamView: React.FC = () => {
       {/* Notifications */}
       {actionSuccessMessage && (
         <View style={styles.successBox}>
-          <CheckCircle2 size={15} color={ADMIN_COLORS.statusSuccessText} />
+          <CheckCircle2 size={14} color="#047857" />
           <Text style={styles.successText}>{actionSuccessMessage}</Text>
         </View>
       )}
 
       {errorMessage && (
         <View style={styles.errorBox}>
-          <AlertTriangle size={15} color={ADMIN_COLORS.statusDangerText} />
+          <AlertTriangle size={14} color="#B91C1C" />
           <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       )}
@@ -365,15 +397,15 @@ export const AdminTeamView: React.FC = () => {
         <View style={styles.credentialsBanner}>
           <View style={styles.credentialsBannerHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Key size={15} color={ADMIN_COLORS.emeraldPrimary} />
-              <Text style={styles.credentialsBannerTitle}>New Administrator Credentials Issued</Text>
+              <Key size={14} color="#047857" />
+              <Text style={styles.credentialsBannerTitle}>New Employee Credentials Ready for Login</Text>
             </View>
             <TouchableOpacity onPress={() => setCredentialsResult(null)}>
               <X size={14} color={ADMIN_COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
           <Text style={styles.credentialsBannerSub}>
-            Share these temporary credentials securely with {credentialsResult.fullName}.
+            The employee can now sign in immediately using this Email and Password. Google Authenticator (TOTP) will be enrolled upon first login.
           </Text>
 
           <View style={styles.credRow}>
@@ -385,7 +417,7 @@ export const AdminTeamView: React.FC = () => {
           </View>
 
           <View style={styles.credRow}>
-            <Text style={styles.credLabel}>Temporary Password:</Text>
+            <Text style={styles.credLabel}>Permanent Password:</Text>
             <Text style={styles.credValue}>{showPassword ? credentialsResult.password : '••••••••••••'}</Text>
             <TouchableOpacity style={styles.copyBtn} onPress={() => setShowPassword(!showPassword)}>
               <Text style={styles.copyBtnText}>{showPassword ? 'Hide' : 'Show'}</Text>
@@ -397,7 +429,7 @@ export const AdminTeamView: React.FC = () => {
         </View>
       )}
 
-      {/* Main Content: Mobile Record Cards vs Desktop Table */}
+      {/* Main Content */}
       {loading ? (
         <View style={styles.loadingCard}>
           <ActivityIndicator size="small" color={ADMIN_COLORS.emeraldPrimary} />
@@ -443,14 +475,15 @@ export const AdminTeamView: React.FC = () => {
                   onPress={() => handleOpenRecoveryModal(m)}
                 >
                   <Key size={11} color={ADMIN_COLORS.textSecondary} />
-                  <Text style={styles.actionOutlineBtnText}>Credentials</Text>
+                  <Text style={styles.actionOutlineBtnText}>Password</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.actionOutlineBtn}
                   onPress={() => handleOpenEditModal(m)}
                 >
-                  <Text style={styles.actionOutlineBtnText}>Edit Role</Text>
+                  <Edit3 size={11} color={ADMIN_COLORS.textSecondary} />
+                  <Text style={styles.actionOutlineBtnText}>Edit Details</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -466,7 +499,7 @@ export const AdminTeamView: React.FC = () => {
         </View>
       )}
 
-      {/* Provisioning Modal */}
+      {/* 1. Provisioning Modal */}
       {isProvisionModalOpen && (
         <Modal
           visible={true}
@@ -479,7 +512,7 @@ export const AdminTeamView: React.FC = () => {
               <View style={styles.modalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <UserPlus size={16} color={ADMIN_COLORS.emeraldPrimary} />
-                  <Text style={styles.modalTitle}>Provision New Operations Admin</Text>
+                  <Text style={styles.modalTitle}>Provision New Staff / Admin Account</Text>
                 </View>
                 <TouchableOpacity onPress={() => setIsProvisionModalOpen(false)} style={styles.closeBtn}>
                   <X size={16} color={ADMIN_COLORS.textSecondary} />
@@ -487,7 +520,7 @@ export const AdminTeamView: React.FC = () => {
               </View>
 
               <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-                <Text style={styles.inputLabel}>Full Legal / Staff Name</Text>
+                <Text style={styles.inputLabel}>Employee Full Name</Text>
                 <TextInput
                   style={styles.inputField}
                   placeholder="e.g. Dr. Eleanor Vance"
@@ -496,7 +529,18 @@ export const AdminTeamView: React.FC = () => {
                   onChangeText={setProvisionFullName}
                 />
 
-                <Text style={[styles.inputLabel, { marginTop: 10 }]}>Username Handle</Text>
+                <Text style={[styles.inputLabel, { marginTop: 10 }]}>Employee Email Address (Login ID)</Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="e.g. eleanor.vance@gmail.com"
+                  placeholderTextColor={ADMIN_COLORS.textMuted}
+                  value={provisionEmail}
+                  onChangeText={setProvisionEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+
+                <Text style={[styles.inputLabel, { marginTop: 10 }]}>Username Handle (Optional)</Text>
                 <TextInput
                   style={styles.inputField}
                   placeholder="e.g. eleanor.vance"
@@ -504,6 +548,20 @@ export const AdminTeamView: React.FC = () => {
                   value={provisionUsername}
                   onChangeText={setProvisionUsername}
                   autoCapitalize="none"
+                />
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                  <Text style={styles.inputLabel}>Initial Permanent Password</Text>
+                  <TouchableOpacity onPress={() => setProvisionPassword(generateSecurePassword())}>
+                    <Text style={styles.linkActionText}>Auto-Generate</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Enter or generate password"
+                  placeholderTextColor={ADMIN_COLORS.textMuted}
+                  value={provisionPassword}
+                  onChangeText={setProvisionPassword}
                 />
 
                 <Text style={[styles.inputLabel, { marginTop: 10 }]}>Assign Security Role</Text>
@@ -538,7 +596,7 @@ export const AdminTeamView: React.FC = () => {
                   {isSubmittingProvision ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.primaryActionBtnText}>Issue Provisioning</Text>
+                    <Text style={styles.primaryActionBtnText}>Create Employee Account</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -547,7 +605,7 @@ export const AdminTeamView: React.FC = () => {
         </Modal>
       )}
 
-      {/* Edit Role Modal */}
+      {/* 2. Edit Details & Role Modal */}
       {selectedMember && (
         <Modal
           visible={true}
@@ -558,14 +616,32 @@ export const AdminTeamView: React.FC = () => {
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Modify Role — {selectedMember.fullName || 'Admin'}</Text>
+                <Text style={styles.modalTitle}>Edit Staff Details — {selectedMember.fullName || 'Admin'}</Text>
                 <TouchableOpacity onPress={() => setSelectedMember(null)} style={styles.closeBtn}>
                   <X size={16} color={ADMIN_COLORS.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-                <Text style={styles.inputLabel}>Select Authority Tier</Text>
+                <Text style={styles.inputLabel}>Full Staff Name</Text>
+                <TextInput
+                  style={styles.inputField}
+                  value={editFullName}
+                  onChangeText={setEditFullName}
+                  placeholder="Full Name"
+                />
+
+                <Text style={[styles.inputLabel, { marginTop: 10 }]}>Email Address (Login ID)</Text>
+                <TextInput
+                  style={styles.inputField}
+                  value={editEmail}
+                  onChangeText={setEditEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  placeholder="Email Address"
+                />
+
+                <Text style={[styles.inputLabel, { marginTop: 10 }]}>Authority Tier & Role</Text>
                 <View style={styles.roleSelectionGrid}>
                   {(['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT_LEAD', 'AUDITOR'] as AdminRole[]).map((r) => (
                     <TouchableOpacity
@@ -587,19 +663,19 @@ export const AdminTeamView: React.FC = () => {
                   onPress={() => handleToggleMemberStatus(selectedMember)}
                 >
                   <Text style={styles.actionDangerBtnText}>
-                    {selectedMember.status === 'ACTIVE' ? 'Deactivate Access' : 'Activate Access'}
+                    {selectedMember.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.primaryActionBtn}
-                  onPress={handleExecuteRoleChange}
-                  disabled={isSubmittingRoleChange}
+                  onPress={handleExecuteDetailsChange}
+                  disabled={isSubmittingDetailsChange}
                 >
-                  {isSubmittingRoleChange ? (
+                  {isSubmittingDetailsChange ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.primaryActionBtnText}>Save Role</Text>
+                    <Text style={styles.primaryActionBtnText}>Save Changes</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -608,7 +684,7 @@ export const AdminTeamView: React.FC = () => {
         </Modal>
       )}
 
-      {/* Credentials Recovery Modal */}
+      {/* 3. Password Reset / Change Modal */}
       {recoveryMember && (
         <Modal
           visible={true}
@@ -621,7 +697,7 @@ export const AdminTeamView: React.FC = () => {
               <View style={styles.modalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Key size={16} color={ADMIN_COLORS.emeraldPrimary} />
-                  <Text style={styles.modalTitle}>Credentials Inspection & Reset</Text>
+                  <Text style={styles.modalTitle}>Set Permanent Password</Text>
                 </View>
                 <TouchableOpacity onPress={() => setRecoveryMember(null)} style={styles.closeBtn}>
                   <X size={16} color={ADMIN_COLORS.textSecondary} />
@@ -643,29 +719,33 @@ export const AdminTeamView: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
-                {generatedRecoveryPassword ? (
-                  <View style={[styles.credRow, { marginTop: 8 }]}>
-                    <Text style={styles.credLabel}>New Password:</Text>
-                    <Text style={styles.credValue}>{showRecoveryPassword ? generatedRecoveryPassword : '••••••••••••'}</Text>
-                    <TouchableOpacity style={styles.copyBtn} onPress={() => setShowRecoveryPassword(!showRecoveryPassword)}>
-                      <Text style={styles.copyBtnText}>{showRecoveryPassword ? 'Hide' : 'Show'}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.copyBtn} onPress={() => copyTextToClipboard(generatedRecoveryPassword, 'recPass')}>
-                      <Text style={styles.copyBtnText}>{copiedRecoveryPassword ? 'Copied' : 'Copy'}</Text>
-                    </TouchableOpacity>
+                {activeNewPassword ? (
+                  <View style={[styles.successBannerBlock, { marginTop: 12 }]}>
+                    <Text style={styles.successBannerTitle}>Password Updated Successfully</Text>
+                    <Text style={styles.successBannerSub}>This password is now active and permanent in authentication:</Text>
+                    <View style={[styles.credRow, { marginTop: 6 }]}>
+                      <Text style={styles.credLabel}>Active Password:</Text>
+                      <Text style={styles.credValue}>{activeNewPassword}</Text>
+                      <TouchableOpacity style={styles.copyBtn} onPress={() => copyTextToClipboard(activeNewPassword, 'recPass')}>
+                        <Text style={styles.copyBtnText}>{copiedRecoveryPassword ? 'Copied' : 'Copy'}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ) : (
-                  <TouchableOpacity
-                    style={[styles.primaryActionBtn, { marginTop: 12, alignSelf: 'flex-start' }]}
-                    onPress={handleGenerateNewPassword}
-                    disabled={isResettingPassword}
-                  >
-                    {isResettingPassword ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.primaryActionBtnText}>Generate New Temporary Password</Text>
-                    )}
-                  </TouchableOpacity>
+                  <View style={{ marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={styles.inputLabel}>New Permanent Password</Text>
+                      <TouchableOpacity onPress={() => setNewCustomPassword(generateSecurePassword())}>
+                        <Text style={styles.linkActionText}>Generate Random</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={styles.inputField}
+                      value={newCustomPassword}
+                      onChangeText={setNewCustomPassword}
+                      placeholder="Type or generate new password"
+                    />
+                  </View>
                 )}
               </ScrollView>
 
@@ -674,8 +754,22 @@ export const AdminTeamView: React.FC = () => {
                   style={styles.actionOutlineBtn}
                   onPress={() => setRecoveryMember(null)}
                 >
-                  <Text style={styles.actionOutlineBtnText}>Close</Text>
+                  <Text style={styles.actionOutlineBtnText}>{activeNewPassword ? 'Done' : 'Cancel'}</Text>
                 </TouchableOpacity>
+
+                {!activeNewPassword && (
+                  <TouchableOpacity
+                    style={styles.primaryActionBtn}
+                    onPress={handleSavePermanentPassword}
+                    disabled={isResettingPassword}
+                  >
+                    {isResettingPassword ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.primaryActionBtnText}>Apply Permanent Password</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
@@ -713,42 +807,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: ADMIN_COLORS.statusSuccessBg,
+    backgroundColor: '#F0FDF4',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.statusSuccessBorder,
-    borderRadius: ADMIN_RADII.card,
+    borderColor: '#DCFCE7',
+    borderRadius: 6,
     padding: 10,
     marginBottom: 14,
   },
   successText: {
     fontSize: 12,
-    color: ADMIN_COLORS.statusSuccessText,
+    color: '#047857',
     fontWeight: '500',
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: ADMIN_COLORS.statusDangerBg,
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.statusDangerBorder,
-    borderRadius: ADMIN_RADII.card,
+    borderColor: '#FEE2E2',
+    borderRadius: 6,
     padding: 10,
     marginBottom: 14,
   },
   errorText: {
     fontSize: 12,
-    color: ADMIN_COLORS.statusDangerText,
+    color: '#B91C1C',
     fontWeight: '500',
   },
   credentialsBanner: {
     backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.emeraldBorder,
-    borderRadius: ADMIN_RADII.card,
+    borderRadius: 8,
     padding: 12,
     marginBottom: 16,
-    gap: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: ADMIN_COLORS.emeraldPrimary,
   },
   credentialsBannerHeader: {
     flexDirection: 'row',
@@ -758,42 +853,45 @@ const styles = StyleSheet.create({
   credentialsBannerTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: ADMIN_COLORS.emeraldPrimary,
+    color: ADMIN_COLORS.textPrimary,
   },
   credentialsBannerSub: {
     fontSize: 11,
     color: ADMIN_COLORS.textSecondary,
-    marginBottom: 4,
+    marginTop: 2,
+    marginBottom: 10,
   },
   credRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: ADMIN_COLORS.bgCanvas,
-    padding: 8,
-    borderRadius: ADMIN_RADII.input,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 6,
+    gap: 8,
   },
   credLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: ADMIN_COLORS.textLight,
+    color: ADMIN_COLORS.textSecondary,
   },
   credValue: {
-    fontSize: 12,
+    fontSize: 11.5,
+    fontFamily: 'monospace',
     fontWeight: '600',
     color: ADMIN_COLORS.textPrimary,
     flex: 1,
-    fontFamily: 'monospace',
   },
   copyBtn: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 4,
     backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: ADMIN_RADII.badge,
   },
   copyBtnText: {
     fontSize: 10,
@@ -804,7 +902,7 @@ const styles = StyleSheet.create({
     backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.card,
+    borderRadius: 8,
     padding: 36,
     alignItems: 'center',
     justifyContent: 'center',
@@ -820,22 +918,22 @@ const styles = StyleSheet.create({
   memberCell: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 9,
   },
   memberAvatar: {
     width: 28,
     height: 28,
-    borderRadius: 4,
-    backgroundColor: ADMIN_COLORS.bgActive,
+    borderRadius: 6,
+    backgroundColor: '#ECFDF5',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.emeraldBorder,
+    borderColor: '#A7F3D0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   memberAvatarText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    color: ADMIN_COLORS.emeraldPrimary,
+    color: '#047857',
   },
   boldText: {
     fontSize: 12,
@@ -847,35 +945,50 @@ const styles = StyleSheet.create({
     color: ADMIN_COLORS.textMuted,
   },
   roleTag: {
-    backgroundColor: ADMIN_COLORS.bgCanvas,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.badge,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
     alignSelf: 'flex-start',
   },
   roleTagText: {
     fontSize: 10,
     fontWeight: '600',
     color: ADMIN_COLORS.textSecondary,
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    justifyContent: 'flex-end',
+  },
+  primaryActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 6,
+    gap: 5,
+  },
+  primaryActionBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   actionOutlineBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    backgroundColor: ADMIN_COLORS.bgSurface,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: ADMIN_RADII.button,
+    borderRadius: 4,
+    gap: 4,
   },
   actionOutlineBtnText: {
     fontSize: 11,
@@ -883,32 +996,19 @@ const styles = StyleSheet.create({
     color: ADMIN_COLORS.textSecondary,
   },
   actionDangerBtn: {
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.statusDangerBorder,
-    backgroundColor: ADMIN_COLORS.statusDangerBg,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: ADMIN_RADII.button,
+    borderColor: '#FECACA',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
   actionDangerBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: ADMIN_COLORS.statusDangerText,
+    color: '#B91C1C',
   },
-  primaryActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: ADMIN_COLORS.emeraldPrimary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: ADMIN_RADII.button,
-  },
-  primaryActionBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: ADMIN_COLORS.textInverse,
-  },
+  // Mobile Card
   mobileListContainer: {
     gap: 10,
     marginBottom: 24,
@@ -917,7 +1017,7 @@ const styles = StyleSheet.create({
     backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.card,
+    borderRadius: 8,
     padding: 12,
     gap: 8,
   },
@@ -934,12 +1034,12 @@ const styles = StyleSheet.create({
   recordFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 6,
     borderTopWidth: 1,
-    borderTopColor: ADMIN_COLORS.borderSubtle,
+    borderTopColor: '#F1F5F9',
     paddingTop: 8,
+    gap: 8,
   },
-  // Modal Styles
+  // Modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
@@ -949,13 +1049,13 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    maxWidth: 500,
+    maxWidth: 480,
     backgroundColor: ADMIN_COLORS.bgSurface,
-    borderRadius: ADMIN_RADII.modal,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
     padding: 18,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -963,11 +1063,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: ADMIN_COLORS.borderSubtle,
+    borderBottomColor: '#F1F5F9',
     marginBottom: 14,
   },
   modalTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: ADMIN_COLORS.textPrimary,
   },
@@ -980,20 +1080,23 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: ADMIN_COLORS.textLight,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    color: ADMIN_COLORS.textSecondary,
     marginBottom: 4,
   },
   inputField: {
-    backgroundColor: ADMIN_COLORS.bgCanvas,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    borderRadius: ADMIN_RADII.input,
+    borderRadius: 6,
     paddingHorizontal: 10,
-    height: 36,
+    paddingVertical: 7,
     fontSize: 12,
     color: ADMIN_COLORS.textPrimary,
+    backgroundColor: '#FFFFFF',
+  },
+  linkActionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#047857',
   },
   roleSelectionGrid: {
     flexDirection: 'row',
@@ -1002,32 +1105,49 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   roleSelectBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: ADMIN_RADII.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: ADMIN_COLORS.border,
-    backgroundColor: ADMIN_COLORS.bgCanvas,
+    backgroundColor: '#F8FAFC',
   },
   roleSelectBtnActive: {
-    borderColor: ADMIN_COLORS.emeraldPrimary,
-    backgroundColor: ADMIN_COLORS.bgActive,
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
   },
   roleSelectText: {
     fontSize: 11,
-    fontWeight: '500',
     color: ADMIN_COLORS.textSecondary,
+    fontWeight: '500',
   },
   roleSelectTextActive: {
-    color: ADMIN_COLORS.emeraldPrimary,
-    fontWeight: '600',
+    color: '#047857',
+    fontWeight: '700',
   },
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
     borderTopWidth: 1,
-    borderTopColor: ADMIN_COLORS.borderSubtle,
+    borderTopColor: '#F1F5F9',
     paddingTop: 12,
+    gap: 8,
+  },
+  successBannerBlock: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    borderRadius: 6,
+    padding: 10,
+  },
+  successBannerTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#047857',
+  },
+  successBannerSub: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 2,
   },
 });

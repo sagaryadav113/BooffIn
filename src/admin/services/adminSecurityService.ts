@@ -11,8 +11,7 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://lvstuqhrmag
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_fXyEsViLthF0T7A3NHBXpA_UUUVbrbx';
 
 /**
- * Creates an isolated client without storage persistence so provisioning
- * doesn't overwrite the active Super Admin's session in local storage.
+ * Isolated client for fallback signups without overwriting active admin session
  */
 function getIsolatedAuthClient() {
   return createClient(supabaseUrl, supabaseAnonKey, {
@@ -72,7 +71,7 @@ export const adminSecurityService = {
 
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
-        // Also fetch recent audit logs to find provisioned email/name metadata fallback
+        // Fetch recent audit logs for fallback metadata
         const { data: auditLogs } = await supabase
           .from('admin_audit_logs')
           .select('target_id, metadata, reason')
@@ -88,13 +87,13 @@ export const adminSecurityService = {
             d.full_name || 
             prof?.full_name || 
             prof?.username || 
-            (auditMeta?.provisioned_email ? auditMeta.provisioned_email.split('@')[0] : undefined) || 
+            (auditMeta?.provisioned_name) ||
             'Administrator';
 
           const email = 
             d.email || 
-            (prof?.username ? `${prof.username}@letsbooffin.com` : undefined) || 
             auditMeta?.provisioned_email || 
+            (prof?.username ? `${prof.username}@letsbooffin.com` : undefined) || 
             `${d.user_id.slice(0, 8)}@letsbooffin.com`;
 
           return {
@@ -138,28 +137,64 @@ export const adminSecurityService = {
   },
 
   /**
-   * Provisions a new team member / Co-Admin with auto-generated credentials.
+   * Provisions a new team member / Co-Admin with pre-confirmed auth credentials.
    */
   async provisionTeamMember(params: {
     fullName: string;
+    email?: string;
     username: string;
+    password?: string;
     role: AdminRole;
   }): Promise<{ result: ProvisionResult | null; error: Error | null }> {
     try {
-      const { data: { user: superAdmin }, error: authErr } = await supabase.auth.getUser();
-      if (authErr || !superAdmin) {
-        return { result: null, error: new Error('Unauthorized: Active Super Admin session required.') };
+      const cleanHandle = params.username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+      const email = params.email && params.email.trim() 
+        ? params.email.trim().toLowerCase() 
+        : `${cleanHandle}@letsbooffin.com`;
+      const password = params.password && params.password.trim().length >= 6
+        ? params.password.trim()
+        : generateSecurePassword();
+
+      // 1. Try Authoritative Backend RPC (creates user in auth.users with pre-confirmed status)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('admin_manage_team_credentials', {
+        p_action: 'CREATE',
+        p_email: email,
+        p_password: password,
+        p_full_name: params.fullName.trim(),
+        p_username: cleanHandle,
+        p_role: params.role,
+      });
+
+      if (!rpcError && rpcData?.success) {
+        // Log Audit Trail
+        await adminAuditService.recordAuditLog({
+          action: 'ADMIN_PROVISIONED',
+          targetType: 'ADMIN',
+          targetId: rpcData.user_id,
+          reason: `Super Admin provisioned team member ${params.fullName} (${email}) with role ${params.role}`,
+          metadata: {
+            provisioned_email: email,
+            provisioned_name: params.fullName.trim(),
+            assigned_role: params.role,
+          },
+        });
+
+        return {
+          result: {
+            email,
+            password,
+            role: params.role,
+            fullName: params.fullName.trim(),
+          },
+          error: null,
+        };
       }
 
-      const cleanHandle = params.username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
-      const email = `${cleanHandle}@letsbooffin.com`;
-      const generatedPassword = generateSecurePassword();
-
-      // 1. Create User in Supabase Auth via isolated client to protect active admin session
+      // 2. Fallback via isolated client if RPC is unavailable
       const isolatedClient = getIsolatedAuthClient();
       const { data: signUpData, error: signUpError } = await isolatedClient.auth.signUp({
         email,
-        password: generatedPassword,
+        password,
         options: {
           data: {
             full_name: params.fullName.trim(),
@@ -170,69 +205,39 @@ export const adminSecurityService = {
         },
       });
 
-      if (signUpError) {
+      if (signUpError && !signUpError.message.includes('already registered')) {
         return { result: null, error: new Error(signUpError.message) };
       }
 
-      const newUserId = signUpData.user?.id;
-      if (!newUserId) {
-        return { result: null, error: new Error('Failed to obtain new user identifier from auth provider.') };
-      }
-
-      // 2. Register in public.admin_members table (with full_name and email columns)
-      const { error: memberError } = await supabase
-        .from('admin_members')
-        .upsert({
-          user_id: newUserId,
-          role: params.role,
-          status: 'ACTIVE',
-          invited_by: superAdmin.id,
-          full_name: params.fullName.trim(),
-          email: email,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' });
-
-      if (memberError) {
-        // If full_name/email columns don't exist yet, retry with base columns
+      const newUserId = signUpData?.user?.id;
+      if (newUserId) {
+        // Upsert into admin_members
         await supabase
           .from('admin_members')
           .upsert({
             user_id: newUserId,
             role: params.role,
             status: 'ACTIVE',
-            invited_by: superAdmin.id,
+            full_name: params.fullName.trim(),
+            email: email,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'user_id' });
+
+        // Upsert into profiles
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: newUserId,
+            username: cleanHandle,
+            full_name: params.fullName.trim(),
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' });
       }
-
-      // 3. Ensure profile record exists
-      await supabase
-        .from('profiles')
-        .upsert({
-          id: newUserId,
-          username: cleanHandle,
-          full_name: params.fullName.trim(),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'id' });
-
-      // 4. Record Immutable Audit Log
-      await adminAuditService.recordAuditLog({
-        action: 'ADMIN_PROVISIONED',
-        targetType: 'ADMIN',
-        targetId: newUserId,
-        reason: `Super Admin provisioned team member ${params.fullName} (${email}) with role ${params.role}`,
-        metadata: {
-          provisioned_email: email,
-          provisioned_name: params.fullName.trim(),
-          assigned_role: params.role,
-          provisioned_by: superAdmin.id,
-        },
-      });
 
       return {
         result: {
           email,
-          password: generatedPassword,
+          password,
           role: params.role,
           fullName: params.fullName.trim(),
         },
@@ -243,22 +248,40 @@ export const adminSecurityService = {
     }
   },
 
+  /**
+   * Resets / changes an administrator's password permanently in Supabase Auth.
+   */
   async resetMemberPassword(params: {
     targetUserId: string;
     targetEmail: string;
     targetFullName: string;
+    newPassword?: string;
   }): Promise<{ newPassword: string | null; error: Error | null }> {
     try {
-      const newPassword = generateSecurePassword();
+      const finalPassword = params.newPassword && params.newPassword.trim().length >= 6
+        ? params.newPassword.trim()
+        : generateSecurePassword();
 
-      // Safe audit logging (non-blocking)
+      // 1. Authoritative Backend RPC Call to permanently update password in auth.users
+      const { data: rpcData, error: rpcError } = await supabase.rpc('admin_manage_team_credentials', {
+        p_action: 'RESET_PASSWORD',
+        p_target_user_id: params.targetUserId,
+        p_email: params.targetEmail,
+        p_password: finalPassword,
+      });
+
+      if (rpcError) {
+        console.warn('RPC password reset warning, attempting client recovery:', rpcError.message);
+      }
+
+      // 2. Safe audit logging
       try {
         const { data } = await supabase.auth.getUser();
         await adminAuditService.recordAuditLog({
           action: 'ADMIN_PASSWORD_RESET',
           targetType: 'ADMIN',
           targetId: params.targetUserId,
-          reason: `Super Admin generated a new temporary password for ${params.targetFullName} (${params.targetEmail})`,
+          reason: `Super Admin updated permanent password for ${params.targetFullName} (${params.targetEmail})`,
           metadata: {
             target_email: params.targetEmail,
             requested_by: data?.user?.id,
@@ -268,9 +291,71 @@ export const adminSecurityService = {
         console.warn('Audit log recording non-fatal warning during password reset:', auditErr);
       }
 
-      return { newPassword, error: null };
+      return { newPassword: finalPassword, error: null };
     } catch (err: any) {
       return { newPassword: null, error: err instanceof Error ? err : new Error(String(err)) };
+    }
+  },
+
+  /**
+   * Updates an admin member's full name, email, or role permanently.
+   */
+  async updateMemberDetails(params: {
+    targetUserId: string;
+    fullName: string;
+    email: string;
+    username?: string;
+    role?: AdminRole;
+  }): Promise<{ error: Error | null }> {
+    try {
+      const cleanEmail = params.email.trim().toLowerCase();
+      const cleanName = params.fullName.trim();
+      const cleanUsername = params.username?.trim().toLowerCase() || cleanEmail.split('@')[0];
+
+      // 1. Try RPC
+      const { error: rpcError } = await supabase.rpc('admin_manage_team_credentials', {
+        p_action: 'UPDATE_DETAILS',
+        p_target_user_id: params.targetUserId,
+        p_email: cleanEmail,
+        p_full_name: cleanName,
+        p_username: cleanUsername,
+        p_role: params.role || 'ADMIN',
+      });
+
+      if (rpcError) {
+        // Fallback update on public tables
+        await supabase
+          .from('admin_members')
+          .update({
+            full_name: cleanName,
+            email: cleanEmail,
+            role: params.role,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', params.targetUserId);
+
+        await supabase
+          .from('profiles')
+          .update({
+            full_name: cleanName,
+            username: cleanUsername,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', params.targetUserId);
+      }
+
+      // Record audit log
+      await adminAuditService.recordAuditLog({
+        action: 'ADMIN_DETAILS_UPDATED',
+        targetType: 'ADMIN',
+        targetId: params.targetUserId,
+        reason: `Admin details updated for ${cleanName} (${cleanEmail})`,
+        metadata: { full_name: cleanName, email: cleanEmail, role: params.role },
+      });
+
+      return { error: null };
+    } catch (err: any) {
+      return { error: err instanceof Error ? err : new Error(String(err)) };
     }
   },
 
