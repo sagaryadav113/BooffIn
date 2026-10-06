@@ -29,6 +29,10 @@ import {
   Users,
   CheckCircle2,
   RefreshCw,
+  Sparkles,
+  Smile,
+  Paperclip,
+  Clock,
 } from 'lucide-react-native';
 
 const CHANNELS: { key: AdminChatChannel; label: string; desc: string; icon: string }[] = [
@@ -269,94 +273,147 @@ export const AdminOpsChatView: React.FC = () => {
                 </Text>
               </View>
             ) : (
-              messages.map((msg) => {
+              messages.map((msg, index) => {
                 const isMe = msg.sender_id === userId || msg.sender_email === email;
                 const avatarTheme = getAvatarColor(msg.sender_id || msg.sender_name || 'Admin');
+                const displayName = msg.sender_name || 'Admin';
+                const showDateDivider = index === 0 || index === Math.floor(messages.length / 2);
 
                 return (
-                  <View
-                    key={msg.id}
-                    style={[
-                      styles.messageRow,
-                      isMe ? styles.sentMessageRow : styles.receivedMessageRow,
-                      msg.is_pinned && styles.pinnedMessageRow,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.avatarPill,
-                        {
-                          backgroundColor: avatarTheme.bg,
-                          borderColor: avatarTheme.border,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.avatarPillText, { color: avatarTheme.text }]}>
-                        {(msg.sender_name || 'A').substring(0, 2).toUpperCase()}
-                      </Text>
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      {/* Sender Meta */}
-                      <View style={styles.senderMetaRow}>
-                        <Text style={[styles.senderName, { color: avatarTheme.text }]}>
-                          {msg.sender_name} {isMe ? '(You)' : ''}
+                  <React.Fragment key={msg.id}>
+                    {showDateDivider && (
+                      <View style={styles.dateDividerRow}>
+                        <View style={styles.dateDividerLine} />
+                        <Text style={styles.dateDividerText}>
+                          Today, {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Text>
-                        <AdminBadge
-                          label={msg.sender_role}
-                          variant={msg.sender_role === 'SUPER_ADMIN' ? 'emerald' : 'info'}
-                          size="sm"
-                        />
-                        <Text style={styles.timestampText}>
-                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                        {msg.is_pinned && (
-                          <View style={styles.pinBadge}>
-                            <Pin size={10} color="#B45309" />
-                            <Text style={styles.pinBadgeText}>PINNED</Text>
-                          </View>
-                        )}
+                        <View style={styles.dateDividerLine} />
                       </View>
+                    )}
 
-                      {/* Message Content */}
-                      <Text style={styles.messageText}>{msg.message}</Text>
-                    </View>
+                    {isMe ? (
+                      /* Sent Message (Right Aligned) */
+                      <View style={styles.sentMessageContainer}>
+                        <Text style={styles.senderHeaderRight}>You</Text>
+                        <View style={styles.sentBubbleRow}>
+                          <View style={[styles.sentBubble, msg.is_pinned && styles.pinnedMessageBubble]}>
+                            <Text style={styles.sentMessageText}>{msg.message}</Text>
+                            <Text style={styles.sentTimestamp}>
+                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </View>
 
-                    {/* Pin button */}
-                    <TouchableOpacity
-                      style={styles.pinBtn}
-                      onPress={() => handleTogglePin(msg.id, msg.is_pinned)}
-                    >
-                      <Pin size={12} color={msg.is_pinned ? '#B45309' : '#94A3B8'} />
-                    </TouchableOpacity>
-                  </View>
+                          <View style={styles.avatarWrapper}>
+                            <View
+                              style={[
+                                styles.avatarPill,
+                                { backgroundColor: avatarTheme.bg, borderColor: avatarTheme.border },
+                              ]}
+                            >
+                              <Text style={[styles.avatarPillText, { color: avatarTheme.text }]}>
+                                {displayName.substring(0, 2).toUpperCase()}
+                              </Text>
+                            </View>
+                            <View style={styles.avatarOnlineDot} />
+                          </View>
+                        </View>
+                      </View>
+                    ) : (
+                      /* Received Message (Left Aligned) */
+                      <View style={styles.receivedMessageContainer}>
+                        <Text style={[styles.senderHeaderLeft, { color: avatarTheme.text }]}>
+                          {displayName}
+                        </Text>
+                        <View style={styles.receivedBubbleRow}>
+                          <View style={styles.avatarWrapper}>
+                            <View
+                              style={[
+                                styles.avatarPill,
+                                { backgroundColor: avatarTheme.bg, borderColor: avatarTheme.border },
+                              ]}
+                            >
+                              <Text style={[styles.avatarPillText, { color: avatarTheme.text }]}>
+                                {displayName.substring(0, 2).toUpperCase()}
+                              </Text>
+                            </View>
+                            <View style={styles.avatarOnlineDot} />
+                          </View>
+
+                          <View style={[styles.receivedBubble, msg.is_pinned && styles.pinnedMessageBubble]}>
+                            <Text style={styles.receivedMessageText}>{msg.message}</Text>
+                            <Text style={styles.receivedTimestamp}>
+                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+                  </React.Fragment>
                 );
               })
             )}
           </ScrollView>
 
-          {/* Bottom Message Input Bar */}
-          <View style={styles.inputBarRow}>
-            <TextInput
-              style={styles.chatInput}
-              placeholder={`Message #${activeChannel}... (Press enter to send)`}
-              placeholderTextColor="#94A3B8"
-              value={inputText}
-              onChangeText={setInputText}
-              onSubmitEditing={handleSendMessage}
-              returnKeyType="send"
-            />
-            <TouchableOpacity
-              style={[styles.sendBtn, (!inputText.trim() || sending) && styles.sendBtnDisabled]}
-              onPress={handleSendMessage}
-              disabled={!inputText.trim() || sending}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Send size={15} color="#FFFFFF" />
-              )}
-            </TouchableOpacity>
+          {/* Bottom Floating Message Input Bar (Modern Pill Design) */}
+          <View style={styles.inputContainerOuter}>
+            <View style={styles.inputBarPill}>
+              {/* Magic/AI Purple Square Chip */}
+              <View style={styles.aiBadgeIcon}>
+                <Sparkles size={14} color="#FFFFFF" />
+              </View>
+
+              <TextInput
+                style={styles.chatInputPill}
+                placeholder="Write a message..."
+                placeholderTextColor="#94A3B8"
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={handleSendMessage}
+                returnKeyType="send"
+              />
+
+              {/* Action Icons: Emoji, Attach, Clock, Send */}
+              <View style={styles.inputIconsGroup}>
+                <TouchableOpacity
+                  style={styles.inputIconButton}
+                  onPress={() => setInputText((prev) => prev + ' 😊')}
+                >
+                  <Smile size={18} color="#94A3B8" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.inputIconButton}
+                  onPress={() => alert('Document & attachment upload ready.')}
+                >
+                  <Paperclip size={18} color="#94A3B8" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.inputIconButton}
+                  onPress={() =>
+                    setInputText(
+                      (prev) =>
+                        prev +
+                        ` [${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] `
+                    )
+                  }
+                >
+                  <Clock size={18} color="#94A3B8" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.sendPillBtn, (!inputText.trim() || sending) && styles.sendPillBtnDisabled]}
+                  onPress={handleSendMessage}
+                  disabled={!inputText.trim() || sending}
+                >
+                  {sending ? (
+                    <ActivityIndicator size="small" color="#059669" />
+                  ) : (
+                    <Send size={16} color={inputText.trim() ? '#059669' : '#94A3B8'} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </View>
@@ -554,109 +611,184 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  messageRow: {
+  // Date divider
+  dateDividerRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 14,
     gap: 12,
-    padding: 12,
-    borderRadius: 12,
+  },
+  dateDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dateDividerText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+
+  // Sent message (Right-aligned)
+  sentMessageContainer: {
+    alignSelf: 'flex-end',
+    maxWidth: '75%',
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  senderHeaderRight: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 4,
+    marginRight: 40,
+  },
+  sentBubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  sentBubble: {
+    backgroundColor: 'rgba(6, 78, 59, 0.08)', // Dark green transparent matching app theme
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: 'rgba(5, 150, 105, 0.25)',
+    borderRadius: 16,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  sentMessageRow: {
-    backgroundColor: 'rgba(6, 78, 59, 0.07)', // Dark green transparent matching BooffIn theme
-    borderColor: 'rgba(5, 150, 105, 0.28)',
-    borderRadius: 12,
+  sentMessageText: {
+    fontSize: 13,
+    color: '#0F172A',
+    lineHeight: 19,
   },
-  receivedMessageRow: {
-    backgroundColor: 'rgba(241, 245, 249, 0.8)', // Light grey transparent
-    borderColor: 'rgba(226, 232, 240, 0.95)',
-    borderRadius: 12,
+  sentTimestamp: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 4,
+    alignSelf: 'flex-end',
   },
-  pinnedMessageRow: {
-    backgroundColor: '#FFFBEB',
-    borderLeftWidth: 4,
+
+  // Received message (Left-aligned)
+  receivedMessageContainer: {
+    alignSelf: 'flex-start',
+    maxWidth: '75%',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  senderHeaderLeft: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 4,
+    marginLeft: 40,
+  },
+  receivedBubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  receivedBubble: {
+    backgroundColor: 'rgba(241, 245, 249, 0.85)', // Light grey transparent
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.9)',
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  receivedMessageText: {
+    fontSize: 13,
+    color: '#0F172A',
+    lineHeight: 19,
+  },
+  receivedTimestamp: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+
+  pinnedMessageBubble: {
+    borderLeftWidth: 3,
     borderLeftColor: '#F59E0B',
   },
+
+  // Avatar Wrapper & Online Dot
+  avatarWrapper: {
+    position: 'relative',
+    width: 32,
+    height: 32,
+  },
   avatarPill: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarPillText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  senderMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  senderName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  timestampText: {
     fontSize: 11,
-    color: '#94A3B8',
-    marginLeft: 4,
-  },
-  pinBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  pinBadgeText: {
-    fontSize: 9,
     fontWeight: '800',
-    color: '#92400E',
   },
-  messageText: {
-    fontSize: 13,
-    color: '#1E293B',
-    lineHeight: 19,
+  avatarOnlineDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
-  pinBtn: {
-    padding: 4,
-  },
-  inputBarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    paddingHorizontal: 16,
+
+  // Floating Input Pill Bar
+  inputContainerOuter: {
+    padding: 14,
+    paddingHorizontal: 18,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    backgroundColor: '#F8FAFC',
-  },
-  chatInput: {
-    flex: 1,
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: '#0F172A',
   },
-  sendBtn: {
-    backgroundColor: '#059669',
-    width: 38,
-    height: 38,
+  inputBarPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 10,
+  },
+  aiBadgeIcon: {
+    width: 28,
+    height: 28,
     borderRadius: 8,
+    backgroundColor: '#8B5CF6', // Purple badge from screenshot
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sendBtnDisabled: {
-    backgroundColor: '#94A3B8',
+  chatInputPill: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0F172A',
+    paddingVertical: 4,
+  },
+  inputIconsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  inputIconButton: {
+    padding: 6,
+  },
+  sendPillBtn: {
+    padding: 6,
+  },
+  sendPillBtnDisabled: {
+    opacity: 0.4,
   },
 });
