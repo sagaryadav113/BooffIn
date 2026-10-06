@@ -16,6 +16,7 @@ import {
   Modal,
   useWindowDimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { 
   Mail, 
@@ -27,6 +28,8 @@ import { GoogleIcon } from '../../components/core/GoogleIcon';
 import { useAuthStore } from '../../store/useAuthStore';
 import { isProfileComplete } from '../../api/authService';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../constants/legalPolicies';
+
+const WELCOME_FULL_BG = require('../../../assets/images/welcome-bg.png');
 
 type LandingTab = 'welcome' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
 
@@ -146,14 +149,23 @@ export default function WelcomeScreen() {
         contentContainerStyle={styles.scrollContent} 
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.mainContainer}>
+        {/* ============================================================ */}
+        {/* TAB 1: WELCOME / HOME (IMAGE 1 WITH FULL COVER BACKGROUND) */}
+        {/* ============================================================ */}
+        {activeTab === 'welcome' ? (
+          <View style={styles.welcomeHeroContainer}>
+            {/* Full Screen Background Image */}
+            <Image
+              source={WELCOME_FULL_BG}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              contentPosition="center"
+              priority="high"
+            />
 
-          {/* ============================================================ */}
-          {/* TAB 1: WELCOME / HOME (IMAGE 1) */}
-          {/* ============================================================ */}
-          {activeTab === 'welcome' && (
-            <View style={styles.pageLayout}>
-              <View style={styles.contentBlock}>
+            {/* Left Content Overlay */}
+            <View style={styles.welcomeContentInner}>
+              <View style={styles.welcomeTextCard}>
                 <Text style={styles.heroPreTitle}>Welcome to BooffIn</Text>
                 
                 <View style={styles.brandTitleBlock}>
@@ -186,262 +198,263 @@ export default function WelcomeScreen() {
                 </View>
               </View>
             </View>
-          )}
+          </View>
+        ) : (
+          <View style={styles.mainContainer}>
+            {/* ============================================================ */}
+            {/* TAB 2: ABOUT (IMAGE 2) */}
+            {/* ============================================================ */}
+            {activeTab === 'about' && (
+              <View style={styles.pageLayout}>
+                <View style={styles.contentBlock}>
+                  <Text style={styles.editorialTitle}>About BooffIn</Text>
+                  <Text style={styles.editorialSubtitle}>A space where research finds its people</Text>
 
-          {/* ============================================================ */}
-          {/* TAB 2: ABOUT (IMAGE 2) */}
-          {/* ============================================================ */}
-          {activeTab === 'about' && (
-            <View style={styles.pageLayout}>
-              <View style={styles.contentBlock}>
-                <Text style={styles.editorialTitle}>About BooffIn</Text>
-                <Text style={styles.editorialSubtitle}>A space where research finds its people</Text>
+                  <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionHeading}>Our Mission</Text>
+                    <Text style={styles.bodyParagraph}>
+                      BooffIn was created to bridge the gap between curiosity and collaboration. We believe that groundbreaking research shouldn't exist in a vacuum, but rather thrive through connection.
+                    </Text>
+                    <Text style={[styles.bodyParagraph, { marginTop: 10 }]}>
+                      Our platform enables student researchers, academics, and science enthusiasts to share insights, engage in meaningful discussions, and push the boundaries of collective knowledge.
+                    </Text>
+                  </View>
 
-                <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionHeading}>Our Mission</Text>
-                  <Text style={styles.bodyParagraph}>
-                    BooffIn was created to bridge the gap between curiosity and collaboration. We believe that groundbreaking research shouldn't exist in a vacuum, but rather thrive through connection.
-                  </Text>
-                  <Text style={[styles.bodyParagraph, { marginTop: 10 }]}>
-                    Our platform enables student researchers, academics, and science enthusiasts to share insights, engage in meaningful discussions, and push the boundaries of collective knowledge.
-                  </Text>
-                </View>
+                  <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionHeading}>What We Do</Text>
+                    <View style={styles.bulletList}>
+                      <Text style={styles.bulletItem}>• Connect researchers globally</Text>
+                      <Text style={styles.bulletItem}>• Facilitate interdisciplinary discussions</Text>
+                      <Text style={styles.bulletItem}>• Make scientific insight accessible to everyone</Text>
+                    </View>
+                  </View>
 
-                <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionHeading}>What We Do</Text>
-                  <View style={styles.bulletList}>
-                    <Text style={styles.bulletItem}>• Connect researchers globally</Text>
-                    <Text style={styles.bulletItem}>• Facilitate interdisciplinary discussions</Text>
-                    <Text style={styles.bulletItem}>• Make scientific insight accessible to everyone</Text>
+                  {/* Footer */}
+                  <View style={styles.inlineFooter}>
+                    <TouchableOpacity onPress={() => setActiveTab('privacy')}>
+                      <Text style={styles.footerLink}>Privacy Policy</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setActiveTab('terms')}>
+                      <Text style={styles.footerLink}>Terms of Service</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
+              </View>
+            )}
 
-                {/* Footer */}
-                <View style={styles.inlineFooter}>
-                  <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                    <Text style={styles.footerLink}>Privacy Policy</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                    <Text style={styles.footerLink}>Terms of Service</Text>
-                  </TouchableOpacity>
+            {/* ============================================================ */}
+            {/* TAB 3: FEATURES (IMAGE 3) */}
+            {/* ============================================================ */}
+            {activeTab === 'features' && (
+              <View style={styles.pageLayout}>
+                <View style={styles.contentBlock}>
+                  <Text style={styles.editorialTitle}>What You Can Do on BooffIn</Text>
+                  <Text style={styles.editorialSubtitle}>
+                    Explore the features that connect researchers with people and ideas
+                  </Text>
+
+                  {/* 2x2 Feature Grid */}
+                  <View style={styles.featureGrid}>
+                    <View style={styles.featureGridItem}>
+                      <Text style={styles.featureTitle}>Engage in Discussions</Text>
+                      <Text style={styles.featureDesc}>
+                        Share insights, ask questions, and engage with a global community on biology, AI, and neuroscience.
+                      </Text>
+                    </View>
+
+                    <View style={styles.featureGridItem}>
+                      <Text style={styles.featureTitle}>Discover Content</Text>
+                      <Text style={styles.featureDesc}>
+                        Find articles, post updates, and follow topics like DeepMind's AlphaFold.
+                      </Text>
+                    </View>
+
+                    <View style={styles.featureGridItem}>
+                      <Text style={styles.featureTitle}>Find Your People</Text>
+                      <Text style={styles.featureDesc}>
+                        Build networks with student researchers, academics, and global science enthusiasts.
+                      </Text>
+                    </View>
+
+                    <View style={styles.featureGridItem}>
+                      <Text style={styles.featureTitle}>Filing & Storage</Text>
+                      <Text style={styles.featureDesc}>
+                        Keep track of your research, find academic papers, and organize your bibliography.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Actions */}
+                  <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
+                    <TouchableOpacity 
+                      style={styles.primaryCtaBtn} 
+                      onPress={handleOpenAuthModal}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.primaryCtaBtnText}>Explore All Features</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={styles.secondaryLinkBtn} 
+                      onPress={handleOpenAuthModal}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.secondaryLinkText}>Start For Free</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Footer */}
+                  <View style={styles.inlineFooter}>
+                    <TouchableOpacity onPress={() => setActiveTab('privacy')}>
+                      <Text style={styles.footerLink}>Privacy Policy</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setActiveTab('terms')}>
+                      <Text style={styles.footerLink}>Terms of Service</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            )}
 
-          {/* ============================================================ */}
-          {/* TAB 3: FEATURES (IMAGE 3) */}
-          {/* ============================================================ */}
-          {activeTab === 'features' && (
-            <View style={styles.pageLayout}>
-              <View style={styles.contentBlock}>
-                <Text style={styles.editorialTitle}>What You Can Do on BooffIn</Text>
-                <Text style={styles.editorialSubtitle}>
-                  Explore the features that connect researchers with people and ideas
+            {/* ============================================================ */}
+            {/* TAB 4: COMMUNITY (IMAGE 4) */}
+            {/* ============================================================ */}
+            {activeTab === 'community' && (
+              <View style={styles.pageLayout}>
+                <View style={styles.contentBlock}>
+                  <Text style={styles.editorialTitle}>Meet the BooffIn Community</Text>
+                  <Text style={styles.editorialSubtitle}>
+                    Where curious minds, researchers, and creators come together to share the shape of life
+                  </Text>
+
+                  <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionHeading}>A Global Network</Text>
+                    <Text style={styles.bodyParagraph}>
+                      BooffIn is home to thousands of student researchers, PhD candidates, and science enthusiasts who are passionate about sharing knowledge. From late-night breakthrough discussions to collaborative reviews, find your place in a thriving network designed for curious minds.
+                    </Text>
+                  </View>
+
+                  <View style={styles.sectionBlock}>
+                    <Text style={styles.sectionHeading}>How to Participate</Text>
+                    <View style={styles.bulletList}>
+                      <Text style={styles.bulletItem}>• Join dedicated interest groups (e.g., AI in Science, Neuroscience)</Text>
+                      <Text style={styles.bulletItem}>• Participate in live discussions & Q&As</Text>
+                      <Text style={styles.bulletItem}>• Share your latest research & insights with peers</Text>
+                    </View>
+                  </View>
+
+                  <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
+                    <TouchableOpacity 
+                      style={styles.primaryCtaBtn} 
+                      onPress={handleOpenAuthModal}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.primaryCtaBtnText}>Join the Community</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={styles.secondaryLinkBtn} 
+                      onPress={handleOpenAuthModal}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.secondaryLinkText}>Browse Groups</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Footer */}
+                  <View style={styles.inlineFooter}>
+                    <TouchableOpacity onPress={() => setActiveTab('privacy')}>
+                      <Text style={styles.footerLink}>Privacy Policy</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setActiveTab('terms')}>
+                      <Text style={styles.footerLink}>Terms of Service</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* ============================================================ */}
+            {/* TAB 5: IN-PAGE EMBEDDED PRIVACY POLICY */}
+            {/* ============================================================ */}
+            {activeTab === 'privacy' && (
+              <View style={styles.embeddedLegalContainer}>
+                <TouchableOpacity 
+                  style={styles.backToHomeBtn} 
+                  onPress={() => setActiveTab('welcome')}
+                  activeOpacity={0.7}
+                >
+                  <ArrowLeft size={16} color="#047857" />
+                  <Text style={styles.backToHomeText}>Back to Welcome</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.legalTitle}>{PRIVACY_POLICY.title}</Text>
+                <Text style={styles.legalMeta}>
+                  Effective Date: {PRIVACY_POLICY.effectiveDate} · Version {PRIVACY_POLICY.version}
                 </Text>
+                <Text style={styles.legalSummary}>{PRIVACY_POLICY.summary}</Text>
 
-                {/* 2x2 Feature Grid */}
-                <View style={styles.featureGrid}>
-                  <View style={styles.featureGridItem}>
-                    <Text style={styles.featureTitle}>Engage in Discussions</Text>
-                    <Text style={styles.featureDesc}>
-                      Share insights, ask questions, and engage with a global community on biology, AI, and neuroscience.
-                    </Text>
+                {PRIVACY_POLICY.sections.map((sec, idx) => (
+                  <View key={idx} style={styles.legalSection}>
+                    <Text style={styles.legalSectionTitle}>{sec.title}</Text>
+                    {sec.content.map((p, pIdx) => (
+                      <Text key={pIdx} style={styles.legalSectionText}>{p}</Text>
+                    ))}
                   </View>
+                ))}
 
-                  <View style={styles.featureGridItem}>
-                    <Text style={styles.featureTitle}>Discover Content</Text>
-                    <Text style={styles.featureDesc}>
-                      Find articles, post updates, and follow topics like DeepMind's AlphaFold.
-                    </Text>
-                  </View>
-
-                  <View style={styles.featureGridItem}>
-                    <Text style={styles.featureTitle}>Find Your People</Text>
-                    <Text style={styles.featureDesc}>
-                      Build networks with student researchers, academics, and global science enthusiasts.
-                    </Text>
-                  </View>
-
-                  <View style={styles.featureGridItem}>
-                    <Text style={styles.featureTitle}>Filing & Storage</Text>
-                    <Text style={styles.featureDesc}>
-                      Keep track of your research, find academic papers, and organize your bibliography.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Actions */}
-                <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
-                  <TouchableOpacity 
-                    style={styles.primaryCtaBtn} 
-                    onPress={handleOpenAuthModal}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.primaryCtaBtnText}>Explore All Features</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.secondaryLinkBtn} 
-                    onPress={handleOpenAuthModal}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.secondaryLinkText}>Start For Free</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Footer */}
                 <View style={styles.inlineFooter}>
-                  <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                    <Text style={styles.footerLink}>Privacy Policy</Text>
-                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                    <Text style={styles.footerLink}>Terms of Service</Text>
+                    <Text style={styles.footerLink}>Switch to Terms of Service</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setActiveTab('welcome')}>
+                    <Text style={styles.footerLink}>Back to Home</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
-          )}
+            )}
 
-          {/* ============================================================ */}
-          {/* TAB 4: COMMUNITY (IMAGE 4) */}
-          {/* ============================================================ */}
-          {activeTab === 'community' && (
-            <View style={styles.pageLayout}>
-              <View style={styles.contentBlock}>
-                <Text style={styles.editorialTitle}>Meet the BooffIn Community</Text>
-                <Text style={styles.editorialSubtitle}>
-                  Where curious minds, researchers, and creators come together to share the shape of life
+            {/* ============================================================ */}
+            {/* TAB 6: IN-PAGE EMBEDDED TERMS OF SERVICE */}
+            {/* ============================================================ */}
+            {activeTab === 'terms' && (
+              <View style={styles.embeddedLegalContainer}>
+                <TouchableOpacity 
+                  style={styles.backToHomeBtn} 
+                  onPress={() => setActiveTab('welcome')}
+                  activeOpacity={0.7}
+                >
+                  <ArrowLeft size={16} color="#047857" />
+                  <Text style={styles.backToHomeText}>Back to Welcome</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.legalTitle}>{TERMS_OF_SERVICE.title}</Text>
+                <Text style={styles.legalMeta}>
+                  Effective Date: {TERMS_OF_SERVICE.effectiveDate} · Version {TERMS_OF_SERVICE.version}
                 </Text>
+                <Text style={styles.legalSummary}>{TERMS_OF_SERVICE.summary}</Text>
 
-                <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionHeading}>A Global Network</Text>
-                  <Text style={styles.bodyParagraph}>
-                    BooffIn is home to thousands of student researchers, PhD candidates, and science enthusiasts who are passionate about sharing knowledge. From late-night breakthrough discussions to collaborative reviews, find your place in a thriving network designed for curious minds.
-                  </Text>
-                </View>
-
-                <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionHeading}>How to Participate</Text>
-                  <View style={styles.bulletList}>
-                    <Text style={styles.bulletItem}>• Join dedicated interest groups (e.g., AI in Science, Neuroscience)</Text>
-                    <Text style={styles.bulletItem}>• Participate in live discussions & Q&As</Text>
-                    <Text style={styles.bulletItem}>• Share your latest research & insights with peers</Text>
+                {TERMS_OF_SERVICE.sections.map((sec, idx) => (
+                  <View key={idx} style={styles.legalSection}>
+                    <Text style={styles.legalSectionTitle}>{sec.title}</Text>
+                    {sec.content.map((p, pIdx) => (
+                      <Text key={pIdx} style={styles.legalSectionText}>{p}</Text>
+                    ))}
                   </View>
-                </View>
+                ))}
 
-                <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
-                  <TouchableOpacity 
-                    style={styles.primaryCtaBtn} 
-                    onPress={handleOpenAuthModal}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.primaryCtaBtnText}>Join the Community</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.secondaryLinkBtn} 
-                    onPress={handleOpenAuthModal}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.secondaryLinkText}>Browse Groups</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Footer */}
                 <View style={styles.inlineFooter}>
                   <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                    <Text style={styles.footerLink}>Privacy Policy</Text>
+                    <Text style={styles.footerLink}>Switch to Privacy Policy</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                    <Text style={styles.footerLink}>Terms of Service</Text>
+                  <TouchableOpacity onPress={() => setActiveTab('welcome')}>
+                    <Text style={styles.footerLink}>Back to Home</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
-          )}
-
-          {/* ============================================================ */}
-          {/* TAB 5: IN-PAGE EMBEDDED PRIVACY POLICY */}
-          {/* ============================================================ */}
-          {activeTab === 'privacy' && (
-            <View style={styles.embeddedLegalContainer}>
-              <TouchableOpacity 
-                style={styles.backToHomeBtn} 
-                onPress={() => setActiveTab('welcome')}
-                activeOpacity={0.7}
-              >
-                <ArrowLeft size={16} color="#047857" />
-                <Text style={styles.backToHomeText}>Back to Welcome</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.legalTitle}>{PRIVACY_POLICY.title}</Text>
-              <Text style={styles.legalMeta}>
-                Effective Date: {PRIVACY_POLICY.effectiveDate} · Version {PRIVACY_POLICY.version}
-              </Text>
-              <Text style={styles.legalSummary}>{PRIVACY_POLICY.summary}</Text>
-
-              {PRIVACY_POLICY.sections.map((sec, idx) => (
-                <View key={idx} style={styles.legalSection}>
-                  <Text style={styles.legalSectionTitle}>{sec.title}</Text>
-                  {sec.content.map((p, pIdx) => (
-                    <Text key={pIdx} style={styles.legalSectionText}>{p}</Text>
-                  ))}
-                </View>
-              ))}
-
-              <View style={styles.inlineFooter}>
-                <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                  <Text style={styles.footerLink}>Switch to Terms of Service</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setActiveTab('welcome')}>
-                  <Text style={styles.footerLink}>Back to Home</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* ============================================================ */}
-          {/* TAB 6: IN-PAGE EMBEDDED TERMS OF SERVICE */}
-          {/* ============================================================ */}
-          {activeTab === 'terms' && (
-            <View style={styles.embeddedLegalContainer}>
-              <TouchableOpacity 
-                style={styles.backToHomeBtn} 
-                onPress={() => setActiveTab('welcome')}
-                activeOpacity={0.7}
-              >
-                <ArrowLeft size={16} color="#047857" />
-                <Text style={styles.backToHomeText}>Back to Welcome</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.legalTitle}>{TERMS_OF_SERVICE.title}</Text>
-              <Text style={styles.legalMeta}>
-                Effective Date: {TERMS_OF_SERVICE.effectiveDate} · Version {TERMS_OF_SERVICE.version}
-              </Text>
-              <Text style={styles.legalSummary}>{TERMS_OF_SERVICE.summary}</Text>
-
-              {TERMS_OF_SERVICE.sections.map((sec, idx) => (
-                <View key={idx} style={styles.legalSection}>
-                  <Text style={styles.legalSectionTitle}>{sec.title}</Text>
-                  {sec.content.map((p, pIdx) => (
-                    <Text key={pIdx} style={styles.legalSectionText}>{p}</Text>
-                  ))}
-                </View>
-              ))}
-
-              <View style={styles.inlineFooter}>
-                <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                  <Text style={styles.footerLink}>Switch to Privacy Policy</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setActiveTab('welcome')}>
-                  <Text style={styles.footerLink}>Back to Home</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-        </View>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* ============================================================ */}
@@ -573,6 +586,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#EBEFED',
     paddingHorizontal: 32,
     paddingVertical: 16,
+    zIndex: 10,
   },
   headerInner: {
     maxWidth: 1280,
@@ -628,6 +642,26 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
+  welcomeHeroContainer: {
+    width: '100%',
+    minHeight: 640,
+    position: 'relative',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  welcomeContentInner: {
+    maxWidth: 1280,
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: 36,
+    paddingVertical: 48,
+    position: 'relative',
+    zIndex: 2,
+  },
+  welcomeTextCard: {
+    maxWidth: 580,
+    width: '100%',
+  },
   mainContainer: {
     maxWidth: 1280,
     width: '100%',
@@ -682,7 +716,7 @@ const styles = StyleSheet.create({
     color: '#475569',
     lineHeight: 25,
     marginBottom: 28,
-    maxWidth: 620,
+    maxWidth: 520,
   },
   heroActionsRow: {
     flexDirection: 'row',
