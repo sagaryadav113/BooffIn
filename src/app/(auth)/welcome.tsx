@@ -581,12 +581,15 @@ const styles = StyleSheet.create({
   },
   // Header
   headerContainer: {
-    backgroundColor: '#FAFBF9',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EBEFED',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 0,
     paddingHorizontal: 32,
-    paddingVertical: 16,
-    zIndex: 10,
+    paddingVertical: 20,
+    zIndex: 20,
   },
   headerInner: {
     maxWidth: 1280,
@@ -644,7 +647,8 @@ const styles = StyleSheet.create({
   },
   welcomeHeroContainer: {
     width: '100%',
-    minHeight: 640,
+    minHeight: '100vh' as any,
+    height: Platform.OS === 'web' ? ('100vh' as any) : undefined,
     position: 'relative',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -655,6 +659,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 36,
     paddingVertical: 48,
+    paddingTop: 80,
     position: 'relative',
     zIndex: 2,
   },
@@ -668,6 +673,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 32,
     paddingVertical: 48,
+    paddingTop: 100,
   },
   pageLayout: {
     width: '100%',
