@@ -38,6 +38,31 @@ const CHANNELS: { key: AdminChatChannel; label: string; desc: string; icon: stri
   { key: 'announcements', label: 'announcements', desc: 'Company updates & policy changes', icon: 'Radio' },
 ];
 
+// WhatsApp-style distinct avatar color themes for team members
+const AVATAR_PALETTES = [
+  { bg: '#EDE9FE', text: '#6D28D9', border: '#C4B5FD' }, // Violet
+  { bg: '#E0F2FE', text: '#0369A1', border: '#7DD3FC' }, // Sky Blue
+  { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A' }, // Amber / Gold
+  { bg: '#FCE7F3', text: '#BE185D', border: '#F472B6' }, // Pink / Rose
+  { bg: '#CCFBF1', text: '#0F766E', border: '#99F6E4' }, // Teal
+  { bg: '#FFEDD5', text: '#C2410C', border: '#FDBA74' }, // Orange
+  { bg: '#E0E7FF', text: '#4338CA', border: '#C7D2FE' }, // Indigo
+  { bg: '#DCFCE7', text: '#15803D', border: '#86EFAC' }, // Emerald
+  { bg: '#FAE8FF', text: '#A21CAF', border: '#F0ABFC' }, // Fuchsia
+  { bg: '#FEE2E2', text: '#B91C1C', border: '#FCA5A5' }, // Crimson
+  { bg: '#F1F5F9', text: '#334155', border: '#CBD5E1' }, // Slate
+];
+
+export const getAvatarColor = (identifier: string) => {
+  if (!identifier) return AVATAR_PALETTES[0];
+  let hash = 0;
+  for (let i = 0; i < identifier.length; i++) {
+    hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_PALETTES.length;
+  return AVATAR_PALETTES[index];
+};
+
 export const AdminOpsChatView: React.FC = () => {
   const { userId, email } = useAdminAuth();
   const [activeChannel, setActiveChannel] = useState<AdminChatChannel>('general-ops');
@@ -174,15 +199,35 @@ export const AdminOpsChatView: React.FC = () => {
           {/* Team Roster Summary */}
           <Text style={styles.columnHeader}>ONLINE ADMINS ({teamMembers.length})</Text>
           <ScrollView style={styles.rosterList}>
-            {teamMembers.map((m) => (
-              <View key={m.user_id} style={styles.rosterItem}>
-                <View style={styles.onlineDot} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rosterName} numberOfLines={1}>{m.full_name || m.email?.split('@')[0]}</Text>
-                  <Text style={styles.rosterRole}>{m.role}</Text>
+            {teamMembers.map((m) => {
+              const rosterColor = getAvatarColor(m.user_id || m.full_name || m.email);
+              const displayName = m.full_name || m.email?.split('@')[0] || 'Admin';
+
+              return (
+                <View key={m.user_id} style={styles.rosterItem}>
+                  <View
+                    style={[
+                      styles.rosterAvatar,
+                      {
+                        backgroundColor: rosterColor.bg,
+                        borderColor: rosterColor.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.rosterAvatarText, { color: rosterColor.text }]}>
+                      {displayName.substring(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.rosterName, { color: rosterColor.text }]} numberOfLines={1}>
+                      {displayName}
+                    </Text>
+                    <Text style={styles.rosterRole}>{m.role}</Text>
+                  </View>
+                  <View style={styles.onlineDot} />
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -226,14 +271,27 @@ export const AdminOpsChatView: React.FC = () => {
             ) : (
               messages.map((msg) => {
                 const isMe = msg.sender_id === userId || msg.sender_email === email;
+                const avatarTheme = getAvatarColor(msg.sender_id || msg.sender_name || 'Admin');
 
                 return (
                   <View
                     key={msg.id}
-                    style={[styles.messageRow, msg.is_pinned && styles.pinnedMessageRow]}
+                    style={[
+                      styles.messageRow,
+                      isMe ? styles.sentMessageRow : styles.receivedMessageRow,
+                      msg.is_pinned && styles.pinnedMessageRow,
+                    ]}
                   >
-                    <View style={styles.avatarPill}>
-                      <Text style={styles.avatarPillText}>
+                    <View
+                      style={[
+                        styles.avatarPill,
+                        {
+                          backgroundColor: avatarTheme.bg,
+                          borderColor: avatarTheme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.avatarPillText, { color: avatarTheme.text }]}>
                         {(msg.sender_name || 'A').substring(0, 2).toUpperCase()}
                       </Text>
                     </View>
@@ -241,7 +299,9 @@ export const AdminOpsChatView: React.FC = () => {
                     <View style={{ flex: 1 }}>
                       {/* Sender Meta */}
                       <View style={styles.senderMetaRow}>
-                        <Text style={styles.senderName}>{msg.sender_name}</Text>
+                        <Text style={[styles.senderName, { color: avatarTheme.text }]}>
+                          {msg.sender_name} {isMe ? '(You)' : ''}
+                        </Text>
                         <AdminBadge
                           label={msg.sender_role}
                           variant={msg.sender_role === 'SUPER_ADMIN' ? 'emerald' : 'info'}
@@ -401,6 +461,18 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 6,
   },
+  rosterAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rosterAvatarText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
   onlineDot: {
     width: 8,
     height: 8,
@@ -484,27 +556,38 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: 'row',
-    gap: 10,
-    padding: 8,
-    borderRadius: 8,
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  sentMessageRow: {
+    backgroundColor: 'rgba(6, 78, 59, 0.07)', // Dark green transparent matching BooffIn theme
+    borderColor: 'rgba(5, 150, 105, 0.28)',
+    borderRadius: 12,
+  },
+  receivedMessageRow: {
+    backgroundColor: 'rgba(241, 245, 249, 0.8)', // Light grey transparent
+    borderColor: 'rgba(226, 232, 240, 0.95)',
+    borderRadius: 12,
   },
   pinnedMessageRow: {
     backgroundColor: '#FFFBEB',
-    borderLeftWidth: 3,
+    borderLeftWidth: 4,
     borderLeftColor: '#F59E0B',
   },
   avatarPill: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E2E8F0',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#334155',
+    fontSize: 12,
+    fontWeight: '800',
   },
   senderMetaRow: {
     flexDirection: 'row',
