@@ -2,7 +2,7 @@
 // BOOFFIN ADMIN PORTAL — REAL TOTP MFA ENROLLMENT & CHALLENGE VIEW (STAGE 3A)
 // ============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,12 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { ADMIN_COLORS } from '../lib/constants';
 import { adminMfaService, TotpFactorEnrollmentResponse, MfaFactorSummary } from '../services/adminMfaService';
+import { ShieldCheck, Key, Lock, LogOut, RefreshCw, AlertCircle } from 'lucide-react-native';
 
 interface AdminMfaViewProps {
   onVerified: () => void;
@@ -28,6 +30,9 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
   onCancel,
   hasEnrolledFactor = false,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [mode, setMode] = useState<'CHALLENGE' | 'ENROLL'>(hasEnrolledFactor ? 'CHALLENGE' : 'ENROLL');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -82,6 +87,28 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
       setEnrollmentData(null);
     };
   }, []);
+
+  // Clean raw SVG from Supabase data URI
+  const cleanSvgXml = useMemo(() => {
+    if (!enrollmentData?.totp?.qr_code) return '';
+    let raw = enrollmentData.totp.qr_code.trim();
+    
+    // Strip data URI prefixes like data:image/svg+xml;utf-8, or data:image/svg+xml,
+    if (raw.startsWith('data:image/svg+xml')) {
+      const commaIdx = raw.indexOf(',');
+      if (commaIdx !== -1) {
+        raw = raw.substring(commaIdx + 1);
+      }
+    }
+    
+    try {
+      raw = decodeURIComponent(raw);
+    } catch {
+      // already decoded
+    }
+
+    return raw.trim();
+  }, [enrollmentData]);
 
   // 2. Handle TOTP Verification (Challenge or Enrollment Verification)
   const handleVerify = async () => {
@@ -139,9 +166,10 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
 
   return (
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.card}>
+      <View style={[styles.card, isMobile && styles.cardMobile]}>
+        {/* Top Header Badge */}
         <View style={styles.iconBadge}>
-          <Text style={styles.iconText}>🔐</Text>
+          <ShieldCheck size={24} color="#047857" />
         </View>
 
         <Text style={styles.title}>
@@ -149,12 +177,13 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
         </Text>
         <Text style={styles.subtitle}>
           {mode === 'CHALLENGE'
-            ? 'Enter the 6-digit security code from your registered authenticator app to upgrade to an AAL2 session.'
-            : 'Scan the QR code below using Google Authenticator, 1Password, or Authy, then enter the generated 6-digit code.'}
+            ? 'Enter the 6-digit security code from Google Authenticator to verify your administrator session.'
+            : 'Scan the QR code below using Google Authenticator or Authy, then enter the 6-digit code.'}
         </Text>
 
         {error ? (
           <View style={styles.errorBox}>
+            <AlertCircle size={14} color="#B91C1C" />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
@@ -162,23 +191,36 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
         {/* Enrollment QR Code Display */}
         {mode === 'ENROLL' && enrollmentData ? (
           <View style={styles.qrContainer}>
-            {enrollmentData.totp?.qr_code ? (
+            {cleanSvgXml ? (
               <View style={styles.qrWrapper}>
                 {Platform.OS === 'web' ? (
                   <div
-                    dangerouslySetInnerHTML={{ __html: enrollmentData.totp.qr_code }}
-                    style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+                    dangerouslySetInnerHTML={{ __html: cleanSvgXml }}
+                    style={{ 
+                      width: 180, 
+                      height: 180, 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center',
+                      overflow: 'hidden'
+                    }}
                   />
                 ) : (
-                  <SvgXml xml={enrollmentData.totp.qr_code} width={180} height={180} />
+                  <SvgXml xml={cleanSvgXml} width={180} height={180} />
                 )}
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.qrLoadingBox}>
+                <ActivityIndicator size="small" color="#047857" />
+                <Text style={styles.qrLoadingText}>Generating QR Code...</Text>
+              </View>
+            )}
 
             {/* Manual Secret Fallback */}
             <TouchableOpacity
               style={styles.toggleSecretBtn}
               onPress={() => setShowManualSecret(!showManualSecret)}
+              activeOpacity={0.7}
             >
               <Text style={styles.toggleSecretText}>
                 {showManualSecret ? 'Hide Manual Setup Key' : 'Show Manual Setup Key'}
@@ -192,7 +234,7 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
                   {enrollmentData.totp.secret}
                 </Text>
                 <Text style={styles.secretWarn}>
-                  ⚠️ Keep this secret confidential. Do not share or log it.
+                  Keep this secret confidential. Enter it manually if unable to scan the QR code.
                 </Text>
               </View>
             ) : null}
@@ -204,7 +246,7 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
           <Text style={styles.inputLabel}>6-Digit Security Code</Text>
           <TextInput
             style={styles.otpInput}
-            placeholder="000000"
+            placeholder="000 000"
             placeholderTextColor={ADMIN_COLORS.textMuted}
             value={code}
             onChangeText={(t) => {
@@ -221,6 +263,7 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
             style={[styles.verifyBtn, loading && styles.verifyBtnDisabled]}
             onPress={handleVerify}
             disabled={loading}
+            activeOpacity={0.75}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -236,12 +279,15 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
               style={styles.switchModeBtn}
               onPress={handleRestartEnrollment}
               disabled={loading}
+              activeOpacity={0.7}
             >
+              <RefreshCw size={12} color="#047857" style={{ marginRight: 4 }} />
               <Text style={styles.switchModeText}>Register a New Authenticator Device</Text>
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} disabled={loading}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} disabled={loading} activeOpacity={0.7}>
+            <LogOut size={12} color={ADMIN_COLORS.textMuted} style={{ marginRight: 4 }} />
             <Text style={styles.cancelBtnText}>Sign Out of Admin Console</Text>
           </TouchableOpacity>
         </View>
@@ -259,109 +305,138 @@ export const AdminMfaView: React.FC<AdminMfaViewProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: ADMIN_COLORS.bgPrimary,
+    backgroundColor: ADMIN_COLORS.bgCanvas,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 16,
   },
   card: {
     width: '100%',
-    maxWidth: 460,
-    backgroundColor: ADMIN_COLORS.bgCard,
+    maxWidth: 440,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.borderSubtle,
-    borderRadius: 16,
-    padding: 36,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: 12,
+    padding: 28,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+  },
+  cardMobile: {
+    padding: 20,
+    borderRadius: 8,
   },
   iconBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: ADMIN_COLORS.emeraldBg,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-  },
-  iconText: {
-    fontSize: 24,
+    marginBottom: 14,
   },
   title: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '700',
     color: ADMIN_COLORS.textPrimary,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: ADMIN_COLORS.textSecondary,
     textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: 22,
+    lineHeight: 18,
+    marginBottom: 18,
+    paddingHorizontal: 8,
   },
   errorBox: {
-    backgroundColor: ADMIN_COLORS.dangerBg,
-    borderColor: ADMIN_COLORS.dangerBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
     borderWidth: 1,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginBottom: 14,
     width: '100%',
   },
   errorText: {
-    color: ADMIN_COLORS.danger,
-    fontSize: 13,
-    textAlign: 'center',
+    color: '#B91C1C',
+    fontSize: 12,
+    flex: 1,
   },
   qrContainer: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 18,
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   qrWrapper: {
-    padding: 16,
+    width: 206,
+    height: 206,
+    padding: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.borderSubtle,
-    borderRadius: 12,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-  },
-  toggleSecretBtn: {
-    paddingVertical: 6,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    overflow: 'hidden',
     marginBottom: 10,
   },
+  qrLoadingBox: {
+    width: 206,
+    height: 206,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  qrLoadingText: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  toggleSecretBtn: {
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
   toggleSecretText: {
-    color: ADMIN_COLORS.actionBlue,
-    fontSize: 13,
+    color: '#047857',
+    fontSize: 12,
     fontWeight: '600',
   },
   secretBox: {
     width: '100%',
-    backgroundColor: ADMIN_COLORS.bgPrimary,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: ADMIN_COLORS.borderSubtle,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 14,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 10,
+    alignItems: 'center',
   },
   secretLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: ADMIN_COLORS.textMuted,
     textTransform: 'uppercase',
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 4,
   },
   secretText: {
-    fontSize: 14,
+    fontSize: 13,
     color: ADMIN_COLORS.textPrimary,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontWeight: '700',
@@ -370,8 +445,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   secretWarn: {
-    fontSize: 11,
-    color: ADMIN_COLORS.warning,
+    fontSize: 10.5,
+    color: '#B45309',
     textAlign: 'center',
   },
   form: {
@@ -379,69 +454,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inputLabel: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
     color: ADMIN_COLORS.textSecondary,
-    marginBottom: 8,
-    alignSelf: 'flex-start',
+    marginBottom: 6,
+    alignSelf: 'center',
   },
   otpInput: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: ADMIN_COLORS.borderStrong,
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: 8,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     color: ADMIN_COLORS.textPrimary,
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '700',
-    letterSpacing: 8,
+    letterSpacing: 6,
     textAlign: 'center',
     width: '100%',
-    marginBottom: 18,
+    maxWidth: 260,
+    marginBottom: 14,
+    fontFamily: 'monospace',
   },
   verifyBtn: {
-    backgroundColor: ADMIN_COLORS.emeraldPrimary,
-    paddingVertical: 13,
-    borderRadius: 8,
+    backgroundColor: '#047857',
+    paddingVertical: 11,
+    borderRadius: 6,
     alignItems: 'center',
     width: '100%',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   verifyBtnDisabled: {
     opacity: 0.6,
   },
   verifyBtnText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   switchModeBtn: {
-    paddingVertical: 8,
-    marginBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    marginBottom: 4,
   },
   switchModeText: {
-    color: ADMIN_COLORS.actionBlue,
-    fontSize: 13,
-    fontWeight: '500',
+    color: '#047857',
+    fontSize: 12,
+    fontWeight: '600',
   },
   cancelBtn: {
-    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
   },
   cancelBtnText: {
     color: ADMIN_COLORS.textMuted,
-    fontSize: 12,
+    fontSize: 11.5,
   },
   footer: {
-    marginTop: 24,
+    marginTop: 18,
     borderTopWidth: 1,
-    borderTopColor: ADMIN_COLORS.borderSubtle,
-    paddingTop: 16,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 12,
     width: '100%',
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 12,
+    fontSize: 10.5,
     color: ADMIN_COLORS.textMuted,
   },
 });
