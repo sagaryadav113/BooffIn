@@ -1,3 +1,7 @@
+// ============================================================================
+// BOOFFIN ADMIN PORTAL — RESEARCHER SUPPORT DESK & TICKETS
+// ============================================================================
+
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -8,10 +12,9 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Modal,
-  Linking,
   useWindowDimensions,
 } from 'react-native';
-import { ADMIN_COLORS } from '../lib/constants';
+import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminSupportService } from '../services/adminSupportService';
@@ -23,14 +26,11 @@ import {
   RefreshCw,
   Eye,
   CheckCircle2,
-  Clock,
   AlertTriangle,
   Mail,
   UserCheck,
-  Filter,
-  FileText,
   Send,
-  ExternalLink,
+  X
 } from 'lucide-react-native';
 
 export const AdminSupportView: React.FC = () => {
@@ -100,136 +100,100 @@ export const AdminSupportView: React.FC = () => {
     setActionSuccessMessage(null);
     setErrorMessage(null);
 
-    const assignedMember = teamMembers.find((m) => m.user_id === selectedAssignee);
-    const assignedName = assignedMember?.fullName || assignedMember?.full_name || (selectedAssignee ? 'Co-Admin' : null);
-
     const res = await adminSupportService.updateTicket({
       ticketId: selectedTicket.id,
       status: newStatus || selectedTicket.status,
-      assignedTo: selectedAssignee || null,
-      assignedName: assignedName,
+      assignedTo: selectedAssignee || undefined,
       resolutionNotes: resolutionNotes.trim() || undefined,
     });
 
     setUpdating(false);
 
     if (res.error) {
-      setErrorMessage(`Update Failed: ${res.error.message}`);
+      setErrorMessage(`Update failed: ${res.error.message}`);
     } else {
-      setActionSuccessMessage(`Ticket ${selectedTicket.ticket_number} updated successfully.`);
+      setActionSuccessMessage(`Ticket #${selectedTicket.ticket_number} updated successfully.`);
       setSelectedTicket(null);
       loadTickets();
     }
   };
 
-  const handleEmailReply = (email: string, ticketNum: string, subject: string) => {
-    const mailtoUrl = `mailto:${email}?subject=Re: [${ticketNum}] ${encodeURIComponent(subject)}&body=Dear Researcher,%0D%0A%0D%0AThank you for contacting BooffIn Support.%0D%0A%0D%0A`;
-    Linking.openURL(mailtoUrl);
-  };
-
-  // Table Columns
   const columns: ColumnDef<SupportTicket>[] = [
     {
       key: 'ticket_number',
-      header: 'Ticket #',
-      width: 120,
+      header: 'TICKET #',
+      width: 110,
       render: (t) => (
-        <View style={styles.ticketNumPill}>
-          <Text style={styles.ticketNumText}>{t.ticket_number}</Text>
-        </View>
+        <Text style={styles.monoNumber}>#{t.ticket_number}</Text>
       ),
     },
     {
       key: 'subject',
-      header: 'Subject & Inquiry',
+      header: 'INQUIRY SUBJECT',
       width: 260,
       render: (t) => (
         <View>
           <Text style={styles.boldText} numberOfLines={1}>{t.subject}</Text>
-          <Text style={styles.cellMuted} numberOfLines={1}>{t.message_body}</Text>
-        </View>
-      ),
-    },
-    {
-      key: 'sender_email',
-      header: 'Sender / Researcher',
-      width: 200,
-      render: (t) => (
-        <View>
-          <Text style={styles.cellText}>{t.sender_name || 'Researcher'}</Text>
-          <Text style={styles.emailText}>{t.sender_email}</Text>
+          <Text style={styles.cellMuted} numberOfLines={1}>{t.sender_name || t.sender_email || 'Researcher'}</Text>
         </View>
       ),
     },
     {
       key: 'category',
-      header: 'Category',
-      width: 130,
+      header: 'CATEGORY',
+      width: 140,
       render: (t) => (
-        <AdminBadge
-          label={t.category}
-          variant="neutral"
-          size="sm"
-        />
+        <View style={styles.tag}>
+          <Text style={styles.tagText}>{t.category.replace('_', ' ')}</Text>
+        </View>
       ),
     },
     {
       key: 'priority',
-      header: 'Priority',
+      header: 'PRIORITY',
       width: 110,
       render: (t) => (
         <AdminBadge
           label={t.priority}
-          variant={
-            t.priority === 'URGENT'
-              ? 'danger'
-              : t.priority === 'HIGH'
-              ? 'warning'
-              : t.priority === 'LOW'
-              ? 'neutral'
-              : 'info'
-          }
+          variant={t.priority === 'URGENT' || t.priority === 'HIGH' ? 'danger' : t.priority === 'NORMAL' ? 'warning' : 'neutral'}
           size="sm"
         />
       ),
     },
     {
       key: 'status',
-      header: 'Status',
+      header: 'STATUS',
       width: 120,
       render: (t) => (
         <AdminBadge
-          label={t.status}
-          variant={
-            t.status === 'NEW'
-              ? 'warning'
-              : t.status === 'IN_PROGRESS' || t.status === 'ASSIGNED'
-              ? 'info'
-              : 'emerald'
-          }
+          label={t.status.replace('_', ' ')}
+          variant={t.status === 'RESOLVED' || t.status === 'CLOSED' ? 'emerald' : t.status === 'IN_PROGRESS' ? 'info' : 'warning'}
           size="sm"
         />
       ),
     },
     {
-      key: 'assigned_name',
-      header: 'Assignee',
-      width: 140,
+      key: 'created_at',
+      header: 'FILED',
+      width: 110,
       render: (t) => (
-        <Text style={styles.cellText}>{t.assigned_name || '— Unassigned'}</Text>
+        <Text style={styles.cellMuted}>
+          {new Date(t.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+        </Text>
       ),
     },
     {
       key: 'actions',
-      header: 'Actions',
-      width: 120,
+      header: 'ACTION',
+      width: 110,
+      align: 'right',
       render: (t) => (
         <TouchableOpacity
-          style={styles.inspectBtn}
+          style={styles.actionOutlineBtn}
           onPress={() => handleOpenTicket(t)}
         >
-          <Eye size={12} color={ADMIN_COLORS.textSecondary} />
-          <Text style={styles.inspectBtnText}>Manage</Text>
+          <Eye size={11} color={ADMIN_COLORS.textSecondary} />
+          <Text style={styles.actionOutlineBtnText}>Review</Text>
         </TouchableOpacity>
       ),
     },
@@ -238,85 +202,129 @@ export const AdminSupportView: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={[styles.headerRow, isMobile && styles.headerRowMobile]}>
+      <View style={styles.headerSection}>
         <View>
-          <Text style={styles.pageTitle}>Support & Email Inquiries Desk</Text>
+          <Text style={styles.pageTitle}>Support Desk & Inquiries</Text>
           <Text style={styles.pageSubtitle}>
-            Official support inbox (support@letsbooffin.com) • In-app researcher problem reports
+            Direct researcher assistance, bug reports, and credential triage ({totalCount} total tickets)
           </Text>
         </View>
-
-        <TouchableOpacity style={styles.refreshBtn} onPress={loadTickets}>
-          <RefreshCw size={14} color={ADMIN_COLORS.textSecondary} />
-          <Text style={styles.refreshBtnText}>Refresh Inbox</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* Notifications */}
       {actionSuccessMessage && (
         <View style={styles.successBox}>
-          <CheckCircle2 size={16} color={ADMIN_COLORS.emeraldPrimary} />
+          <CheckCircle2 size={15} color={ADMIN_COLORS.statusSuccessText} />
           <Text style={styles.successText}>{actionSuccessMessage}</Text>
         </View>
       )}
 
       {errorMessage && (
         <View style={styles.errorBox}>
-          <AlertTriangle size={16} color={ADMIN_COLORS.danger} />
+          <AlertTriangle size={15} color={ADMIN_COLORS.statusDangerText} />
           <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       )}
 
-      {/* Filter Tabs */}
-      <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-        <View style={styles.tabsRow}>
-          {(['ALL', 'NEW', 'IN_PROGRESS', 'RESOLVED'] as const).map((st) => (
-            <TouchableOpacity
-              key={st}
-              style={[styles.tabBtn, statusFilter === st && styles.tabBtnActive]}
-              onPress={() => setStatusFilter(st)}
-            >
-              <Text style={[styles.tabBtnText, statusFilter === st && styles.tabBtnTextActive]}>
-                {st === 'ALL' ? 'All Inquiries' : st === 'NEW' ? 'New / Open' : st === 'IN_PROGRESS' ? 'In Progress' : 'Resolved'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      {/* Unified Toolbar */}
+      <View style={styles.toolbarCard}>
+        <View style={styles.segmentedControl}>
+          <TouchableOpacity
+            style={[styles.segmentBtn, statusFilter === 'ALL' && styles.segmentBtnActive]}
+            onPress={() => setStatusFilter('ALL')}
+          >
+            <Text style={[styles.segmentText, statusFilter === 'ALL' && styles.segmentTextActive]}>All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, statusFilter === 'NEW' && styles.segmentBtnActive]}
+            onPress={() => setStatusFilter('NEW')}
+          >
+            <Text style={[styles.segmentText, statusFilter === 'NEW' && styles.segmentTextActive]}>New</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, statusFilter === 'IN_PROGRESS' && styles.segmentBtnActive]}
+            onPress={() => setStatusFilter('IN_PROGRESS')}
+          >
+            <Text style={[styles.segmentText, statusFilter === 'IN_PROGRESS' && styles.segmentTextActive]}>In Progress</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, statusFilter === 'RESOLVED' && styles.segmentBtnActive]}
+            onPress={() => setStatusFilter('RESOLVED')}
+          >
+            <Text style={[styles.segmentText, statusFilter === 'RESOLVED' && styles.segmentTextActive]}>Resolved</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
 
-      {/* Search & Category Filter Bar */}
-      <View style={[styles.searchBarRow, isMobile && styles.searchBarRowMobile]}>
-        <View style={styles.searchWrapper}>
-          <Search size={15} color="#94A3B8" />
+        <View style={styles.searchInputGroup}>
+          <Search size={14} color={ADMIN_COLORS.textMuted} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search ticket #, email, or keyword..."
-            placeholderTextColor="#94A3B8"
+            placeholder="Search tickets by subject, user, or #number..."
+            placeholderTextColor={ADMIN_COLORS.textMuted}
             value={search}
             onChangeText={setSearch}
             onSubmitEditing={loadTickets}
           />
         </View>
 
-        <TouchableOpacity style={styles.searchBtn} onPress={loadTickets}>
-          <Text style={styles.searchBtnText}>Filter</Text>
+        <TouchableOpacity style={styles.refreshIconBtn} onPress={loadTickets}>
+          <RefreshCw size={13} color={ADMIN_COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
 
-      {/* Table Card */}
-      <View style={styles.tableCard}>
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={ADMIN_COLORS.emeraldPrimary} />
-          </View>
-        ) : (
+      {/* Main Content */}
+      {loading ? (
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="small" color={ADMIN_COLORS.emeraldPrimary} />
+          <Text style={styles.loadingText}>Loading support tickets...</Text>
+        </View>
+      ) : isMobile ? (
+        <View style={styles.mobileListContainer}>
+          {tickets.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Support Inbox Clear</Text>
+              <Text style={styles.emptySub}>No support requests match your active filters.</Text>
+            </View>
+          ) : (
+            tickets.map((t) => (
+              <View key={t.id} style={styles.recordCard}>
+                <View style={styles.recordHeader}>
+                  <Text style={styles.monoNumber}>#{t.ticket_number}</Text>
+                  <AdminBadge
+                    label={t.status.replace('_', ' ')}
+                    variant={t.status === 'RESOLVED' || t.status === 'CLOSED' ? 'emerald' : t.status === 'IN_PROGRESS' ? 'info' : 'warning'}
+                    size="sm"
+                  />
+                </View>
+                <Text style={styles.boldText} numberOfLines={1}>{t.subject}</Text>
+                <Text style={styles.cellMuted}>{t.sender_name || t.sender_email || 'Researcher'}</Text>
+
+                <View style={styles.recordFooter}>
+                  <AdminBadge
+                    label={t.priority}
+                    variant={t.priority === 'URGENT' || t.priority === 'HIGH' ? 'danger' : t.priority === 'NORMAL' ? 'warning' : 'neutral'}
+                    size="sm"
+                  />
+                  <TouchableOpacity
+                    style={styles.actionOutlineBtn}
+                    onPress={() => handleOpenTicket(t)}
+                  >
+                    <Eye size={11} color={ADMIN_COLORS.textSecondary} />
+                    <Text style={styles.actionOutlineBtnText}>Review Ticket</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      ) : (
+        <View style={styles.tableWrapper}>
           <AdminDataTable
             columns={columns}
             data={tickets}
-            emptyMessage="No support tickets matching current filters. All researcher inquiries are resolved."
+            emptyMessage="No support tickets match the selected filter."
           />
-        )}
-      </View>
+        </View>
+      )}
 
       {/* Ticket Details & Resolution Modal */}
       {selectedTicket && (
@@ -329,98 +337,78 @@ export const AdminSupportView: React.FC = () => {
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Inbox size={18} color={ADMIN_COLORS.emeraldPrimary} />
-                  <Text style={styles.modalTitle}>Ticket {selectedTicket.ticket_number}</Text>
+                <View>
+                  <Text style={styles.modalTitle}>Ticket #{selectedTicket.ticket_number}</Text>
+                  <Text style={styles.cellMuted}>{selectedTicket.subject}</Text>
                 </View>
                 <TouchableOpacity onPress={() => setSelectedTicket(null)} style={styles.closeBtn}>
-                  <Text style={styles.closeBtnText}>✕</Text>
+                  <X size={16} color={ADMIN_COLORS.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-                {/* Inquiry Details Card */}
-                <View style={styles.ticketDetailBox}>
-                  <View style={styles.metaRow}>
-                    <Text style={styles.ticketSubject}>{selectedTicket.subject}</Text>
-                    <AdminBadge label={selectedTicket.priority} variant={selectedTicket.priority === 'URGENT' ? 'danger' : 'info'} size="sm" />
+                <View style={styles.metaGrid}>
+                  <View style={styles.metaCard}>
+                    <Text style={styles.inspectorLabel}>Submitter</Text>
+                    <Text style={styles.metaVal}>{selectedTicket.sender_name || 'Anonymous'}</Text>
+                    <Text style={styles.cellMuted}>{selectedTicket.sender_email || 'No email'}</Text>
                   </View>
-
-                  <Text style={styles.senderSub}>
-                    From: <Text style={{ fontWeight: '700', color: '#0F172A' }}>{selectedTicket.sender_name || 'Researcher'}</Text> ({selectedTicket.sender_email})
-                  </Text>
-                  <Text style={styles.submittedAt}>Received: {new Date(selectedTicket.created_at).toLocaleString()}</Text>
-
-                  <View style={styles.messageBox}>
-                    <Text style={styles.messageBodyText}>{selectedTicket.message_body}</Text>
+                  <View style={styles.metaCard}>
+                    <Text style={styles.inspectorLabel}>Priority</Text>
+                    <AdminBadge label={selectedTicket.priority} variant={selectedTicket.priority === 'HIGH' || selectedTicket.priority === 'URGENT' ? 'danger' : 'warning'} size="sm" />
                   </View>
-
-                  <TouchableOpacity
-                    style={styles.replyEmailBtn}
-                    onPress={() => handleEmailReply(selectedTicket.sender_email, selectedTicket.ticket_number, selectedTicket.subject)}
-                  >
-                    <Mail size={14} color="#059669" />
-                    <Text style={styles.replyEmailBtnText}>Open Email Reply (to {selectedTicket.sender_email})</Text>
-                    <ExternalLink size={12} color="#059669" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Assignment Section */}
-                <View style={styles.sectionBox}>
-                  <Text style={styles.sectionLabel}>Assign to Team Member</Text>
-                  <View style={styles.assigneeList}>
-                    {teamMembers.map((m) => (
-                      <TouchableOpacity
-                        key={m.user_id}
-                        style={[styles.assigneeChip, selectedAssignee === m.user_id && styles.assigneeChipActive]}
-                        onPress={() => setSelectedAssignee(m.user_id)}
-                      >
-                        <Text style={[styles.assigneeChipText, selectedAssignee === m.user_id && styles.assigneeChipTextActive]}>
-                          {m.fullName || m.full_name || m.email?.split('@')[0]} ({m.role})
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                  <View style={styles.metaCard}>
+                    <Text style={styles.inspectorLabel}>Category</Text>
+                    <Text style={styles.metaVal}>{selectedTicket.category.replace('_', ' ')}</Text>
                   </View>
                 </View>
 
-                {/* Resolution Notes Section */}
-                <View style={styles.sectionBox}>
-                  <Text style={styles.sectionLabel}>Internal Resolution Notes / Action Taken</Text>
-                  <TextInput
-                    style={styles.notesInput}
-                    placeholder="Log internal notes on how this inquiry was addressed..."
-                    placeholderTextColor="#94A3B8"
-                    value={resolutionNotes}
-                    onChangeText={setResolutionNotes}
-                    multiline
-                    numberOfLines={3}
-                  />
+                <Text style={[styles.inspectorLabel, { marginTop: 8 }]}>Inquiry Narrative</Text>
+                <View style={styles.narrativeBox}>
+                  <Text style={styles.narrativeText}>{selectedTicket.message_body}</Text>
                 </View>
+
+                <Text style={[styles.inspectorLabel, { marginTop: 12 }]}>Resolution Notes & Actions</Text>
+                <TextInput
+                  style={styles.rationaleInput}
+                  placeholder="Record resolution notes, outreach details, or diagnosis..."
+                  placeholderTextColor={ADMIN_COLORS.textMuted}
+                  value={resolutionNotes}
+                  onChangeText={setResolutionNotes}
+                  multiline={true}
+                  numberOfLines={3}
+                />
               </ScrollView>
 
-              {/* Modal Footer Actions */}
               <View style={styles.modalFooter}>
                 <TouchableOpacity
-                  style={styles.cancelBtn}
+                  style={styles.actionOutlineBtn}
                   onPress={() => setSelectedTicket(null)}
                 >
-                  <Text style={styles.cancelBtnText}>Close</Text>
+                  <Text style={styles.actionOutlineBtnText}>Close</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.inProgressBtn}
-                  onPress={() => handleUpdateTicket('IN_PROGRESS')}
-                  disabled={updating}
-                >
-                  <Text style={styles.inProgressBtnText}>Mark In Progress</Text>
-                </TouchableOpacity>
+                {selectedTicket.status !== 'RESOLVED' && (
+                  <TouchableOpacity
+                    style={styles.actionEmeraldBtn}
+                    onPress={() => handleUpdateTicket('RESOLVED')}
+                    disabled={updating}
+                  >
+                    <CheckCircle2 size={12} color={ADMIN_COLORS.emeraldPrimary} />
+                    <Text style={styles.actionEmeraldBtnText}>Mark Resolved</Text>
+                  </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
-                  style={styles.resolveBtn}
-                  onPress={() => handleUpdateTicket('RESOLVED')}
+                  style={styles.primaryActionBtn}
+                  onPress={() => handleUpdateTicket()}
                   disabled={updating}
                 >
-                  <Text style={styles.resolveBtnText}>✓ Mark Resolved</Text>
+                  {updating ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.primaryActionBtnText}>Save Updates</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -434,396 +422,353 @@ export const AdminSupportView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerRowMobile: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 10,
+  headerSection: {
+    marginBottom: 16,
   },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
+    fontSize: 20,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
+    letterSpacing: -0.3,
   },
   pageSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
-  },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  refreshBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
   },
   successBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: ADMIN_COLORS.statusSuccessBg,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    borderColor: ADMIN_COLORS.statusSuccessBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
   },
   successText: {
-    color: '#065F46',
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    color: ADMIN_COLORS.statusSuccessText,
+    fontWeight: '500',
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: ADMIN_COLORS.statusDangerBg,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    borderColor: ADMIN_COLORS.statusDangerBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
   },
   errorText: {
-    color: '#991B1B',
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    color: ADMIN_COLORS.statusDangerText,
+    fontWeight: '500',
   },
-  tabsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  tabBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+  toolbarCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  tabBtnActive: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-  },
-  tabBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  tabBtnTextActive: {
-    color: '#059669',
-    fontWeight: '700',
-  },
-  searchBarRow: {
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 10,
     marginBottom: 16,
   },
-  searchBarRowMobile: {
-    flexDirection: 'column',
-    gap: 8,
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: ADMIN_COLORS.bgHover,
+    padding: 2,
+    borderRadius: ADMIN_RADII.button,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
   },
-  searchWrapper: {
+  segmentBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: ADMIN_RADII.badge,
+  },
+  segmentBtnActive: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+  },
+  segmentText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
+  },
+  segmentTextActive: {
+    color: ADMIN_COLORS.textPrimary,
+    fontWeight: '600',
+  },
+  searchInputGroup: {
     flex: 1,
+    minWidth: 200,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    gap: 8,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.input,
+    paddingHorizontal: 10,
+    height: 34,
+  },
+  searchIcon: {
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 9,
-    fontSize: 13,
-    color: '#0F172A',
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
+    padding: 0,
   },
-  searchBtn: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  tableCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+  refreshIconBtn: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
+    borderColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    padding: 7,
+    borderRadius: ADMIN_RADII.button,
   },
-  centerContainer: {
-    padding: 40,
-    justifyContent: 'center',
+  loadingCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 36,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
-  ticketNumPill: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+  loadingText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
   },
-  ticketNumText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#1E293B',
+  tableWrapper: {
+    marginBottom: 24,
+  },
+  monoNumber: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: ADMIN_COLORS.emeraldPrimary,
     fontFamily: 'monospace',
   },
   boldText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  cellText: {
-    fontSize: 13,
-    color: '#334155',
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   cellMuted: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
+    fontSize: 11,
+    color: ADMIN_COLORS.textMuted,
   },
-  emailText: {
-    fontSize: 12,
-    color: '#059669',
-    marginTop: 1,
+  tag: {
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.badge,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
   },
-  inspectBtn: {
+  tagText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textSecondary,
+    textTransform: 'uppercase',
+  },
+  actionOutlineBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: ADMIN_RADII.button,
+  },
+  actionOutlineBtnText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
+  },
+  actionEmeraldBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: ADMIN_COLORS.bgActive,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.emeraldBorder,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: ADMIN_RADII.button,
   },
-  inspectBtnText: {
+  actionEmeraldBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: ADMIN_COLORS.emeraldPrimary,
+  },
+  primaryActionBtn: {
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: ADMIN_RADII.button,
+  },
+  primaryActionBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#475569',
+    color: ADMIN_COLORS.textInverse,
   },
+  mobileListContainer: {
+    gap: 10,
+    marginBottom: 24,
+  },
+  recordCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 12,
+    gap: 6,
+  },
+  recordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recordFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    paddingTop: 8,
+    marginTop: 4,
+  },
+  emptyCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  emptySub: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 4,
+  },
+  // Modal Styles
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 600,
-    maxHeight: '90%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 22,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    maxWidth: 520,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderRadius: ADMIN_RADII.modal,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    padding: 18,
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
     paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: ADMIN_COLORS.borderSubtle,
+    marginBottom: 14,
   },
   modalTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontSize: 15,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   closeBtn: {
     padding: 4,
   },
-  closeBtnText: {
-    fontSize: 16,
-    color: '#94A3B8',
-    fontWeight: '700',
-  },
   modalScroll: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  ticketDetailBox: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 16,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  ticketSubject: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
-    flex: 1,
-    marginRight: 8,
-  },
-  senderSub: {
-    fontSize: 13,
-    color: '#475569',
-    marginBottom: 2,
-  },
-  submittedAt: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginBottom: 10,
-  },
-  messageBox: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  messageBodyText: {
-    fontSize: 13,
-    color: '#1E293B',
-    lineHeight: 20,
-  },
-  replyEmailBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  replyEmailBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#065F46',
-  },
-  sectionBox: {
-    marginBottom: 16,
-  },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  assigneeList: {
+  metaGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 8,
   },
-  assigneeChip: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
+  metaCard: {
+    flex: 1,
+    minWidth: '30%',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
+    padding: 8,
   },
-  assigneeChipActive: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#059669',
-  },
-  assigneeChipText: {
-    fontSize: 12,
-    color: '#475569',
+  inspectorLabel: {
+    fontSize: 10,
     fontWeight: '600',
+    color: ADMIN_COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 3,
   },
-  assigneeChipTextActive: {
-    color: '#059669',
-    fontWeight: '700',
+  metaVal: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
-  notesInput: {
-    backgroundColor: '#F8FAFC',
+  narrativeBox: {
+    backgroundColor: ADMIN_COLORS.bgCanvas,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
     padding: 10,
-    fontSize: 13,
-    color: '#0F172A',
+    marginTop: 4,
+  },
+  narrativeText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+    lineHeight: 17,
+  },
+  rationaleInput: {
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.input,
+    padding: 8,
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
+    marginTop: 4,
     textAlignVertical: 'top',
-    minHeight: 60,
   },
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 10,
+    gap: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 14,
-  },
-  cancelBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 6,
-  },
-  cancelBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  inProgressBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    borderRadius: 6,
-  },
-  inProgressBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1D4ED8',
-  },
-  resolveBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#059669',
-    borderRadius: 6,
-  },
-  resolveBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    paddingTop: 12,
   },
 });

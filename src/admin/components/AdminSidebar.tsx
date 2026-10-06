@@ -1,10 +1,10 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — SIDEBAR NAVIGATION (LIGHT SAAS METIS STYLE)
+// BOOFFIN ADMIN PORTAL — ENTERPRISE SIDEBAR NAVIGATION
 // ============================================================================
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { ADMIN_COLORS, ADMIN_NAV_ITEMS, AdminNavKey } from '../lib/constants';
+import { ADMIN_COLORS, ADMIN_NAV_GROUPS, AdminNavKey, ADMIN_RADII } from '../lib/constants';
 import { useAdminPermissions } from '../hooks/useAdminPermissions';
 import { AdminPermission } from '../types/roles';
 import {
@@ -20,8 +20,7 @@ import {
   TrendingUp,
   Activity,
   Settings,
-  Sparkles,
-  ChevronRight,
+  User,
   LifeBuoy,
   MessagesSquare,
   X,
@@ -42,6 +41,7 @@ const NAV_ICON_MAP: Record<string, React.FC<any>> = {
   TrendingUp,
   Activity,
   Settings,
+  User,
 };
 
 interface AdminSidebarProps {
@@ -69,57 +69,70 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             style={styles.brandLogoImage}
             resizeMode="contain"
           />
+          <View style={styles.versionBadge}>
+            <Text style={styles.versionBadgeText}>v1.0 Prod</Text>
+          </View>
         </View>
 
         {isMobileDrawer && onClose && (
-          <TouchableOpacity style={styles.closeDrawerBtn} onPress={onClose}>
-            <X size={20} color="#64748B" />
+          <TouchableOpacity style={styles.closeDrawerBtn} onPress={onClose} activeOpacity={0.7}>
+            <X size={18} color={ADMIN_COLORS.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* 2. Navigation Items List */}
+      {/* 2. Structured Grouped Navigation */}
       <ScrollView style={styles.navList} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionHeader}>Console Navigation</Text>
+        {ADMIN_NAV_GROUPS.map((group, gIdx) => {
+          const visibleItems = group.items.filter((item) =>
+            !item.permission || hasPermission(item.permission as AdminPermission)
+          );
 
-        {ADMIN_NAV_ITEMS.map((item) => {
-          const isAllowed = !item.permission || hasPermission(item.permission as AdminPermission);
-          const isActive = activeKey === item.key;
-          const IconComponent = NAV_ICON_MAP[item.icon] || LayoutDashboard;
-
-          if (!isAllowed) return null;
+          if (visibleItems.length === 0) return null;
 
           return (
-            <TouchableOpacity
-              key={item.key}
-              style={[
-                styles.navItem,
-                isActive && styles.navItemActive,
-              ]}
-              onPress={() => onSelect(item.key)}
-            >
-              <View style={styles.navItemLeft}>
-                <IconComponent
-                  size={18}
-                  color={isActive ? '#059669' : '#64748B'}
-                  strokeWidth={isActive ? 2.3 : 1.8}
-                />
-                <Text
-                  style={[
-                    styles.navLabel,
-                    isActive ? styles.navLabelActive : styles.navLabelInactive,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </View>
+            <View key={group.category} style={[styles.navGroup, gIdx > 0 && styles.navGroupSpaced]}>
+              <Text style={styles.sectionHeader}>{group.category}</Text>
 
-              {item.key === 'security' ? (
-                <View style={styles.badgePill}>
-                  <Text style={styles.badgePillText}>AAL2</Text>
-                </View>
-              ) : null}
-            </TouchableOpacity>
+              {visibleItems.map((item) => {
+                const isActive = activeKey === item.key;
+                const IconComponent = NAV_ICON_MAP[item.icon] || LayoutDashboard;
+
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[
+                      styles.navItem,
+                      isActive && styles.navItemActive,
+                    ]}
+                    onPress={() => onSelect(item.key as AdminNavKey)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={styles.navItemLeft}>
+                      <IconComponent
+                        size={16}
+                        color={isActive ? ADMIN_COLORS.emeraldPrimary : ADMIN_COLORS.textSecondary}
+                        strokeWidth={isActive ? 2.4 : 1.8}
+                      />
+                      <Text
+                        style={[
+                          styles.navLabel,
+                          isActive ? styles.navLabelActive : styles.navLabelInactive,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </View>
+
+                    {item.key === 'security' ? (
+                      <View style={styles.badgeTag}>
+                        <Text style={styles.badgeTagText}>AAL2</Text>
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           );
         })}
       </ScrollView>
@@ -128,8 +141,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       <View style={styles.footer}>
         <View style={styles.statusDot} />
         <View style={styles.footerTextContainer}>
-          <Text style={styles.footerTitle}>Production Connected</Text>
-          <Text style={styles.footerSubtitle}>BooffIn Security v1.0</Text>
+          <Text style={styles.footerTitle}>Production Gateway</Text>
+          <Text style={styles.footerSubtitle}>Realtime Postgres TLS</Text>
         </View>
       </View>
     </View>
@@ -141,7 +154,7 @@ const styles = StyleSheet.create({
     width: 240,
     backgroundColor: '#FFFFFF',
     borderRightWidth: 1,
-    borderRightColor: '#E2E8F0',
+    borderRightColor: ADMIN_COLORS.border,
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
@@ -150,10 +163,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRightWidth: 0,
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
     elevation: 16,
   },
   brandContainer: {
@@ -161,105 +174,131 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    height: 52,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    minHeight: 64,
+    borderBottomColor: ADMIN_COLORS.border,
   },
   brandLogoWrapper: {
     flex: 1,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   brandLogoImage: {
-    width: 175,
-    height: 30,
+    width: 130,
+    height: 24,
+  },
+  versionBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: ADMIN_RADII.badge,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+  },
+  versionBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textSecondary,
+    letterSpacing: 0.3,
   },
   closeDrawerBtn: {
     padding: 6,
-    borderRadius: 8,
+    borderRadius: ADMIN_RADII.button,
     backgroundColor: '#F1F5F9',
   },
   navList: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingTop: 16,
+    paddingHorizontal: 8,
+    paddingTop: 14,
+  },
+  navGroup: {
+    marginBottom: 16,
+  },
+  navGroupSpaced: {
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
   },
   sectionHeader: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: ADMIN_COLORS.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    paddingHorizontal: 12,
-    marginBottom: 10,
+    letterSpacing: 0.7,
+    paddingHorizontal: 10,
+    marginBottom: 6,
   },
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: ADMIN_RADII.button,
+    marginBottom: 2,
   },
   navItemActive: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: ADMIN_COLORS.bgActive,
+    borderLeftWidth: 3,
+    borderLeftColor: ADMIN_COLORS.emeraldPrimary,
   },
   navItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   navLabel: {
     fontSize: 13,
   },
   navLabelActive: {
-    color: '#059669',
+    color: ADMIN_COLORS.emeraldPrimary,
     fontWeight: '700',
   },
   navLabelInactive: {
-    color: '#475569',
+    color: ADMIN_COLORS.textSecondary,
     fontWeight: '500',
   },
-  badgePill: {
-    backgroundColor: '#DEF7EC',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+  badgeTag: {
+    backgroundColor: ADMIN_COLORS.statusSuccessBg,
+    borderColor: ADMIN_COLORS.statusSuccessBorder,
+    borderWidth: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: ADMIN_RADII.badge,
   },
-  badgePillText: {
+  badgeTagText: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#03543F',
+    color: ADMIN_COLORS.statusSuccessText,
+    letterSpacing: 0.4,
   },
   footer: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: ADMIN_COLORS.border,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     backgroundColor: '#F8FAFC',
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: ADMIN_COLORS.emeraldLight,
   },
   footerTextContainer: {
     flex: 1,
   },
   footerTitle: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   footerSubtitle: {
     fontSize: 10,
-    color: '#64748B',
+    color: ADMIN_COLORS.textMuted,
   },
 });

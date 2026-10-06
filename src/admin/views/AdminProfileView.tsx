@@ -1,6 +1,5 @@
 // ============================================================================
 // BOOFFIN ADMIN PORTAL — DEDICATED SUPER ADMIN PROFILE PAGE
-// Synchronized personal credentials, access tier, contacts & security metadata
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
@@ -14,7 +13,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
-import { ADMIN_COLORS } from '../lib/constants';
+import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminProfileService, SuperAdminProfileData } from '../services/adminProfileService';
 import {
@@ -24,15 +23,11 @@ import {
   Briefcase,
   ShieldCheck,
   Key,
-  Clock,
   LogOut,
   CheckCircle2,
   Copy,
   Check,
-  Sparkles,
-  ArrowLeft,
   Save,
-  Shield,
   Fingerprint,
 } from 'lucide-react-native';
 
@@ -105,7 +100,7 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
     if (res.error) {
       alert('Failed to update profile: ' + res.error.message);
     } else {
-      setSuccessMsg('Profile credentials updated & synchronized to database!');
+      setSuccessMsg('Profile credentials updated & synchronized to database.');
       const updated = {
         ...profile!,
         fullName: formFullName.trim(),
@@ -135,48 +130,38 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
   if (loading) {
     return (
       <View style={styles.centerLoading}>
-        <ActivityIndicator size="large" color={ADMIN_COLORS.emeraldPrimary} />
+        <ActivityIndicator size="small" color={ADMIN_COLORS.emeraldPrimary} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
-      {/* 1. Header Row */}
-      <View style={styles.pageHeader}>
-        <View style={styles.headerTitleRow}>
-          {onNavigateBack && (
-            <TouchableOpacity style={styles.backBtn} onPress={onNavigateBack}>
-              <ArrowLeft size={18} color="#0F172A" />
-            </TouchableOpacity>
-          )}
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Sparkles size={18} color="#059669" />
-              <Text style={styles.pageTitle}>Admin Personal Profile</Text>
-            </View>
-            <Text style={styles.pageSubtitle}>
-              Manage your personal staff credentials, access levels & contact info
-            </Text>
-          </View>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Header */}
+      <View style={styles.headerSection}>
+        <View>
+          <Text style={styles.pageTitle}>Administrator Profile</Text>
+          <Text style={styles.pageSubtitle}>
+            Personal staff credentials, role permissions & security metadata
+          </Text>
         </View>
 
-        <TouchableOpacity style={styles.headerSignOutBtn} onPress={onSignOut}>
-          <LogOut size={14} color="#EF4444" />
-          <Text style={styles.headerSignOutText}>Sign Out</Text>
+        <TouchableOpacity style={styles.signOutBtn} onPress={onSignOut}>
+          <LogOut size={13} color={ADMIN_COLORS.statusDangerText} />
+          <Text style={styles.signOutBtnText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Success Toast */}
+      {/* Success Notification */}
       {successMsg && (
-        <View style={styles.successBanner}>
-          <CheckCircle2 size={16} color="#064E3B" />
-          <Text style={styles.successBannerText}>{successMsg}</Text>
+        <View style={styles.successBox}>
+          <CheckCircle2 size={15} color={ADMIN_COLORS.statusSuccessText} />
+          <Text style={styles.successText}>{successMsg}</Text>
         </View>
       )}
 
-      {/* 2. Hero Identity Card */}
-      <View style={[styles.heroCard, isMobile && styles.heroCardMobile]}>
+      {/* Hero Identity Block */}
+      <View style={styles.heroCard}>
         <View style={styles.avatarLarge}>
           <Text style={styles.avatarLargeText}>{getInitials()}</Text>
         </View>
@@ -184,197 +169,123 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
         <View style={styles.heroInfo}>
           <View style={styles.heroNameRow}>
             <Text style={styles.heroName} numberOfLines={1}>
-              {formFullName.trim() || profile?.fullName || 'Super Administrator'}
+              {formFullName.trim() || profile?.fullName || 'Administrator'}
             </Text>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>{profile?.role || 'SUPER_ADMIN'}</Text>
+            <View style={styles.roleTag}>
+              <Text style={styles.roleTagText}>{profile?.role || 'SUPER_ADMIN'}</Text>
             </View>
           </View>
 
           <Text style={styles.heroEmail}>{profile?.email || 'admin@letsbooffin.com'}</Text>
 
-          <View style={styles.heroStatusRow}>
-            <View style={styles.statusPill}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.statusPillText}>Active Session</Text>
-            </View>
-
-            <View style={styles.securityPill}>
-              <ShieldCheck size={13} color="#059669" />
-              <Text style={styles.securityPillText}>AAL2 Verified</Text>
-            </View>
+          <View style={styles.heroMetaRow}>
+            <AdminBadge label="ACTIVE SESSION" variant="emerald" size="sm" />
+            <TouchableOpacity style={styles.copyIdBtn} onPress={handleCopyId}>
+              <Text style={styles.copyIdText}>ID: {profile?.id?.slice(0, 8)}...</Text>
+              {copiedId ? <Check size={11} color={ADMIN_COLORS.emeraldPrimary} /> : <Copy size={11} color={ADMIN_COLORS.textMuted} />}
+            </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* 3. Main Form Grid */}
-      <View style={[styles.gridContainer, isMobile && styles.gridContainerMobile]}>
-        {/* Left Card: Personal Credentials & Contacts */}
-        <View style={[styles.cardSection, isMobile && styles.cardSectionMobile]}>
-          <Text style={styles.cardSectionTitle}>PERSONAL CREDENTIALS & CONTACTS</Text>
-
-          {/* Full Name */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name</Text>
-            <View style={styles.inputWrapper}>
-              <User size={16} color="#64748B" style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                value={formFullName}
-                onChangeText={setFormFullName}
-                placeholder="Syed Shaeel Ahmed"
-                placeholderTextColor="#94A3B8"
-              />
-            </View>
+      {/* Two-Column Grid / Forms */}
+      <View style={styles.gridContainer}>
+        {/* Left Column: Personal Information Form */}
+        <View style={styles.formCard}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Personal & Contact Details</Text>
+            <Text style={styles.cardSub}>Update your administrative contact profile</Text>
           </View>
 
-          {/* Username */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Staff Handle / Username</Text>
-            <View style={styles.inputWrapper}>
-              <Text style={styles.atPrefix}>@</Text>
-              <TextInput
-                style={[styles.textInput, { paddingLeft: 4 }]}
-                value={formUsername}
-                onChangeText={setFormUsername}
-                placeholder="shaeel_admin"
-                placeholderTextColor="#94A3B8"
-                autoCapitalize="none"
-              />
-            </View>
+          <View style={styles.formGroup}>
+            <Text style={styles.fieldLabel}>Full Legal / Staff Name</Text>
+            <TextInput
+              style={styles.inputField}
+              value={formFullName}
+              onChangeText={setFormFullName}
+              placeholder="e.g. Dr. Eleanor Vance"
+              placeholderTextColor={ADMIN_COLORS.textMuted}
+            />
           </View>
 
-          {/* Authenticated Email (Read-only verified) */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Authenticated Email ID</Text>
-            <View style={[styles.inputWrapper, styles.inputWrapperDisabled]}>
-              <Mail size={16} color="#94A3B8" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.textInput, styles.textInputDisabled]}
-                value={profile?.email || 'admin@letsbooffin.com'}
-                editable={false}
-              />
-              <View style={styles.verifiedChip}>
-                <Check size={12} color="#059669" />
-                <Text style={styles.verifiedChipText}>Verified</Text>
-              </View>
-            </View>
+          <View style={styles.formGroup}>
+            <Text style={styles.fieldLabel}>Username Handle</Text>
+            <TextInput
+              style={styles.inputField}
+              value={formUsername}
+              onChangeText={setFormUsername}
+              placeholder="e.g. eleanor.vance"
+              placeholderTextColor={ADMIN_COLORS.textMuted}
+              autoCapitalize="none"
+            />
           </View>
 
-          {/* Phone Number */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Contact Number / Phone</Text>
-            <View style={styles.inputWrapper}>
-              <Phone size={16} color="#64748B" style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                value={formPhone}
-                onChangeText={setFormPhone}
-                placeholder="+91 98765 43210"
-                placeholderTextColor="#94A3B8"
-                keyboardType="phone-pad"
-              />
-            </View>
+          <View style={styles.formGroup}>
+            <Text style={styles.fieldLabel}>Operational Department</Text>
+            <TextInput
+              style={styles.inputField}
+              value={formDepartment}
+              onChangeText={setFormDepartment}
+              placeholder="e.g. Trust & Safety Ops"
+              placeholderTextColor={ADMIN_COLORS.textMuted}
+            />
           </View>
 
-          {/* Designation / Department */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Designation / Department</Text>
-            <View style={styles.inputWrapper}>
-              <Briefcase size={16} color="#64748B" style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                value={formDepartment}
-                onChangeText={setFormDepartment}
-                placeholder="Operations & Security"
-                placeholderTextColor="#94A3B8"
-              />
-            </View>
+          <View style={styles.formGroup}>
+            <Text style={styles.fieldLabel}>Direct Phone (Optional)</Text>
+            <TextInput
+              style={styles.inputField}
+              value={formPhone}
+              onChangeText={setFormPhone}
+              placeholder="+1 (555) 000-0000"
+              placeholderTextColor={ADMIN_COLORS.textMuted}
+              keyboardType="phone-pad"
+            />
           </View>
+
+          <TouchableOpacity
+            style={[styles.primarySaveBtn, saving && { opacity: 0.6 }]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Save size={13} color="#FFFFFF" />
+                <Text style={styles.primarySaveBtnText}>Save Profile</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* Right Card: Security & Account Metadata */}
-        <View style={[styles.cardSection, isMobile && styles.cardSectionMobile]}>
-          <Text style={styles.cardSectionTitle}>SECURITY & ACCOUNT METADATA</Text>
-
-          <View style={styles.metadataCard}>
-            {/* Admin UUID */}
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>Admin UUID</Text>
-              <TouchableOpacity style={styles.uuidBadge} onPress={handleCopyId}>
-                <Text style={styles.uuidText} numberOfLines={1}>
-                  {profile?.id || 'f5534cbc-14dc-4d50-975d-1a0b3d459359'}
-                </Text>
-                {copiedId ? (
-                  <Check size={13} color="#059669" />
-                ) : (
-                  <Copy size={13} color="#64748B" />
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Access Tier */}
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>Access Tier</Text>
-              <Text style={styles.metaValueHighlight}>Tier 1 — Full Root Access</Text>
-            </View>
-
-            {/* MFA Security Method */}
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>MFA Enforcement</Text>
-              <View style={styles.mfaStatusRow}>
-                <Fingerprint size={14} color="#059669" />
-                <Text style={styles.metaValue}>TOTP Authenticator (AAL2)</Text>
-              </View>
-            </View>
-
-            {/* Member Since */}
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>Member Since</Text>
-              <Text style={styles.metaValue}>
-                {profile?.createdAt
-                  ? new Date(profile.createdAt).toLocaleDateString(undefined, {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })
-                  : 'Oct 5, 2026'}
-              </Text>
-            </View>
+        {/* Right Column: Security & Role Metadata */}
+        <View style={styles.metaCard}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Authority & System Access</Text>
+            <Text style={styles.cardSub}>Assigned security tier and privileges</Text>
           </View>
 
-          {/* Security Notice Box */}
-          <View style={styles.securityNoticeBox}>
-            <Shield size={16} color="#059669" style={{ marginTop: 2 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.securityNoticeTitle}>Root Level Account Protection</Text>
-              <Text style={styles.securityNoticeText}>
-                All profile updates are immediately committed to the central PostgreSQL security tables with strict cryptographic audit logs.
-              </Text>
+          <View style={styles.definitionList}>
+            <View style={styles.defItem}>
+              <Text style={styles.defLabel}>Assigned Role</Text>
+              <Text style={styles.defVal}>{profile?.role || 'SUPER_ADMIN'}</Text>
             </View>
-          </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.saveBtn}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Save size={16} color="#FFFFFF" />
-                  <Text style={styles.saveBtnText}>Save Profile Changes</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <View style={styles.defItem}>
+              <Text style={styles.defLabel}>Account Standing</Text>
+              <AdminBadge label="ACTIVE" variant="emerald" size="sm" />
+            </View>
 
-            <TouchableOpacity style={styles.signOutBtn} onPress={onSignOut}>
-              <LogOut size={16} color="#EF4444" />
-              <Text style={styles.signOutBtnText}>Sign Out</Text>
-            </TouchableOpacity>
+            <View style={styles.defItem}>
+              <Text style={styles.defLabel}>Two-Factor Authentication</Text>
+              <AdminBadge label="ENFORCED (AAL2)" variant="emerald" size="sm" />
+            </View>
+
+            <View style={styles.defItem}>
+              <Text style={styles.defLabel}>Database Access</Text>
+              <Text style={styles.defVal}>RLS Full Superadmin Scope</Text>
+            </View>
           </View>
         </View>
       </View>
@@ -385,380 +296,242 @@ export const AdminProfileView: React.FC<AdminProfileViewProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  contentContainer: {
-    padding: 20,
-    gap: 16,
-    paddingBottom: 60,
+    backgroundColor: ADMIN_COLORS.bgCanvas,
   },
   centerLoading: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  pageHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
+    padding: 40,
+  },
+  headerSection: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  backBtn: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 10,
   },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontSize: 20,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
     letterSpacing: -0.3,
   },
   pageSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
   },
-  headerSignOutBtn: {
+  signOutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#FEF2F2',
+    gap: 5,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: ADMIN_COLORS.statusDangerBorder,
+    backgroundColor: ADMIN_COLORS.statusDangerBg,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: ADMIN_RADII.button,
   },
-  headerSignOutText: {
+  signOutBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#EF4444',
+    color: ADMIN_COLORS.statusDangerText,
   },
-  successBanner: {
+  successBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: ADMIN_COLORS.statusSuccessBg,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
-    padding: 12,
-    borderRadius: 10,
+    borderColor: ADMIN_COLORS.statusSuccessBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
   },
-  successBannerText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#064E3B',
+  successText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.statusSuccessText,
+    fontWeight: '500',
   },
   heroCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  heroCardMobile: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    textAlign: 'center',
+    gap: 14,
+    marginBottom: 16,
   },
   avatarLarge: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#059669',
-    alignItems: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    backgroundColor: ADMIN_COLORS.bgActive,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.emeraldBorder,
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#D1FAE5',
+    alignItems: 'center',
   },
   avatarLargeText: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    color: ADMIN_COLORS.emeraldPrimary,
   },
   heroInfo: {
     flex: 1,
-    gap: 6,
   },
   heroNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   heroName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  roleBadge: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  roleBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#059669',
+    fontSize: 15,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   heroEmail: {
-    fontSize: 13,
-    color: '#64748B',
-  },
-  heroStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 2,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  onlineDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  statusPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  securityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  securityPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  gridContainerMobile: {
-    flexDirection: 'column',
-  },
-  cardSection: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  cardSectionMobile: {
-    flex: 1,
-  },
-  cardSectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#94A3B8',
-    letterSpacing: 0.5,
-  },
-  inputGroup: {
-    gap: 6,
-  },
-  inputLabel: {
     fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 1,
+  },
+  roleTag: {
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.badge,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  roleTagText: {
+    fontSize: 10,
     fontWeight: '600',
-    color: '#334155',
+    color: ADMIN_COLORS.textSecondary,
+    letterSpacing: 0.4,
   },
-  inputWrapper: {
+  heroMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  inputWrapperDisabled: {
-    backgroundColor: '#F1F5F9',
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  atPrefix: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#64748B',
-    marginRight: 4,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#0F172A',
-    padding: 0,
-  },
-  textInputDisabled: {
-    color: '#64748B',
-  },
-  verifiedChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  verifiedChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  metadataCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 12,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  metaKey: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  metaValue: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  metaValueHighlight: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  mfaStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  uuidBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    maxWidth: 180,
-  },
-  uuidText: {
-    fontSize: 11,
-    fontFamily: 'monospace',
-    color: '#475569',
-  },
-  securityNoticeBox: {
-    flexDirection: 'row',
-    gap: 10,
-    backgroundColor: '#ECFDF5',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  securityNoticeTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#064E3B',
-    marginBottom: 2,
-  },
-  securityNoticeText: {
-    fontSize: 11,
-    color: '#047857',
-    lineHeight: 15,
-  },
-  actionRow: {
-    flexDirection: 'row',
     gap: 10,
     marginTop: 6,
   },
-  saveBtn: {
-    flex: 2,
+  copyIdBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#059669',
-    paddingVertical: 12,
-    borderRadius: 10,
+    gap: 4,
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: ADMIN_RADII.badge,
   },
-  saveBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  copyIdText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    color: ADMIN_COLORS.textMuted,
   },
-  signOutBtn: {
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginBottom: 24,
+  },
+  formCard: {
     flex: 1,
+    minWidth: 300,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 14,
+  },
+  metaCard: {
+    flex: 1,
+    minWidth: 260,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 14,
+  },
+  cardHeader: {
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: ADMIN_COLORS.borderSubtle,
+    paddingBottom: 8,
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  cardSub: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 1,
+  },
+  formGroup: {
+    marginBottom: 10,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  inputField: {
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.input,
+    paddingHorizontal: 10,
+    height: 34,
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
+  },
+  primarySaveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
+    paddingVertical: 8,
+    borderRadius: ADMIN_RADII.button,
+    marginTop: 8,
   },
-  signOutBtnText: {
-    fontSize: 13,
+  primarySaveBtnText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#EF4444',
+    color: ADMIN_COLORS.textInverse,
+  },
+  definitionList: {
+    gap: 10,
+  },
+  defItem: {
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
+    padding: 10,
+    gap: 4,
+  },
+  defLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  defVal: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
 });

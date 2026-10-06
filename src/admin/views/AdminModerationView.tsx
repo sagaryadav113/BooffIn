@@ -1,17 +1,31 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — MODERATION QUEUE VIEW (LIGHT SAAS METIS STYLE)
+// BOOFFIN ADMIN PORTAL — MODERATION QUEUE VIEW
 // ============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { ADMIN_COLORS } from '../lib/constants';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  ActivityIndicator, 
+  TouchableOpacity,
+  TextInput,
+  useWindowDimensions 
+} from 'react-native';
+import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
+import { AdminBadge } from '../components/AdminBadge';
 import { adminModerationService } from '../services/adminModerationService';
-import { ShieldAlert, Trash2, RefreshCw } from 'lucide-react-native';
+import { ShieldAlert, Trash2, RefreshCw, Search, X, CheckCircle2, AlertTriangle } from 'lucide-react-native';
 
 export const AdminModerationView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
 
@@ -46,10 +60,20 @@ export const AdminModerationView: React.FC = () => {
     }
   };
 
+  const filteredPosts = posts.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (p.author_name || '').toLowerCase().includes(q) ||
+      (p.author_username || '').toLowerCase().includes(q) ||
+      (p.content || '').toLowerCase().includes(q)
+    );
+  });
+
   const columns: ColumnDef<any>[] = [
     {
       key: 'author',
-      header: 'Author / Researcher',
+      header: 'RESEARCHER / AUTHOR',
       width: 200,
       render: (p) => (
         <View style={styles.authorCell}>
@@ -58,17 +82,17 @@ export const AdminModerationView: React.FC = () => {
               {(p.author_name || 'U').substring(0, 2).toUpperCase()}
             </Text>
           </View>
-          <View>
-            <Text style={styles.boldText}>{p.author_name}</Text>
-            <Text style={styles.usernameText}>@{p.author_username}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.boldText} numberOfLines={1}>{p.author_name}</Text>
+            <Text style={styles.usernameText} numberOfLines={1}>@{p.author_username}</Text>
           </View>
         </View>
       ),
     },
     {
       key: 'content',
-      header: 'Scientific Content / Discussion',
-      width: 320,
+      header: 'SCIENTIFIC DISCUSSION CONTENT',
+      width: 340,
       render: (p) => (
         <Text style={styles.cellText} numberOfLines={2}>
           {p.content || '[Publication Discussion]'}
@@ -77,8 +101,8 @@ export const AdminModerationView: React.FC = () => {
     },
     {
       key: 'created_at',
-      header: 'Posted Date',
-      width: 140,
+      header: 'POSTED DATE',
+      width: 130,
       render: (p) => (
         <Text style={styles.cellMuted}>
           {new Date(p.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -87,12 +111,13 @@ export const AdminModerationView: React.FC = () => {
     },
     {
       key: 'actions',
-      header: 'Moderation Action',
+      header: 'MODERATION ACTION',
       width: 140,
+      align: 'right',
       render: (p) => (
-        <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemove(p.id)}>
-          <Trash2 size={13} color="#991B1B" />
-          <Text style={styles.removeBtnText}>Remove</Text>
+        <TouchableOpacity style={styles.actionDangerBtn} onPress={() => handleRemove(p.id)}>
+          <Trash2 size={11} color={ADMIN_COLORS.statusDangerText} />
+          <Text style={styles.actionDangerBtnText}>Remove</Text>
         </TouchableOpacity>
       ),
     },
@@ -101,44 +126,109 @@ export const AdminModerationView: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.headerRow}>
+      <View style={styles.headerSection}>
         <View>
-          <Text style={styles.pageTitle}>Content Moderation Queue</Text>
-          <Text style={styles.pageSubtitle}>Authoritative feeds from public.posts ({posts.length} loaded)</Text>
+          <Text style={styles.pageTitle}>Flagged Content Moderation</Text>
+          <Text style={styles.pageSubtitle}>
+            Live platform stream from public.posts ({posts.length} entries scanned)
+          </Text>
+        </View>
+      </View>
+
+      {actionSuccessMessage && (
+        <View style={styles.successBox}>
+          <CheckCircle2 size={15} color={ADMIN_COLORS.statusSuccessText} />
+          <Text style={styles.successText}>{actionSuccessMessage}</Text>
+        </View>
+      )}
+
+      {errorMessage && (
+        <View style={styles.errorBox}>
+          <AlertTriangle size={15} color={ADMIN_COLORS.statusDangerText} />
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      )}
+
+      {/* Toolbar */}
+      <View style={styles.toolbarCard}>
+        <View style={styles.searchInputGroup}>
+          <Search size={14} color={ADMIN_COLORS.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Filter discussion posts by author or keywords..."
+            placeholderTextColor={ADMIN_COLORS.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <X size={13} color={ADMIN_COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
 
-        <TouchableOpacity style={styles.refreshBtn} onPress={loadPosts}>
-          <RefreshCw size={14} color="#475569" />
-          <Text style={styles.refreshBtnText}>Refresh</Text>
+        <TouchableOpacity style={styles.refreshIconBtn} onPress={loadPosts}>
+          <RefreshCw size={13} color={ADMIN_COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
 
-      {actionSuccessMessage ? (
-        <View style={styles.successBox}>
-          <Text style={styles.successText}>{actionSuccessMessage}</Text>
+      {/* Main Content */}
+      {loading ? (
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="small" color={ADMIN_COLORS.emeraldPrimary} />
+          <Text style={styles.loadingText}>Loading moderation queue...</Text>
         </View>
-      ) : null}
+      ) : isMobile ? (
+        <View style={styles.mobileListContainer}>
+          {filteredPosts.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Moderation Feed Clean</Text>
+              <Text style={styles.emptySub}>No flagged discussions requiring admin review.</Text>
+            </View>
+          ) : (
+            filteredPosts.map((p) => (
+              <View key={p.id} style={styles.recordCard}>
+                <View style={styles.recordHeader}>
+                  <View style={styles.authorCell}>
+                    <View style={styles.authorAvatar}>
+                      <Text style={styles.authorAvatarText}>
+                        {(p.author_name || 'U').substring(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={styles.boldText}>{p.author_name}</Text>
+                      <Text style={styles.usernameText}>@{p.author_username}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.cellMuted}>
+                    {new Date(p.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </Text>
+                </View>
 
-      {errorMessage ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
+                <Text style={styles.cellText} numberOfLines={3}>
+                  {p.content || '[Publication Discussion]'}
+                </Text>
+
+                <View style={styles.recordFooter}>
+                  <Text style={styles.cellMuted}>ID #{p.id?.slice?.(0, 8) || 'N/A'}</Text>
+                  <TouchableOpacity style={styles.actionDangerBtn} onPress={() => handleRemove(p.id)}>
+                    <Trash2 size={11} color={ADMIN_COLORS.statusDangerText} />
+                    <Text style={styles.actionDangerBtnText}>Remove Post</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
         </View>
-      ) : null}
-
-      {/* Table Card */}
-      <View style={styles.tableCard}>
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#059669" />
-          </View>
-        ) : (
+      ) : (
+        <View style={styles.tableWrapper}>
           <AdminDataTable
             columns={columns}
-            data={posts}
-            emptyMessage="No posts found in platform database."
+            data={filteredPosts}
+            emptyMessage="No flagged posts found in platform database."
           />
-        )}
-      </View>
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -146,135 +236,204 @@ export const AdminModerationView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+  headerSection: {
+    marginBottom: 16,
   },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
+    fontSize: 20,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
+    letterSpacing: -0.3,
   },
   pageSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
   },
-  refreshBtn: {
+  successBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFFFF',
+    gap: 8,
+    backgroundColor: ADMIN_COLORS.statusSuccessBg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    borderColor: ADMIN_COLORS.statusSuccessBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
   },
-  refreshBtnText: {
+  successText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
+    color: ADMIN_COLORS.statusSuccessText,
+    fontWeight: '500',
   },
-  tableCard: {
-    backgroundColor: '#FFFFFF',
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: ADMIN_COLORS.statusDangerBg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
+    borderColor: ADMIN_COLORS.statusDangerBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
   },
-  centerContainer: {
-    paddingVertical: 40,
+  errorText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.statusDangerText,
+    fontWeight: '500',
+  },
+  toolbarCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  searchInputGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.input,
+    paddingHorizontal: 10,
+    height: 34,
+  },
+  searchIcon: {
+    marginRight: 6,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
+    padding: 0,
+  },
+  refreshIconBtn: {
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    padding: 7,
+    borderRadius: ADMIN_RADII.button,
+  },
+  loadingCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  tableWrapper: {
+    marginBottom: 24,
   },
   authorCell: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   authorAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#DEF7EC',
+    width: 28,
+    height: 28,
+    borderRadius: 4,
+    backgroundColor: ADMIN_COLORS.bgActive,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.emeraldBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#BCF0DA',
   },
   authorAvatarText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#03543F',
+    color: ADMIN_COLORS.emeraldPrimary,
   },
   boldText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   usernameText: {
     fontSize: 11,
-    color: '#64748B',
+    color: ADMIN_COLORS.textMuted,
   },
   cellText: {
-    fontSize: 13,
-    color: '#334155',
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
+    lineHeight: 17,
   },
   cellMuted: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 11,
+    color: ADMIN_COLORS.textMuted,
   },
-  removeBtn: {
+  actionDangerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FEF2F2',
+    gap: 4,
+    backgroundColor: ADMIN_COLORS.statusDangerBg,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
+    borderColor: ADMIN_COLORS.statusDangerBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: ADMIN_RADII.button,
   },
-  removeBtnText: {
+  actionDangerBtnText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#991B1B',
-  },
-  successBox: {
-    backgroundColor: '#DEF7EC',
-    borderWidth: 1,
-    borderColor: '#BCF0DA',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-  },
-  successText: {
-    fontSize: 12,
-    color: '#03543F',
     fontWeight: '600',
+    color: ADMIN_COLORS.statusDangerText,
   },
-  errorBox: {
-    backgroundColor: '#FEF2F2',
+  mobileListContainer: {
+    gap: 10,
+    marginBottom: 24,
+  },
+  recordCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 8,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
     padding: 12,
-    marginBottom: 20,
+    gap: 8,
   },
-  errorText: {
+  recordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recordFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    paddingTop: 8,
+  },
+  emptyCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  emptySub: {
     fontSize: 12,
-    color: '#991B1B',
-    fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 4,
   },
 });

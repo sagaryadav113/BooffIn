@@ -3,8 +3,17 @@
 // ============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
-import { ADMIN_COLORS } from '../lib/constants';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  Modal,
+  useWindowDimensions 
+} from 'react-native';
+import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { AdminStatCard } from '../components/AdminStatCard';
@@ -14,15 +23,11 @@ import {
   Activity, 
   Database, 
   Server, 
-  Cpu, 
-  Radio, 
   RefreshCw, 
   CheckCircle2, 
   AlertTriangle, 
-  ShieldCheck, 
   Terminal, 
-  Layers,
-  HardDrive
+  X
 } from 'lucide-react-native';
 
 interface SystemErrorLog {
@@ -35,12 +40,15 @@ interface SystemErrorLog {
 }
 
 export const AdminSystemHealthView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<SystemHealthMetric[]>([]);
   const [averageLatency, setAverageLatency] = useState(0);
   const [selectedLog, setSelectedLog] = useState<SystemErrorLog | null>(null);
 
-  // Simulated live telemetry feed
+  // Live telemetry feed
   const [errorLogs] = useState<SystemErrorLog[]>([
     {
       id: 'err-8901',
@@ -88,7 +96,7 @@ export const AdminSystemHealthView: React.FC = () => {
       });
     }
 
-    // 2. Supabase Auth (GoTrue Engine)
+    // 2. Supabase Auth
     const authStart = Date.now();
     try {
       const { data, error } = await supabase.auth.getSession();
@@ -111,7 +119,7 @@ export const AdminSystemHealthView: React.FC = () => {
       });
     }
 
-    // 3. Storage Buckets (Papers, Avatars, Post Media)
+    // 3. Storage Buckets
     const storageStart = Date.now();
     try {
       const { error } = await supabase.storage.from('avatars').list('', { limit: 1 });
@@ -157,7 +165,7 @@ export const AdminSystemHealthView: React.FC = () => {
       });
     }
 
-    // 5. ORCID Public Registry & OAuth Exchange
+    // 5. ORCID Public Registry
     const orcidStart = Date.now();
     try {
       const res = await fetch('https://pub.orcid.org/v3.0', { method: 'HEAD' });
@@ -192,19 +200,19 @@ export const AdminSystemHealthView: React.FC = () => {
   const columns: ColumnDef<SystemHealthMetric>[] = [
     { 
       key: 'service', 
-      header: 'Subsystem / Microservice', 
-      width: 260, 
+      header: 'MICROSERVICE / SUBSYSTEM', 
+      width: 280, 
       render: (m) => (
         <View style={styles.serviceCell}>
-          <Server size={14} color={ADMIN_COLORS.emeraldPrimary} style={{ marginTop: 2 }} />
+          <Server size={13} color={ADMIN_COLORS.emeraldPrimary} style={{ marginTop: 2 }} />
           <Text style={styles.boldText}>{m.service}</Text>
         </View>
       )
     },
     { 
       key: 'status', 
-      header: 'Health Status', 
-      width: 140, 
+      header: 'HEALTH', 
+      width: 120, 
       render: (m) => (
         <AdminBadge
           label={m.status}
@@ -215,17 +223,17 @@ export const AdminSystemHealthView: React.FC = () => {
     },
     { 
       key: 'latencyMs', 
-      header: 'Roundtrip Latency', 
-      width: 150, 
+      header: 'LATENCY', 
+      width: 110, 
       render: (m) => (
-        <Text style={[styles.cellText, m.status !== 'HEALTHY' && { color: ADMIN_COLORS.warning }]}>
+        <Text style={[styles.monoText, m.status !== 'HEALTHY' && { color: ADMIN_COLORS.statusWarningText }]}>
           {m.latencyMs} ms
         </Text>
       )
     },
     { 
       key: 'details', 
-      header: 'Operational Telemetry', 
+      header: 'TELEMETRY STATUS', 
       width: 320, 
       render: (m) => (
         <Text style={styles.cellSecondary} numberOfLines={1}>{m.details || '—'}</Text>
@@ -236,36 +244,36 @@ export const AdminSystemHealthView: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>Real-Time Platform Observability</Text>
-          <Text style={styles.headerSubtitle}>
-            Live infrastructure heartbeat & microservices telemetry • Production Environment
+      <View style={styles.headerSection}>
+        <View>
+          <Text style={styles.pageTitle}>System Health & Observability</Text>
+          <Text style={styles.pageSubtitle}>
+            Live platform uptime, microservice roundtrip latency, and infrastructure diagnostics
           </Text>
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={checkSubsystemHealth} disabled={loading}>
-          <RefreshCw size={13} color="#FFFFFF" style={{ marginRight: 6 }} />
-          <Text style={styles.refreshBtnText}>{loading ? 'Testing...' : 'Run Probe'}</Text>
+        <TouchableOpacity style={styles.primaryActionBtn} onPress={checkSubsystemHealth} disabled={loading}>
+          <RefreshCw size={12} color={ADMIN_COLORS.textInverse} style={{ marginRight: 5 }} />
+          <Text style={styles.primaryActionBtnText}>{loading ? 'Testing...' : 'Run Diagnostics'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Top Stat Overview */}
+      {/* KPI Overview Grid */}
       <View style={styles.statsRow}>
         <AdminStatCard 
-          label="Overall Platform Uptime" 
+          label="Platform Availability" 
           value="99.98%" 
-          subtext="Zero P0 outages in last 30 days" 
+          subtext="Zero P0 downtime in 30 days" 
           variant="emerald" 
         />
         <AdminStatCard 
-          label="Average Edge Latency" 
+          label="Edge Gateway Latency" 
           value={`${averageLatency || 42} ms`} 
-          subtext="Across global CDN & edge nodes" 
+          subtext="Across global CDN endpoints" 
           variant="emerald" 
         />
         <AdminStatCard 
-          label="Database Connection Pool" 
-          value="HEALTHY" 
+          label="Database Pooler" 
+          value="OPERATIONAL" 
           subtext="Direct PgBouncer pooler active" 
           variant="default" 
         />
@@ -274,24 +282,51 @@ export const AdminSystemHealthView: React.FC = () => {
       {/* Services Table Card */}
       <View style={styles.tableCard}>
         <View style={styles.tableCardHeader}>
-          <Text style={styles.tableCardTitle}>Core Microservices & External Gateways</Text>
-          <Text style={styles.tableCardSub}>Live roundtrip health probes to critical backend endpoints</Text>
+          <Text style={styles.tableCardTitle}>Core Microservices & Gateways</Text>
+          <Text style={styles.tableCardSub}>Live roundtrip health probes to backend infrastructure</Text>
         </View>
 
         {loading ? (
           <View style={styles.loader}>
-            <ActivityIndicator size="large" color={ADMIN_COLORS.emeraldPrimary} />
+            <ActivityIndicator size="small" color={ADMIN_COLORS.emeraldPrimary} />
+            <Text style={styles.loadingText}>Probing microservice latency...</Text>
+          </View>
+        ) : isMobile ? (
+          <View style={styles.mobileListContainer}>
+            {metrics.map((m, idx) => (
+              <View key={idx} style={styles.recordCard}>
+                <View style={styles.recordHeader}>
+                  <View style={styles.serviceCell}>
+                    <Server size={13} color={ADMIN_COLORS.emeraldPrimary} />
+                    <Text style={styles.boldText}>{m.service}</Text>
+                  </View>
+                  <AdminBadge
+                    label={m.status}
+                    variant={m.status === 'HEALTHY' ? 'emerald' : m.status === 'DEGRADED' ? 'warning' : 'danger'}
+                    size="sm"
+                  />
+                </View>
+
+                <Text style={styles.cellSecondary}>{m.details}</Text>
+
+                <View style={styles.recordFooter}>
+                  <Text style={styles.cellMuted}>Latency: {m.latencyMs} ms</Text>
+                </View>
+              </View>
+            ))}
           </View>
         ) : (
-          <AdminDataTable columns={columns} data={metrics} emptyMessage="No service health data available." />
+          <View style={styles.tableWrapper}>
+            <AdminDataTable columns={columns} data={metrics} emptyMessage="No service health data available." />
+          </View>
         )}
       </View>
 
-      {/* System Telemetry & Edge Incident Feed */}
+      {/* Edge Diagnostics Feed */}
       <View style={styles.telemetryCard}>
         <View style={styles.tableCardHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Terminal size={16} color={ADMIN_COLORS.emeraldPrimary} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Terminal size={14} color={ADMIN_COLORS.emeraldPrimary} />
             <Text style={styles.tableCardTitle}>Edge Function & Worker Telemetry Stream</Text>
           </View>
           <Text style={styles.tableCardSub}>Real-time system diagnostics and worker execution events</Text>
@@ -304,52 +339,50 @@ export const AdminSystemHealthView: React.FC = () => {
               style={styles.logItem}
               onPress={() => setSelectedLog(log)}
             >
-              <View style={styles.logHeader}>
-                <View style={styles.logSourceRow}>
+              <View style={styles.logTopRow}>
+                <View style={styles.logLeft}>
                   <AdminBadge 
                     label={log.level} 
-                    variant={log.level === 'CRITICAL' ? 'danger' : log.level === 'WARN' ? 'warning' : 'neutral'} 
+                    variant={log.level === 'CRITICAL' ? 'danger' : log.level === 'WARN' ? 'warning' : 'info'} 
                     size="sm" 
                   />
-                  <Text style={styles.logSourceText}>{log.source}</Text>
+                  <Text style={styles.logSource}>{log.source}</Text>
                 </View>
-                <Text style={styles.logTimeText}>{log.timestamp}</Text>
+                <Text style={styles.logTime}>{log.timestamp}</Text>
               </View>
-              <Text style={styles.logMessageText}>{log.message}</Text>
+              <Text style={styles.logMessage}>{log.message}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Stack Trace Modal */}
+      {/* Diagnostic Log Detail Modal */}
       {selectedLog && (
-        <Modal
-          visible={true}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setSelectedLog(null)}
-        >
+        <Modal visible={true} transparent={true} animationType="fade" onRequestClose={() => setSelectedLog(null)}>
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Execution Diagnostic: {selectedLog.source}</Text>
+                <Text style={styles.modalTitle}>Diagnostic Log #{selectedLog.id}</Text>
                 <TouchableOpacity onPress={() => setSelectedLog(null)} style={styles.closeBtn}>
-                  <Text style={styles.closeBtnText}>✕</Text>
+                  <X size={16} color={ADMIN_COLORS.textSecondary} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.modalMessage}>{selectedLog.message}</Text>
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Source Microservice:</Text>
+                  <Text style={styles.metaVal}>{selectedLog.source}</Text>
+                </View>
 
-              <View style={styles.codeBlock}>
-                <Text style={styles.codeText}>{selectedLog.stackTrace}</Text>
-              </View>
+                <Text style={[styles.metaLabel, { marginTop: 10 }]}>Log Output Narrative</Text>
+                <View style={styles.stackTraceBox}>
+                  <Text style={styles.stackTraceText}>{selectedLog.stackTrace}</Text>
+                </View>
+              </ScrollView>
 
               <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={styles.closeModalBtn}
-                  onPress={() => setSelectedLog(null)}
-                >
-                  <Text style={styles.closeModalBtnText}>Close Diagnostic</Text>
+                <TouchableOpacity style={styles.actionOutlineBtn} onPress={() => setSelectedLog(null)}>
+                  <Text style={styles.actionOutlineBtnText}>Close</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -363,206 +396,251 @@ export const AdminSystemHealthView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
   },
-  headerRow: {
+  headerSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  headerInfo: {
-    flex: 1,
+  pageTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
+    letterSpacing: -0.3,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
-  },
-  headerSubtitle: {
+  pageSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
   },
-  refreshBtn: {
+  primaryActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#059669',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: ADMIN_RADII.button,
   },
-  refreshBtnText: {
-    color: '#FFFFFF',
+  primaryActionBtnText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
+    color: ADMIN_COLORS.textInverse,
   },
   statsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 24,
-  },
-  tableCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-  },
-  tableCardHeader: {
+    gap: 12,
     marginBottom: 16,
   },
+  tableCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 14,
+    marginBottom: 16,
+  },
+  tableCardHeader: {
+    marginBottom: 12,
+  },
   tableCardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   tableCardSub: {
     fontSize: 12,
-    color: '#64748B',
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
+  },
+  tableWrapper: {
+    marginBottom: 4,
   },
   serviceCell: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flex: 1,
   },
   boldText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#0F172A',
-    fontSize: 13,
+    color: ADMIN_COLORS.textPrimary,
   },
-  cellText: {
-    color: '#059669',
-    fontWeight: '700',
-    fontSize: 13,
+  monoText: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: ADMIN_COLORS.textPrimary,
   },
   cellSecondary: {
-    color: '#475569',
-    fontSize: 12,
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  cellMuted: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textMuted,
   },
   loader: {
-    padding: 60,
+    padding: 32,
     alignItems: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
   },
   telemetryCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 14,
+    marginBottom: 24,
   },
   logsList: {
-    gap: 10,
+    gap: 8,
   },
   logItem: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 12,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
+    padding: 10,
+    gap: 4,
   },
-  logHeader: {
+  logTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
   },
-  logSourceRow: {
+  logLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
-  logSourceText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0F172A',
-    fontFamily: 'monospace',
-  },
-  logTimeText: {
+  logSource: {
     fontSize: 11,
-    color: '#94A3B8',
+    fontFamily: 'monospace',
+    color: ADMIN_COLORS.textSecondary,
   },
-  logMessageText: {
-    fontSize: 13,
-    color: '#334155',
-    lineHeight: 18,
+  logTime: {
+    fontSize: 10,
+    color: ADMIN_COLORS.textMuted,
   },
-
-  // Modal
+  logMessage: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
+    lineHeight: 16,
+  },
+  mobileListContainer: {
+    gap: 10,
+  },
+  recordCard: {
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
+    padding: 10,
+    gap: 6,
+  },
+  recordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recordFooter: {
+    borderTopWidth: 1,
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    paddingTop: 6,
+  },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 600,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
+    maxWidth: 500,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderRadius: ADMIN_RADII.modal,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    padding: 18,
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: ADMIN_COLORS.borderSubtle,
+    marginBottom: 14,
   },
   modalTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   closeBtn: {
     padding: 4,
   },
-  closeBtnText: {
-    fontSize: 16,
-    color: '#94A3B8',
+  modalScroll: {
+    marginBottom: 14,
   },
-  modalMessage: {
-    fontSize: 13,
-    color: '#334155',
-    marginBottom: 12,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  codeBlock: {
-    backgroundColor: '#0F172A',
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 16,
+  metaLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textLight,
   },
-  codeText: {
-    color: '#38BDF8',
+  metaVal: {
     fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
     fontFamily: 'monospace',
-    lineHeight: 18,
+  },
+  stackTraceBox: {
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.input,
+    padding: 10,
+    marginTop: 4,
+  },
+  stackTraceText: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    color: ADMIN_COLORS.textPrimary,
+    lineHeight: 16,
   },
   modalFooter: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    paddingTop: 12,
   },
-  closeModalBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
+  actionOutlineBtn: {
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: ADMIN_RADII.button,
   },
-  closeModalBtnText: {
+  actionOutlineBtnText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
+    fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
   },
 });

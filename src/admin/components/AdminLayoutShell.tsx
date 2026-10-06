@@ -105,13 +105,11 @@ export const AdminLayoutShell: React.FC<AdminLayoutShellProps> = ({
                   }}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.bottomTabIconBox, isTabActive && styles.bottomTabIconBoxActive]}>
-                    <IconComp
-                      size={20}
-                      color={isTabActive ? '#059669' : '#64748B'}
-                      strokeWidth={isTabActive ? 2.4 : 1.8}
-                    />
-                  </View>
+                  <IconComp
+                    size={19}
+                    color={isTabActive ? ADMIN_COLORS.emeraldPrimary : ADMIN_COLORS.textMuted}
+                    strokeWidth={isTabActive ? 2.4 : 1.8}
+                  />
                   <Text style={[styles.bottomTabLabel, isTabActive && styles.bottomTabLabelActive]}>
                     {tab.label}
                   </Text>
@@ -145,30 +143,28 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     backgroundColor: '#F8FAFC',
+    maxWidth: 1600,
+    width: '100%',
+    alignSelf: 'center',
   },
   mobileViewContainer: {
-    padding: 16,
-    paddingBottom: 76, // Safe space for bottom tab bar
+    padding: 14,
+    paddingBottom: 72, // Safe space for 56px bottom tab bar
+    maxWidth: '100%',
   },
   bottomTabBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 64,
+    height: 56,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: ADMIN_COLORS.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 8,
-    paddingBottom: 4,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 8,
     zIndex: 90,
   },
   bottomTabItem: {
@@ -176,22 +172,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 6,
-  },
-  bottomTabIconBox: {
-    padding: 4,
-    borderRadius: 12,
-  },
-  bottomTabIconBoxActive: {
-    backgroundColor: '#ECFDF5',
+    gap: 3,
   },
   bottomTabLabel: {
     fontSize: 10,
-    fontWeight: '600',
-    color: '#64748B',
-    marginTop: 2,
+    fontWeight: '500',
+    color: ADMIN_COLORS.textMuted,
   },
   bottomTabLabelActive: {
-    color: '#059669',
+    color: ADMIN_COLORS.emeraldPrimary,
     fontWeight: '700',
   },
   drawerBackdrop: {
@@ -208,16 +197,16 @@ const styles = StyleSheet.create({
     right: 0,
   },
   drawerContent: {
-    width: 270,
-    maxWidth: '82%',
+    width: 250,
+    maxWidth: '80%',
     height: '100%',
     backgroundColor: '#FFFFFF',
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
+    borderRightWidth: 1,
+    borderRightColor: ADMIN_COLORS.border,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 20,
     zIndex: 10000,

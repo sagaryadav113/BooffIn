@@ -1,5 +1,5 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — TRUST & SAFETY REPORTS WORKBENCH (INSTAGRAM/META STYLE)
+// BOOFFIN ADMIN PORTAL — TRUST & SAFETY REPORTS WORKBENCH
 // ============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -11,9 +11,10 @@ import {
   ActivityIndicator, 
   TouchableOpacity, 
   Modal, 
-  TextInput 
+  TextInput,
+  useWindowDimensions 
 } from 'react-native';
-import { ADMIN_COLORS } from '../lib/constants';
+import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminReportService } from '../services/adminReportService';
@@ -29,16 +30,17 @@ import {
   Eye, 
   Trash2, 
   Ban, 
-  MessageSquare, 
-  UserX,
-  FileText,
   Search,
-  Check
+  X,
+  FileText
 } from 'lucide-react-native';
 
-type CategoryFilter = 'ALL' | 'SCIENTIFIC_INTEGRITY' | 'COPYRIGHT' | 'HARASSMENT' | 'DECEPTIVE_AI' | 'SPAM' | 'OTHER';
+type CategoryFilter = 'ALL' | 'SCIENTIFIC_INTEGRITY' | 'COPYRIGHT' | 'HARASSMENT' | 'DECEPTIVE_AI' | 'SPAM';
 
 export const AdminReportsView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [statusFilter, setStatusFilter] = useState<'PENDING' | 'RESOLVED' | undefined>('PENDING');
@@ -115,9 +117,9 @@ export const AdminReportsView: React.FC = () => {
       if (selectedAction === 'DISMISS') {
         const res = await adminReportService.resolveReport(selectedReport.id, 'DISMISSED', adminRationale || 'Dismissed: No community violation found');
         if (res.error) throw res.error;
-        setActionSuccessMessage(`Report ${selectedReport.id.slice(0, 8)} successfully dismissed.`);
+        setActionSuccessMessage(`Report ${selectedReport.id.slice(0, 8)} marked as dismissed.`);
       } else if (selectedAction === 'WARNING') {
-        const res = await adminReportService.resolveReport(selectedReport.id, 'RESOLVED', adminRationale || 'Official academic warning issued to researcher');
+        const res = await adminReportService.resolveReport(selectedReport.id, 'RESOLVED', adminRationale || 'Official academic warning issued');
         if (res.error) throw res.error;
         setActionSuccessMessage(`Academic warning recorded and report resolved.`);
       } else if (selectedAction === 'TAKEDOWN') {
@@ -126,11 +128,11 @@ export const AdminReportsView: React.FC = () => {
         }
         const res = await adminReportService.resolveReport(selectedReport.id, 'RESOLVED', adminRationale || 'Violating content removed from platform');
         if (res.error) throw res.error;
-        setActionSuccessMessage(`Content removed and report marked resolved.`);
+        setActionSuccessMessage(`Content removed and incident case closed.`);
       } else if (selectedAction === 'SUSPEND') {
-        const res = await adminReportService.resolveReport(selectedReport.id, 'RESOLVED', adminRationale || 'Target account suspended for repeated/critical violations');
+        const res = await adminReportService.resolveReport(selectedReport.id, 'RESOLVED', adminRationale || 'Account suspended for repeated violation');
         if (res.error) throw res.error;
-        setActionSuccessMessage(`Account suspension action recorded to audit logs.`);
+        setActionSuccessMessage(`Suspension action recorded to platform audit log.`);
       }
 
       setIsActionModalOpen(false);
@@ -146,32 +148,32 @@ export const AdminReportsView: React.FC = () => {
   const columns: ColumnDef<AdminReport>[] = [
     {
       key: 'reason',
-      header: 'Violation Category',
-      width: 220,
+      header: 'VIOLATION CATEGORY',
+      width: 200,
       render: (r) => (
         <View style={styles.reasonCell}>
-          <Flag size={14} color={ADMIN_COLORS.danger} style={{ marginTop: 2 }} />
-          <View>
-            <Text style={styles.boldText}>{r.reason}</Text>
-            <Text style={styles.cellMuted}>ID: {r.id.slice(0, 8)}...</Text>
+          <Flag size={13} color={ADMIN_COLORS.statusDangerText} style={{ marginTop: 2 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.boldText} numberOfLines={1}>{r.reason}</Text>
+            <Text style={styles.cellMuted}>ID #{r.id.slice(0, 8)}</Text>
           </View>
         </View>
       ),
     },
     {
       key: 'details',
-      header: 'Context & Submitter Evidence',
-      width: 300,
+      header: 'SUBMITTER EVIDENCE',
+      width: 280,
       render: (r) => (
         <Text style={styles.cellText} numberOfLines={2}>
-          {r.details || 'No additional evidence text provided.'}
+          {r.details || 'No specific textual narrative provided.'}
         </Text>
       ),
     },
     {
       key: 'status',
-      header: 'Review State',
-      width: 140,
+      header: 'STATE',
+      width: 120,
       render: (r) => (
         <AdminBadge
           label={r.status}
@@ -182,8 +184,8 @@ export const AdminReportsView: React.FC = () => {
     },
     {
       key: 'created_at',
-      header: 'Reported Date',
-      width: 150,
+      header: 'REPORTED',
+      width: 120,
       render: (r) => (
         <Text style={styles.cellMuted}>
           {new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -192,37 +194,38 @@ export const AdminReportsView: React.FC = () => {
     },
     {
       key: 'actions',
-      header: 'Enforcement Action',
-      width: 220,
+      header: 'ENFORCEMENT',
+      width: 200,
+      align: 'right',
       render: (r) => (
         <View style={styles.actionRow}>
           <TouchableOpacity
-            style={styles.inspectBtn}
+            style={styles.actionOutlineBtn}
             onPress={() => setSelectedReport(r)}
           >
-            <Eye size={12} color={ADMIN_COLORS.textSecondary} />
-            <Text style={styles.inspectBtnText}>Inspect</Text>
+            <Eye size={11} color={ADMIN_COLORS.textSecondary} />
+            <Text style={styles.actionOutlineBtnText}>Inspect</Text>
           </TouchableOpacity>
 
           {r.status === 'PENDING' ? (
             <>
               <TouchableOpacity
-                style={styles.resolveBtn}
+                style={styles.actionEmeraldBtn}
                 onPress={() => handleOpenActionModal(r, 'TAKEDOWN')}
               >
-                <ShieldAlert size={12} color="#03543F" />
-                <Text style={styles.resolveBtnText}>Enforce</Text>
+                <ShieldAlert size={11} color={ADMIN_COLORS.emeraldPrimary} />
+                <Text style={styles.actionEmeraldBtnText}>Enforce</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.dismissBtn}
+                style={styles.actionDangerBtn}
                 onPress={() => handleOpenActionModal(r, 'DISMISS')}
               >
-                <XCircle size={12} color="#475569" />
-                <Text style={styles.dismissBtnText}>Dismiss</Text>
+                <XCircle size={11} color={ADMIN_COLORS.statusDangerText} />
+                <Text style={styles.actionDangerBtnText}>Dismiss</Text>
               </TouchableOpacity>
             </>
           ) : (
-            <Text style={styles.resolvedText}>Completed</Text>
+            <Text style={styles.cellMuted}>Resolved</Text>
           )}
         </View>
       ),
@@ -232,69 +235,65 @@ export const AdminReportsView: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.headerRow}>
+      <View style={styles.headerSection}>
         <View>
-          <Text style={styles.pageTitle}>Trust & Safety Moderation Queue</Text>
+          <Text style={styles.pageTitle}>Trust & Safety Queue</Text>
           <Text style={styles.pageSubtitle}>
-            Live reports from researchers • Direct connection with public.reports ({filteredReports.length} in view)
+            Incident triage and enforcement workbench • public.reports ({filteredReports.length} queued)
           </Text>
         </View>
-
-        <TouchableOpacity style={styles.refreshBtn} onPress={() => loadReports(statusFilter)}>
-          <RefreshCw size={14} color={ADMIN_COLORS.textSecondary} />
-          <Text style={styles.refreshBtnText}>Sync Queue</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Notifications */}
       {actionSuccessMessage && (
         <View style={styles.successBox}>
-          <CheckCircle2 size={16} color={ADMIN_COLORS.emeraldPrimary} />
+          <CheckCircle2 size={15} color={ADMIN_COLORS.statusSuccessText} />
           <Text style={styles.successText}>{actionSuccessMessage}</Text>
         </View>
       )}
 
       {errorMessage && (
         <View style={styles.errorBox}>
-          <AlertTriangle size={16} color={ADMIN_COLORS.danger} />
+          <AlertTriangle size={15} color={ADMIN_COLORS.statusDangerText} />
           <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       )}
 
-      {/* Status & Search Filter Bar */}
-      <View style={styles.filterControlsBar}>
-        <View style={styles.tabsRow}>
+      {/* Unified Search & Status Filter Toolbar */}
+      <View style={styles.toolbarCard}>
+        {/* Status Segmented Control */}
+        <View style={styles.segmentedControl}>
           <TouchableOpacity
-            style={[styles.tabBtn, statusFilter === 'PENDING' && styles.tabBtnActive]}
+            style={[styles.segmentBtn, statusFilter === 'PENDING' && styles.segmentBtnActive]}
             onPress={() => setStatusFilter('PENDING')}
           >
-            <Text style={[styles.tabBtnText, statusFilter === 'PENDING' && styles.tabBtnTextActive]}>
+            <Text style={[styles.segmentText, statusFilter === 'PENDING' && styles.segmentTextActive]}>
               Pending Review
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabBtn, statusFilter === 'RESOLVED' && styles.tabBtnActive]}
+            style={[styles.segmentBtn, statusFilter === 'RESOLVED' && styles.segmentBtnActive]}
             onPress={() => setStatusFilter('RESOLVED')}
           >
-            <Text style={[styles.tabBtnText, statusFilter === 'RESOLVED' && styles.tabBtnTextActive]}>
-              Resolved & Closed
+            <Text style={[styles.segmentText, statusFilter === 'RESOLVED' && styles.segmentTextActive]}>
+              Resolved
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabBtn, statusFilter === undefined && styles.tabBtnActive]}
+            style={[styles.segmentBtn, statusFilter === undefined && styles.segmentBtnActive]}
             onPress={() => setStatusFilter(undefined)}
           >
-            <Text style={[styles.tabBtnText, statusFilter === undefined && styles.tabBtnTextActive]}>
-              All History
+            <Text style={[styles.segmentText, statusFilter === undefined && styles.segmentTextActive]}>
+              All
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Search Input */}
-        <View style={styles.searchBox}>
-          <Search size={14} color={ADMIN_COLORS.textMuted} />
+        <View style={styles.searchInputGroup}>
+          <Search size={14} color={ADMIN_COLORS.textMuted} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search report reason, ID, or keywords..."
@@ -302,82 +301,142 @@ export const AdminReportsView: React.FC = () => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <X size={13} color={ADMIN_COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
+
+        <TouchableOpacity style={styles.refreshIconBtn} onPress={() => loadReports(statusFilter)}>
+          <RefreshCw size={13} color={ADMIN_COLORS.textSecondary} />
+        </TouchableOpacity>
       </View>
 
-      {/* Category Triage Chips (Instagram Style) */}
-      <View style={styles.categoryChipsRow}>
+      {/* Category Triage Filter Pills */}
+      <View style={styles.categoryPillsRow}>
         <TouchableOpacity
-          style={[styles.chip, categoryFilter === 'ALL' && styles.chipActive]}
+          style={[styles.catPill, categoryFilter === 'ALL' && styles.catPillActive]}
           onPress={() => setCategoryFilter('ALL')}
         >
-          <Text style={[styles.chipText, categoryFilter === 'ALL' && styles.chipTextActive]}>All Queues</Text>
+          <Text style={[styles.catPillText, categoryFilter === 'ALL' && styles.catPillTextActive]}>All Queues</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.chip, categoryFilter === 'SCIENTIFIC_INTEGRITY' && styles.chipActive]}
+          style={[styles.catPill, categoryFilter === 'SCIENTIFIC_INTEGRITY' && styles.catPillActive]}
           onPress={() => setCategoryFilter('SCIENTIFIC_INTEGRITY')}
         >
-          <Text style={[styles.chipText, categoryFilter === 'SCIENTIFIC_INTEGRITY' && styles.chipTextActive]}>
-            🔬 Scientific Integrity
+          <Text style={[styles.catPillText, categoryFilter === 'SCIENTIFIC_INTEGRITY' && styles.catPillTextActive]}>
+            Scientific Integrity
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.chip, categoryFilter === 'COPYRIGHT' && styles.chipActive]}
+          style={[styles.catPill, categoryFilter === 'COPYRIGHT' && styles.catPillActive]}
           onPress={() => setCategoryFilter('COPYRIGHT')}
         >
-          <Text style={[styles.chipText, categoryFilter === 'COPYRIGHT' && styles.chipTextActive]}>
-            ⚖️ Copyright & IP
+          <Text style={[styles.catPillText, categoryFilter === 'COPYRIGHT' && styles.catPillTextActive]}>
+            Copyright & IP
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.chip, categoryFilter === 'DECEPTIVE_AI' && styles.chipActive]}
+          style={[styles.catPill, categoryFilter === 'DECEPTIVE_AI' && styles.catPillActive]}
           onPress={() => setCategoryFilter('DECEPTIVE_AI')}
         >
-          <Text style={[styles.chipText, categoryFilter === 'DECEPTIVE_AI' && styles.chipTextActive]}>
-            🤖 Undisclosed AI
+          <Text style={[styles.catPillText, categoryFilter === 'DECEPTIVE_AI' && styles.catPillTextActive]}>
+            Deceptive AI
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.chip, categoryFilter === 'HARASSMENT' && styles.chipActive]}
+          style={[styles.catPill, categoryFilter === 'HARASSMENT' && styles.catPillActive]}
           onPress={() => setCategoryFilter('HARASSMENT')}
         >
-          <Text style={[styles.chipText, categoryFilter === 'HARASSMENT' && styles.chipTextActive]}>
-            🛡️ Harassment
+          <Text style={[styles.catPillText, categoryFilter === 'HARASSMENT' && styles.catPillTextActive]}>
+            Harassment
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.chip, categoryFilter === 'SPAM' && styles.chipActive]}
+          style={[styles.catPill, categoryFilter === 'SPAM' && styles.catPillActive]}
           onPress={() => setCategoryFilter('SPAM')}
         >
-          <Text style={[styles.chipText, categoryFilter === 'SPAM' && styles.chipTextActive]}>
-            🚫 Spam & Scams
+          <Text style={[styles.catPillText, categoryFilter === 'SPAM' && styles.catPillTextActive]}>
+            Spam
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Table Card */}
-      <View style={styles.tableCard}>
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={ADMIN_COLORS.emeraldPrimary} />
-          </View>
-        ) : (
+      {/* Main Content: Mobile Record Cards vs Desktop Table */}
+      {loading ? (
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="small" color={ADMIN_COLORS.emeraldPrimary} />
+          <Text style={styles.loadingText}>Loading safety queue...</Text>
+        </View>
+      ) : isMobile ? (
+        /* Mobile Structured Record Cards */
+        <View style={styles.mobileListContainer}>
+          {filteredReports.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Queue is Clean</Text>
+              <Text style={styles.emptySub}>No pending incidents match current filters.</Text>
+            </View>
+          ) : (
+            filteredReports.map((r) => (
+              <View key={r.id} style={styles.recordCard}>
+                <View style={styles.recordHeader}>
+                  <View style={styles.recordCategoryGroup}>
+                    <Flag size={13} color={ADMIN_COLORS.statusDangerText} />
+                    <Text style={styles.boldText}>{r.reason}</Text>
+                  </View>
+                  <AdminBadge
+                    label={r.status}
+                    variant={r.status === 'PENDING' ? 'warning' : 'emerald'}
+                    size="sm"
+                  />
+                </View>
+
+                <Text style={styles.recordDetailText} numberOfLines={2}>
+                  {r.details || 'No detailed evidence text provided.'}
+                </Text>
+
+                <View style={styles.recordFooter}>
+                  <Text style={styles.cellMuted}>ID #{r.id.slice(0, 8)}</Text>
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={styles.actionOutlineBtn}
+                      onPress={() => setSelectedReport(r)}
+                    >
+                      <Eye size={11} color={ADMIN_COLORS.textSecondary} />
+                      <Text style={styles.actionOutlineBtnText}>Inspect</Text>
+                    </TouchableOpacity>
+
+                    {r.status === 'PENDING' && (
+                      <TouchableOpacity
+                        style={styles.actionEmeraldBtn}
+                        onPress={() => handleOpenActionModal(r, 'TAKEDOWN')}
+                      >
+                        <ShieldAlert size={11} color={ADMIN_COLORS.emeraldPrimary} />
+                        <Text style={styles.actionEmeraldBtnText}>Enforce</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      ) : (
+        /* Desktop High-Density Table */
+        <View style={styles.tableWrapper}>
           <AdminDataTable
             columns={columns}
             data={filteredReports}
-            emptyMessage={
-              statusFilter === 'PENDING'
-                ? 'No active pending moderation reports in this queue. Platform integrity is clean!'
-                : 'No reports found matching your criteria.'
-            }
+            emptyMessage="No reports found matching your criteria."
           />
-        )}
-      </View>
+        </View>
+      )}
 
       {/* Incident Inspector Modal */}
       {selectedReport && !isActionModalOpen && (
@@ -388,88 +447,78 @@ export const AdminReportsView: React.FC = () => {
           onRequestClose={() => setSelectedReport(null)}
         >
           <View style={styles.modalBackdrop}>
-            <View style={styles.inspectorModalCard}>
+            <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
                 <View style={styles.modalHeaderTitleRow}>
-                  <ShieldAlert size={20} color={ADMIN_COLORS.danger} />
+                  <ShieldAlert size={16} color={ADMIN_COLORS.statusDangerText} />
                   <Text style={styles.modalTitle}>Incident Case #{selectedReport.id.slice(0, 8)}</Text>
                 </View>
                 <TouchableOpacity onPress={() => setSelectedReport(null)} style={styles.closeBtn}>
-                  <Text style={styles.closeBtnText}>✕</Text>
+                  <X size={16} color={ADMIN_COLORS.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-                {/* Case Status & Timestamp */}
-                <View style={styles.inspectorRow}>
-                  <View style={styles.inspectorMetaItem}>
+                <View style={styles.metaGrid}>
+                  <View style={styles.metaCard}>
                     <Text style={styles.inspectorLabel}>Status</Text>
                     <AdminBadge label={selectedReport.status} variant={selectedReport.status === 'PENDING' ? 'warning' : 'emerald'} size="sm" />
                   </View>
-                  <View style={styles.inspectorMetaItem}>
+                  <View style={styles.metaCard}>
                     <Text style={styles.inspectorLabel}>Submitted</Text>
-                    <Text style={styles.inspectorValue}>
-                      {new Date(selectedReport.created_at).toLocaleString()}
-                    </Text>
+                    <Text style={styles.metaVal}>{new Date(selectedReport.created_at).toLocaleDateString()}</Text>
                   </View>
-                  <View style={styles.inspectorMetaItem}>
-                    <Text style={styles.inspectorLabel}>Entity Target</Text>
-                    <Text style={styles.inspectorValue}>
-                      {selectedReport.post_id ? `Post #${selectedReport.post_id.slice(0, 8)}` : 'Researcher Profile'}
+                  <View style={styles.metaCard}>
+                    <Text style={styles.inspectorLabel}>Target Entity</Text>
+                    <Text style={styles.metaVal}>
+                      {selectedReport.post_id ? `Post #${selectedReport.post_id.slice(0, 8)}` : 'Profile'}
                     </Text>
                   </View>
                 </View>
 
-                {/* Violation Category */}
                 <View style={styles.incidentSection}>
-                  <Text style={styles.inspectorLabel}>Alleged Violation Category</Text>
-                  <View style={styles.categoryBadgeRow}>
-                    <Text style={styles.categoryBadgeText}>{selectedReport.reason}</Text>
+                  <Text style={styles.inspectorLabel}>Violation Category</Text>
+                  <View style={styles.categoryTag}>
+                    <Text style={styles.categoryTagText}>{selectedReport.reason}</Text>
                   </View>
                 </View>
 
-                {/* Submitter Details & Evidence */}
                 <View style={styles.incidentSection}>
-                  <Text style={styles.inspectorLabel}>Submitter Context & Evidence Note</Text>
+                  <Text style={styles.inspectorLabel}>Submitter Narrative & Evidence</Text>
                   <View style={styles.detailsContentBox}>
                     <Text style={styles.detailsContentText}>
-                      {selectedReport.details || 'No additional written narrative submitted.'}
+                      {selectedReport.details || 'No additional narrative submitted.'}
                     </Text>
                   </View>
-                </View>
-
-                {/* Prior History Note */}
-                <View style={styles.incidentSection}>
-                  <Text style={styles.inspectorLabel}>Platform Integrity Intelligence</Text>
-                  <Text style={styles.intelligenceText}>
-                    • Target entity has 0 previous confirmed strikes in the last 90 days.
-                    • Reporter account is verified with high signal reputation.
-                  </Text>
                 </View>
               </ScrollView>
 
-              {/* Inspector Footer Actions */}
               <View style={styles.modalFooter}>
                 <TouchableOpacity
-                  style={styles.footerDismissBtn}
-                  onPress={() => handleOpenActionModal(selectedReport, 'DISMISS')}
+                  style={styles.actionOutlineBtn}
+                  onPress={() => setSelectedReport(null)}
                 >
-                  <Text style={styles.footerDismissBtnText}>Dismiss Report</Text>
+                  <Text style={styles.actionOutlineBtnText}>Close</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.footerEnforceBtn}
-                  onPress={() => handleOpenActionModal(selectedReport, 'TAKEDOWN')}
-                >
-                  <Text style={styles.footerEnforceBtnText}>Take Moderation Action</Text>
-                </TouchableOpacity>
+                {selectedReport.status === 'PENDING' && (
+                  <TouchableOpacity
+                    style={styles.primaryActionBtn}
+                    onPress={() => {
+                      const rep = selectedReport;
+                      setSelectedReport(null);
+                      handleOpenActionModal(rep, 'TAKEDOWN');
+                    }}
+                  >
+                    <Text style={styles.primaryActionBtnText}>Take Action</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
         </Modal>
       )}
 
-      {/* Enforcement Decision Action Modal */}
+      {/* Enforcement Decision Modal */}
       {isActionModalOpen && selectedReport && (
         <Modal
           visible={true}
@@ -478,98 +527,90 @@ export const AdminReportsView: React.FC = () => {
           onRequestClose={() => setIsActionModalOpen(false)}
         >
           <View style={styles.modalBackdrop}>
-            <View style={styles.actionModalCard}>
+            <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Execute Moderation Enforcement</Text>
+                <View style={styles.modalHeaderTitleRow}>
+                  <ShieldAlert size={16} color={ADMIN_COLORS.emeraldPrimary} />
+                  <Text style={styles.modalTitle}>Enforce Moderation Action</Text>
+                </View>
                 <TouchableOpacity onPress={() => setIsActionModalOpen(false)} style={styles.closeBtn}>
-                  <Text style={styles.closeBtnText}>✕</Text>
+                  <X size={16} color={ADMIN_COLORS.textSecondary} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.actionModalSub}>
-                Select the graduated enforcement action to apply against this case. All actions are cryptographically sealed in the audit logs.
-              </Text>
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                <Text style={styles.inspectorLabel}>Select Resolution Type</Text>
+                <View style={styles.actionTypeGrid}>
+                  <TouchableOpacity
+                    style={[styles.actionOption, selectedAction === 'DISMISS' && styles.actionOptionActive]}
+                    onPress={() => setSelectedAction('DISMISS')}
+                  >
+                    <Text style={[styles.actionOptionTitle, selectedAction === 'DISMISS' && styles.actionOptionTitleActive]}>
+                      Dismiss Report
+                    </Text>
+                    <Text style={styles.actionOptionSub}>No platform violation identified</Text>
+                  </TouchableOpacity>
 
-              {/* Action Selection Grid */}
-              <View style={styles.actionOptionGrid}>
-                <TouchableOpacity
-                  style={[styles.actionOptionCard, selectedAction === 'DISMISS' && styles.actionOptionCardActive]}
-                  onPress={() => setSelectedAction('DISMISS')}
-                >
-                  <Check size={16} color={selectedAction === 'DISMISS' ? ADMIN_COLORS.emeraldPrimary : ADMIN_COLORS.textMuted} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.actionOptionTitle}>Dismiss (No Violation)</Text>
-                    <Text style={styles.actionOptionDesc}>Acceptable scientific discourse / insufficient evidence.</Text>
-                  </View>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionOption, selectedAction === 'WARNING' && styles.actionOptionActive]}
+                    onPress={() => setSelectedAction('WARNING')}
+                  >
+                    <Text style={[styles.actionOptionTitle, selectedAction === 'WARNING' && styles.actionOptionTitleActive]}>
+                      Issue Warning
+                    </Text>
+                    <Text style={styles.actionOptionSub}>Formal academic warning to user</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.actionOptionCard, selectedAction === 'WARNING' && styles.actionOptionCardActive]}
-                  onPress={() => setSelectedAction('WARNING')}
-                >
-                  <AlertTriangle size={16} color={selectedAction === 'WARNING' ? '#D97706' : ADMIN_COLORS.textMuted} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.actionOptionTitle}>Issue Official Academic Warning</Text>
-                    <Text style={styles.actionOptionDesc}>Send formal notice citing academic community standards.</Text>
-                  </View>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionOption, selectedAction === 'TAKEDOWN' && styles.actionOptionActive]}
+                    onPress={() => setSelectedAction('TAKEDOWN')}
+                  >
+                    <Text style={[styles.actionOptionTitle, selectedAction === 'TAKEDOWN' && styles.actionOptionTitleActive]}>
+                      Takedown Content
+                    </Text>
+                    <Text style={styles.actionOptionSub}>Remove post / discussion item</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.actionOptionCard, selectedAction === 'TAKEDOWN' && styles.actionOptionCardActive]}
-                  onPress={() => setSelectedAction('TAKEDOWN')}
-                >
-                  <Trash2 size={16} color={selectedAction === 'TAKEDOWN' ? ADMIN_COLORS.danger : ADMIN_COLORS.textMuted} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.actionOptionTitle}>Content Takedown & Feed Suppression</Text>
-                    <Text style={styles.actionOptionDesc}>Purge post from discovery feed, search index, and citations.</Text>
-                  </View>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionOption, selectedAction === 'SUSPEND' && styles.actionOptionActive]}
+                    onPress={() => setSelectedAction('SUSPEND')}
+                  >
+                    <Text style={[styles.actionOptionTitle, selectedAction === 'SUSPEND' && styles.actionOptionTitleActive]}>
+                      Suspend Account
+                    </Text>
+                    <Text style={styles.actionOptionSub}>Disable researcher access</Text>
+                  </TouchableOpacity>
+                </View>
 
-                <TouchableOpacity
-                  style={[styles.actionOptionCard, selectedAction === 'SUSPEND' && styles.actionOptionCardActive]}
-                  onPress={() => setSelectedAction('SUSPEND')}
-                >
-                  <Ban size={16} color={selectedAction === 'SUSPEND' ? ADMIN_COLORS.danger : ADMIN_COLORS.textMuted} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.actionOptionTitle}>Account Suspension & Strike</Text>
-                    <Text style={styles.actionOptionDesc}>Freeze researcher publishing and collaboration privileges.</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              {/* Mandatory Rationale */}
-              <View style={styles.rationaleContainer}>
-                <Text style={styles.inspectorLabel}>Moderator Rationale & Audit Note (Required)</Text>
+                <Text style={[styles.inspectorLabel, { marginTop: 12 }]}>Administrative Rationale</Text>
                 <TextInput
                   style={styles.rationaleInput}
-                  placeholder="State the justification, policy cited, or findings..."
+                  placeholder="State compliance justification for the audit trail..."
                   placeholderTextColor={ADMIN_COLORS.textMuted}
                   value={adminRationale}
                   onChangeText={setAdminRationale}
                   multiline={true}
                   numberOfLines={3}
                 />
-              </View>
+              </ScrollView>
 
-              {/* Action Modal Footer */}
               <View style={styles.modalFooter}>
                 <TouchableOpacity
-                  style={styles.cancelBtn}
+                  style={styles.actionOutlineBtn}
                   onPress={() => setIsActionModalOpen(false)}
-                  disabled={isSubmittingAction}
                 >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                  <Text style={styles.actionOutlineBtnText}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.confirmEnforceBtn}
+                  style={[styles.primaryActionBtn, isSubmittingAction && { opacity: 0.6 }]}
                   onPress={handleExecuteAction}
                   disabled={isSubmittingAction}
                 >
                   {isSubmittingAction ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.confirmEnforceBtnText}>Confirm Enforcement</Text>
+                    <Text style={styles.primaryActionBtnText}>Execute Action</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -584,136 +625,166 @@ export const AdminReportsView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+  headerSection: {
+    marginBottom: 16,
   },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
+    fontSize: 20,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
+    letterSpacing: -0.3,
   },
   pageSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
   },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  refreshBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  filterControlsBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
-  tabsRow: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-    padding: 4,
-    gap: 4,
-  },
-  tabBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  tabBtnActive: {
-    backgroundColor: '#ECFDF5',
-  },
-  tabBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  tabBtnTextActive: {
-    color: '#059669',
-    fontWeight: '700',
-  },
-  searchBox: {
+  successBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: ADMIN_COLORS.statusSuccessBg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 280,
+    borderColor: ADMIN_COLORS.statusSuccessBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
+  },
+  successText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.statusSuccessText,
+    fontWeight: '500',
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: ADMIN_COLORS.statusDangerBg,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.statusDangerBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
+  },
+  errorText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.statusDangerText,
+    fontWeight: '500',
+  },
+  toolbarCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: ADMIN_COLORS.bgHover,
+    padding: 2,
+    borderRadius: ADMIN_RADII.button,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+  },
+  segmentBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: ADMIN_RADII.badge,
+  },
+  segmentBtnActive: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+  },
+  segmentText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
+  },
+  segmentTextActive: {
+    color: ADMIN_COLORS.textPrimary,
+    fontWeight: '600',
+  },
+  searchInputGroup: {
+    flex: 1,
+    minWidth: 200,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.input,
+    paddingHorizontal: 10,
+    height: 34,
+  },
+  searchIcon: {
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
-    color: '#0F172A',
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
     padding: 0,
   },
-  categoryChipsRow: {
+  refreshIconBtn: {
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    padding: 7,
+    borderRadius: ADMIN_RADII.button,
+  },
+  categoryPillsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+    gap: 6,
+    marginBottom: 16,
   },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+  catPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: ADMIN_RADII.badge,
+    backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
   },
-  chipActive: {
-    backgroundColor: '#DEF7EC',
-    borderColor: '#BCF0DA',
+  catPillActive: {
+    backgroundColor: ADMIN_COLORS.bgActive,
+    borderColor: ADMIN_COLORS.emeraldBorder,
   },
-  chipText: {
-    fontSize: 12,
+  catPillText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
+  },
+  catPillTextActive: {
+    color: ADMIN_COLORS.emeraldPrimary,
     fontWeight: '600',
-    color: '#64748B',
   },
-  chipTextActive: {
-    color: '#03543F',
-    fontWeight: '700',
-  },
-  tableCard: {
-    backgroundColor: '#FFFFFF',
+  loadingCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-  },
-  centerContainer: {
-    paddingVertical: 40,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  tableWrapper: {
+    marginBottom: 24,
   },
   reasonCell: {
     flexDirection: 'row',
@@ -721,335 +792,285 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   boldText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   cellText: {
-    fontSize: 13,
-    color: '#334155',
-    lineHeight: 18,
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
   },
   cellMuted: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 11,
+    color: ADMIN_COLORS.textMuted,
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  inspectBtn: {
+  actionOutlineBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: ADMIN_RADII.button,
   },
-  inspectBtnText: {
+  actionOutlineBtnText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  resolveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#DEF7EC',
-    borderWidth: 1,
-    borderColor: '#BCF0DA',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  resolveBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#03543F',
-  },
-  dismissBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  dismissBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  resolvedText: {
-    fontSize: 11,
-    fontStyle: 'italic',
-    color: '#94A3B8',
-  },
-  successBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#DEF7EC',
-    borderWidth: 1,
-    borderColor: '#BCF0DA',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-  },
-  successText: {
-    fontSize: 12,
-    color: '#03543F',
-    fontWeight: '600',
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#991B1B',
     fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
   },
-
+  actionEmeraldBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: ADMIN_COLORS.bgActive,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.emeraldBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: ADMIN_RADII.button,
+  },
+  actionEmeraldBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: ADMIN_COLORS.emeraldPrimary,
+  },
+  actionDangerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: ADMIN_COLORS.statusDangerBg,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.statusDangerBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: ADMIN_RADII.button,
+  },
+  actionDangerBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: ADMIN_COLORS.statusDangerText,
+  },
+  primaryActionBtn: {
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: ADMIN_RADII.button,
+  },
+  primaryActionBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textInverse,
+  },
+  // Mobile Card Styles
+  mobileListContainer: {
+    gap: 10,
+    marginBottom: 24,
+  },
+  recordCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 12,
+  },
+  recordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  recordCategoryGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  recordDetailText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+    lineHeight: 17,
+    marginBottom: 8,
+  },
+  recordFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    paddingTop: 8,
+  },
+  emptyCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  emptySub: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 4,
+  },
   // Modal Styles
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
-  inspectorModalCard: {
+  modalCard: {
     width: '100%',
-    maxWidth: 620,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    maxHeight: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-  },
-  actionModalCard: {
-    width: '100%',
-    maxWidth: 560,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+    maxWidth: 520,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderRadius: ADMIN_RADII.modal,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    padding: 18,
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
     paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: ADMIN_COLORS.borderSubtle,
+    marginBottom: 14,
   },
   modalHeaderTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   modalTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 15,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   closeBtn: {
     padding: 4,
   },
-  closeBtnText: {
-    fontSize: 16,
-    color: '#94A3B8',
-    fontWeight: '600',
-  },
   modalScroll: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  inspectorRow: {
+  metaGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
   },
-  inspectorMetaItem: {
+  metaCard: {
     flex: 1,
+    minWidth: '30%',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
+    padding: 8,
   },
   inspectorLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
+    fontSize: 10,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textLight,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 3,
   },
-  inspectorValue: {
-    fontSize: 13,
+  metaVal: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#0F172A',
+    color: ADMIN_COLORS.textPrimary,
   },
   incidentSection: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  categoryBadgeRow: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
+  categoryTag: {
+    backgroundColor: ADMIN_COLORS.statusDangerBg,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    borderColor: ADMIN_COLORS.statusDangerBorder,
+    borderRadius: ADMIN_RADII.badge,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     alignSelf: 'flex-start',
-    marginTop: 4,
+    marginTop: 2,
   },
-  categoryBadgeText: {
-    color: '#991B1B',
-    fontWeight: '700',
-    fontSize: 13,
+  categoryTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.statusDangerText,
   },
   detailsContentBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 14,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
+    padding: 10,
     marginTop: 4,
   },
   detailsContentText: {
-    fontSize: 13,
-    color: '#334155',
-    lineHeight: 20,
-  },
-  intelligenceText: {
     fontSize: 12,
-    color: '#64748B',
-    lineHeight: 18,
+    color: ADMIN_COLORS.textSecondary,
+    lineHeight: 17,
+  },
+  actionTypeGrid: {
+    gap: 6,
     marginTop: 4,
+  },
+  actionOption: {
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
+    padding: 10,
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+  },
+  actionOptionActive: {
+    borderColor: ADMIN_COLORS.emeraldPrimary,
+    backgroundColor: ADMIN_COLORS.bgActive,
+  },
+  actionOptionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  actionOptionTitleActive: {
+    color: ADMIN_COLORS.emeraldPrimary,
+  },
+  actionOptionSub: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 1,
+  },
+  rationaleInput: {
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.input,
+    padding: 8,
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
+    marginTop: 4,
+    textAlignVertical: 'top',
   },
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 12,
+    gap: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 16,
-  },
-  footerDismissBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
-  },
-  footerDismissBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  footerEnforceBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#059669',
-    borderRadius: 8,
-  },
-  footerEnforceBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-
-  // Action Grid
-  actionModalSub: {
-    fontSize: 13,
-    color: '#64748B',
-    marginBottom: 16,
-    lineHeight: 19,
-  },
-  actionOptionGrid: {
-    gap: 10,
-    marginBottom: 16,
-  },
-  actionOptionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-    padding: 12,
-  },
-  actionOptionCardActive: {
-    borderColor: '#059669',
-    backgroundColor: '#ECFDF5',
-  },
-  actionOptionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  actionOptionDesc: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  rationaleContainer: {
-    marginBottom: 16,
-  },
-  rationaleInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 13,
-    color: '#0F172A',
-    textAlignVertical: 'top',
-    minHeight: 70,
-    marginTop: 6,
-  },
-  cancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
-  },
-  cancelBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  confirmEnforceBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    backgroundColor: '#059669',
-    borderRadius: 8,
-    minWidth: 140,
-    alignItems: 'center',
-  },
-  confirmEnforceBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    paddingTop: 12,
   },
 });

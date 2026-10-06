@@ -1,17 +1,28 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — IMMUTABLE AUDIT LOGS VIEW (LIGHT SAAS METIS STYLE)
+// BOOFFIN ADMIN PORTAL — IMMUTABLE COMPLIANCE AUDIT TRAIL
 // ============================================================================
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { ADMIN_COLORS } from '../lib/constants';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  ActivityIndicator, 
+  TouchableOpacity,
+  useWindowDimensions 
+} from 'react-native';
+import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminAuditService } from '../services/adminAuditService';
 import { AdminAuditLog } from '../types/audit';
-import { FileText, RefreshCw, ShieldCheck, Lock } from 'lucide-react-native';
+import { FileText, RefreshCw, ShieldCheck, Lock, AlertTriangle } from 'lucide-react-native';
 
 export const AdminAuditLogsView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<AdminAuditLog[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -37,26 +48,26 @@ export const AdminAuditLogsView: React.FC = () => {
   const columns: ColumnDef<AdminAuditLog>[] = [
     {
       key: 'action',
-      header: 'Audit Action',
-      width: 190,
-      render: (l) => <Text style={styles.boldText}>{l.action}</Text>,
+      header: 'AUDIT ACTION',
+      width: 200,
+      render: (l) => <Text style={styles.boldText} numberOfLines={1}>{l.action}</Text>,
     },
     {
       key: 'actor_role',
-      header: 'Actor Role',
+      header: 'ACTOR ROLE',
       width: 140,
       render: (l) => <AdminBadge label={l.actor_role} variant="emerald" size="sm" />,
     },
     {
       key: 'target_type',
-      header: 'Target Resource',
+      header: 'TARGET RESOURCE',
       width: 140,
       render: (l) => <Text style={styles.cellText}>{l.target_type}</Text>,
     },
     {
       key: 'reason',
-      header: 'Compliance Justification',
-      width: 280,
+      header: 'COMPLIANCE JUSTIFICATION',
+      width: 260,
       render: (l) => (
         <Text style={styles.cellSecondary} numberOfLines={2}>
           {l.reason || '—'}
@@ -65,8 +76,8 @@ export const AdminAuditLogsView: React.FC = () => {
     },
     {
       key: 'success',
-      header: 'Result',
-      width: 110,
+      header: 'RESULT',
+      width: 100,
       render: (l) => (
         <AdminBadge
           label={l.success ? 'SUCCESS' : 'FAILED'}
@@ -77,8 +88,8 @@ export const AdminAuditLogsView: React.FC = () => {
     },
     {
       key: 'created_at',
-      header: 'Timestamp',
-      width: 160,
+      header: 'TIMESTAMP',
+      width: 150,
       render: (l) => (
         <Text style={styles.cellMuted}>
           {new Date(l.created_at).toLocaleString(undefined, {
@@ -95,51 +106,81 @@ export const AdminAuditLogsView: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.headerRow}>
+      <View style={styles.headerSection}>
         <View>
           <Text style={styles.pageTitle}>Immutable Compliance Audit Trail</Text>
-          <Text style={styles.pageSubtitle}>Authoritative append-only log from public.admin_audit_logs ({logs.length} events)</Text>
+          <Text style={styles.pageSubtitle}>
+            Cryptographically sealed activity log from public.admin_audit_logs ({logs.length} events recorded)
+          </Text>
         </View>
 
-        <TouchableOpacity style={styles.refreshBtn} onPress={loadAuditLogs}>
-          <RefreshCw size={14} color="#475569" />
-          <Text style={styles.refreshBtnText}>Refresh Logs</Text>
+        <TouchableOpacity style={styles.refreshIconBtn} onPress={loadAuditLogs}>
+          <RefreshCw size={13} color={ADMIN_COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
 
       {/* Compliance Notice Banner */}
       <View style={styles.complianceBanner}>
-        <View style={styles.bannerIconBox}>
-          <ShieldCheck size={18} color="#059669" />
-        </View>
+        <ShieldCheck size={16} color={ADMIN_COLORS.emeraldPrimary} />
         <View style={styles.bannerTextGroup}>
-          <Text style={styles.bannerTitle}>Cryptographically Protected & Immutable</Text>
+          <Text style={styles.bannerTitle}>Cryptographically Protected & Append-Only</Text>
           <Text style={styles.bannerSubtitle}>
-            Zero UPDATE or DELETE policies exist on this table. Every administrative operation is permanently recorded with actor binding.
+            Zero UPDATE or DELETE policies exist on this audit table. Every operator action is permanently recorded with actor identity binding.
           </Text>
         </View>
       </View>
 
-      {errorMessage ? (
+      {errorMessage && (
         <View style={styles.errorBox}>
+          <AlertTriangle size={15} color={ADMIN_COLORS.statusDangerText} />
           <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
-      ) : null}
+      )}
 
-      {/* Table Card */}
-      <View style={styles.tableCard}>
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#059669" />
-          </View>
-        ) : (
+      {/* Main Content */}
+      {loading ? (
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="small" color={ADMIN_COLORS.emeraldPrimary} />
+          <Text style={styles.loadingText}>Verifying audit ledger...</Text>
+        </View>
+      ) : isMobile ? (
+        <View style={styles.mobileListContainer}>
+          {logs.map((l) => (
+            <View key={l.id} style={styles.recordCard}>
+              <View style={styles.recordHeader}>
+                <Text style={styles.boldText}>{l.action}</Text>
+                <AdminBadge
+                  label={l.success ? 'SUCCESS' : 'FAILED'}
+                  variant={l.success ? 'emerald' : 'danger'}
+                  size="sm"
+                />
+              </View>
+
+              <Text style={styles.cellSecondary}>Target: {l.target_type} • Role: {l.actor_role}</Text>
+              {l.reason && <Text style={styles.cellMuted}>{l.reason}</Text>}
+
+              <View style={styles.recordFooter}>
+                <Text style={styles.cellMuted}>
+                  {new Date(l.created_at).toLocaleString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.tableWrapper}>
           <AdminDataTable
             columns={columns}
             data={logs}
             emptyMessage="No audit logs recorded in database."
           />
-        )}
-      </View>
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -147,120 +188,132 @@ export const AdminAuditLogsView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
   },
-  headerRow: {
+  headerSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 10,
   },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
+    fontSize: 20,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
+    letterSpacing: -0.3,
   },
   pageSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
   },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFFFF',
+  refreshIconBtn: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  refreshBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
+    borderColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    padding: 7,
+    borderRadius: ADMIN_RADII.button,
   },
   complianceBanner: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 16,
+    borderColor: ADMIN_COLORS.emeraldBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 12,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#059669',
-  },
-  bannerIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#ECFDF5',
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: ADMIN_COLORS.emeraldPrimary,
   },
   bannerTextGroup: {
     flex: 1,
   },
   bannerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   bannerSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
-  },
-  tableCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-  },
-  centerContainer: {
-    paddingVertical: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  boldText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  cellText: {
-    fontSize: 13,
-    color: '#334155',
-  },
-  cellSecondary: {
-    fontSize: 12,
-    color: '#475569',
-  },
-  cellMuted: {
-    fontSize: 12,
-    color: '#64748B',
+    lineHeight: 16,
   },
   errorBox: {
-    backgroundColor: '#FEF2F2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: ADMIN_COLORS.statusDangerBg,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
+    borderColor: ADMIN_COLORS.statusDangerBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
   },
   errorText: {
     fontSize: 12,
-    color: '#991B1B',
+    color: ADMIN_COLORS.statusDangerText,
     fontWeight: '500',
+  },
+  loadingCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  tableWrapper: {
+    marginBottom: 24,
+  },
+  boldText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  cellText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
+  },
+  cellSecondary: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  cellMuted: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textMuted,
+  },
+  mobileListContainer: {
+    gap: 10,
+    marginBottom: 24,
+  },
+  recordCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 12,
+    gap: 6,
+  },
+  recordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recordFooter: {
+    borderTopWidth: 1,
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    paddingTop: 6,
+    marginTop: 2,
   },
 });

@@ -33,7 +33,7 @@ import {
   Eye,
   CheckCircle2,
 } from 'lucide-react-native';
-import { ADMIN_COLORS } from '../lib/constants';
+import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import {
   AdminCalendarEvent,
   CalendarColorId,
@@ -1662,7 +1662,7 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#475569',
+    color: ADMIN_COLORS.textSecondary,
   },
   newEventBtn: {
     flexDirection: 'row',
@@ -1670,8 +1670,8 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#4F46E5', // Indigo 600
+    borderRadius: ADMIN_RADII.button,
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
   },
   newEventBtnText: {
     fontSize: 13,
@@ -1682,16 +1682,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: ADMIN_COLORS.statusSuccessBg,
     borderBottomWidth: 1,
-    borderBottomColor: '#A7F3D0',
+    borderBottomColor: ADMIN_COLORS.statusSuccessBorder,
     paddingHorizontal: 24,
     paddingVertical: 10,
   },
   toastSuccessText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#064E3B',
+    color: ADMIN_COLORS.statusSuccessText,
   },
 
   // Main Layout Grid
@@ -1701,13 +1701,13 @@ const styles = StyleSheet.create({
   },
   gridContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: ADMIN_COLORS.bgSurface,
   },
   daysHeaderRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#FAFAFA',
+    borderBottomColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgCanvas,
   },
   timezoneBox: {
     width: 65,
@@ -1715,30 +1715,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRightWidth: 1,
-    borderRightColor: '#F1F5F9',
+    borderRightColor: ADMIN_COLORS.border,
   },
   timezoneText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: ADMIN_COLORS.textMuted,
   },
   dayHeaderCol: {
     flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
     borderRightWidth: 1,
-    borderRightColor: '#F1F5F9',
+    borderRightColor: ADMIN_COLORS.border,
   },
   dayHeaderColToday: {
-    backgroundColor: '#F5F3FF',
+    backgroundColor: ADMIN_COLORS.bgActive,
+    borderBottomWidth: 2,
+    borderBottomColor: ADMIN_COLORS.emeraldPrimary,
   },
   dayHeaderText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
+    color: ADMIN_COLORS.textSecondary,
   },
   dayHeaderTextToday: {
-    color: '#6D28D9',
+    color: ADMIN_COLORS.emeraldDark,
     fontWeight: '700',
   },
 
@@ -1746,8 +1748,8 @@ const styles = StyleSheet.create({
   allDayRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
     minHeight: 44,
   },
   allDayLabelBox: {
@@ -1756,24 +1758,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRightWidth: 1,
-    borderRightColor: '#F1F5F9',
+    borderRightColor: ADMIN_COLORS.border,
   },
   allDayLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#94A3B8',
+    color: ADMIN_COLORS.textMuted,
   },
   allDayCol: {
     flex: 1,
     padding: 4,
     borderRightWidth: 1,
-    borderRightColor: '#F1F5F9',
+    borderRightColor: ADMIN_COLORS.border,
     gap: 4,
   },
   allDayCapsule: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: ADMIN_RADII.badge,
     borderWidth: 1,
   },
   allDayCapsuleText: {
@@ -1792,24 +1794,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: 80,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: ADMIN_COLORS.borderSubtle,
   },
   hourLabelBox: {
     width: 65,
     paddingTop: 8,
     alignItems: 'center',
     borderRightWidth: 1,
-    borderRightColor: '#F1F5F9',
+    borderRightColor: ADMIN_COLORS.border,
   },
   hourLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#94A3B8',
+    color: ADMIN_COLORS.textMuted,
   },
   hourCell: {
     flex: 1,
     borderRightWidth: 1,
-    borderRightColor: '#F8FAFC',
+    borderRightColor: ADMIN_COLORS.borderSubtle,
   },
 
   // Current Live Time Marker Line
@@ -1822,8 +1824,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   currentTimeBadge: {
-    backgroundColor: '#8B5CF6',
-    borderRadius: 6,
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
+    borderRadius: ADMIN_RADII.badge,
     paddingHorizontal: 6,
     paddingVertical: 2,
     marginLeft: 6,
@@ -1837,7 +1839,7 @@ const styles = StyleSheet.create({
   currentTimeBar: {
     flex: 1,
     height: 2,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
   },
 
   // Event Blocks in Grid

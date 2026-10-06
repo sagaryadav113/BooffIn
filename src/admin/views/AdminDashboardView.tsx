@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop, Circle, Line, Text as SvgText } from 'react-native-svg';
-import { ADMIN_COLORS } from '../lib/constants';
+import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import { supabase } from '../../api/client';
 import { AdminStatCard } from '../components/AdminStatCard';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
@@ -305,7 +305,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             onPress={() => onNavigate?.('users')}
             activeOpacity={0.8}
           >
-            <Plus size={15} color="#FFFFFF" />
+            <Plus size={14} color="#FFFFFF" strokeWidth={2.2} />
             <Text style={styles.primaryBtnText}>Manage Users</Text>
           </TouchableOpacity>
 
@@ -315,7 +315,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             activeOpacity={0.7}
             accessibilityLabel="Refresh live data"
           >
-            <RefreshCw size={15} color="#475569" />
+            <RefreshCw size={14} color={ADMIN_COLORS.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -324,7 +324,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             activeOpacity={0.7}
             accessibilityLabel="View reports"
           >
-            <ShieldAlert size={15} color="#475569" />
+            <ShieldAlert size={14} color={ADMIN_COLORS.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -333,24 +333,22 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             activeOpacity={0.7}
             accessibilityLabel="Admin settings"
           >
-            <Settings size={15} color="#475569" />
+            <Settings size={14} color={ADMIN_COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Quick Actions 4-Grid (Shown only on Mobile App UI) */}
+      {/* Quick Actions Bar (Compact outlined utility buttons on Mobile) */}
       {isMobile && (
         <View style={styles.quickActionsContainer}>
-          <Text style={styles.sectionHeaderLabel}>QUICK ACTIONS</Text>
+          <Text style={styles.sectionHeaderLabel}>QUICK UTILITIES</Text>
           <View style={styles.quickActionsGrid}>
             <TouchableOpacity
               style={styles.quickActionItem}
               onPress={() => onNavigate?.('users')}
               activeOpacity={0.75}
             >
-              <View style={[styles.quickActionIconBox, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
-                <Users size={20} color="#059669" strokeWidth={2.2} />
-              </View>
+              <Users size={16} color={ADMIN_COLORS.emeraldPrimary} strokeWidth={2} />
               <Text style={styles.quickActionLabel}>Researchers</Text>
             </TouchableOpacity>
 
@@ -359,9 +357,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               onPress={() => onNavigate?.('calendar')}
               activeOpacity={0.75}
             >
-              <View style={[styles.quickActionIconBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
-                <Calendar size={20} color="#2563EB" strokeWidth={2.2} />
-              </View>
+              <Calendar size={16} color={ADMIN_COLORS.textSecondary} strokeWidth={2} />
               <Text style={styles.quickActionLabel}>Schedule</Text>
             </TouchableOpacity>
 
@@ -370,9 +366,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               onPress={() => onNavigate?.('reports')}
               activeOpacity={0.75}
             >
-              <View style={[styles.quickActionIconBox, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
-                <ShieldAlert size={20} color="#D97706" strokeWidth={2.2} />
-              </View>
+              <ShieldAlert size={16} color={ADMIN_COLORS.textSecondary} strokeWidth={2} />
               <Text style={styles.quickActionLabel}>Mod Queue</Text>
             </TouchableOpacity>
 
@@ -381,27 +375,24 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               onPress={() => onNavigate?.('approvals')}
               activeOpacity={0.75}
             >
-              <View style={[styles.quickActionIconBox, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }]}>
-                <ShieldCheck size={20} color="#7C3AED" strokeWidth={2.2} />
-              </View>
+              <CheckSquare size={16} color={ADMIN_COLORS.textSecondary} strokeWidth={2} />
               <Text style={styles.quickActionLabel}>Approvals</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
 
-      {/* 2. Top 4 Metric KPI Cards (2x2 Grid on Mobile) */}
+      {/* 2. Top 4 Metric KPI Cards (4-column grid on desktop, 2x2 on mobile) */}
       <View style={styles.kpiContainer}>
-        <Text style={styles.sectionHeaderLabel}>METRICS & PERFORMANCE</Text>
+        <Text style={styles.sectionHeaderLabel}>SYSTEM METRICS</Text>
         <View style={[styles.kpiRow, isMobile && styles.kpiRowMobile]}>
           <AdminStatCard
-            label="Total Researchers"
+            label="Researchers"
             value={userCount}
-            trend="↑ Live DB"
+            trend="Live DB"
             trendPositive={true}
-            subtext="click to view all users"
+            subtext="active directory profiles"
             iconName="Users"
-            variant="emerald"
             onPress={() => onNavigate?.('users')}
             style={isMobile ? { width: '48%', minWidth: 0 } : { flex: 1 }}
           />
@@ -409,35 +400,32 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
           <AdminStatCard
             label="Scientific Posts"
             value={postCount}
-            trend="↑ Live DB"
+            trend="Live DB"
             trendPositive={true}
-            subtext="click to inspect posts"
+            subtext="published peer discussions"
             iconName="FileText"
-            variant="blue"
             onPress={() => onNavigate?.('moderation')}
             style={isMobile ? { width: '48%', minWidth: 0 } : { flex: 1 }}
           />
 
           <AdminStatCard
-            label="Moderation Queue"
+            label="Mod Queue"
             value={pendingReportsCount}
-            trend={pendingReportsCount === 0 ? "↓ Clean" : "↑ Pending"}
+            trend={pendingReportsCount === 0 ? "Clean" : "Pending"}
             trendPositive={pendingReportsCount === 0}
-            subtext="click to review reports"
+            subtext="flagged submissions"
             iconName="ShieldAlert"
-            variant={pendingReportsCount > 0 ? "danger" : "warning"}
             onPress={() => onNavigate?.('reports')}
             style={isMobile ? { width: '48%', minWidth: 0 } : { flex: 1 }}
           />
 
           <AdminStatCard
-            label="Live Users"
+            label="Live Sessions"
             value={liveUsersCount}
-            trend="● Realtime"
+            trend="Realtime"
             trendPositive={true}
-            subtext="active app sessions"
+            subtext="connected app instances"
             iconName="Radio"
-            variant="purple"
             onPress={() => onNavigate?.('users')}
             style={isMobile ? { width: '48%', minWidth: 0 } : { flex: 1 }}
           />
@@ -454,13 +442,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               <Text style={styles.cardSectionSubtitle}>Researcher registrations vs. scientific output</Text>
             </View>
 
-            {/* Time Filter Pills */}
+            {/* Segmented Time Filter Control */}
             <View style={[styles.timePillsContainer, isMobile && { marginTop: 8, alignSelf: 'flex-start' }]}>
               {(['7D', '30D', '90D', '1Y'] as const).map((t) => (
                 <TouchableOpacity
                   key={t}
                   style={[styles.timePill, activeTimeRange === t && styles.timePillActive]}
                   onPress={() => setActiveTimeRange(t)}
+                  activeOpacity={0.75}
                 >
                   <Text style={[styles.timePillText, activeTimeRange === t && styles.timePillTextActive]}>
                     {t}
@@ -472,121 +461,121 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
 
           {/* SVG Line Chart */}
           <View style={styles.chartWrapper}>
-            <Svg width="100%" height={240} viewBox="0 0 680 260">
+            <Svg width="100%" height={230} viewBox="0 0 680 250">
               <Defs>
                 <LinearGradient id="emeraldGrad" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0%" stopColor="#059669" stopOpacity="0.25" />
-                  <Stop offset="100%" stopColor="#059669" stopOpacity="0.0" />
+                  <Stop offset="0%" stopColor="#047857" stopOpacity="0.20" />
+                  <Stop offset="100%" stopColor="#047857" stopOpacity="0.0" />
                 </LinearGradient>
                 <LinearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0%" stopColor="#2563EB" stopOpacity="0.2" />
-                  <Stop offset="100%" stopColor="#2563EB" stopOpacity="0.0" />
+                  <Stop offset="0%" stopColor="#0284C7" stopOpacity="0.15" />
+                  <Stop offset="100%" stopColor="#0284C7" stopOpacity="0.0" />
                 </LinearGradient>
               </Defs>
 
               {/* Grid Lines */}
-              <Line x1="40" y1="40" x2="660" y2="40" stroke="#F1F5F9" strokeWidth="1" />
-              <Line x1="40" y1="90" x2="660" y2="90" stroke="#F1F5F9" strokeWidth="1" />
-              <Line x1="40" y1="140" x2="660" y2="140" stroke="#F1F5F9" strokeWidth="1" />
-              <Line x1="40" y1="190" x2="660" y2="190" stroke="#F1F5F9" strokeWidth="1" />
-              <Line x1="40" y1="230" x2="660" y2="230" stroke="#E2E8F0" strokeWidth="1" />
+              <Line x1="40" y1="35" x2="660" y2="35" stroke="#F1F5F9" strokeWidth="1" />
+              <Line x1="40" y1="85" x2="660" y2="85" stroke="#F1F5F9" strokeWidth="1" />
+              <Line x1="40" y1="135" x2="660" y2="135" stroke="#F1F5F9" strokeWidth="1" />
+              <Line x1="40" y1="185" x2="660" y2="185" stroke="#F1F5F9" strokeWidth="1" />
+              <Line x1="40" y1="225" x2="660" y2="225" stroke="#E2E8F0" strokeWidth="1" />
 
               {/* Y Axis Labels */}
-              <SvgText x="10" y="45" fontSize="10" fill="#94A3B8" fontWeight="600">30</SvgText>
-              <SvgText x="10" y="95" fontSize="10" fill="#94A3B8" fontWeight="600">20</SvgText>
-              <SvgText x="10" y="145" fontSize="10" fill="#94A3B8" fontWeight="600">10</SvgText>
-              <SvgText x="15" y="195" fontSize="10" fill="#94A3B8" fontWeight="600">5</SvgText>
-              <SvgText x="15" y="235" fontSize="10" fill="#94A3B8" fontWeight="600">0</SvgText>
+              <SvgText x="10" y="40" fontSize="10" fill="#94A3B8" fontWeight="600">30</SvgText>
+              <SvgText x="10" y="90" fontSize="10" fill="#94A3B8" fontWeight="600">20</SvgText>
+              <SvgText x="10" y="140" fontSize="10" fill="#94A3B8" fontWeight="600">10</SvgText>
+              <SvgText x="15" y="190" fontSize="10" fill="#94A3B8" fontWeight="600">5</SvgText>
+              <SvgText x="15" y="228" fontSize="10" fill="#94A3B8" fontWeight="600">0</SvgText>
 
-              {/* Blue Curve (Publications / Posts) Area & Stroke */}
+              {/* Curve (Posts) Area & Stroke */}
               <Path
                 d={
                   activeTimeRange === '7D'
-                    ? "M 50 190 C 120 180, 220 160, 320 120 C 420 80, 520 100, 660 70 L 660 230 L 50 230 Z"
+                    ? "M 50 185 C 120 175, 220 155, 320 115 C 420 75, 520 95, 660 65 L 660 225 L 50 225 Z"
                     : activeTimeRange === '30D'
-                    ? "M 50 170 C 120 160, 180 185, 230 145 C 290 95, 340 120, 390 75 C 450 60, 500 110, 550 65 C 600 170, 630 150, 660 135 L 660 230 L 50 230 Z"
+                    ? "M 50 165 C 120 155, 180 180, 230 140 C 290 90, 340 115, 390 70 C 450 55, 500 105, 550 60 C 600 165, 630 145, 660 130 L 660 225 L 50 225 Z"
                     : activeTimeRange === '90D'
-                    ? "M 50 200 C 150 180, 300 130, 450 90 C 550 70, 600 60, 660 45 L 660 230 L 50 230 Z"
-                    : "M 50 215 C 180 200, 320 140, 480 80 C 580 50, 620 45, 660 40 L 660 230 L 50 230 Z"
+                    ? "M 50 195 C 150 175, 300 125, 450 85 C 550 65, 600 55, 660 40 L 660 225 L 50 225 Z"
+                    : "M 50 210 C 180 195, 320 135, 480 75 C 580 45, 620 40, 660 35 L 660 225 L 50 225 Z"
                 }
                 fill="url(#blueGrad)"
               />
               <Path
                 d={
                   activeTimeRange === '7D'
-                    ? "M 50 190 C 120 180, 220 160, 320 120 C 420 80, 520 100, 660 70"
+                    ? "M 50 185 C 120 175, 220 155, 320 115 C 420 75, 520 95, 660 65"
                     : activeTimeRange === '30D'
-                    ? "M 50 170 C 120 160, 180 185, 230 145 C 290 95, 340 120, 390 75 C 450 60, 500 110, 550 65 C 600 170, 630 150, 660 135"
+                    ? "M 50 165 C 120 155, 180 180, 230 140 C 290 90, 340 115, 390 70 C 450 55, 500 105, 550 60 C 600 165, 630 145, 660 130"
                     : activeTimeRange === '90D'
-                    ? "M 50 200 C 150 180, 300 130, 450 90 C 550 70, 600 60, 660 45"
-                    : "M 50 215 C 180 200, 320 140, 480 80 C 580 50, 620 45, 660 40"
+                    ? "M 50 195 C 150 175, 300 125, 450 85 C 550 65, 600 55, 660 40"
+                    : "M 50 210 C 180 195, 320 135, 480 75 C 580 45, 620 40, 660 35"
                 }
                 fill="none"
-                stroke="#2563EB"
-                strokeWidth="2.5"
+                stroke="#0284C7"
+                strokeWidth="2.2"
               />
 
               {/* Emerald Curve (Researchers) Area & Stroke */}
               <Path
                 d={
                   activeTimeRange === '7D'
-                    ? "M 50 210 C 120 200, 220 185, 320 160 C 420 140, 520 130, 660 110 L 660 230 L 50 230 Z"
+                    ? "M 50 205 C 120 195, 220 180, 320 155 C 420 135, 520 125, 660 105 L 660 225 L 50 225 Z"
                     : activeTimeRange === '30D'
-                    ? "M 50 210 C 110 205, 170 195, 220 180 C 280 160, 330 190, 390 150 C 450 140, 500 160, 560 130 C 610 145, 635 155, 660 160 L 660 230 L 50 230 Z"
+                    ? "M 50 205 C 110 200, 170 190, 220 175 C 280 155, 330 185, 390 145 C 450 135, 500 155, 560 125 C 610 140, 635 150, 660 155 L 660 225 L 50 225 Z"
                     : activeTimeRange === '90D'
-                    ? "M 50 220 C 150 210, 300 170, 450 140 C 550 120, 600 110, 660 95 L 660 230 L 50 230 Z"
-                    : "M 50 225 C 180 215, 320 170, 480 130 C 580 100, 620 90, 660 85 L 660 230 L 50 230 Z"
+                    ? "M 50 215 C 150 205, 300 165, 450 135 C 550 115, 600 105, 660 90 L 660 225 L 50 225 Z"
+                    : "M 50 220 C 180 210, 320 165, 480 125 C 580 95, 620 85, 660 80 L 660 225 L 50 225 Z"
                 }
                 fill="url(#emeraldGrad)"
               />
               <Path
                 d={
                   activeTimeRange === '7D'
-                    ? "M 50 210 C 120 200, 220 185, 320 160 C 420 140, 520 130, 660 110"
+                    ? "M 50 205 C 120 195, 220 180, 320 155 C 420 135, 520 125, 660 105"
                     : activeTimeRange === '30D'
-                    ? "M 50 210 C 110 205, 170 195, 220 180 C 280 160, 330 190, 390 150 C 450 140, 500 160, 560 130 C 610 145, 635 155, 660 160"
+                    ? "M 50 205 C 110 200, 170 190, 220 175 C 280 155, 330 185, 390 145 C 450 135, 500 155, 560 125 C 610 140, 635 150, 660 155"
                     : activeTimeRange === '90D'
-                    ? "M 50 220 C 150 210, 300 170, 450 140 C 550 120, 600 110, 660 95"
-                    : "M 50 225 C 180 215, 320 170, 480 130 C 580 100, 620 90, 660 85"
+                    ? "M 50 215 C 150 205, 300 165, 450 135 C 550 115, 600 105, 660 90"
+                    : "M 50 220 C 180 210, 320 165, 480 125 C 580 95, 620 85, 660 80"
                 }
                 fill="none"
-                stroke="#059669"
-                strokeWidth="2.5"
+                stroke="#047857"
+                strokeWidth="2.2"
               />
 
-              {/* Dynamic X-Axis Labels based on Time Range */}
+              {/* Dynamic X-Axis Labels */}
               {activeTimeRange === '7D' && (
                 <>
-                  <SvgText x="50" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Mon</SvgText>
-                  <SvgText x="150" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Tue</SvgText>
-                  <SvgText x="250" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Wed</SvgText>
-                  <SvgText x="350" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Thu</SvgText>
-                  <SvgText x="450" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Fri</SvgText>
-                  <SvgText x="550" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Sat</SvgText>
-                  <SvgText x="650" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Sun</SvgText>
+                  <SvgText x="50" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Mon</SvgText>
+                  <SvgText x="150" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Tue</SvgText>
+                  <SvgText x="250" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Wed</SvgText>
+                  <SvgText x="350" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Thu</SvgText>
+                  <SvgText x="450" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Fri</SvgText>
+                  <SvgText x="550" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Sat</SvgText>
+                  <SvgText x="650" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Sun</SvgText>
                 </>
               )}
               {activeTimeRange === '30D' && (
                 <>
-                  <SvgText x="80" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Week 1</SvgText>
-                  <SvgText x="260" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Week 2</SvgText>
-                  <SvgText x="440" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Week 3</SvgText>
-                  <SvgText x="620" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Week 4</SvgText>
+                  <SvgText x="80" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Week 1</SvgText>
+                  <SvgText x="260" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Week 2</SvgText>
+                  <SvgText x="440" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Week 3</SvgText>
+                  <SvgText x="620" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Week 4</SvgText>
                 </>
               )}
               {activeTimeRange === '90D' && (
                 <>
-                  <SvgText x="100" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Month 1</SvgText>
-                  <SvgText x="350" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Month 2</SvgText>
-                  <SvgText x="600" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Month 3</SvgText>
+                  <SvgText x="100" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Month 1</SvgText>
+                  <SvgText x="350" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Month 2</SvgText>
+                  <SvgText x="600" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Month 3</SvgText>
                 </>
               )}
               {activeTimeRange === '1Y' && (
                 <>
-                  <SvgText x="80" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Q1</SvgText>
-                  <SvgText x="260" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Q2</SvgText>
-                  <SvgText x="440" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Q3</SvgText>
-                  <SvgText x="620" y="250" fontSize="10" fill="#94A3B8" textAnchor="middle">Q4</SvgText>
+                  <SvgText x="80" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Q1</SvgText>
+                  <SvgText x="260" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Q2</SvgText>
+                  <SvgText x="440" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Q3</SvgText>
+                  <SvgText x="620" y="242" fontSize="9.5" fill="#94A3B8" textAnchor="middle">Q4</SvgText>
                 </>
               )}
             </Svg>
@@ -594,11 +583,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             {/* Legend */}
             <View style={styles.chartLegend}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#2563EB' }]} />
+                <View style={[styles.legendDot, { backgroundColor: '#0284C7' }]} />
                 <Text style={styles.legendText}>Posts ({postCount})</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#059669' }]} />
+                <View style={[styles.legendDot, { backgroundColor: '#047857' }]} />
                 <Text style={styles.legendText}>Researchers ({userCount})</Text>
               </View>
             </View>
@@ -617,16 +606,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               onPress={() => onNavigate?.('calendar')}
               activeOpacity={0.7}
             >
-              <View style={[styles.activityIconBox, { backgroundColor: '#EFF6FF' }]}>
-                <Calendar size={16} color="#2563EB" />
+              <View style={styles.activityIconBox}>
+                <Calendar size={15} color={ADMIN_COLORS.textSecondary} strokeWidth={2} />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>Upcoming Events (Calendar)</Text>
+                <Text style={styles.activityTitle}>Upcoming Events</Text>
                 <Text style={styles.activityDesc} numberOfLines={1}>
                   {upcomingEvent
                     ? `${upcomingEvent.title} • ${new Date(upcomingEvent.start_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
                     : upcomingEventsCount > 0
-                    ? `${upcomingEventsCount} scheduled team events on calendar`
+                    ? `${upcomingEventsCount} scheduled team events`
                     : 'No upcoming events • Click to schedule'}
                 </Text>
                 <Text style={styles.activityTime}>Open calendar & schedule →</Text>
@@ -639,15 +628,15 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               onPress={() => onNavigate?.('team-chat')}
               activeOpacity={0.7}
             >
-              <View style={[styles.activityIconBox, { backgroundColor: '#ECFDF5' }]}>
-                <MessagesSquare size={16} color="#059669" />
+              <View style={styles.activityIconBox}>
+                <MessagesSquare size={15} color={ADMIN_COLORS.textSecondary} strokeWidth={2} />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>Team Chats</Text>
+                <Text style={styles.activityTitle}>Team Comms</Text>
                 <Text style={styles.activityDesc} numberOfLines={1}>
                   {latestChatMessage
                     ? `${latestChatMessage.sender_name}: "${latestChatMessage.message}"`
-                    : 'Active co-admin ops channel ready'}
+                    : 'Ops chat room active'}
                 </Text>
                 <Text style={styles.activityTime}>Open team discussion →</Text>
               </View>
@@ -659,17 +648,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               onPress={() => onNavigate?.('audit-logs')}
               activeOpacity={0.7}
             >
-              <View style={[styles.activityIconBox, { backgroundColor: '#FEF3C7' }]}>
-                <Activity size={16} color="#D97706" />
+              <View style={styles.activityIconBox}>
+                <Activity size={15} color={ADMIN_COLORS.textSecondary} strokeWidth={2} />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>Audit Log</Text>
+                <Text style={styles.activityTitle}>Audit Trail</Text>
                 <Text style={styles.activityDesc} numberOfLines={1}>
                   {latestAuditLog
                     ? `${latestAuditLog.action.replace(/_/g, ' ')} ${latestAuditLog.reason ? `• ${latestAuditLog.reason}` : ''}`
-                    : `${auditLogsCount} security & governance logs recorded`}
+                    : `${auditLogsCount} security logs logged`}
                 </Text>
-                <Text style={styles.activityTime}>View immutable audit trail →</Text>
+                <Text style={styles.activityTime}>Inspect immutable audit log →</Text>
               </View>
             </TouchableOpacity>
 
@@ -679,19 +668,19 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               onPress={() => onNavigate?.('approvals')}
               activeOpacity={0.7}
             >
-              <View style={[styles.activityIconBox, { backgroundColor: '#F5F3FF' }]}>
-                <CheckSquare size={16} color="#7C3AED" />
+              <View style={styles.activityIconBox}>
+                <CheckSquare size={15} color={ADMIN_COLORS.textSecondary} strokeWidth={2} />
               </View>
               <View style={styles.activityTextGroup}>
-                <Text style={styles.activityTitle}>Assigned Job & Approvals</Text>
+                <Text style={styles.activityTitle}>Approvals Queue</Text>
                 <Text style={styles.activityDesc} numberOfLines={1}>
                   {pendingApprovalsCount > 0
-                    ? `${pendingApprovalsCount} dual-approval requests pending review`
+                    ? `${pendingApprovalsCount} dual-approval requests pending`
                     : pendingReportsCount > 0
-                    ? `${pendingReportsCount} items pending in moderation queue`
-                    : 'All operational jobs & queues up to date'}
+                    ? `${pendingReportsCount} items pending in queue`
+                    : 'All operational jobs up to date'}
                 </Text>
-                <Text style={styles.activityTime}>Inspect approvals queue →</Text>
+                <Text style={styles.activityTime}>Review approvals queue →</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -703,19 +692,19 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         <View style={styles.tableCardHeader}>
           <View>
             <Text style={styles.tableCardTitle}>Recent Registered Researchers</Text>
-            <Text style={styles.tableCardSubtitle}>Authoritative profiles from public.profiles</Text>
+            <Text style={styles.tableCardSubtitle}>Live directory from public.profiles</Text>
           </View>
           <TouchableOpacity
-            style={styles.viewAllPill}
+            style={styles.viewAllBtn}
             onPress={() => onNavigate?.('users')}
             activeOpacity={0.7}
           >
-            <Text style={styles.viewAllPillText}>View All ({userCount})</Text>
+            <Text style={styles.viewAllBtnText}>View All ({userCount})</Text>
           </TouchableOpacity>
         </View>
 
         {isMobile ? (
-          /* Mobile Card List */
+          /* Mobile Structured Record Cards */
           <View style={styles.mobileCardList}>
             {recentUsers.length === 0 ? (
               <Text style={styles.emptyMobileText}>No researcher profiles found in database.</Text>
@@ -746,10 +735,10 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
 
                   <View style={styles.mobileUserCardBottom}>
                     <Text style={styles.mobileInstitutionText} numberOfLines={1}>
-                      🏛️ {u.institution || 'Academic Institution'}
+                      {u.institution || 'Academic Institution'}
                     </Text>
                     <Text style={styles.mobileFieldText} numberOfLines={1}>
-                      🔬 {u.field_of_study || 'Scientific Research'}
+                      {u.field_of_study || 'Scientific Research'}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -787,13 +776,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   headerBarMobile: {
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   titleRow: {
     flexDirection: 'row',
@@ -801,37 +790,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
+    fontSize: 20,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
+    letterSpacing: -0.3,
   },
   livePulseBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
+    backgroundColor: ADMIN_COLORS.statusSuccessBg,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: ADMIN_RADII.badge,
     borderWidth: 1,
-    borderColor: '#D1FAE5',
+    borderColor: ADMIN_COLORS.statusSuccessBorder,
   },
   livePulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#059669',
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: ADMIN_COLORS.statusSuccessDot,
   },
   livePulseText: {
     fontSize: 10,
-    fontWeight: '800',
-    color: '#059669',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    color: ADMIN_COLORS.statusSuccessText,
+    letterSpacing: 0.4,
   },
   pageSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
+    fontSize: 12.5,
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
   },
   actionsRow: {
@@ -847,166 +836,143 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 10,
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: ADMIN_RADII.button,
   },
   primaryBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12.5,
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: ADMIN_RADII.button,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sectionHeaderLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#94A3B8',
-    letterSpacing: 0.8,
-    marginBottom: 10,
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 8,
   },
   quickActionsContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   quickActionsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 8,
   },
   quickActionItem: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  quickActionIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: ADMIN_RADII.card,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    gap: 5,
   },
   quickActionLabel: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#334155',
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
     textAlign: 'center',
   },
   kpiContainer: {
-    marginBottom: 20,
+    marginBottom: 18,
   },
   kpiRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
+    gap: 12,
   },
   kpiRowMobile: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 8,
   },
   mainGrid: {
     flexDirection: 'row',
-    gap: 18,
-    marginBottom: 20,
+    gap: 16,
+    marginBottom: 18,
   },
   mainGridMobile: {
     flexDirection: 'column',
-    gap: 16,
+    gap: 14,
   },
   chartCard: {
     flex: 2,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 18,
-    padding: 18,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
-    elevation: 2,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 16,
   },
   activityCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 18,
-    padding: 18,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
-    elevation: 2,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 16,
   },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   cardHeaderRowMobile: {
     flexDirection: 'column',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 8,
   },
   cardSectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
   },
   cardSectionSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
+    fontSize: 11.5,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 1,
   },
   timePillsContainer: {
     flexDirection: 'row',
     backgroundColor: '#F1F5F9',
-    borderRadius: 8,
-    padding: 3,
+    borderRadius: ADMIN_RADII.button,
+    padding: 2,
   },
   timePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
   },
   timePillActive: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
   },
   timePillText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '600',
-    color: '#64748B',
+    color: ADMIN_COLORS.textMuted,
   },
   timePillTextActive: {
-    color: '#FFFFFF',
+    color: ADMIN_COLORS.textPrimary,
     fontWeight: '700',
   },
   chartWrapper: {
@@ -1016,37 +982,43 @@ const styles = StyleSheet.create({
   chartLegend: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
-    marginTop: 8,
+    gap: 16,
+    marginTop: 6,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   legendText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '600',
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+    fontWeight: '500',
   },
   activityList: {
-    marginTop: 14,
-    gap: 14,
+    marginTop: 12,
+    gap: 12,
   },
   activityItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
   },
   activityIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: ADMIN_RADII.button,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1054,138 +1026,135 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   activityTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   activityDesc: {
-    fontSize: 12,
-    color: '#475569',
+    fontSize: 11.5,
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 1,
   },
   activityTime: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 3,
+    fontSize: 10.5,
+    color: ADMIN_COLORS.emeraldPrimary,
+    fontWeight: '500',
+    marginTop: 2,
   },
   tablesSection: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 30,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
-    elevation: 2,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 16,
+    marginBottom: 24,
   },
   tableCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   tableCardTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
   },
   tableCardSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
+    fontSize: 11.5,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 1,
   },
-  viewAllPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+  viewAllBtn: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: ADMIN_RADII.button,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: ADMIN_COLORS.border,
   },
-  viewAllPillText: {
+  viewAllBtnText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#2563EB',
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   mobileCardList: {
-    gap: 10,
+    gap: 8,
   },
   mobileUserCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: ADMIN_RADII.card,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
   },
   mobileUserCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
+    gap: 8,
+    marginBottom: 6,
   },
   mobileUserInfo: {
     flex: 1,
   },
   mobileUserCardBottom: {
-    paddingTop: 8,
+    paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    gap: 3,
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    gap: 2,
   },
   mobileInstitutionText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
-    color: '#334155',
+    color: ADMIN_COLORS.textPrimary,
   },
   mobileFieldText: {
-    fontSize: 11,
-    color: '#64748B',
+    fontSize: 10.5,
+    color: ADMIN_COLORS.textSecondary,
   },
   emptyMobileText: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: ADMIN_COLORS.textMuted,
     textAlign: 'center',
-    paddingVertical: 20,
+    paddingVertical: 18,
   },
   userCell: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   userAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#DEF7EC',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: ADMIN_COLORS.bgActive,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#BCF0DA',
+    borderColor: ADMIN_COLORS.emeraldBorder,
   },
   userAvatarText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#03543F',
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: ADMIN_COLORS.emeraldPrimary,
   },
   boldText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   usernameText: {
     fontSize: 11,
-    color: '#64748B',
+    color: ADMIN_COLORS.textMuted,
   },
   cellText: {
-    fontSize: 13,
-    color: '#1E293B',
+    fontSize: 12.5,
+    color: ADMIN_COLORS.textPrimary,
     fontWeight: '500',
   },
   cellMuted: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 11.5,
+    color: ADMIN_COLORS.textSecondary,
   },
 });
+

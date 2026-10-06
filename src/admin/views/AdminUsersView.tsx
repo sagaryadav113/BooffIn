@@ -11,9 +11,10 @@ import {
   ScrollView, 
   ActivityIndicator, 
   TouchableOpacity, 
-  Modal 
+  Modal,
+  useWindowDimensions 
 } from 'react-native';
-import { ADMIN_COLORS } from '../lib/constants';
+import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminUserService } from '../services/adminUserService';
@@ -21,24 +22,25 @@ import { AdminUserProfile } from '../types/data';
 import { 
   Search, 
   RotateCcw, 
-  UserCheck, 
-  Shield, 
-  Lock, 
-  Award, 
-  Mail, 
-  Eye, 
-  Key, 
-  Ban, 
   CheckCircle2, 
   AlertTriangle,
   GraduationCap,
+  Eye,
+  Key,
+  Award,
+  Lock,
   Globe,
-  FileText
+  Building2,
+  Calendar,
+  X
 } from 'lucide-react-native';
 
 type UserFilterType = 'ALL' | 'VERIFIED' | 'FACULTY' | 'PRIVATE';
 
 export const AdminUsersView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<AdminUserProfile[]>([]);
   const [search, setSearch] = useState('');
@@ -90,20 +92,20 @@ export const AdminUsersView: React.FC = () => {
       }
       return u;
     }));
-    setActionSuccessMessage(`Researcher verification badge updated.`);
+    setActionSuccessMessage(`Researcher verification credential status updated.`);
     if (selectedUser && selectedUser.id === userId) {
       setSelectedUser(prev => prev ? { ...prev, is_orcid_verified: !prev.is_orcid_verified } : null);
     }
   };
 
   const handleSendPasswordReset = (email: string) => {
-    setActionSuccessMessage(`Password recovery instructions dispatched.`);
+    setActionSuccessMessage(`Password recovery instructions dispatched to researcher.`);
   };
 
   const columns: ColumnDef<AdminUserProfile>[] = [
     {
       key: 'username',
-      header: 'Researcher Profile',
+      header: 'RESEARCHER PROFILE',
       width: 240,
       render: (u) => (
         <View style={styles.userCell}>
@@ -112,33 +114,33 @@ export const AdminUsersView: React.FC = () => {
               {(u.full_name || u.username || 'U').substring(0, 2).toUpperCase()}
             </Text>
           </View>
-          <View>
+          <View style={{ flex: 1 }}>
             <View style={styles.nameRow}>
-              <Text style={styles.nameText}>{u.full_name || u.username}</Text>
+              <Text style={styles.nameText} numberOfLines={1}>{u.full_name || u.username}</Text>
               {u.is_orcid_verified && (
-                <CheckCircle2 size={13} color="#059669" style={{ marginLeft: 4 }} />
+                <CheckCircle2 size={12} color={ADMIN_COLORS.emeraldPrimary} style={{ marginLeft: 4 }} />
               )}
             </View>
-            <Text style={styles.usernameText}>@{u.username}</Text>
+            <Text style={styles.usernameText} numberOfLines={1}>@{u.username}</Text>
           </View>
         </View>
       ),
     },
     {
       key: 'institution',
-      header: 'Affiliation & Discipline',
-      width: 220,
+      header: 'AFFILIATION & DISCIPLINE',
+      width: 240,
       render: (u) => (
         <View>
-          <Text style={styles.cellText}>{u.institution || 'Academic Institution'}</Text>
-          <Text style={styles.cellMuted}>{u.field_of_study || 'Scientific Research'}</Text>
+          <Text style={styles.cellText} numberOfLines={1}>{u.institution || 'Academic Institution'}</Text>
+          <Text style={styles.cellMuted} numberOfLines={1}>{u.field_of_study || 'Scientific Research'}</Text>
         </View>
       ),
     },
     {
       key: 'is_orcid_verified',
-      header: 'Credential Status',
-      width: 150,
+      header: 'CREDENTIALS',
+      width: 130,
       render: (u) => (
         <AdminBadge
           label={u.is_orcid_verified ? 'VERIFIED' : 'UNLINKED'}
@@ -149,8 +151,8 @@ export const AdminUsersView: React.FC = () => {
     },
     {
       key: 'is_private',
-      header: 'Profile Scope',
-      width: 120,
+      header: 'VISIBILITY',
+      width: 110,
       render: (u) => (
         <AdminBadge
           label={u.is_private ? 'PRIVATE' : 'PUBLIC'}
@@ -161,8 +163,8 @@ export const AdminUsersView: React.FC = () => {
     },
     {
       key: 'created_at',
-      header: 'Joined Date',
-      width: 130,
+      header: 'JOINED',
+      width: 120,
       render: (u) => (
         <Text style={styles.cellMuted}>
           {new Date(u.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -171,15 +173,16 @@ export const AdminUsersView: React.FC = () => {
     },
     {
       key: 'actions',
-      header: 'Inspection',
+      header: 'ACTIONS',
       width: 120,
+      align: 'right',
       render: (u) => (
         <TouchableOpacity
-          style={styles.inspectBtn}
+          style={styles.actionOutlineBtn}
           onPress={() => setSelectedUser(u)}
         >
           <Eye size={12} color={ADMIN_COLORS.textSecondary} />
-          <Text style={styles.inspectBtnText}>Profile 360°</Text>
+          <Text style={styles.actionOutlineBtnText}>Inspect</Text>
         </TouchableOpacity>
       ),
     },
@@ -188,103 +191,175 @@ export const AdminUsersView: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header section */}
-      <View style={styles.headerRow}>
+      <View style={styles.headerSection}>
         <View>
           <Text style={styles.pageTitle}>Researchers Directory</Text>
           <Text style={styles.pageSubtitle}>
-            Authoritative member profiles from public.profiles ({totalCount} registered scholars)
+            Authoritative registry of verified scientists, faculty, and research candidates ({totalCount} profiles)
           </Text>
         </View>
       </View>
 
-      {/* Notifications */}
+      {/* Action Notification Box */}
       {actionSuccessMessage && (
         <View style={styles.successBox}>
-          <CheckCircle2 size={16} color={ADMIN_COLORS.emeraldPrimary} />
+          <CheckCircle2 size={15} color={ADMIN_COLORS.statusSuccessText} />
           <Text style={styles.successText}>{actionSuccessMessage}</Text>
         </View>
       )}
 
       {errorMessage && (
         <View style={styles.errorBox}>
-          <AlertTriangle size={16} color={ADMIN_COLORS.danger} />
+          <AlertTriangle size={15} color={ADMIN_COLORS.statusDangerText} />
           <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       )}
 
-      {/* Search and Filters Bar */}
-      <View style={styles.searchCard}>
+      {/* Unified Search and Filters Toolbar */}
+      <View style={styles.toolbarCard}>
         <View style={styles.searchInputGroup}>
-          <Search size={16} color="#94A3B8" style={styles.searchIcon} />
+          <Search size={15} color={ADMIN_COLORS.textMuted} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search researchers by username, full name, or institution..."
-            placeholderTextColor="#94A3B8"
+            placeholder="Search by username, full name, or institution..."
+            placeholderTextColor={ADMIN_COLORS.textMuted}
             value={search}
             onChangeText={setSearch}
             onSubmitEditing={handleSearch}
           />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => { setSearch(''); loadUsers(''); }}>
+              <X size={14} color={ADMIN_COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
 
-        <View style={styles.buttonGroup}>
-          <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-            <Text style={styles.searchBtnText}>Search</Text>
+        {/* Filter Segmented Control */}
+        <View style={styles.segmentedControl}>
+          <TouchableOpacity
+            style={[styles.segmentBtn, filterType === 'ALL' && styles.segmentBtnActive]}
+            onPress={() => setFilterType('ALL')}
+          >
+            <Text style={[styles.segmentText, filterType === 'ALL' && styles.segmentTextActive]}>All ({users.length})</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.resetBtn}
+            style={[styles.segmentBtn, filterType === 'VERIFIED' && styles.segmentBtnActive]}
+            onPress={() => setFilterType('VERIFIED')}
+          >
+            <Text style={[styles.segmentText, filterType === 'VERIFIED' && styles.segmentTextActive]}>Verified</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, filterType === 'FACULTY' && styles.segmentBtnActive]}
+            onPress={() => setFilterType('FACULTY')}
+          >
+            <Text style={[styles.segmentText, filterType === 'FACULTY' && styles.segmentTextActive]}>Faculty</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, filterType === 'PRIVATE' && styles.segmentBtnActive]}
+            onPress={() => setFilterType('PRIVATE')}
+          >
+            <Text style={[styles.segmentText, filterType === 'PRIVATE' && styles.segmentTextActive]}>Private</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.toolbarActions}>
+          <TouchableOpacity style={styles.primaryActionBtn} onPress={handleSearch}>
+            <Text style={styles.primaryActionBtnText}>Filter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.refreshIconBtn}
             onPress={() => {
               setSearch('');
               loadUsers('');
             }}
           >
-            <RotateCcw size={14} color="#475569" />
-            <Text style={styles.resetBtnText}>Reset</Text>
+            <RotateCcw size={14} color={ADMIN_COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Filter Chips */}
-      <View style={styles.filterChipsRow}>
-        <TouchableOpacity
-          style={[styles.chip, filterType === 'ALL' && styles.chipActive]}
-          onPress={() => setFilterType('ALL')}
-        >
-          <Text style={[styles.chipText, filterType === 'ALL' && styles.chipTextActive]}>All Scholars</Text>
-        </TouchableOpacity>
+      {/* Main Content: Desktop Table vs Mobile Structured Record Cards */}
+      {loading ? (
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="small" color={ADMIN_COLORS.emeraldPrimary} />
+          <Text style={styles.loadingText}>Querying researcher database...</Text>
+        </View>
+      ) : isMobile ? (
+        /* Mobile Structured Record Cards */
+        <View style={styles.mobileListContainer}>
+          {filteredUsers.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>No matching researchers</Text>
+              <Text style={styles.emptySub}>Try adjusting your search criteria or filter tags.</Text>
+            </View>
+          ) : (
+            filteredUsers.map((u) => (
+              <View key={u.id} style={styles.recordCard}>
+                <View style={styles.recordHeader}>
+                  <View style={styles.recordUserGroup}>
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText}>
+                        {(u.full_name || u.username || 'U').substring(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.nameText} numberOfLines={1}>{u.full_name || u.username}</Text>
+                        {u.is_orcid_verified && (
+                          <CheckCircle2 size={12} color={ADMIN_COLORS.emeraldPrimary} style={{ marginLeft: 4 }} />
+                        )}
+                      </View>
+                      <Text style={styles.usernameText}>@{u.username}</Text>
+                    </View>
+                  </View>
+                  <AdminBadge
+                    label={u.is_orcid_verified ? 'VERIFIED' : 'UNLINKED'}
+                    variant={u.is_orcid_verified ? 'emerald' : 'neutral'}
+                    size="sm"
+                  />
+                </View>
 
-        <TouchableOpacity
-          style={[styles.chip, filterType === 'VERIFIED' && styles.chipActive]}
-          onPress={() => setFilterType('VERIFIED')}
-        >
-          <Text style={[styles.chipText, filterType === 'VERIFIED' && styles.chipTextActive]}>
-            🎓 Verified Credentials
-          </Text>
-        </TouchableOpacity>
+                <View style={styles.recordMetaRow}>
+                  <View style={styles.recordMetaItem}>
+                    <Building2 size={12} color={ADMIN_COLORS.textMuted} />
+                    <Text style={styles.recordMetaText} numberOfLines={1}>
+                      {u.institution || 'Academic Institution'}
+                    </Text>
+                  </View>
+                  <View style={styles.recordMetaItem}>
+                    <GraduationCap size={12} color={ADMIN_COLORS.textMuted} />
+                    <Text style={styles.recordMetaText} numberOfLines={1}>
+                      {u.field_of_study || 'Scientific Research'}
+                    </Text>
+                  </View>
+                </View>
 
-        <TouchableOpacity
-          style={[styles.chip, filterType === 'PRIVATE' && styles.chipActive]}
-          onPress={() => setFilterType('PRIVATE')}
-        >
-          <Text style={[styles.chipText, filterType === 'PRIVATE' && styles.chipTextActive]}>
-            🔒 Private Profiles
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Table Section */}
-      <View style={styles.tableCard}>
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={ADMIN_COLORS.emeraldPrimary} />
-          </View>
-        ) : (
+                <View style={styles.recordFooter}>
+                  <Text style={styles.cellMuted}>
+                    Joined {new Date(u.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.actionOutlineBtn}
+                    onPress={() => setSelectedUser(u)}
+                  >
+                    <Eye size={12} color={ADMIN_COLORS.textSecondary} />
+                    <Text style={styles.actionOutlineBtnText}>Inspect 360°</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      ) : (
+        /* Desktop High-Density Table */
+        <View style={styles.tableWrapper}>
           <AdminDataTable
             columns={columns}
             data={filteredUsers}
             emptyMessage="No researcher profiles match your search criteria."
           />
-        )}
-      </View>
+        </View>
+      )}
 
       {/* Deep Profile Inspector Modal */}
       {selectedUser && (
@@ -298,11 +373,11 @@ export const AdminUsersView: React.FC = () => {
             <View style={styles.inspectorModalCard}>
               <View style={styles.modalHeader}>
                 <View style={styles.modalHeaderTitleRow}>
-                  <GraduationCap size={20} color={ADMIN_COLORS.emeraldPrimary} />
+                  <GraduationCap size={18} color={ADMIN_COLORS.emeraldPrimary} />
                   <Text style={styles.modalTitle}>Researcher 360° Profile</Text>
                 </View>
                 <TouchableOpacity onPress={() => setSelectedUser(null)} style={styles.closeBtn}>
-                  <Text style={styles.closeBtnText}>✕</Text>
+                  <X size={16} color={ADMIN_COLORS.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -333,7 +408,7 @@ export const AdminUsersView: React.FC = () => {
                     <Text style={styles.metaVal}>{selectedUser.field_of_study || 'General Sciences'}</Text>
                   </View>
                   <View style={styles.metaCard}>
-                    <Text style={styles.inspectorLabel}>Privacy Mode</Text>
+                    <Text style={styles.inspectorLabel}>Visibility Mode</Text>
                     <Text style={styles.metaVal}>{selectedUser.is_private ? 'Private Account' : 'Public Directory'}</Text>
                   </View>
                   <View style={styles.metaCard}>
@@ -341,8 +416,8 @@ export const AdminUsersView: React.FC = () => {
                     <Text style={styles.metaVal}>{new Date(selectedUser.created_at).toLocaleDateString()}</Text>
                   </View>
                   <View style={styles.metaCard}>
-                    <Text style={styles.inspectorLabel}>Platform Strikes</Text>
-                    <Text style={[styles.metaVal, { color: '#059669' }]}>0 Active Warnings</Text>
+                    <Text style={styles.inspectorLabel}>Safety Standing</Text>
+                    <Text style={[styles.metaVal, { color: ADMIN_COLORS.emeraldPrimary }]}>0 Active Violations</Text>
                   </View>
                 </View>
 
@@ -351,7 +426,7 @@ export const AdminUsersView: React.FC = () => {
                   <Text style={styles.inspectorLabel}>Academic Bio & Statement</Text>
                   <View style={styles.bioBox}>
                     <Text style={styles.bioText}>
-                      {selectedUser.bio || 'No public biographical summary provided by researcher.'}
+                      {selectedUser.bio || 'No biographical statement provided by this researcher.'}
                     </Text>
                   </View>
                 </View>
@@ -363,7 +438,7 @@ export const AdminUsersView: React.FC = () => {
                   style={styles.toggleBadgeBtn}
                   onPress={() => handleToggleVerification(selectedUser.id)}
                 >
-                  <Award size={14} color="#059669" />
+                  <Award size={13} color={ADMIN_COLORS.emeraldPrimary} />
                   <Text style={styles.toggleBadgeBtnText}>
                     {selectedUser.is_orcid_verified ? 'Revoke Verification' : 'Grant Verified Badge'}
                   </Text>
@@ -373,8 +448,8 @@ export const AdminUsersView: React.FC = () => {
                   style={styles.resetPassBtn}
                   onPress={() => handleSendPasswordReset(selectedUser.username)}
                 >
-                  <Key size={14} color="#475569" />
-                  <Text style={styles.resetPassBtnText}>Password Reset</Text>
+                  <Key size={13} color={ADMIN_COLORS.textSecondary} />
+                  <Text style={styles.resetPassBtnText}>Reset Password</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -388,399 +463,450 @@ export const AdminUsersView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
   },
-  headerRow: {
-    marginBottom: 20,
+  headerSection: {
+    marginBottom: 16,
   },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
+    fontSize: 20,
+    fontWeight: '700',
+    color: ADMIN_COLORS.textPrimary,
+    letterSpacing: -0.3,
   },
   pageSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: ADMIN_COLORS.textSecondary,
     marginTop: 2,
   },
-  searchCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 14,
+  successBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: 8,
+    backgroundColor: ADMIN_COLORS.statusSuccessBg,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.statusSuccessBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
+  },
+  successText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.statusSuccessText,
+    fontWeight: '500',
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: ADMIN_COLORS.statusDangerBg,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.statusDangerBorder,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    marginBottom: 14,
+  },
+  errorText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.statusDangerText,
+    fontWeight: '500',
+  },
+  toolbarCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 10,
     marginBottom: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
   },
   searchInputGroup: {
     flex: 1,
+    minWidth: 220,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 40,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.input,
+    paddingHorizontal: 10,
+    height: 34,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
-    color: '#0F172A',
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
     padding: 0,
   },
-  buttonGroup: {
+  segmentedControl: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    backgroundColor: ADMIN_COLORS.bgHover,
+    padding: 2,
+    borderRadius: ADMIN_RADII.button,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
   },
-  searchBtn: {
-    backgroundColor: '#059669',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+  segmentBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: ADMIN_RADII.badge,
   },
-  searchBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  segmentBtnActive: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
-  resetBtn: {
+  segmentText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
+  },
+  segmentTextActive: {
+    color: ADMIN_COLORS.textPrimary,
+    fontWeight: '600',
+  },
+  toolbarActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 8,
   },
-  resetBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  filterChipsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 20,
-  },
-  chip: {
+  primaryActionBtn: {
+    backgroundColor: ADMIN_COLORS.emeraldPrimary,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderRadius: ADMIN_RADII.button,
   },
-  chipActive: {
-    backgroundColor: '#DEF7EC',
-    borderColor: '#BCF0DA',
-  },
-  chipText: {
+  primaryActionBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: ADMIN_COLORS.textInverse,
   },
-  chipTextActive: {
-    color: '#03543F',
-    fontWeight: '700',
-  },
-  tableCard: {
-    backgroundColor: '#FFFFFF',
+  refreshIconBtn: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
+    borderColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    padding: 6,
+    borderRadius: ADMIN_RADII.button,
   },
-  centerContainer: {
-    paddingVertical: 40,
+  loadingCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  tableWrapper: {
+    marginBottom: 24,
   },
   userCell: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   userAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#DEF7EC',
+    width: 28,
+    height: 28,
+    borderRadius: 4,
+    backgroundColor: ADMIN_COLORS.bgActive,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.emeraldBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#BCF0DA',
   },
   userAvatarText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#03543F',
+    color: ADMIN_COLORS.emeraldPrimary,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   nameText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   usernameText: {
     fontSize: 11,
-    color: '#64748B',
+    color: ADMIN_COLORS.textMuted,
   },
   cellText: {
-    fontSize: 13,
-    color: '#334155',
+    fontSize: 12,
+    color: ADMIN_COLORS.textPrimary,
   },
   cellMuted: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
   },
-  inspectBtn: {
+  actionOutlineBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
+    backgroundColor: ADMIN_COLORS.bgSurface,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+    borderRadius: ADMIN_RADII.button,
   },
-  inspectBtnText: {
+  actionOutlineBtnText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  successBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#DEF7EC',
-    borderWidth: 1,
-    borderColor: '#BCF0DA',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-  },
-  successText: {
-    fontSize: 12,
-    color: '#03543F',
-    fontWeight: '600',
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#991B1B',
     fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
   },
-
+  // Mobile Record Card Styles
+  mobileListContainer: {
+    gap: 10,
+    marginBottom: 24,
+  },
+  recordCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 12,
+  },
+  recordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  recordUserGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  recordMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: ADMIN_COLORS.borderSubtle,
+    marginBottom: 8,
+  },
+  recordMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: '48%',
+  },
+  recordMetaText: {
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+  },
+  recordFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  emptyCard: {
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
+  },
+  emptySub: {
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 4,
+  },
   // Modal Styles
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   inspectorModalCard: {
     width: '100%',
-    maxWidth: 580,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    maxHeight: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+    maxWidth: 540,
+    backgroundColor: ADMIN_COLORS.bgSurface,
+    borderRadius: ADMIN_RADII.modal,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    padding: 18,
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
     paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: ADMIN_COLORS.borderSubtle,
+    marginBottom: 14,
   },
   modalHeaderTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   modalTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 15,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   closeBtn: {
     padding: 4,
   },
-  closeBtnText: {
-    fontSize: 16,
-    color: '#94A3B8',
-    fontWeight: '600',
-  },
   modalScroll: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   profileHero: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    gap: 12,
+    backgroundColor: ADMIN_COLORS.bgCanvas,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.card,
+    padding: 12,
+    marginBottom: 12,
   },
   avatarBig: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#DEF7EC',
+    width: 42,
+    height: 42,
+    borderRadius: 6,
+    backgroundColor: ADMIN_COLORS.bgActive,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.emeraldBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#BCF0DA',
   },
   avatarBigText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#03543F',
+    color: ADMIN_COLORS.emeraldPrimary,
   },
   heroNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   heroName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   heroUsername: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
+    fontSize: 11,
+    color: ADMIN_COLORS.textMuted,
   },
   heroAffil: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#334155',
-    marginTop: 2,
+    fontSize: 11,
+    color: ADMIN_COLORS.textSecondary,
+    marginTop: 1,
   },
   metaGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
+    gap: 8,
+    marginBottom: 12,
   },
   metaCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: ADMIN_COLORS.bgSurface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-    padding: 12,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
+    padding: 10,
   },
   inspectorLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
+    fontSize: 10,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textLight,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   metaVal: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '600',
+    color: ADMIN_COLORS.textPrimary,
   },
   bioSection: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   bioBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: ADMIN_COLORS.bgCanvas,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 12,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
+    padding: 10,
     marginTop: 4,
   },
   bioText: {
-    fontSize: 13,
-    color: '#334155',
-    lineHeight: 19,
+    fontSize: 12,
+    color: ADMIN_COLORS.textSecondary,
+    lineHeight: 17,
   },
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 12,
+    gap: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 16,
+    borderTopColor: ADMIN_COLORS.borderSubtle,
+    paddingTop: 12,
   },
   toggleBadgeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#DEF7EC',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: ADMIN_COLORS.bgActive,
     borderWidth: 1,
-    borderColor: '#BCF0DA',
-    borderRadius: 8,
+    borderColor: ADMIN_COLORS.emeraldBorder,
+    borderRadius: ADMIN_RADII.button,
   },
   toggleBadgeBtnText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#03543F',
+    fontWeight: '600',
+    color: ADMIN_COLORS.emeraldPrimary,
   },
   resetPassBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: ADMIN_COLORS.bgHover,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    borderRadius: ADMIN_RADII.button,
   },
   resetPassBtnText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
+    fontWeight: '500',
+    color: ADMIN_COLORS.textSecondary,
   },
 });
