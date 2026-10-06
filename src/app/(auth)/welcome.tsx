@@ -30,6 +30,7 @@ import { isProfileComplete } from '../../api/authService';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../constants/legalPolicies';
 
 const WELCOME_FULL_BG = require('../../../assets/images/welcome-bg.png');
+const ABOUT_FULL_BG = require('../../../assets/images/about-bg.png');
 
 type LandingTab = 'welcome' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
 
@@ -150,9 +151,9 @@ export default function WelcomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ============================================================ */}
-        {/* TAB 1: WELCOME / HOME (IMAGE 1 WITH FULL COVER BACKGROUND) */}
+        {/* TAB 1: WELCOME / HOME (FULL COVER BACKGROUND) */}
         {/* ============================================================ */}
-        {activeTab === 'welcome' ? (
+        {activeTab === 'welcome' && (
           <View style={styles.welcomeHeroContainer}>
             {/* Full Screen Background Image */}
             <Image
@@ -199,48 +200,63 @@ export default function WelcomeScreen() {
               </View>
             </View>
           </View>
-        ) : (
-          <View style={styles.mainContainer}>
-            {/* ============================================================ */}
-            {/* TAB 2: ABOUT (IMAGE 2) */}
-            {/* ============================================================ */}
-            {activeTab === 'about' && (
-              <View style={styles.pageLayout}>
-                <View style={styles.contentBlock}>
-                  <Text style={styles.editorialTitle}>About BooffIn</Text>
-                  <Text style={styles.editorialSubtitle}>A space where research finds its people</Text>
+        )}
 
-                  <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionHeading}>Our Mission</Text>
-                    <Text style={styles.bodyParagraph}>
-                      BooffIn was created to bridge the gap between curiosity and collaboration. We believe that groundbreaking research shouldn't exist in a vacuum, but rather thrive through connection.
-                    </Text>
-                    <Text style={[styles.bodyParagraph, { marginTop: 10 }]}>
-                      Our platform enables student researchers, academics, and science enthusiasts to share insights, engage in meaningful discussions, and push the boundaries of collective knowledge.
-                    </Text>
-                  </View>
+        {/* ============================================================ */}
+        {/* TAB 2: ABOUT (FULL COVER BACKGROUND) */}
+        {/* ============================================================ */}
+        {activeTab === 'about' && (
+          <View style={styles.aboutHeroContainer}>
+            {/* Full Screen Background Image */}
+            <Image
+              source={ABOUT_FULL_BG}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              contentPosition="center"
+              priority="high"
+            />
 
-                  <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionHeading}>What We Do</Text>
-                    <View style={styles.bulletList}>
-                      <Text style={styles.bulletItem}>• Connect researchers globally</Text>
-                      <Text style={styles.bulletItem}>• Facilitate interdisciplinary discussions</Text>
-                      <Text style={styles.bulletItem}>• Make scientific insight accessible to everyone</Text>
-                    </View>
-                  </View>
+            {/* Content Overlay */}
+            <View style={styles.aboutContentInner}>
+              <View style={styles.aboutContentBlock}>
+                <Text style={styles.editorialTitle}>About BooffIn</Text>
+                <Text style={styles.editorialSubtitle}>A space where research finds its people</Text>
 
-                  {/* Footer */}
-                  <View style={styles.inlineFooter}>
-                    <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                      <Text style={styles.footerLink}>Privacy Policy</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                      <Text style={styles.footerLink}>Terms of Service</Text>
-                    </TouchableOpacity>
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionHeading}>Our Mission</Text>
+                  <Text style={styles.bodyParagraph}>
+                    BooffIn was created to bridge the gap between curiosity and collaboration. We believe that groundbreaking research shouldn't exist in a vacuum, but rather thrive through connection.
+                  </Text>
+                  <Text style={[styles.bodyParagraph, { marginTop: 10 }]}>
+                    Our platform enables student researchers, academics, and science enthusiasts to share insights, engage in meaningful discussions, and push the boundaries of collective knowledge.
+                  </Text>
+                </View>
+
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionHeading}>What We Do</Text>
+                  <View style={styles.bulletList}>
+                    <Text style={styles.bulletItem}>• Connect researchers globally</Text>
+                    <Text style={styles.bulletItem}>• Facilitate interdisciplinary discussions</Text>
+                    <Text style={styles.bulletItem}>• Make scientific insight accessible to everyone</Text>
                   </View>
                 </View>
+
+                {/* Footer */}
+                <View style={styles.inlineFooter}>
+                  <TouchableOpacity onPress={() => setActiveTab('privacy')}>
+                    <Text style={styles.footerLink}>Privacy Policy</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setActiveTab('terms')}>
+                    <Text style={styles.footerLink}>Terms of Service</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            )}
+            </View>
+          </View>
+        )}
+
+        {activeTab !== 'welcome' && activeTab !== 'about' && (
+          <View style={styles.mainContainer}>
 
             {/* ============================================================ */}
             {/* TAB 3: FEATURES (IMAGE 3) */}
@@ -665,6 +681,28 @@ const styles = StyleSheet.create({
   },
   welcomeTextCard: {
     maxWidth: 580,
+    width: '100%',
+  },
+  aboutHeroContainer: {
+    width: '100%',
+    minHeight: '100vh' as any,
+    height: Platform.OS === 'web' ? ('100vh' as any) : undefined,
+    position: 'relative',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  aboutContentInner: {
+    maxWidth: 1280,
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: 36,
+    paddingVertical: 48,
+    paddingTop: 90,
+    position: 'relative',
+    zIndex: 2,
+  },
+  aboutContentBlock: {
+    maxWidth: 620,
     width: '100%',
   },
   mainContainer: {
