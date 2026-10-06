@@ -32,6 +32,7 @@ import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../constants/legalPolicies'
 const WELCOME_FULL_BG = require('../../../assets/images/welcome-bg.png');
 const ABOUT_FULL_BG = require('../../../assets/images/about-bg.png');
 const FEATURES_FULL_BG = require('../../../assets/images/features-bg.png');
+const COMMUNITY_FULL_BG = require('../../../assets/images/community-bg.png');
 
 type LandingTab = 'welcome' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
 
@@ -342,66 +343,78 @@ export default function WelcomeScreen() {
           </View>
         )}
 
-        {activeTab !== 'welcome' && activeTab !== 'about' && activeTab !== 'features' && (
-          <View style={styles.mainContainer}>
+        {/* ============================================================ */}
+        {/* TAB 4: COMMUNITY (FULL COVER BACKGROUND) */}
+        {/* ============================================================ */}
+        {activeTab === 'community' && (
+          <View style={styles.communityHeroContainer}>
+            {/* Full Screen Background Image */}
+            <Image
+              source={COMMUNITY_FULL_BG}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              contentPosition="center"
+              priority="high"
+            />
 
-            {/* ============================================================ */}
-            {/* TAB 4: COMMUNITY (IMAGE 4) */}
-            {/* ============================================================ */}
-            {activeTab === 'community' && (
-              <View style={styles.pageLayout}>
-                <View style={styles.contentBlock}>
-                  <Text style={styles.editorialTitle}>Meet the BooffIn Community</Text>
-                  <Text style={styles.editorialSubtitle}>
-                    Where curious minds, researchers, and creators come together to share the shape of life
+            {/* Content Overlay */}
+            <View style={styles.communityContentInner}>
+              <View style={styles.communityContentBlock}>
+                <Text style={styles.editorialTitle}>Meet the BooffIn Community</Text>
+                <Text style={styles.editorialSubtitle}>
+                  Where curious minds, researchers, and creators come together to share the shape of life
+                </Text>
+
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionHeading}>A Global Network</Text>
+                  <Text style={styles.bodyParagraph}>
+                    BooffIn is home to thousands of student researchers, PhD candidates, and science enthusiasts who are passionate about sharing knowledge. From late-night breakthrough discussions to collaborative reviews, find your place in a thriving network designed for curious minds.
                   </Text>
+                </View>
 
-                  <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionHeading}>A Global Network</Text>
-                    <Text style={styles.bodyParagraph}>
-                      BooffIn is home to thousands of student researchers, PhD candidates, and science enthusiasts who are passionate about sharing knowledge. From late-night breakthrough discussions to collaborative reviews, find your place in a thriving network designed for curious minds.
-                    </Text>
-                  </View>
-
-                  <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionHeading}>How to Participate</Text>
-                    <View style={styles.bulletList}>
-                      <Text style={styles.bulletItem}>• Join dedicated interest groups (e.g., AI in Science, Neuroscience)</Text>
-                      <Text style={styles.bulletItem}>• Participate in live discussions & Q&As</Text>
-                      <Text style={styles.bulletItem}>• Share your latest research & insights with peers</Text>
-                    </View>
-                  </View>
-
-                  <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
-                    <TouchableOpacity 
-                      style={styles.primaryCtaBtn} 
-                      onPress={handleOpenAuthModal}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.primaryCtaBtnText}>Join the Community</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={styles.secondaryLinkBtn} 
-                      onPress={handleOpenAuthModal}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.secondaryLinkText}>Browse Groups</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Footer */}
-                  <View style={styles.inlineFooter}>
-                    <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                      <Text style={styles.footerLink}>Privacy Policy</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                      <Text style={styles.footerLink}>Terms of Service</Text>
-                    </TouchableOpacity>
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionHeading}>How to Participate</Text>
+                  <View style={styles.bulletList}>
+                    <Text style={styles.bulletItem}>• Join dedicated interest groups (e.g., AI in Science, Neuroscience)</Text>
+                    <Text style={styles.bulletItem}>• Participate in live discussions & Q&As</Text>
+                    <Text style={styles.bulletItem}>• Share your latest research & insights with peers</Text>
                   </View>
                 </View>
+
+                <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
+                  <TouchableOpacity 
+                    style={styles.primaryCtaBtn} 
+                    onPress={handleOpenAuthModal}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.primaryCtaBtnText}>Join the Community</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.secondaryLinkBtn} 
+                    onPress={handleOpenAuthModal}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.secondaryLinkText}>Browse Groups</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Footer */}
+                <View style={styles.inlineFooter}>
+                  <TouchableOpacity onPress={() => setActiveTab('privacy')}>
+                    <Text style={styles.footerLink}>Privacy Policy</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setActiveTab('terms')}>
+                    <Text style={styles.footerLink}>Terms of Service</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            )}
+            </View>
+          </View>
+        )}
+
+        {activeTab !== 'welcome' && activeTab !== 'about' && activeTab !== 'features' && activeTab !== 'community' && (
+          <View style={styles.mainContainer}>
 
             {/* ============================================================ */}
             {/* TAB 5: IN-PAGE EMBEDDED PRIVACY POLICY */}
@@ -737,6 +750,28 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   featuresContentBlock: {
+    maxWidth: 620,
+    width: '100%',
+  },
+  communityHeroContainer: {
+    width: '100%',
+    minHeight: '100vh' as any,
+    height: Platform.OS === 'web' ? ('100vh' as any) : undefined,
+    position: 'relative',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  communityContentInner: {
+    maxWidth: 1280,
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: 36,
+    paddingVertical: 48,
+    paddingTop: 90,
+    position: 'relative',
+    zIndex: 2,
+  },
+  communityContentBlock: {
     maxWidth: 620,
     width: '100%',
   },
