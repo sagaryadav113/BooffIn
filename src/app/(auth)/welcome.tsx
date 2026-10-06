@@ -15,9 +15,7 @@ import {
   ScrollView,
   Modal,
   useWindowDimensions,
-  Linking,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { 
   Mail, 
@@ -29,8 +27,6 @@ import { GoogleIcon } from '../../components/core/GoogleIcon';
 import { useAuthStore } from '../../store/useAuthStore';
 import { isProfileComplete } from '../../api/authService';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../constants/legalPolicies';
-
-const WELCOME_HERO_BG = require('../../../assets/images/welcome-hero.jpg');
 
 type LandingTab = 'welcome' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
 
@@ -102,7 +98,6 @@ export default function WelcomeScreen() {
             onPress={() => setActiveTab('welcome')} 
             activeOpacity={0.8}
           >
-            <Text style={styles.logoB}>B</Text>
             <Text style={styles.logoText}>BooffIn</Text>
           </TouchableOpacity>
 
@@ -157,9 +152,8 @@ export default function WelcomeScreen() {
           {/* TAB 1: WELCOME / HOME (IMAGE 1) */}
           {/* ============================================================ */}
           {activeTab === 'welcome' && (
-            <View style={[styles.pageLayout, isDesktop && styles.pageLayoutDesktop]}>
-              {/* Left Column: Text & CTAs */}
-              <View style={[styles.leftColumn, isDesktop && styles.leftColumnDesktop]}>
+            <View style={styles.pageLayout}>
+              <View style={styles.contentBlock}>
                 <Text style={styles.heroPreTitle}>Welcome to BooffIn</Text>
                 
                 <View style={styles.brandTitleBlock}>
@@ -191,16 +185,6 @@ export default function WelcomeScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-
-              {/* Right Column: Isometric Scientific Collage Artwork */}
-              <View style={[styles.rightColumn, isDesktop && styles.rightColumnDesktop]}>
-                <Image
-                  source={WELCOME_HERO_BG}
-                  style={styles.heroImage}
-                  contentFit="contain"
-                  priority="high"
-                />
-              </View>
             </View>
           )}
 
@@ -208,8 +192,8 @@ export default function WelcomeScreen() {
           {/* TAB 2: ABOUT (IMAGE 2) */}
           {/* ============================================================ */}
           {activeTab === 'about' && (
-            <View style={[styles.pageLayout, isDesktop && styles.pageLayoutDesktop]}>
-              <View style={[styles.leftColumn, isDesktop && styles.leftColumnDesktop]}>
+            <View style={styles.pageLayout}>
+              <View style={styles.contentBlock}>
                 <Text style={styles.editorialTitle}>About BooffIn</Text>
                 <Text style={styles.editorialSubtitle}>A space where research finds its people</Text>
 
@@ -218,7 +202,7 @@ export default function WelcomeScreen() {
                   <Text style={styles.bodyParagraph}>
                     BooffIn was created to bridge the gap between curiosity and collaboration. We believe that groundbreaking research shouldn't exist in a vacuum, but rather thrive through connection.
                   </Text>
-                  <Text style={[styles.bodyParagraph, { marginTop: 8 }]}>
+                  <Text style={[styles.bodyParagraph, { marginTop: 10 }]}>
                     Our platform enables student researchers, academics, and science enthusiasts to share insights, engage in meaningful discussions, and push the boundaries of collective knowledge.
                   </Text>
                 </View>
@@ -232,7 +216,7 @@ export default function WelcomeScreen() {
                   </View>
                 </View>
 
-                {/* Footer in Left Column */}
+                {/* Footer */}
                 <View style={styles.inlineFooter}>
                   <TouchableOpacity onPress={() => setActiveTab('privacy')}>
                     <Text style={styles.footerLink}>Privacy Policy</Text>
@@ -242,14 +226,6 @@ export default function WelcomeScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-
-              <View style={[styles.rightColumn, isDesktop && styles.rightColumnDesktop]}>
-                <Image
-                  source={WELCOME_HERO_BG}
-                  style={styles.heroImage}
-                  contentFit="contain"
-                />
-              </View>
             </View>
           )}
 
@@ -257,8 +233,8 @@ export default function WelcomeScreen() {
           {/* TAB 3: FEATURES (IMAGE 3) */}
           {/* ============================================================ */}
           {activeTab === 'features' && (
-            <View style={[styles.pageLayout, isDesktop && styles.pageLayoutDesktop]}>
-              <View style={[styles.leftColumn, isDesktop && styles.leftColumnDesktop]}>
+            <View style={styles.pageLayout}>
+              <View style={styles.contentBlock}>
                 <Text style={styles.editorialTitle}>What You Can Do on BooffIn</Text>
                 <Text style={styles.editorialSubtitle}>
                   Explore the features that connect researchers with people and ideas
@@ -296,7 +272,7 @@ export default function WelcomeScreen() {
                 </View>
 
                 {/* Actions */}
-                <View style={[styles.heroActionsRow, { marginTop: 18 }]}>
+                <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
                   <TouchableOpacity 
                     style={styles.primaryCtaBtn} 
                     onPress={handleOpenAuthModal}
@@ -324,14 +300,6 @@ export default function WelcomeScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-
-              <View style={[styles.rightColumn, isDesktop && styles.rightColumnDesktop]}>
-                <Image
-                  source={WELCOME_HERO_BG}
-                  style={styles.heroImage}
-                  contentFit="contain"
-                />
-              </View>
             </View>
           )}
 
@@ -339,8 +307,8 @@ export default function WelcomeScreen() {
           {/* TAB 4: COMMUNITY (IMAGE 4) */}
           {/* ============================================================ */}
           {activeTab === 'community' && (
-            <View style={[styles.pageLayout, isDesktop && styles.pageLayoutDesktop]}>
-              <View style={[styles.leftColumn, isDesktop && styles.leftColumnDesktop]}>
+            <View style={styles.pageLayout}>
+              <View style={styles.contentBlock}>
                 <Text style={styles.editorialTitle}>Meet the BooffIn Community</Text>
                 <Text style={styles.editorialSubtitle}>
                   Where curious minds, researchers, and creators come together to share the shape of life
@@ -362,7 +330,7 @@ export default function WelcomeScreen() {
                   </View>
                 </View>
 
-                <View style={[styles.heroActionsRow, { marginTop: 16 }]}>
+                <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
                   <TouchableOpacity 
                     style={styles.primaryCtaBtn} 
                     onPress={handleOpenAuthModal}
@@ -390,14 +358,6 @@ export default function WelcomeScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-
-              <View style={[styles.rightColumn, isDesktop && styles.rightColumnDesktop]}>
-                <Image
-                  source={WELCOME_HERO_BG}
-                  style={styles.heroImage}
-                  contentFit="contain"
-                />
-              </View>
             </View>
           )}
 
@@ -411,7 +371,7 @@ export default function WelcomeScreen() {
                 onPress={() => setActiveTab('welcome')}
                 activeOpacity={0.7}
               >
-                <ArrowLeft size={14} color="#047857" />
+                <ArrowLeft size={16} color="#047857" />
                 <Text style={styles.backToHomeText}>Back to Welcome</Text>
               </TouchableOpacity>
 
@@ -451,7 +411,7 @@ export default function WelcomeScreen() {
                 onPress={() => setActiveTab('welcome')}
                 activeOpacity={0.7}
               >
-                <ArrowLeft size={14} color="#047857" />
+                <ArrowLeft size={16} color="#047857" />
                 <Text style={styles.backToHomeText}>Back to Welcome</Text>
               </TouchableOpacity>
 
@@ -498,7 +458,6 @@ export default function WelcomeScreen() {
             {/* Modal Header */}
             <View style={styles.authModalHeader}>
               <View style={styles.modalLogoRow}>
-                <Text style={styles.modalLogoB}>B</Text>
                 <Text style={styles.modalLogoText}>BooffIn</Text>
               </View>
               <TouchableOpacity 
@@ -612,11 +571,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFBF9',
     borderBottomWidth: 1,
     borderBottomColor: '#EBEFED',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
   },
   headerInner: {
-    maxWidth: 1200,
+    maxWidth: 1280,
     width: '100%',
     alignSelf: 'center',
     flexDirection: 'row',
@@ -626,49 +585,42 @@ const styles = StyleSheet.create({
   logoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  logoB: {
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#0F172A',
   },
   logoText: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 20,
+    fontSize: 26,
     fontWeight: '700',
     color: '#0F172A',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   navLinks: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 20,
+    gap: 28,
   },
   navItem: {
     paddingVertical: 4,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   navItemActive: {
-    borderBottomWidth: 1.5,
+    borderBottomWidth: 2,
     borderBottomColor: '#0F172A',
   },
   navItemText: {
-    fontSize: 13,
+    fontSize: 14.5,
     fontWeight: '500',
-    color: '#334155',
+    color: '#475569',
   },
   navItemTextActive: {
     color: '#0F172A',
     fontWeight: '700',
   },
   navSignInBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   navSignInText: {
-    fontSize: 13,
+    fontSize: 14.5,
     fontWeight: '600',
     color: '#0F172A',
   },
@@ -677,59 +629,36 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   mainContainer: {
-    maxWidth: 1200,
+    maxWidth: 1280,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingHorizontal: 32,
+    paddingVertical: 48,
   },
   pageLayout: {
-    flexDirection: 'column',
-    gap: 36,
-  },
-  pageLayoutDesktop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    width: '100%',
     minHeight: 520,
-    gap: 48,
-  },
-  leftColumn: {
-    width: '100%',
-  },
-  leftColumnDesktop: {
-    flex: 1.1,
-    maxWidth: 560,
-  },
-  rightColumn: {
-    width: '100%',
-    alignItems: 'center',
     justifyContent: 'center',
   },
-  rightColumnDesktop: {
-    flex: 1.2,
-    maxWidth: 580,
-  },
-  heroImage: {
+  contentBlock: {
+    maxWidth: 760,
     width: '100%',
-    height: 380,
-    maxWidth: 520,
   },
   // Hero Typography
   heroPreTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 32,
+    fontSize: 38,
     fontWeight: '700',
     color: '#0F172A',
-    letterSpacing: -0.5,
-    marginBottom: 6,
+    letterSpacing: -0.6,
+    marginBottom: 8,
   },
   brandTitleBlock: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   heroLets: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 18,
+    fontSize: 22,
     color: '#047857',
     fontWeight: '600',
     fontStyle: 'italic',
@@ -737,33 +666,33 @@ const styles = StyleSheet.create({
   },
   heroBrandTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 48,
+    fontSize: 58,
     fontWeight: '800',
     color: '#064E3B',
-    letterSpacing: -1,
+    letterSpacing: -1.2,
   },
   heroTagline: {
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '600',
     color: '#0F172A',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   heroDescription: {
-    fontSize: 13.5,
+    fontSize: 15.5,
     color: '#475569',
-    lineHeight: 22,
-    marginBottom: 24,
-    maxWidth: 480,
+    lineHeight: 25,
+    marginBottom: 28,
+    maxWidth: 620,
   },
   heroActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
+    gap: 22,
   },
   primaryCtaBtn: {
     backgroundColor: '#1B3B2B',
-    paddingVertical: 12,
-    paddingHorizontal: 22,
+    paddingVertical: 13,
+    paddingHorizontal: 26,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -774,7 +703,7 @@ const styles = StyleSheet.create({
   },
   primaryCtaBtnText: {
     color: '#FFFFFF',
-    fontSize: 13.5,
+    fontSize: 14.5,
     fontWeight: '600',
   },
   secondaryLinkBtn: {
@@ -783,151 +712,151 @@ const styles = StyleSheet.create({
   },
   secondaryLinkText: {
     color: '#1E293B',
-    fontSize: 13.5,
+    fontSize: 14.5,
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
   // Editorial Content (About / Features / Community)
   editorialTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 34,
+    fontSize: 42,
     fontWeight: '700',
     color: '#0F172A',
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    letterSpacing: -0.8,
+    marginBottom: 6,
   },
   editorialSubtitle: {
-    fontSize: 14,
+    fontSize: 16.5,
     color: '#64748B',
-    marginBottom: 24,
+    marginBottom: 32,
   },
   sectionBlock: {
-    marginBottom: 20,
+    marginBottom: 26,
   },
   sectionHeading: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
     color: '#047857',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   bodyParagraph: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#334155',
-    lineHeight: 20,
+    lineHeight: 24,
   },
   bulletList: {
-    gap: 4,
+    gap: 6,
   },
   bulletItem: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#334155',
-    lineHeight: 20,
+    lineHeight: 24,
   },
   // Feature Grid
   featureGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 10,
+    gap: 20,
+    marginBottom: 12,
   },
   featureGridItem: {
     width: '47%',
-    minWidth: 200,
+    minWidth: 260,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 14,
+    borderRadius: 10,
+    padding: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
-    shadowRadius: 3,
+    shadowRadius: 4,
   },
   featureTitle: {
-    fontSize: 13.5,
+    fontSize: 15.5,
     fontWeight: '700',
     color: '#047857',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   featureDesc: {
-    fontSize: 12,
+    fontSize: 13.5,
     color: '#475569',
-    lineHeight: 17,
+    lineHeight: 20,
   },
   // Embedded Legal Page
   embeddedLegalContainer: {
-    maxWidth: 820,
+    maxWidth: 880,
     width: '100%',
     alignSelf: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 12,
-    padding: 28,
+    padding: 32,
   },
   backToHomeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 16,
+    marginBottom: 20,
     alignSelf: 'flex-start',
   },
   backToHomeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#047857',
   },
   legalTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: '700',
     color: '#0F172A',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   legalMeta: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     color: '#64748B',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   legalSummary: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#334155',
-    lineHeight: 20,
+    lineHeight: 22,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
+    padding: 14,
+    marginBottom: 24,
   },
   legalSection: {
-    marginBottom: 18,
+    marginBottom: 20,
   },
   legalSectionTitle: {
-    fontSize: 14,
+    fontSize: 15.5,
     fontWeight: '700',
     color: '#0F172A',
     marginBottom: 6,
   },
   legalSectionText: {
-    fontSize: 12.5,
+    fontSize: 13.5,
     color: '#475569',
-    lineHeight: 19,
-    marginBottom: 4,
+    lineHeight: 21,
+    marginBottom: 6,
   },
   // Inline Footer
   inlineFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    marginTop: 28,
-    paddingTop: 16,
+    gap: 20,
+    marginTop: 36,
+    paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
   },
   footerLink: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     color: '#64748B',
     fontWeight: '500',
   },
@@ -964,17 +893,10 @@ const styles = StyleSheet.create({
   modalLogoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  modalLogoB: {
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
   },
   modalLogoText: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
     color: '#0F172A',
   },

@@ -35,25 +35,9 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
     pathname.includes('/email') ||
     pathname.includes('/forgot-password');
 
-  // If on Auth/Welcome/Login/Signup page, render a clean full-screen plain white layout
+  // If on Auth/Welcome/Login/Signup page, render children directly without global in-app header
   if (isAuthPage) {
-    return (
-      <View style={[styles.desktopRoot, { backgroundColor: '#FFFFFF' }]}>
-        <DesktopHeader />
-        <main
-          style={{
-            flex: 1,
-            width: '100%',
-            backgroundColor: '#FFFFFF',
-            minHeight: 'calc(100vh - 68px)',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          {children}
-        </main>
-      </View>
-    );
+    return <>{children}</>;
   }
 
   // Determine appropriate right sidebar based on active pathname
