@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.45)', // Backdrop blur style
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 12,
   },
   modalCard: {
     width: '100%',
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 12,
     overflow: 'hidden',
-    maxHeight: '90%',
+    maxHeight: '94%',
   },
   modalHeader: {
     flexDirection: 'row',

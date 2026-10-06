@@ -11,7 +11,8 @@ import {
   ActivityIndicator, 
   TouchableOpacity, 
   Modal, 
-  TextInput 
+  TextInput,
+  useWindowDimensions,
 } from 'react-native';
 import { ADMIN_COLORS } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
@@ -54,6 +55,9 @@ interface AcademicApplicant {
 }
 
 export const AdminApprovalsView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const { userId } = useAdminAuth();
   const [activeTab, setActiveTab] = useState<'VERIFICATIONS' | 'DUAL_ADMIN'>('VERIFICATIONS');
   const [loading, setLoading] = useState(true);
@@ -378,7 +382,7 @@ export const AdminApprovalsView: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, isMobile && styles.headerRowMobile]}>
         <View>
           <Text style={styles.pageTitle}>Academic Credentialing & Approvals</Text>
           <Text style={styles.pageSubtitle}>
@@ -408,27 +412,29 @@ export const AdminApprovalsView: React.FC = () => {
       )}
 
       {/* Mode Tabs */}
-      <View style={styles.tabsRow}>
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'VERIFICATIONS' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('VERIFICATIONS')}
-        >
-          <GraduationCap size={15} color={activeTab === 'VERIFICATIONS' ? '#059669' : '#64748B'} />
-          <Text style={[styles.tabBtnText, activeTab === 'VERIFICATIONS' && styles.tabBtnTextActive]}>
-            Academic & Institution Verifications ({applicants.filter(a => a.status === 'PENDING').length})
-          </Text>
-        </TouchableOpacity>
+      <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+        <View style={styles.tabsRow}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'VERIFICATIONS' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('VERIFICATIONS')}
+          >
+            <GraduationCap size={15} color={activeTab === 'VERIFICATIONS' ? '#059669' : '#64748B'} />
+            <Text style={[styles.tabBtnText, activeTab === 'VERIFICATIONS' && styles.tabBtnTextActive]}>
+              Academic & Institution Verifications ({applicants.filter(a => a.status === 'PENDING').length})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'DUAL_ADMIN' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('DUAL_ADMIN')}
-        >
-          <Lock size={15} color={activeTab === 'DUAL_ADMIN' ? '#059669' : '#64748B'} />
-          <Text style={[styles.tabBtnText, activeTab === 'DUAL_ADMIN' && styles.tabBtnTextActive]}>
-            Dual-Admin High-Risk Operations ({dualRequests.filter(r => r.status === 'PENDING').length})
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'DUAL_ADMIN' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('DUAL_ADMIN')}
+          >
+            <Lock size={15} color={activeTab === 'DUAL_ADMIN' ? '#059669' : '#64748B'} />
+            <Text style={[styles.tabBtnText, activeTab === 'DUAL_ADMIN' && styles.tabBtnTextActive]}>
+              Dual-Admin High-Risk Operations ({dualRequests.filter(r => r.status === 'PENDING').length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {/* Banner */}
       {activeTab === 'VERIFICATIONS' ? (
@@ -748,6 +754,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  headerRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   pageTitle: {
     fontSize: 22,

@@ -11,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import { ADMIN_COLORS } from '../lib/constants';
 import { AdminBadge } from '../components/AdminBadge';
@@ -68,6 +69,9 @@ export const getAvatarColor = (identifier: string) => {
 };
 
 export const AdminOpsChatView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const { userId, email } = useAdminAuth();
   const [activeChannel, setActiveChannel] = useState<AdminChatChannel>('general-ops');
   const [messages, setMessages] = useState<AdminChatMessage[]>([]);
@@ -161,7 +165,7 @@ export const AdminOpsChatView: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, isMobile && styles.headerRowMobile]}>
         <View>
           <Text style={styles.pageTitle}>Internal Admin Team Comms</Text>
           <Text style={styles.pageSubtitle}>
@@ -175,65 +179,92 @@ export const AdminOpsChatView: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Main Chat Layout (Left: Channel Switcher, Center: Messages, Right: Team Members) */}
-      <View style={styles.chatLayoutRow}>
-        {/* Left: Channels Sidebar */}
-        <View style={styles.channelsColumn}>
-          <Text style={styles.columnHeader}>CHANNELS</Text>
-          {CHANNELS.map((ch) => (
-            <TouchableOpacity
-              key={ch.key}
-              style={[styles.channelItem, activeChannel === ch.key && styles.channelItemActive]}
-              onPress={() => setActiveChannel(ch.key)}
-            >
-              <Hash size={15} color={activeChannel === ch.key ? '#059669' : '#64748B'} />
-              <Text
-                style={[
-                  styles.channelItemText,
-                  activeChannel === ch.key && styles.channelItemTextActive,
-                ]}
+      {/* Mobile Horizontal Channels Switcher Bar */}
+      {isMobile && (
+        <View style={styles.mobileChannelBarContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mobileChannelScroll}>
+            {CHANNELS.map((ch) => (
+              <TouchableOpacity
+                key={ch.key}
+                style={[styles.mobileChannelPill, activeChannel === ch.key && styles.mobileChannelPillActive]}
+                onPress={() => setActiveChannel(ch.key)}
               >
-                {ch.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-
-          <View style={styles.divider} />
-
-          {/* Team Roster Summary */}
-          <Text style={styles.columnHeader}>ONLINE ADMINS ({teamMembers.length})</Text>
-          <ScrollView style={styles.rosterList}>
-            {teamMembers.map((m) => {
-              const rosterColor = getAvatarColor(m.user_id || m.full_name || m.email);
-              const displayName = m.full_name || m.email?.split('@')[0] || 'Admin';
-
-              return (
-                <View key={m.user_id} style={styles.rosterItem}>
-                  <View
-                    style={[
-                      styles.rosterAvatar,
-                      {
-                        backgroundColor: rosterColor.bg,
-                        borderColor: rosterColor.border,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.rosterAvatarText, { color: rosterColor.text }]}>
-                      {displayName.substring(0, 2).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.rosterName, { color: rosterColor.text }]} numberOfLines={1}>
-                      {displayName}
-                    </Text>
-                    <Text style={styles.rosterRole}>{m.role}</Text>
-                  </View>
-                  <View style={styles.onlineDot} />
-                </View>
-              );
-            })}
+                <Hash size={13} color={activeChannel === ch.key ? '#059669' : '#64748B'} />
+                <Text
+                  style={[
+                    styles.mobileChannelPillText,
+                    activeChannel === ch.key && styles.mobileChannelPillTextActive,
+                  ]}
+                >
+                  {ch.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
         </View>
+      )}
+
+      {/* Main Chat Layout (Left: Channel Switcher, Center: Messages, Right: Team Members) */}
+      <View style={styles.chatLayoutRow}>
+        {/* Left: Channels Sidebar (Desktop Only) */}
+        {!isMobile && (
+          <View style={styles.channelsColumn}>
+            <Text style={styles.columnHeader}>CHANNELS</Text>
+            {CHANNELS.map((ch) => (
+              <TouchableOpacity
+                key={ch.key}
+                style={[styles.channelItem, activeChannel === ch.key && styles.channelItemActive]}
+                onPress={() => setActiveChannel(ch.key)}
+              >
+                <Hash size={15} color={activeChannel === ch.key ? '#059669' : '#64748B'} />
+                <Text
+                  style={[
+                    styles.channelItemText,
+                    activeChannel === ch.key && styles.channelItemTextActive,
+                  ]}
+                >
+                  {ch.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <View style={styles.divider} />
+
+            {/* Team Roster Summary */}
+            <Text style={styles.columnHeader}>ONLINE ADMINS ({teamMembers.length})</Text>
+            <ScrollView style={styles.rosterList}>
+              {teamMembers.map((m) => {
+                const rosterColor = getAvatarColor(m.user_id || m.full_name || m.email);
+                const displayName = m.full_name || m.email?.split('@')[0] || 'Admin';
+
+                return (
+                  <View key={m.user_id} style={styles.rosterItem}>
+                    <View
+                      style={[
+                        styles.rosterAvatar,
+                        {
+                          backgroundColor: rosterColor.bg,
+                          borderColor: rosterColor.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.rosterAvatarText, { color: rosterColor.text }]}>
+                        {displayName.substring(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.rosterName, { color: rosterColor.text }]} numberOfLines={1}>
+                        {displayName}
+                      </Text>
+                      <Text style={styles.rosterRole}>{m.role}</Text>
+                    </View>
+                    <View style={styles.onlineDot} />
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Center/Right: Message Feed */}
         <View style={styles.feedColumn}>
@@ -243,7 +274,7 @@ export const AdminOpsChatView: React.FC = () => {
               <Hash size={18} color="#059669" />
               <Text style={styles.activeChannelTitle}>{currentChannelInfo.label}</Text>
             </View>
-            <Text style={styles.activeChannelDesc}>{currentChannelInfo.desc}</Text>
+            <Text style={styles.activeChannelDesc} numberOfLines={1}>{currentChannelInfo.desc}</Text>
           </View>
 
           {/* Error Banner */}
@@ -431,6 +462,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  headerRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  mobileChannelBarContainer: {
+    marginBottom: 12,
+  },
+  mobileChannelScroll: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  mobileChannelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  mobileChannelPillActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  mobileChannelPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  mobileChannelPillTextActive: {
+    color: '#059669',
+    fontWeight: '700',
   },
   pageTitle: {
     fontSize: 22,

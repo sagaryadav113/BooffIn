@@ -24,6 +24,7 @@ import {
   ChevronRight,
   LifeBuoy,
   MessagesSquare,
+  X,
 } from 'lucide-react-native';
 
 const NAV_ICON_MAP: Record<string, React.FC<any>> = {
@@ -46,25 +47,37 @@ const NAV_ICON_MAP: Record<string, React.FC<any>> = {
 interface AdminSidebarProps {
   activeKey: AdminNavKey;
   onSelect: (key: AdminNavKey) => void;
+  onClose?: () => void;
+  isMobileDrawer?: boolean;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   activeKey,
   onSelect,
+  onClose,
+  isMobileDrawer,
 }) => {
   const { hasPermission } = useAdminPermissions();
 
   return (
-    <View style={styles.sidebar}>
+    <View style={[styles.sidebar, isMobileDrawer && styles.mobileSidebar]}>
       {/* 1. Brand Logo Header */}
       <View style={styles.brandContainer}>
-        <View style={styles.logoBadge}>
-          <Text style={styles.logoBadgeText}>B</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={styles.logoBadge}>
+            <Text style={styles.logoBadgeText}>B</Text>
+          </View>
+          <View style={styles.brandTextGroup}>
+            <Text style={styles.brandTitle}>BooffIn</Text>
+            <Text style={styles.brandSubtitle}>Admin Console</Text>
+          </View>
         </View>
-        <View style={styles.brandTextGroup}>
-          <Text style={styles.brandTitle}>BooffIn</Text>
-          <Text style={styles.brandSubtitle}>Admin Console</Text>
-        </View>
+
+        {isMobileDrawer && onClose && (
+          <TouchableOpacity style={styles.closeDrawerBtn} onPress={onClose}>
+            <X size={20} color="#64748B" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 2. Navigation Items List */}
@@ -135,14 +148,29 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     height: '100%',
   },
+  mobileSidebar: {
+    width: 280,
+    maxWidth: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 16,
+  },
   brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 18,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     gap: 12,
+  },
+  closeDrawerBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
   },
   logoBadge: {
     width: 36,

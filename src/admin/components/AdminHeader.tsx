@@ -5,15 +5,21 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { useAdminAuth } from '../hooks/useAdminAuth';
-import { Search, LogOut, ChevronDown } from 'lucide-react-native';
+import { Search, LogOut, ChevronDown, Menu } from 'lucide-react-native';
 import { AdminProfileModal } from './AdminProfileModal';
 import { adminProfileService, SuperAdminProfileData } from '../services/adminProfileService';
 
 interface AdminHeaderProps {
   title: string;
+  isMobile?: boolean;
+  onOpenMenu?: () => void;
 }
 
-export const AdminHeader: React.FC<AdminHeaderProps> = ({ title }) => {
+export const AdminHeader: React.FC<AdminHeaderProps> = ({
+  title,
+  isMobile,
+  onOpenMenu,
+}) => {
   const { email, signOut } = useAdminAuth();
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
   const [profile, setProfile] = useState<SuperAdminProfileData | null>(null);
@@ -46,47 +52,60 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ title }) => {
 
   return (
     <>
-      <View style={styles.header}>
-        {/* 1. Left Title / Breadcrumb */}
+      <View style={[styles.header, isMobile && styles.mobileHeader]}>
+        {/* 1. Left Title / Menu Button on Mobile */}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>{title}</Text>
+          {isMobile && onOpenMenu && (
+            <TouchableOpacity style={styles.menuBtn} onPress={onOpenMenu}>
+              <Menu size={20} color="#0F172A" />
+            </TouchableOpacity>
+          )}
+          <Text style={[styles.title, isMobile && styles.mobileTitle]} numberOfLines={1}>
+            {title}
+          </Text>
         </View>
 
-        {/* 2. Center Global Search Input */}
-        <View style={styles.searchContainer}>
-          <Search size={16} color="#94A3B8" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search... (Ctrl+K)"
-            placeholderTextColor="#94A3B8"
-          />
-        </View>
+        {/* 2. Center Global Search Input (Hidden on narrow mobile) */}
+        {!isMobile && (
+          <View style={styles.searchContainer}>
+            <Search size={16} color="#94A3B8" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search... (Ctrl+K)"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+        )}
 
         {/* 3. Right User Identity & Actions */}
         <View style={styles.rightSection}>
           {/* User Avatar & Info (Interactive Profile Trigger) */}
           <TouchableOpacity
-            style={styles.userProfileBtn}
+            style={[styles.userProfileBtn, isMobile && styles.mobileUserProfileBtn]}
             onPress={() => setShowProfileModal(true)}
             activeOpacity={0.7}
           >
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{getInitials()}</Text>
             </View>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName} numberOfLines={1}>
-                {displayName}
-              </Text>
-              <Text style={styles.userSubtext}>{displayRole}</Text>
-            </View>
+            {!isMobile && (
+              <View style={styles.userInfo}>
+                <Text style={styles.userName} numberOfLines={1}>
+                  {displayName}
+                </Text>
+                <Text style={styles.userSubtext}>{displayRole}</Text>
+              </View>
+            )}
             <ChevronDown size={14} color="#94A3B8" style={{ marginLeft: 2 }} />
           </TouchableOpacity>
 
           {/* Sign Out Button */}
-          <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
-            <LogOut size={15} color="#64748B" />
-            <Text style={styles.signOutText}>Sign Out</Text>
-          </TouchableOpacity>
+          {!isMobile && (
+            <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
+              <LogOut size={15} color="#64748B" />
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -119,14 +138,32 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     zIndex: 10,
   },
+  mobileHeader: {
+    height: 56,
+    paddingHorizontal: 12,
+  },
   titleContainer: {
-    minWidth: 140,
+    minWidth: 120,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  menuBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.3,
+  },
+  mobileTitle: {
+    fontSize: 16,
+    maxWidth: 160,
   },
   searchContainer: {
     flex: 1,
@@ -166,6 +203,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  mobileUserProfileBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    gap: 4,
   },
   avatar: {
     width: 32,

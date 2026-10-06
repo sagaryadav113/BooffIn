@@ -1,7 +1,3 @@
-// ============================================================================
-// BOOFFIN ADMIN PORTAL — SUPPORT & INQUIRIES DESK (support@letsbooffin.com)
-// ============================================================================
-
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -13,6 +9,7 @@ import {
   TouchableOpacity,
   Modal,
   Linking,
+  useWindowDimensions,
 } from 'react-native';
 import { ADMIN_COLORS } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
@@ -37,6 +34,9 @@ import {
 } from 'lucide-react-native';
 
 export const AdminSupportView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -238,7 +238,7 @@ export const AdminSupportView: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, isMobile && styles.headerRowMobile]}>
         <View>
           <Text style={styles.pageTitle}>Support & Email Inquiries Desk</Text>
           <Text style={styles.pageSubtitle}>
@@ -268,27 +268,29 @@ export const AdminSupportView: React.FC = () => {
       )}
 
       {/* Filter Tabs */}
-      <View style={styles.tabsRow}>
-        {(['ALL', 'NEW', 'IN_PROGRESS', 'RESOLVED'] as const).map((st) => (
-          <TouchableOpacity
-            key={st}
-            style={[styles.tabBtn, statusFilter === st && styles.tabBtnActive]}
-            onPress={() => setStatusFilter(st)}
-          >
-            <Text style={[styles.tabBtnText, statusFilter === st && styles.tabBtnTextActive]}>
-              {st === 'ALL' ? 'All Inquiries' : st === 'NEW' ? 'New / Open' : st === 'IN_PROGRESS' ? 'In Progress' : 'Resolved'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+        <View style={styles.tabsRow}>
+          {(['ALL', 'NEW', 'IN_PROGRESS', 'RESOLVED'] as const).map((st) => (
+            <TouchableOpacity
+              key={st}
+              style={[styles.tabBtn, statusFilter === st && styles.tabBtnActive]}
+              onPress={() => setStatusFilter(st)}
+            >
+              <Text style={[styles.tabBtnText, statusFilter === st && styles.tabBtnTextActive]}>
+                {st === 'ALL' ? 'All Inquiries' : st === 'NEW' ? 'New / Open' : st === 'IN_PROGRESS' ? 'In Progress' : 'Resolved'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
 
       {/* Search & Category Filter Bar */}
-      <View style={styles.searchBarRow}>
+      <View style={[styles.searchBarRow, isMobile && styles.searchBarRowMobile]}>
         <View style={styles.searchWrapper}>
           <Search size={15} color="#94A3B8" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by ticket #, sender email, or keyword..."
+            placeholder="Search ticket #, email, or keyword..."
             placeholderTextColor="#94A3B8"
             value={search}
             onChangeText={setSearch}
@@ -440,6 +442,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  headerRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
   pageTitle: {
     fontSize: 22,
     fontWeight: '800',
@@ -502,7 +509,6 @@ const styles = StyleSheet.create({
   tabsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 14,
   },
   tabBtn: {
     paddingHorizontal: 14,
@@ -529,6 +535,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginBottom: 16,
+  },
+  searchBarRowMobile: {
+    flexDirection: 'column',
+    gap: 8,
   },
   searchWrapper: {
     flex: 1,

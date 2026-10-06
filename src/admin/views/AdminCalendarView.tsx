@@ -1,8 +1,3 @@
-// ============================================================================
-// BOOFFIN ADMIN PORTAL — COLOR-CODED TEAM TRACKING CALENDAR VIEW
-// Live Realtime Multi-Admin Coordination & Operations Schedule
-// ============================================================================
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
@@ -13,6 +8,8 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  useWindowDimensions,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import {
   Calendar as CalendarIcon,
@@ -55,6 +52,9 @@ const MONTH_NAMES = [
 ];
 
 export const AdminCalendarView: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   // 1. Calendar State & Viewport
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
@@ -381,12 +381,243 @@ export const AdminCalendarView: React.FC = () => {
     });
   };
 
+  const renderDrawerContent = () => (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.drawerContent}>
+      {/* Title Input */}
+      <View style={styles.drawerSection}>
+        <TextInput
+          style={styles.titleInput}
+          value={formTitle}
+          onChangeText={setFormTitle}
+          placeholder="Event Title..."
+          placeholderTextColor={ADMIN_COLORS.textMuted}
+        />
+      </View>
+
+      {/* Date Input */}
+      <View style={styles.formRow}>
+        <CalendarIcon size={16} color={ADMIN_COLORS.textSecondary} />
+        <TextInput
+          style={styles.fieldInput}
+          value={formDate}
+          onChangeText={setFormDate}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={ADMIN_COLORS.textMuted}
+        />
+      </View>
+
+      {/* Time Selection Pills */}
+      <View style={styles.timePillsRow}>
+        <View style={styles.timePill}>
+          <Clock size={14} color={ADMIN_COLORS.textSecondary} />
+          <TextInput
+            style={styles.timeInput}
+            value={formStartTime}
+            onChangeText={setFormStartTime}
+            placeholder="14:00"
+          />
+        </View>
+        <Text style={styles.timeDash}>—</Text>
+        <View style={styles.timePill}>
+          <Clock size={14} color={ADMIN_COLORS.textSecondary} />
+          <TextInput
+            style={styles.timeInput}
+            value={formEndTime}
+            onChangeText={setFormEndTime}
+            placeholder="15:00"
+          />
+        </View>
+      </View>
+
+      {/* Toggles: All Day & Recurring */}
+      <View style={styles.togglesRow}>
+        <TouchableOpacity
+          style={[styles.toggleBtn, formIsAllDay && styles.toggleBtnActive]}
+          onPress={() => setFormIsAllDay(!formIsAllDay)}
+        >
+          <View style={[styles.toggleCircle, formIsAllDay && styles.toggleCircleActive]} />
+          <Text style={styles.toggleText}>All day</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.toggleBtn, formIsRecurring && styles.toggleBtnActive]}
+          onPress={() => setFormIsRecurring(!formIsRecurring)}
+        >
+          <View style={[styles.toggleCircle, formIsRecurring && styles.toggleCircleActive]} />
+          <Text style={styles.toggleText}>Yearly / Repeat</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.divider} />
+
+      {/* Participants Section */}
+      <View style={styles.drawerSection}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Participants</Text>
+          <TouchableOpacity
+            style={styles.addParticipantBtn}
+            onPress={() => {
+              // Toggle first unassigned team member
+              const unassigned = teamMembers.find(
+                (m) => !formParticipants.some((p) => p.id === m.id)
+              );
+              if (unassigned) {
+                toggleParticipant(unassigned);
+              }
+            }}
+          >
+            <Plus size={13} color="#2563EB" />
+            <Text style={styles.addParticipantBtnText}>Add participant</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Team member chips */}
+        <View style={styles.participantsList}>
+          {teamMembers.length === 0 ? (
+            <Text style={{ fontSize: 12, color: ADMIN_COLORS.textMuted, fontStyle: 'italic', paddingVertical: 6 }}>
+              No team members configured yet.
+            </Text>
+          ) : (
+            teamMembers.map((member) => {
+              const isSelected = formParticipants.some((p) => p.id === member.id);
+              return (
+                <TouchableOpacity
+                  key={member.id}
+                  style={[styles.participantRow, isSelected && styles.participantRowActive]}
+                  onPress={() => toggleParticipant(member)}
+                >
+                  <View style={styles.participantAvatar}>
+                    <Text style={styles.avatarInitial}>{member.name.charAt(0)}</Text>
+                  </View>
+                  <View style={styles.participantInfo}>
+                    <Text style={styles.participantName}>{member.name}</Text>
+                    <Text style={styles.participantRole}>{member.role || 'Admin'}</Text>
+                  </View>
+                  {isSelected && <CheckCircle2 size={16} color="#059669" />}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+      </View>
+
+      <View style={styles.divider} />
+
+      {/* Video Meeting Link */}
+      <View style={styles.formRow}>
+        <Video size={16} color={ADMIN_COLORS.textSecondary} />
+        <TextInput
+          style={styles.fieldInput}
+          value={formMeetingLink}
+          onChangeText={setFormMeetingLink}
+          placeholder="https://meet.google.com/..."
+          placeholderTextColor={ADMIN_COLORS.textMuted}
+        />
+      </View>
+
+      {/* Location */}
+      <View style={styles.formRow}>
+        <MapPin size={16} color={ADMIN_COLORS.textSecondary} />
+        <TextInput
+          style={styles.fieldInput}
+          value={formLocation}
+          onChangeText={setFormLocation}
+          placeholder="Location or Room..."
+          placeholderTextColor={ADMIN_COLORS.textMuted}
+        />
+      </View>
+
+      {/* Description / Agenda */}
+      <View style={styles.descSection}>
+        <AlignLeft size={16} color={ADMIN_COLORS.textSecondary} style={{ marginTop: 6 }} />
+        <TextInput
+          style={styles.descInput}
+          value={formDescription}
+          onChangeText={setFormDescription}
+          placeholder="Meeting agenda or notes..."
+          placeholderTextColor={ADMIN_COLORS.textMuted}
+          multiline
+          numberOfLines={3}
+        />
+      </View>
+
+      {/* Reminders Pill */}
+      <TouchableOpacity
+        style={styles.remindersBtn}
+        onPress={() => alert('Reminder alert set: 15 minutes before event.')}
+      >
+        <Bell size={14} color={ADMIN_COLORS.textSecondary} />
+        <Text style={styles.remindersBtnText}>Add Reminders</Text>
+      </TouchableOpacity>
+
+      <View style={styles.divider} />
+
+      {/* Color Palette Selector */}
+      <View style={styles.colorPaletteSection}>
+        <Text style={styles.paletteLabel}>Color Theme</Text>
+        <View style={styles.colorsRow}>
+          {Object.keys(CALENDAR_COLOR_PALETTES).map((colorKey) => {
+            const theme = CALENDAR_COLOR_PALETTES[colorKey as CalendarColorId];
+            const isSelected = formColorId === colorKey;
+
+            return (
+              <TouchableOpacity
+                key={colorKey}
+                style={[
+                  styles.colorCircle,
+                  { backgroundColor: theme.dot },
+                  isSelected && styles.colorCircleSelected,
+                ]}
+                onPress={() => setFormColorId(colorKey as CalendarColorId)}
+              >
+                {isSelected && <Check size={12} color="#FFFFFF" />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.drawerActions}>
+        <TouchableOpacity
+          style={styles.cancelBtn}
+          onPress={() => setIsDrawerOpen(false)}
+        >
+          <Text style={styles.cancelBtnText}>Cancel</Text>
+        </TouchableOpacity>
+
+        {!isNewEvent && (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={handleDeleteEvent}
+          >
+            <Trash2 size={16} color="#EF4444" />
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.saveBtn}
+          onPress={handleSaveEvent}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.saveBtnText}>
+              {isNewEvent ? 'Save Event' : 'Update'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+
   return (
     <View style={styles.container}>
       {/* 1. TOP HEADER CONTROLS (METIS SAAS DESIGN) */}
-      <View style={styles.header}>
+      <View style={[styles.header, isMobile && styles.headerMobile]}>
         {/* Left: Title & Navigation */}
-        <View style={styles.headerLeft}>
+        <View style={[styles.headerLeft, isMobile && styles.headerLeftMobile]}>
           <Text style={styles.pageTitle}>Calendar</Text>
 
           <View style={styles.navButtonGroup}>
@@ -409,7 +640,7 @@ export const AdminCalendarView: React.FC = () => {
         </View>
 
         {/* Right: View Selector, Filter, Export, New Event */}
-        <View style={styles.headerRight}>
+        <View style={[styles.headerRight, isMobile && styles.headerRightMobile]}>
           <View style={styles.viewSelector}>
             {(['week', 'day', 'month'] as CalendarViewMode[]).map((mode) => (
               <TouchableOpacity
@@ -432,13 +663,15 @@ export const AdminCalendarView: React.FC = () => {
             <Text style={[styles.actionBtnText, filterColor !== 'all' && { color: '#2563EB' }]}>Filter</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionIconBtn}
-            onPress={() => alert('Calendar schedule exported to CSV / iCal format.')}
-          >
-            <Download size={15} color={ADMIN_COLORS.textSecondary} />
-            <Text style={styles.actionBtnText}>Export</Text>
-          </TouchableOpacity>
+          {!isMobile && (
+            <TouchableOpacity
+              style={styles.actionIconBtn}
+              onPress={() => alert('Calendar schedule exported to CSV / iCal format.')}
+            >
+              <Download size={15} color={ADMIN_COLORS.textSecondary} />
+              <Text style={styles.actionBtnText}>Export</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.newEventBtn}
@@ -460,412 +693,209 @@ export const AdminCalendarView: React.FC = () => {
 
       {/* 2. MAIN CALENDAR BODY (GRID + RIGHT DRAWER) */}
       <View style={styles.mainLayout}>
-        {/* Main Grid View */}
-        <View style={styles.gridContainer}>
-          {/* Day Headers Row */}
-          <View style={styles.daysHeaderRow}>
-            {/* UTC Timezone Tag Box */}
-            <View style={styles.timezoneBox}>
-              <Text style={styles.timezoneText}>UTC +5:30</Text>
-            </View>
+        {/* Main Grid View (Wraps in horizontal scroll on narrow mobile) */}
+        <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+          <View style={[styles.gridContainer, isMobile && { minWidth: 680 }]}>
+            {/* Day Headers Row */}
+            <View style={styles.daysHeaderRow}>
+              {/* UTC Timezone Tag Box */}
+              <View style={styles.timezoneBox}>
+                <Text style={styles.timezoneText}>UTC +5:30</Text>
+              </View>
 
-            {/* 7 Weekday Columns */}
-            {weekDays.map((dayDate, idx) => {
-              const isToday =
-                dayDate.getDate() === now.getDate() &&
-                dayDate.getMonth() === now.getMonth() &&
-                dayDate.getFullYear() === now.getFullYear();
+              {/* 7 Weekday Columns */}
+              {weekDays.map((dayDate, idx) => {
+                const isToday =
+                  dayDate.getDate() === now.getDate() &&
+                  dayDate.getMonth() === now.getMonth() &&
+                  dayDate.getFullYear() === now.getFullYear();
 
-              return (
-                <View key={idx} style={[styles.dayHeaderCol, isToday && styles.dayHeaderColToday]}>
-                  <Text style={[styles.dayHeaderText, isToday && styles.dayHeaderTextToday]}>
-                    {DAYS_SHORT[dayDate.getDay()]} {dayDate.getDate()}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* All Day Row */}
-          <View style={styles.allDayRow}>
-            <View style={styles.allDayLabelBox}>
-              <Text style={styles.allDayLabel}>All day</Text>
-            </View>
-
-            {weekDays.map((dayDate, idx) => {
-              const dayAllDayEvents = allDayEvents.filter((e) => {
-                const eventDate = new Date(e.start_time);
                 return (
-                  eventDate.getDate() === dayDate.getDate() &&
-                  eventDate.getMonth() === dayDate.getMonth()
+                  <View key={idx} style={[styles.dayHeaderCol, isToday && styles.dayHeaderColToday]}>
+                    <Text style={[styles.dayHeaderText, isToday && styles.dayHeaderTextToday]}>
+                      {DAYS_SHORT[dayDate.getDay()]} {dayDate.getDate()}
+                    </Text>
+                  </View>
                 );
-              });
+              })}
+            </View>
 
-              return (
-                <View key={idx} style={styles.allDayCol}>
-                  {dayAllDayEvents.map((evt) => (
-                    <TouchableOpacity
-                      key={evt.id}
-                      style={[
-                        styles.allDayCapsule,
-                        { backgroundColor: evt.color_bg, borderColor: evt.color_border },
-                      ]}
-                      onPress={() => openEventDetails(evt)}
-                    >
-                      <Text
-                        style={[styles.allDayCapsuleText, { color: evt.color_text }]}
-                        numberOfLines={1}
-                      >
-                        {evt.title}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              );
-            })}
-          </View>
+            {/* All Day Row */}
+            <View style={styles.allDayRow}>
+              <View style={styles.allDayLabelBox}>
+                <Text style={styles.allDayLabel}>All day</Text>
+              </View>
 
-          {/* Hourly Scrollable Grid */}
-          <ScrollView style={styles.gridScrollView} showsVerticalScrollIndicator={true}>
-            <View style={styles.hoursGridWrapper}>
-              {/* Hourly Time Slots */}
-              {HOURS.map((hour) => {
-                const hourFormatted =
-                  hour === 12
-                    ? '12 PM'
-                    : hour > 12
-                    ? `${hour - 12} PM`
-                    : `${hour} AM`;
+              {weekDays.map((dayDate, idx) => {
+                const dayAllDayEvents = allDayEvents.filter((e) => {
+                  const eventDate = new Date(e.start_time);
+                  return (
+                    eventDate.getDate() === dayDate.getDate() &&
+                    eventDate.getMonth() === dayDate.getMonth()
+                  );
+                });
 
                 return (
-                  <View key={hour} style={styles.hourRow}>
-                    <View style={styles.hourLabelBox}>
-                      <Text style={styles.hourLabel}>{hourFormatted}</Text>
-                    </View>
-                    {weekDays.map((dayDate, colIdx) => (
+                  <View key={idx} style={styles.allDayCol}>
+                    {dayAllDayEvents.map((evt) => (
                       <TouchableOpacity
-                        key={colIdx}
-                        style={styles.hourCell}
-                        onPress={() => handleCreateNew(dayDate, hour)}
-                        activeOpacity={0.7}
-                      />
+                        key={evt.id}
+                        style={[
+                          styles.allDayCapsule,
+                          { backgroundColor: evt.color_bg, borderColor: evt.color_border },
+                        ]}
+                        onPress={() => openEventDetails(evt)}
+                      >
+                        <Text
+                          style={[styles.allDayCapsuleText, { color: evt.color_text }]}
+                          numberOfLines={1}
+                        >
+                          {evt.title}
+                        </Text>
+                      </TouchableOpacity>
                     ))}
                   </View>
                 );
               })}
-
-              {/* Current Live Time Red/Purple Indicator Line */}
-              {isCurrentWeek && currentMinutesOffset >= 0 && currentMinutesOffset <= (HOURS.length * 60) && (
-                <View style={[styles.currentTimeLine, { top: currentLineTop }]}>
-                  <View style={styles.currentTimeBadge}>
-                    <Text style={styles.currentTimeBadgeText}>
-                      {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
-                  <View style={styles.currentTimeBar} />
-                </View>
-              )}
-
-              {/* Render Absolute Positioned Event Blocks */}
-              {timeEvents.map((evt) => {
-                const evtStart = new Date(evt.start_time);
-                const evtEnd = new Date(evt.end_time);
-
-                // Find matching day column index
-                const dayIndex = weekDays.findIndex(
-                  (d) =>
-                    d.getDate() === evtStart.getDate() &&
-                    d.getMonth() === evtStart.getMonth() &&
-                    d.getFullYear() === evtStart.getFullYear()
-                );
-
-                if (dayIndex === -1) return null;
-
-                const startHourFloat = evtStart.getHours() + evtStart.getMinutes() / 60;
-                const endHourFloat = evtEnd.getHours() + evtEnd.getMinutes() / 60;
-                const durationHours = Math.max(0.5, endHourFloat - startHourFloat);
-
-                // Calculate vertical position (80px per 1 hour slot, starting at 8 AM)
-                const topPos = (startHourFloat - 8) * 80;
-                const heightPos = Math.max(38, durationHours * 80 - 4);
-
-                // Column width is (100% - 60px time label) / 7
-                const colLeftPercent = 60 + dayIndex * ((100 - 8) / 7);
-
-                const timeDisplay = `${
-                  evtStart.getHours() > 12 ? evtStart.getHours() - 12 : evtStart.getHours()
-                } - ${
-                  evtEnd.getHours() > 12 ? evtEnd.getHours() - 12 : evtEnd.getHours()
-                } ${evtEnd.getHours() >= 12 ? 'PM' : 'AM'}`;
-
-                return (
-                  <TouchableOpacity
-                    key={evt.id}
-                    style={[
-                      styles.eventBlock,
-                      {
-                        top: topPos + 2,
-                        height: heightPos,
-                        left: `${8.5 + dayIndex * 13.0}%`,
-                        width: '12.3%',
-                        backgroundColor: evt.color_bg,
-                        borderColor: evt.color_border,
-                      },
-                    ]}
-                    onPress={() => openEventDetails(evt)}
-                    activeOpacity={0.85}
-                  >
-                    <Text
-                      style={[styles.eventTitle, { color: evt.color_text }]}
-                      numberOfLines={1}
-                    >
-                      {evt.title}
-                    </Text>
-                    <Text
-                      style={[styles.eventTime, { color: evt.color_text }]}
-                      numberOfLines={1}
-                    >
-                      {timeDisplay}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
             </View>
-          </ScrollView>
-        </View>
 
-        {/* 3. RIGHT-HAND EVENT INSPECTOR & EDITOR PANEL */}
-        {isDrawerOpen && (
-          <View style={styles.rightDrawer}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.drawerContent}>
-              {/* Title Input */}
-              <View style={styles.drawerSection}>
-                <TextInput
-                  style={styles.titleInput}
-                  value={formTitle}
-                  onChangeText={setFormTitle}
-                  placeholder="Event Title..."
-                  placeholderTextColor={ADMIN_COLORS.textMuted}
-                />
-              </View>
+            {/* Hourly Scrollable Grid */}
+            <ScrollView style={styles.gridScrollView} showsVerticalScrollIndicator={true}>
+              <View style={styles.hoursGridWrapper}>
+                {/* Hourly Time Slots */}
+                {HOURS.map((hour) => {
+                  const hourFormatted =
+                    hour === 12
+                      ? '12 PM'
+                      : hour > 12
+                      ? `${hour - 12} PM`
+                      : `${hour} AM`;
 
-              {/* Date Input */}
-              <View style={styles.formRow}>
-                <CalendarIcon size={16} color={ADMIN_COLORS.textSecondary} />
-                <TextInput
-                  style={styles.fieldInput}
-                  value={formDate}
-                  onChangeText={setFormDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={ADMIN_COLORS.textMuted}
-                />
-              </View>
-
-              {/* Time Selection Pills */}
-              <View style={styles.timePillsRow}>
-                <View style={styles.timePill}>
-                  <Clock size={14} color={ADMIN_COLORS.textSecondary} />
-                  <TextInput
-                    style={styles.timeInput}
-                    value={formStartTime}
-                    onChangeText={setFormStartTime}
-                    placeholder="14:00"
-                  />
-                </View>
-                <Text style={styles.timeDash}>—</Text>
-                <View style={styles.timePill}>
-                  <Clock size={14} color={ADMIN_COLORS.textSecondary} />
-                  <TextInput
-                    style={styles.timeInput}
-                    value={formEndTime}
-                    onChangeText={setFormEndTime}
-                    placeholder="15:00"
-                  />
-                </View>
-              </View>
-
-              {/* Toggles: All Day & Recurring */}
-              <View style={styles.togglesRow}>
-                <TouchableOpacity
-                  style={[styles.toggleBtn, formIsAllDay && styles.toggleBtnActive]}
-                  onPress={() => setFormIsAllDay(!formIsAllDay)}
-                >
-                  <View style={[styles.toggleCircle, formIsAllDay && styles.toggleCircleActive]} />
-                  <Text style={styles.toggleText}>All day</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.toggleBtn, formIsRecurring && styles.toggleBtnActive]}
-                  onPress={() => setFormIsRecurring(!formIsRecurring)}
-                >
-                  <View style={[styles.toggleCircle, formIsRecurring && styles.toggleCircleActive]} />
-                  <Text style={styles.toggleText}>Yearly / Repeat</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Participants Section */}
-              <View style={styles.drawerSection}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionTitle}>Participants</Text>
-                  <TouchableOpacity
-                    style={styles.addParticipantBtn}
-                    onPress={() => {
-                      // Toggle first unassigned team member
-                      const unassigned = teamMembers.find(
-                        (m) => !formParticipants.some((p) => p.id === m.id)
-                      );
-                      if (unassigned) {
-                        toggleParticipant(unassigned);
-                      }
-                    }}
-                  >
-                    <Plus size={13} color="#2563EB" />
-                    <Text style={styles.addParticipantBtnText}>Add participant</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Team member chips */}
-                <View style={styles.participantsList}>
-                  {teamMembers.length === 0 ? (
-                    <Text style={{ fontSize: 12, color: ADMIN_COLORS.textMuted, fontStyle: 'italic', paddingVertical: 6 }}>
-                      No team members configured yet.
-                    </Text>
-                  ) : (
-                    teamMembers.map((member) => {
-                      const isSelected = formParticipants.some((p) => p.id === member.id);
-                      return (
+                  return (
+                    <View key={hour} style={styles.hourRow}>
+                      <View style={styles.hourLabelBox}>
+                        <Text style={styles.hourLabel}>{hourFormatted}</Text>
+                      </View>
+                      {weekDays.map((dayDate, colIdx) => (
                         <TouchableOpacity
-                          key={member.id}
-                          style={[styles.participantRow, isSelected && styles.participantRowActive]}
-                          onPress={() => toggleParticipant(member)}
-                        >
-                          <View style={styles.participantAvatar}>
-                            <Text style={styles.avatarInitial}>{member.name.charAt(0)}</Text>
-                          </View>
-                          <View style={styles.participantInfo}>
-                            <Text style={styles.participantName}>{member.name}</Text>
-                            <Text style={styles.participantRole}>{member.role || 'Admin'}</Text>
-                          </View>
-                          {isSelected && <CheckCircle2 size={16} color="#059669" />}
-                        </TouchableOpacity>
-                      );
-                    })
-                  )}
-                </View>
-              </View>
+                          key={colIdx}
+                          style={styles.hourCell}
+                          onPress={() => handleCreateNew(dayDate, hour)}
+                          activeOpacity={0.7}
+                        />
+                      ))}
+                    </View>
+                  );
+                })}
 
-              <View style={styles.divider} />
-
-              {/* Video Meeting Link */}
-              <View style={styles.formRow}>
-                <Video size={16} color={ADMIN_COLORS.textSecondary} />
-                <TextInput
-                  style={styles.fieldInput}
-                  value={formMeetingLink}
-                  onChangeText={setFormMeetingLink}
-                  placeholder="https://meet.google.com/..."
-                  placeholderTextColor={ADMIN_COLORS.textMuted}
-                />
-              </View>
-
-              {/* Location */}
-              <View style={styles.formRow}>
-                <MapPin size={16} color={ADMIN_COLORS.textSecondary} />
-                <TextInput
-                  style={styles.fieldInput}
-                  value={formLocation}
-                  onChangeText={setFormLocation}
-                  placeholder="Location or Room..."
-                  placeholderTextColor={ADMIN_COLORS.textMuted}
-                />
-              </View>
-
-              {/* Description / Agenda */}
-              <View style={styles.descSection}>
-                <AlignLeft size={16} color={ADMIN_COLORS.textSecondary} style={{ marginTop: 6 }} />
-                <TextInput
-                  style={styles.descInput}
-                  value={formDescription}
-                  onChangeText={setFormDescription}
-                  placeholder="Meeting agenda or notes..."
-                  placeholderTextColor={ADMIN_COLORS.textMuted}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              {/* Reminders Pill */}
-              <TouchableOpacity
-                style={styles.remindersBtn}
-                onPress={() => alert('Reminder alert set: 15 minutes before event.')}
-              >
-                <Bell size={14} color={ADMIN_COLORS.textSecondary} />
-                <Text style={styles.remindersBtnText}>Add Reminders</Text>
-              </TouchableOpacity>
-
-              <View style={styles.divider} />
-
-              {/* Color Palette Selector */}
-              <View style={styles.colorPaletteSection}>
-                <Text style={styles.paletteLabel}>Color Theme</Text>
-                <View style={styles.colorsRow}>
-                  {Object.keys(CALENDAR_COLOR_PALETTES).map((colorKey) => {
-                    const theme = CALENDAR_COLOR_PALETTES[colorKey as CalendarColorId];
-                    const isSelected = formColorId === colorKey;
-
-                    return (
-                      <TouchableOpacity
-                        key={colorKey}
-                        style={[
-                          styles.colorCircle,
-                          { backgroundColor: theme.dot },
-                          isSelected && styles.colorCircleSelected,
-                        ]}
-                        onPress={() => setFormColorId(colorKey as CalendarColorId)}
-                      >
-                        {isSelected && <Check size={12} color="#FFFFFF" />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.drawerActions}>
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  onPress={() => setIsDrawerOpen(false)}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-
-                {!isNewEvent && (
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={handleDeleteEvent}
-                  >
-                    <Trash2 size={16} color="#EF4444" />
-                  </TouchableOpacity>
+                {/* Current Live Time Red/Purple Indicator Line */}
+                {isCurrentWeek && currentMinutesOffset >= 0 && currentMinutesOffset <= (HOURS.length * 60) && (
+                  <View style={[styles.currentTimeLine, { top: currentLineTop }]}>
+                    <View style={styles.currentTimeBadge}>
+                      <Text style={styles.currentTimeBadgeText}>
+                        {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </View>
+                    <View style={styles.currentTimeBar} />
+                  </View>
                 )}
 
-                <TouchableOpacity
-                  style={styles.saveBtn}
-                  onPress={handleSaveEvent}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.saveBtnText}>
-                      {isNewEvent ? 'Save Event' : 'Update'}
-                    </Text>
-                  )}
-                </TouchableOpacity>
+                {/* Render Absolute Positioned Event Blocks */}
+                {timeEvents.map((evt) => {
+                  const evtStart = new Date(evt.start_time);
+                  const evtEnd = new Date(evt.end_time);
+
+                  // Find matching day column index
+                  const dayIndex = weekDays.findIndex(
+                    (d) =>
+                      d.getDate() === evtStart.getDate() &&
+                      d.getMonth() === evtStart.getMonth() &&
+                      d.getFullYear() === evtStart.getFullYear()
+                  );
+
+                  if (dayIndex === -1) return null;
+
+                  const startHourFloat = evtStart.getHours() + evtStart.getMinutes() / 60;
+                  const endHourFloat = evtEnd.getHours() + evtEnd.getMinutes() / 60;
+                  const durationHours = Math.max(0.5, endHourFloat - startHourFloat);
+
+                  // Calculate vertical position (80px per 1 hour slot, starting at 8 AM)
+                  const topPos = (startHourFloat - 8) * 80;
+                  const heightPos = Math.max(38, durationHours * 80 - 4);
+
+                  return (
+                    <TouchableOpacity
+                      key={evt.id}
+                      style={[
+                        styles.eventBlock,
+                        {
+                          top: topPos + 2,
+                          height: heightPos,
+                          left: `${8.5 + dayIndex * 13.0}%`,
+                          width: '12.3%',
+                          backgroundColor: evt.color_bg,
+                          borderColor: evt.color_border,
+                        },
+                      ]}
+                      onPress={() => openEventDetails(evt)}
+                      activeOpacity={0.85}
+                    >
+                      <Text
+                        style={[styles.eventTitle, { color: evt.color_text }]}
+                        numberOfLines={1}
+                      >
+                        {evt.title}
+                      </Text>
+                      <Text
+                        style={[styles.eventTime, { color: evt.color_text }]}
+                        numberOfLines={1}
+                      >
+                        {`${
+                          evtStart.getHours() > 12 ? evtStart.getHours() - 12 : evtStart.getHours()
+                        } - ${
+                          evtEnd.getHours() > 12 ? evtEnd.getHours() - 12 : evtEnd.getHours()
+                        } ${evtEnd.getHours() >= 12 ? 'PM' : 'AM'}`}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </ScrollView>
           </View>
+        </ScrollView>
+
+        {/* 3. RIGHT-HAND EVENT INSPECTOR & EDITOR PANEL (Desktop Inline) */}
+        {!isMobile && isDrawerOpen && (
+          <View style={styles.rightDrawer}>
+            {renderDrawerContent()}
+          </View>
+        )}
+
+        {/* Mobile Event Editor Modal */}
+        {isMobile && (
+          <Modal
+            visible={isDrawerOpen}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setIsDrawerOpen(false)}
+          >
+            <View style={styles.modalBackdrop}>
+              <TouchableWithoutFeedback onPress={() => setIsDrawerOpen(false)}>
+                <View style={styles.modalOverlay} />
+              </TouchableWithoutFeedback>
+              <View style={styles.modalSheetContainer}>
+                <View style={styles.modalSheetHeader}>
+                  <Text style={styles.modalSheetTitle}>
+                    {isNewEvent ? 'New Team Event' : 'Edit Event'}
+                  </Text>
+                  <TouchableOpacity onPress={() => setIsDrawerOpen(false)} style={styles.modalCloseBtn}>
+                    <X size={18} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+                {renderDrawerContent()}
+              </View>
+            </View>
+          </Modal>
         )}
       </View>
 
@@ -944,10 +974,33 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
   },
+  headerMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 20,
+  },
+  headerLeftMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 8,
+    width: '100%',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerRightMobile: {
+    flexWrap: 'wrap',
+    gap: 8,
+    width: '100%',
   },
   pageTitle: {
     fontSize: 22,
@@ -972,6 +1025,51 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#334155',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'flex-end',
+    zIndex: 9999,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  modalSheetContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '85%',
+    paddingBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 20,
+    zIndex: 10000,
+  },
+  modalSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalSheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  modalCloseBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
   },
   monthNavigator: {
     flexDirection: 'row',

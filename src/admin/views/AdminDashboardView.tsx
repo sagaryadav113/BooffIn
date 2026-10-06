@@ -1,9 +1,5 @@
-// ============================================================================
-// BOOFFIN ADMIN PORTAL — DASHBOARD VIEW (LIGHT SAAS METIS STYLE)
-// ============================================================================
-
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop, Circle, Line, Text as SvgText } from 'react-native-svg';
 import { ADMIN_COLORS } from '../lib/constants';
 import { AdminStatCard } from '../components/AdminStatCard';
@@ -37,6 +33,10 @@ interface AdminDashboardViewProps {
 }
 
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNavigate }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  const isTablet = width < 1024;
+
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTimeRange, setActiveTimeRange] = useState<'7D' | '30D' | '90D' | '1Y'>('30D');
@@ -186,14 +186,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* 1. Dashboard Top Header Bar */}
-      <View style={styles.headerBar}>
+      <View style={[styles.headerBar, isMobile && styles.headerBarMobile]}>
         <View>
           <Text style={styles.pageTitle}>Dashboard</Text>
           <Text style={styles.pageSubtitle}>Live Production Data • updated just now</Text>
         </View>
 
         {/* Action Buttons */}
-        <View style={styles.actionsRow}>
+        <View style={[styles.actionsRow, isMobile && styles.actionsRowMobile]}>
           <TouchableOpacity
             style={styles.primaryBtn}
             onPress={() => onNavigate?.('users')}
@@ -233,7 +233,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       </View>
 
       {/* 2. Top 4 Metric KPI Cards (Metis Style) */}
-      <View style={styles.kpiRow}>
+      <View style={[styles.kpiRow, isMobile && styles.kpiRowMobile]}>
         <AdminStatCard
           label="Total Researchers"
           value={userCount}
@@ -276,17 +276,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
       </View>
 
       {/* 3. Main Two-Column Analytics & Activity Section (Metis Style) */}
-      <View style={styles.mainGrid}>
+      <View style={[styles.mainGrid, (isTablet || isMobile) && styles.mainGridMobile]}>
         {/* Left Column: Visual SVG Activity Chart */}
         <View style={styles.chartCard}>
-          <View style={styles.cardHeaderRow}>
+          <View style={[styles.cardHeaderRow, isMobile && styles.cardHeaderRowMobile]}>
             <View>
               <Text style={styles.cardSectionTitle}>Platform Growth & Activity</Text>
               <Text style={styles.cardSectionSubtitle}>Researcher registrations and scientific publication volume</Text>
             </View>
 
             {/* Time Filter Pills */}
-            <View style={styles.timePillsContainer}>
+            <View style={[styles.timePillsContainer, isMobile && { marginTop: 10, alignSelf: 'flex-start' }]}>
               {(['7D', '30D', '90D', '1Y'] as const).map((t) => (
                 <TouchableOpacity
                   key={t}
@@ -539,6 +539,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  headerBarMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
   pageTitle: {
     fontSize: 22,
     fontWeight: '800',
@@ -554,6 +559,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  actionsRowMobile: {
+    flexWrap: 'wrap',
+    width: '100%',
   },
   primaryBtn: {
     flexDirection: 'row',
@@ -589,10 +598,18 @@ const styles = StyleSheet.create({
     gap: 16,
     marginBottom: 24,
   },
+  kpiRowMobile: {
+    flexDirection: 'column',
+    gap: 12,
+  },
   mainGrid: {
     flexDirection: 'row',
     gap: 20,
     marginBottom: 24,
+  },
+  mainGridMobile: {
+    flexDirection: 'column',
+    gap: 16,
   },
   chartCard: {
     flex: 2,
@@ -623,6 +640,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  cardHeaderRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   cardSectionTitle: {
     fontSize: 15,
