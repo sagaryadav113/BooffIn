@@ -1,9 +1,9 @@
 // ============================================================================
-// BOOFFIN ADMIN PORTAL — ADMIN STAT CARD (LIGHT SAAS THEME)
+// BOOFFIN ADMIN PORTAL — ADMIN STAT CARD (MODERN SAAS & MOBILE APP THEME)
 // ============================================================================
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { ADMIN_COLORS } from '../lib/constants';
 import * as Icons from 'lucide-react-native';
 
@@ -14,9 +14,20 @@ interface AdminStatCardProps {
   trend?: string;
   trendPositive?: boolean;
   iconName?: keyof typeof Icons;
-  variant?: 'default' | 'emerald' | 'warning' | 'danger' | 'info';
+  variant?: 'default' | 'emerald' | 'warning' | 'danger' | 'info' | 'purple' | 'blue';
   onPress?: () => void;
+  style?: ViewStyle;
 }
+
+const VARIANT_MAP = {
+  default: { iconBg: '#F1F5F9', iconColor: '#059669', borderColor: '#E2E8F0' },
+  emerald: { iconBg: '#ECFDF5', iconColor: '#059669', borderColor: '#D1FAE5' },
+  blue: { iconBg: '#EFF6FF', iconColor: '#2563EB', borderColor: '#DBEAFE' },
+  warning: { iconBg: '#FEF3C7', iconColor: '#D97706', borderColor: '#FDE68A' },
+  danger: { iconBg: '#FEE2E2', iconColor: '#DC2626', borderColor: '#FECACA' },
+  info: { iconBg: '#F0F9FF', iconColor: '#0284C7', borderColor: '#BAE6FD' },
+  purple: { iconBg: '#F5F3FF', iconColor: '#7C3AED', borderColor: '#DDD6FE' },
+};
 
 export const AdminStatCard: React.FC<AdminStatCardProps> = ({
   label,
@@ -27,32 +38,34 @@ export const AdminStatCard: React.FC<AdminStatCardProps> = ({
   iconName,
   variant = 'default',
   onPress,
+  style,
 }) => {
   // Resolve Lucide Icon
   const IconComponent = iconName && (Icons[iconName] as any) ? (Icons[iconName] as any) : null;
+  const vStyle = VARIANT_MAP[variant] || VARIANT_MAP.default;
 
   const content = (
     <View style={styles.cardContent}>
-      {IconComponent ? (
-        <View style={styles.iconBox}>
-          <IconComponent size={20} color={ADMIN_COLORS.emeraldDark} />
-        </View>
-      ) : null}
+      <View style={styles.cardTopRow}>
+        {IconComponent ? (
+          <View style={[styles.iconBox, { backgroundColor: vStyle.iconBg, borderColor: vStyle.borderColor }]}>
+            <IconComponent size={18} color={vStyle.iconColor} strokeWidth={2.2} />
+          </View>
+        ) : null}
+
+        {trend ? (
+          <View style={[styles.trendBadge, trendPositive ? styles.trendBadgeUp : styles.trendBadgeDown]}>
+            <Text style={[styles.trendText, trendPositive ? styles.trendUp : styles.trendDown]}>
+              {trend}
+            </Text>
+          </View>
+        ) : null}
+      </View>
 
       <View style={styles.textContainer}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.value}>{value}</Text>
-        
-        <View style={styles.footerRow}>
-          {trend ? (
-            <View style={styles.trendRow}>
-              <Text style={[styles.trendText, trendPositive ? styles.trendUp : styles.trendDown]}>
-                {trend}
-              </Text>
-            </View>
-          ) : null}
-          {subtext ? <Text style={styles.subtext} numberOfLines={1}>{subtext}</Text> : null}
-        </View>
+        <Text style={styles.value} numberOfLines={1}>{value}</Text>
+        <Text style={styles.label} numberOfLines={1}>{label}</Text>
+        {subtext ? <Text style={styles.subtext} numberOfLines={1}>{subtext}</Text> : null}
       </View>
     </View>
   );
@@ -60,9 +73,9 @@ export const AdminStatCard: React.FC<AdminStatCardProps> = ({
   if (onPress) {
     return (
       <TouchableOpacity
-        style={[styles.card, styles.cardInteractive]}
+        style={[styles.card, styles.cardInteractive, style]}
         onPress={onPress}
-        activeOpacity={0.8}
+        activeOpacity={0.75}
         accessibilityRole="button"
       >
         {content}
@@ -70,72 +83,55 @@ export const AdminStatCard: React.FC<AdminStatCardProps> = ({
     );
   }
 
-  return <View style={styles.card}>{content}</View>;
+  return <View style={[styles.card, style]}>{content}</View>;
 };
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
-    minWidth: 220,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 18,
+    borderRadius: 16,
+    padding: 16,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowRadius: 6,
+    elevation: 2,
   },
   cardInteractive: {
-    cursor: 'pointer' as any,
-    borderColor: '#CBD5E1',
+    borderColor: '#E2E8F0',
   },
   cardContent: {
+    flexDirection: 'column',
+  },
+  cardTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
-  textContainer: {
-    flex: 1,
+  trendBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 4,
+  trendBadgeUp: {
+    backgroundColor: '#ECFDF5',
   },
-  value: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.5,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-  },
-  trendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  trendBadgeDown: {
+    backgroundColor: '#FEF2F2',
   },
   trendText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   trendUp: {
@@ -144,9 +140,26 @@ const styles = StyleSheet.create({
   trendDown: {
     color: '#EF4444',
   },
-  subtext: {
+  textContainer: {
+    flexDirection: 'column',
+  },
+  value: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+    marginBottom: 2,
+  },
+  label: {
     fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  subtext: {
+    fontSize: 11,
     color: '#94A3B8',
     fontWeight: '500',
   },
 });
+

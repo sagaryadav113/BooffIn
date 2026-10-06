@@ -184,12 +184,18 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={isMobile && styles.scrollContentMobile}>
       {/* 1. Dashboard Top Header Bar */}
       <View style={[styles.headerBar, isMobile && styles.headerBarMobile]}>
         <View>
-          <Text style={styles.pageTitle}>Dashboard</Text>
-          <Text style={styles.pageSubtitle}>Live Production Data • updated just now</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.pageTitle}>Admin Operations</Text>
+            <View style={styles.livePulseBadge}>
+              <View style={styles.livePulseDot} />
+              <Text style={styles.livePulseText}>LIVE DB</Text>
+            </View>
+          </View>
+          <Text style={styles.pageSubtitle}>Real-time system overview & analytics</Text>
         </View>
 
         {/* Action Buttons */}
@@ -199,7 +205,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             onPress={() => onNavigate?.('users')}
             activeOpacity={0.8}
           >
-            <Plus size={16} color="#FFFFFF" />
+            <Plus size={15} color="#FFFFFF" />
             <Text style={styles.primaryBtnText}>Manage Users</Text>
           </TouchableOpacity>
 
@@ -209,7 +215,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             activeOpacity={0.7}
             accessibilityLabel="Refresh live data"
           >
-            <RefreshCw size={16} color="#475569" />
+            <RefreshCw size={15} color="#475569" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -218,7 +224,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             activeOpacity={0.7}
             accessibilityLabel="View reports"
           >
-            <ShieldAlert size={16} color="#475569" />
+            <ShieldAlert size={15} color="#475569" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -227,66 +233,127 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             activeOpacity={0.7}
             accessibilityLabel="Admin settings"
           >
-            <Settings size={16} color="#475569" />
+            <Settings size={15} color="#475569" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* 2. Top 4 Metric KPI Cards (Metis Style) */}
-      <View style={[styles.kpiRow, isMobile && styles.kpiRowMobile]}>
-        <AdminStatCard
-          label="Total Researchers"
-          value={userCount}
-          trend="↑ Live DB"
-          trendPositive={true}
-          subtext="click to view all users"
-          iconName="Users"
-          onPress={() => onNavigate?.('users')}
-        />
+      {/* Quick Actions 4-Grid (Everyday Essentials - Reference UI style) */}
+      <View style={styles.quickActionsContainer}>
+        <Text style={styles.sectionHeaderLabel}>QUICK ACTIONS</Text>
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            onPress={() => onNavigate?.('users')}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.quickActionIconBox, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
+              <Users size={20} color="#059669" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.quickActionLabel}>Researchers</Text>
+          </TouchableOpacity>
 
-        <AdminStatCard
-          label="Scientific Posts"
-          value={postCount}
-          trend="↑ Live DB"
-          trendPositive={true}
-          subtext="click to inspect posts"
-          iconName="FileText"
-          onPress={() => onNavigate?.('moderation')}
-        />
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            onPress={() => onNavigate?.('calendar')}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.quickActionIconBox, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
+              <Calendar size={20} color="#2563EB" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.quickActionLabel}>Schedule</Text>
+          </TouchableOpacity>
 
-        <AdminStatCard
-          label="Moderation Queue"
-          value={pendingReportsCount}
-          trend={pendingReportsCount === 0 ? "↓ Clean" : "↑ Pending"}
-          trendPositive={pendingReportsCount === 0}
-          subtext="click to review reports"
-          iconName="ShieldAlert"
-          onPress={() => onNavigate?.('reports')}
-        />
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            onPress={() => onNavigate?.('reports')}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.quickActionIconBox, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
+              <ShieldAlert size={20} color="#D97706" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.quickActionLabel}>Mod Queue</Text>
+          </TouchableOpacity>
 
-        <AdminStatCard
-          label="Security & AAL2"
-          value="100% SECURE"
-          trend="↑ Enforced"
-          trendPositive={true}
-          subtext="click for security logs"
-          iconName="ShieldCheck"
-          onPress={() => onNavigate?.('security')}
-        />
+          <TouchableOpacity
+            style={styles.quickActionItem}
+            onPress={() => onNavigate?.('approvals')}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.quickActionIconBox, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }]}>
+              <ShieldCheck size={20} color="#7C3AED" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.quickActionLabel}>Approvals</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* 3. Main Two-Column Analytics & Activity Section (Metis Style) */}
+      {/* 2. Top 4 Metric KPI Cards (2x2 Grid on Mobile) */}
+      <View style={styles.kpiContainer}>
+        <Text style={styles.sectionHeaderLabel}>METRICS & PERFORMANCE</Text>
+        <View style={[styles.kpiRow, isMobile && styles.kpiRowMobile]}>
+          <AdminStatCard
+            label="Total Researchers"
+            value={userCount}
+            trend="↑ Live DB"
+            trendPositive={true}
+            subtext="click to view all users"
+            iconName="Users"
+            variant="emerald"
+            onPress={() => onNavigate?.('users')}
+            style={isMobile ? { width: '48%', minWidth: 0 } : { flex: 1 }}
+          />
+
+          <AdminStatCard
+            label="Scientific Posts"
+            value={postCount}
+            trend="↑ Live DB"
+            trendPositive={true}
+            subtext="click to inspect posts"
+            iconName="FileText"
+            variant="blue"
+            onPress={() => onNavigate?.('moderation')}
+            style={isMobile ? { width: '48%', minWidth: 0 } : { flex: 1 }}
+          />
+
+          <AdminStatCard
+            label="Moderation Queue"
+            value={pendingReportsCount}
+            trend={pendingReportsCount === 0 ? "↓ Clean" : "↑ Pending"}
+            trendPositive={pendingReportsCount === 0}
+            subtext="click to review reports"
+            iconName="ShieldAlert"
+            variant={pendingReportsCount > 0 ? "danger" : "warning"}
+            onPress={() => onNavigate?.('reports')}
+            style={isMobile ? { width: '48%', minWidth: 0 } : { flex: 1 }}
+          />
+
+          <AdminStatCard
+            label="Security & AAL2"
+            value="100% SECURE"
+            trend="↑ Enforced"
+            trendPositive={true}
+            subtext="click for security logs"
+            iconName="ShieldCheck"
+            variant="purple"
+            onPress={() => onNavigate?.('security')}
+            style={isMobile ? { width: '48%', minWidth: 0 } : { flex: 1 }}
+          />
+        </View>
+      </View>
+
+      {/* 3. Main Two-Column Analytics & Activity Section */}
       <View style={[styles.mainGrid, (isTablet || isMobile) && styles.mainGridMobile]}>
         {/* Left Column: Visual SVG Activity Chart */}
         <View style={styles.chartCard}>
           <View style={[styles.cardHeaderRow, isMobile && styles.cardHeaderRowMobile]}>
             <View>
               <Text style={styles.cardSectionTitle}>Platform Growth & Activity</Text>
-              <Text style={styles.cardSectionSubtitle}>Researcher registrations and scientific publication volume</Text>
+              <Text style={styles.cardSectionSubtitle}>Researcher registrations vs. scientific output</Text>
             </View>
 
             {/* Time Filter Pills */}
-            <View style={[styles.timePillsContainer, isMobile && { marginTop: 10, alignSelf: 'flex-start' }]}>
+            <View style={[styles.timePillsContainer, isMobile && { marginTop: 8, alignSelf: 'flex-start' }]}>
               {(['7D', '30D', '90D', '1Y'] as const).map((t) => (
                 <TouchableOpacity
                   key={t}
@@ -303,7 +370,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
 
           {/* SVG Line Chart */}
           <View style={styles.chartWrapper}>
-            <Svg width="100%" height={260} viewBox="0 0 680 260">
+            <Svg width="100%" height={240} viewBox="0 0 680 260">
               <Defs>
                 <LinearGradient id="emeraldGrad" x1="0" y1="0" x2="0" y2="1">
                   <Stop offset="0%" stopColor="#059669" stopOpacity="0.25" />
@@ -426,17 +493,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
             <View style={styles.chartLegend}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#2563EB' }]} />
-                <Text style={styles.legendText}>Scientific Posts & Papers ({postCount})</Text>
+                <Text style={styles.legendText}>Posts ({postCount})</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#059669' }]} />
-                <Text style={styles.legendText}>Registered Researchers ({userCount})</Text>
+                <Text style={styles.legendText}>Researchers ({userCount})</Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Right Column: Recent Activity Feed (Metis Style) */}
+        {/* Right Column: Recent Activity Feed */}
         <View style={styles.activityCard}>
           <Text style={styles.cardSectionTitle}>Recent Activity</Text>
           <Text style={styles.cardSectionSubtitle}>Real-time platform & audit events</Text>
@@ -452,7 +519,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
               </View>
               <View style={styles.activityTextGroup}>
                 <Text style={styles.activityTitle}>Registered researchers</Text>
-                <Text style={styles.activityDesc}>16 active accounts in database</Text>
+                <Text style={styles.activityDesc}>{userCount} active accounts in database</Text>
                 <Text style={styles.activityTime}>Click to view directory</Text>
               </View>
             </TouchableOpacity>
@@ -505,18 +572,72 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onNaviga
         </View>
       </View>
 
-      {/* 4. Bottom Data Tables (Registered Researchers) */}
+      {/* 4. Bottom Section: Recent Registered Researchers */}
       <View style={styles.tablesSection}>
         <View style={styles.tableCardHeader}>
-          <Text style={styles.tableCardTitle}>Recent Registered Researchers</Text>
-          <Text style={styles.tableCardSubtitle}>Authoritative profiles from public.profiles</Text>
+          <View>
+            <Text style={styles.tableCardTitle}>Recent Registered Researchers</Text>
+            <Text style={styles.tableCardSubtitle}>Authoritative profiles from public.profiles</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.viewAllPill}
+            onPress={() => onNavigate?.('users')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.viewAllPillText}>View All ({userCount})</Text>
+          </TouchableOpacity>
         </View>
 
-        <AdminDataTable
-          columns={userColumns}
-          data={recentUsers}
-          emptyMessage="No researcher profiles found in database."
-        />
+        {isMobile ? (
+          /* Mobile Card List */
+          <View style={styles.mobileCardList}>
+            {recentUsers.length === 0 ? (
+              <Text style={styles.emptyMobileText}>No researcher profiles found in database.</Text>
+            ) : (
+              recentUsers.map((u) => (
+                <TouchableOpacity
+                  key={u.id}
+                  style={styles.mobileUserCard}
+                  onPress={() => onNavigate?.('users')}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.mobileUserCardTop}>
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText}>
+                        {(u.full_name || u.username || 'U').substring(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.mobileUserInfo}>
+                      <Text style={styles.boldText} numberOfLines={1}>{u.full_name || u.username}</Text>
+                      <Text style={styles.usernameText}>@{u.username}</Text>
+                    </View>
+                    <AdminBadge
+                      label={u.is_orcid_verified ? 'VERIFIED' : 'UNLINKED'}
+                      variant={u.is_orcid_verified ? 'emerald' : 'neutral'}
+                      size="sm"
+                    />
+                  </View>
+
+                  <View style={styles.mobileUserCardBottom}>
+                    <Text style={styles.mobileInstitutionText} numberOfLines={1}>
+                      🏛️ {u.institution || 'Academic Institution'}
+                    </Text>
+                    <Text style={styles.mobileFieldText} numberOfLines={1}>
+                      🔬 {u.field_of_study || 'Scientific Research'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        ) : (
+          /* Desktop Data Table */
+          <AdminDataTable
+            columns={userColumns}
+            data={recentUsers}
+            emptyMessage="No researcher profiles found in database."
+          />
+        )}
       </View>
     </ScrollView>
   );
@@ -526,6 +647,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  scrollContentMobile: {
+    paddingBottom: 40,
   },
   centerContainer: {
     flex: 1,
@@ -543,12 +667,41 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: 12,
+    marginBottom: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   pageTitle: {
     fontSize: 22,
     fontWeight: '800',
     color: '#0F172A',
     letterSpacing: -0.4,
+  },
+  livePulseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+  },
+  livePulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#059669',
+  },
+  livePulseText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#059669',
+    letterSpacing: 0.5,
   },
   pageSubtitle: {
     fontSize: 13,
@@ -571,7 +724,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563EB',
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 8,
+    borderRadius: 10,
     shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -585,27 +738,76 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  sectionHeaderLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  quickActionsContainer: {
+    marginBottom: 20,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  quickActionItem: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  quickActionIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  quickActionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+    textAlign: 'center',
+  },
+  kpiContainer: {
+    marginBottom: 20,
+  },
   kpiRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 24,
+    gap: 14,
   },
   kpiRowMobile: {
-    flexDirection: 'column',
-    gap: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   mainGrid: {
     flexDirection: 'row',
-    gap: 20,
-    marginBottom: 24,
+    gap: 18,
+    marginBottom: 20,
   },
   mainGridMobile: {
     flexDirection: 'column',
@@ -616,24 +818,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 18,
+    padding: 18,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
   },
   activityCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 18,
+    padding: 18,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -648,7 +852,7 @@ const styles = StyleSheet.create({
   },
   cardSectionTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#0F172A',
   },
   cardSectionSubtitle: {
@@ -659,13 +863,13 @@ const styles = StyleSheet.create({
   timePillsContainer: {
     flexDirection: 'row',
     backgroundColor: '#F1F5F9',
-    borderRadius: 6,
-    padding: 2,
+    borderRadius: 8,
+    padding: 3,
   },
   timePill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   timePillActive: {
     backgroundColor: '#2563EB',
@@ -686,7 +890,7 @@ const styles = StyleSheet.create({
   chartLegend: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 24,
+    gap: 20,
     marginTop: 8,
   },
   legendItem: {
@@ -702,11 +906,11 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: '#64748B',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   activityList: {
     marginTop: 14,
-    gap: 16,
+    gap: 14,
   },
   activityItem: {
     flexDirection: 'row',
@@ -714,9 +918,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   activityIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -742,16 +946,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 18,
+    padding: 18,
     marginBottom: 30,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
   },
   tableCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
   tableCardTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#0F172A',
   },
   tableCardSubtitle: {
@@ -759,15 +971,68 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
+  viewAllPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  viewAllPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  mobileCardList: {
+    gap: 10,
+  },
+  mobileUserCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  mobileUserCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  mobileUserInfo: {
+    flex: 1,
+  },
+  mobileUserCardBottom: {
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 3,
+  },
+  mobileInstitutionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  mobileFieldText: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  emptyMobileText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
   userCell: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
   userAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     backgroundColor: '#DEF7EC',
     justifyContent: 'center',
     alignItems: 'center',
@@ -775,8 +1040,8 @@ const styles = StyleSheet.create({
     borderColor: '#BCF0DA',
   },
   userAvatarText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
     color: '#03543F',
   },
   boldText: {

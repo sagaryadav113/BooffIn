@@ -1090,11 +1090,6 @@ const styles = StyleSheet.create({
   arrowButton: {
     padding: 4,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
   viewSelector: {
     flexDirection: 'row',
     backgroundColor: '#F1F5F9',
