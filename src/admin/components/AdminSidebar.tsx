@@ -3,7 +3,7 @@
 // ============================================================================
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { ADMIN_COLORS, ADMIN_NAV_ITEMS, AdminNavKey } from '../lib/constants';
 import { useAdminPermissions } from '../hooks/useAdminPermissions';
 import { AdminPermission } from '../types/roles';
@@ -63,14 +63,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     <View style={[styles.sidebar, isMobileDrawer && styles.mobileSidebar]}>
       {/* 1. Brand Logo Header */}
       <View style={styles.brandContainer}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoBadgeText}>B</Text>
-          </View>
-          <View style={styles.brandTextGroup}>
-            <Text style={styles.brandTitle}>BooffIn</Text>
-            <Text style={styles.brandSubtitle}>Admin Console</Text>
-          </View>
+        <View style={styles.brandLogoWrapper}>
+          <Image
+            source={require('../../../assets/images/booffin-admin-logo.png')}
+            style={styles.brandLogoImage}
+            resizeMode="contain"
+          />
         </View>
 
         {isMobileDrawer && onClose && (
@@ -162,48 +160,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    gap: 12,
+    minHeight: 64,
+  },
+  brandLogoWrapper: {
+    flex: 1,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  brandLogoImage: {
+    width: 175,
+    height: 30,
   },
   closeDrawerBtn: {
     padding: 6,
     borderRadius: 8,
     backgroundColor: '#F1F5F9',
-  },
-  logoBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#059669',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  logoBadgeText: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#FFFFFF',
-  },
-  brandTextGroup: {
-    flexDirection: 'column',
-  },
-  brandTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.4,
-  },
-  brandSubtitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    letterSpacing: 0.2,
   },
   navList: {
     flex: 1,

@@ -3,7 +3,7 @@
 // ============================================================================
 
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { ADMIN_COLORS } from '../lib/constants';
 import { adminAuthService } from '../services/adminAuthService';
 
@@ -42,10 +42,11 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({ onSuccess }) => 
     <View style={styles.container}>
       <View style={styles.card}>
         <View style={styles.header}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoBadgeText}>B</Text>
-          </View>
-          <Text style={styles.title}>BooffIn Administration</Text>
+          <Image
+            source={require('../../../assets/images/booffin-admin-logo.png')}
+            style={styles.loginLogoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.subtitle}>Protected Infrastructure Console</Text>
         </View>
 
@@ -123,32 +124,18 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 24,
   },
-  logoBadge: {
-    width: 48,
+  loginLogoImage: {
+    width: 250,
     height: 48,
-    borderRadius: 12,
-    backgroundColor: ADMIN_COLORS.emeraldPrimary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  logoBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 24,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: ADMIN_COLORS.textPrimary,
-    letterSpacing: -0.3,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 13,
     color: ADMIN_COLORS.textMuted,
-    marginTop: 4,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   errorBox: {
     backgroundColor: ADMIN_COLORS.dangerBg,
