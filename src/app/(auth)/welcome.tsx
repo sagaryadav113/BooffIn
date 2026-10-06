@@ -39,6 +39,8 @@ type LandingTab = 'welcome' | 'about' | 'features' | 'community' | 'privacy' | '
 export default function WelcomeScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 960;
+  const isMobile = width < 768;
+  const isSmallMobile = width < 480;
 
   const [activeTab, setActiveTab] = useState<LandingTab>('welcome');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -96,7 +98,10 @@ export default function WelcomeScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#FAFBF9" />
 
       {/* 1. TOP HEADER NAVIGATION */}
-      <View style={styles.headerContainer}>
+      <View style={[
+        styles.headerContainer, 
+        isMobile && { paddingHorizontal: isSmallMobile ? 12 : 18, paddingVertical: 14 }
+      ]}>
         <View style={styles.headerInner}>
           {/* Brand Logo */}
           <TouchableOpacity 
@@ -104,16 +109,23 @@ export default function WelcomeScreen() {
             onPress={() => setActiveTab('welcome')} 
             activeOpacity={0.8}
           >
-            <Text style={styles.logoText}>BooffIn</Text>
+            <Text style={[styles.logoText, isSmallMobile && { fontSize: 21 }]}>BooffIn</Text>
           </TouchableOpacity>
 
           {/* Nav Links */}
-          <View style={styles.navLinks}>
+          <View style={[
+            styles.navLinks, 
+            isMobile && { gap: isSmallMobile ? 10 : 14 }
+          ]}>
             <TouchableOpacity 
               style={[styles.navItem, activeTab === 'about' && styles.navItemActive]} 
               onPress={() => setActiveTab('about')}
             >
-              <Text style={[styles.navItemText, activeTab === 'about' && styles.navItemTextActive]}>
+              <Text style={[
+                styles.navItemText, 
+                isMobile && { fontSize: 13 },
+                activeTab === 'about' && styles.navItemTextActive
+              ]}>
                 About
               </Text>
             </TouchableOpacity>
@@ -122,7 +134,11 @@ export default function WelcomeScreen() {
               style={[styles.navItem, activeTab === 'features' && styles.navItemActive]} 
               onPress={() => setActiveTab('features')}
             >
-              <Text style={[styles.navItemText, activeTab === 'features' && styles.navItemTextActive]}>
+              <Text style={[
+                styles.navItemText, 
+                isMobile && { fontSize: 13 },
+                activeTab === 'features' && styles.navItemTextActive
+              ]}>
                 Features
               </Text>
             </TouchableOpacity>
@@ -131,17 +147,21 @@ export default function WelcomeScreen() {
               style={[styles.navItem, activeTab === 'community' && styles.navItemActive]} 
               onPress={() => setActiveTab('community')}
             >
-              <Text style={[styles.navItemText, activeTab === 'community' && styles.navItemTextActive]}>
+              <Text style={[
+                styles.navItemText, 
+                isMobile && { fontSize: 13 },
+                activeTab === 'community' && styles.navItemTextActive
+              ]}>
                 Community
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.navSignInBtn} 
+              style={[styles.navSignInBtn, isSmallMobile && { paddingHorizontal: 6 }]} 
               onPress={handleOpenAuthModal}
               activeOpacity={0.7}
             >
-              <Text style={styles.navSignInText}>Sign In</Text>
+              <Text style={[styles.navSignInText, isMobile && { fontSize: 13 }]}>Sign In</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -156,35 +176,81 @@ export default function WelcomeScreen() {
         {/* TAB 1: WELCOME / HOME (FULL COVER BACKGROUND) */}
         {/* ============================================================ */}
         {activeTab === 'welcome' && (
-          <View style={styles.welcomeHeroContainer}>
+          <View style={[
+            styles.welcomeHeroContainer,
+            isMobile && { minHeight: Platform.OS === 'web' ? ('100dvh' as any) : 600 }
+          ]}>
             {/* Full Screen Background Image */}
             <Image
               source={WELCOME_FULL_BG}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
-              contentPosition="center"
+              contentPosition={isMobile ? "right center" : "center"}
               priority="high"
             />
 
+            {/* Mobile Contrast Layer for crisp readability */}
+            {isMobile && (
+              <View 
+                style={[
+                  StyleSheet.absoluteFill, 
+                  { backgroundColor: 'rgba(250, 251, 249, 0.42)' }
+                ]} 
+                pointerEvents="none" 
+              />
+            )}
+
             {/* Left Content Overlay */}
-            <View style={styles.welcomeContentInner}>
+            <View style={[
+              styles.welcomeContentInner,
+              isMobile && { paddingHorizontal: isSmallMobile ? 18 : 24, paddingTop: 76, paddingBottom: 36 }
+            ]}>
               <View style={styles.welcomeTextCard}>
-                <Text style={styles.heroPreTitle}>Welcome to BooffIn</Text>
+                <Text style={[
+                  styles.heroPreTitle,
+                  isMobile && { fontSize: isSmallMobile ? 22 : 26 }
+                ]}>
+                  Welcome to BooffIn
+                </Text>
                 
                 <View style={styles.brandTitleBlock}>
-                  <Text style={styles.heroLets}>Let’s</Text>
-                  <Text style={styles.heroBrandTitle}>BooffIn</Text>
+                  <Text style={[
+                    styles.heroLets,
+                    isMobile && { fontSize: 18 }
+                  ]}>
+                    Let’s
+                  </Text>
+                  <Text style={[
+                    styles.heroBrandTitle,
+                    isMobile && { fontSize: isSmallMobile ? 38 : 46 }
+                  ]}>
+                    BooffIn
+                  </Text>
                 </View>
 
-                <Text style={styles.heroTagline}>Research finds its people.</Text>
+                <Text style={[
+                  styles.heroTagline,
+                  isMobile && { fontSize: 16.5, marginBottom: 10 }
+                ]}>
+                  Research finds its people.
+                </Text>
 
-                <Text style={styles.heroDescription}>
+                <Text style={[
+                  styles.heroDescription,
+                  isMobile && { fontSize: 14, lineHeight: 21, marginBottom: 22 }
+                ]}>
                   Connect our researchers, share insights, and discover the science of finding you platforms.
                 </Text>
 
-                <View style={styles.heroActionsRow}>
+                <View style={[
+                  styles.heroActionsRow,
+                  isMobile && { gap: 16 }
+                ]}>
                   <TouchableOpacity 
-                    style={styles.primaryCtaBtn} 
+                    style={[
+                      styles.primaryCtaBtn,
+                      isMobile && { paddingVertical: 11, paddingHorizontal: 22 }
+                    ]} 
                     onPress={handleOpenAuthModal}
                     activeOpacity={0.8}
                   >
@@ -208,38 +274,65 @@ export default function WelcomeScreen() {
         {/* TAB 2: ABOUT (FULL COVER BACKGROUND) */}
         {/* ============================================================ */}
         {activeTab === 'about' && (
-          <View style={styles.aboutHeroContainer}>
+          <View style={[
+            styles.aboutHeroContainer,
+            isMobile && { minHeight: Platform.OS === 'web' ? ('100dvh' as any) : 600 }
+          ]}>
             {/* Full Screen Background Image */}
             <Image
               source={ABOUT_FULL_BG}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
-              contentPosition="center"
+              contentPosition={isMobile ? "right center" : "center"}
               priority="high"
             />
 
-            {/* Content Overlay */}
-            <View style={styles.aboutContentInner}>
-              <View style={styles.aboutContentBlock}>
-                <Text style={styles.editorialTitle}>About BooffIn</Text>
-                <Text style={styles.editorialSubtitle}>A space where research finds its people</Text>
+            {/* Mobile Contrast Layer */}
+            {isMobile && (
+              <View 
+                style={[
+                  StyleSheet.absoluteFill, 
+                  { backgroundColor: 'rgba(250, 251, 249, 0.5)' }
+                ]} 
+                pointerEvents="none" 
+              />
+            )}
 
-                <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionHeading}>Our Mission</Text>
-                  <Text style={styles.bodyParagraph}>
+            {/* Content Overlay */}
+            <View style={[
+              styles.aboutContentInner,
+              isMobile && { paddingHorizontal: isSmallMobile ? 18 : 24, paddingTop: 76, paddingBottom: 36 }
+            ]}>
+              <View style={styles.aboutContentBlock}>
+                <Text style={[
+                  styles.editorialTitle,
+                  isMobile && { fontSize: isSmallMobile ? 26 : 30 }
+                ]}>
+                  About BooffIn
+                </Text>
+                <Text style={[
+                  styles.editorialSubtitle,
+                  isMobile && { fontSize: 14.5, marginBottom: 20 }
+                ]}>
+                  A space where research finds its people
+                </Text>
+
+                <View style={[styles.sectionBlock, isMobile && { marginBottom: 18 }]}>
+                  <Text style={[styles.sectionHeading, isMobile && { fontSize: 18 }]}>Our Mission</Text>
+                  <Text style={[styles.bodyParagraph, isMobile && { fontSize: 14, lineHeight: 21 }]}>
                     BooffIn was created to bridge the gap between curiosity and collaboration. We believe that groundbreaking research shouldn't exist in a vacuum, but rather thrive through connection.
                   </Text>
-                  <Text style={[styles.bodyParagraph, { marginTop: 10 }]}>
+                  <Text style={[styles.bodyParagraph, isMobile && { fontSize: 14, lineHeight: 21 }, { marginTop: 8 }]}>
                     Our platform enables student researchers, academics, and science enthusiasts to share insights, engage in meaningful discussions, and push the boundaries of collective knowledge.
                   </Text>
                 </View>
 
-                <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionHeading}>What We Do</Text>
+                <View style={[styles.sectionBlock, isMobile && { marginBottom: 18 }]}>
+                  <Text style={[styles.sectionHeading, isMobile && { fontSize: 18 }]}>What We Do</Text>
                   <View style={styles.bulletList}>
-                    <Text style={styles.bulletItem}>• Connect researchers globally</Text>
-                    <Text style={styles.bulletItem}>• Facilitate interdisciplinary discussions</Text>
-                    <Text style={styles.bulletItem}>• Make scientific insight accessible to everyone</Text>
+                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Connect researchers globally</Text>
+                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Facilitate interdisciplinary discussions</Text>
+                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Make scientific insight accessible to everyone</Text>
                   </View>
                 </View>
 
@@ -261,48 +354,88 @@ export default function WelcomeScreen() {
         {/* TAB 3: FEATURES (FULL COVER BACKGROUND) */}
         {/* ============================================================ */}
         {activeTab === 'features' && (
-          <View style={styles.featuresHeroContainer}>
+          <View style={[
+            styles.featuresHeroContainer,
+            isMobile && { minHeight: Platform.OS === 'web' ? ('100dvh' as any) : 600 }
+          ]}>
             {/* Full Screen Background Image */}
             <Image
               source={FEATURES_FULL_BG}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
-              contentPosition="center"
+              contentPosition={isMobile ? "right center" : "center"}
               priority="high"
             />
 
+            {/* Mobile Contrast Layer */}
+            {isMobile && (
+              <View 
+                style={[
+                  StyleSheet.absoluteFill, 
+                  { backgroundColor: 'rgba(250, 251, 249, 0.52)' }
+                ]} 
+                pointerEvents="none" 
+              />
+            )}
+
             {/* Content Overlay */}
-            <View style={styles.featuresContentInner}>
+            <View style={[
+              styles.featuresContentInner,
+              isMobile && { paddingHorizontal: isSmallMobile ? 18 : 24, paddingTop: 76, paddingBottom: 36 }
+            ]}>
               <View style={styles.featuresContentBlock}>
-                <Text style={styles.editorialTitle}>What You Can Do on BooffIn</Text>
-                <Text style={styles.editorialSubtitle}>
+                <Text style={[
+                  styles.editorialTitle,
+                  isMobile && { fontSize: isSmallMobile ? 24 : 28 }
+                ]}>
+                  What You Can Do on BooffIn
+                </Text>
+                <Text style={[
+                  styles.editorialSubtitle,
+                  isMobile && { fontSize: 14.5, marginBottom: 18 }
+                ]}>
                   Explore the features that connect researchers with people and ideas
                 </Text>
 
-                {/* 2x2 Feature Grid */}
-                <View style={styles.featureGrid}>
-                  <View style={styles.featureGridItem}>
+                {/* Feature Grid */}
+                <View style={[
+                  styles.featureGrid,
+                  isMobile && { gap: 10 }
+                ]}>
+                  <View style={[
+                    styles.featureGridItem,
+                    isMobile && { width: '100%', minWidth: '100%', padding: 14 }
+                  ]}>
                     <Text style={styles.featureTitle}>Engage in Discussions</Text>
                     <Text style={styles.featureDesc}>
                       Share insights, ask questions, and engage with a global community on biology, AI, and neuroscience.
                     </Text>
                   </View>
 
-                  <View style={styles.featureGridItem}>
+                  <View style={[
+                    styles.featureGridItem,
+                    isMobile && { width: '100%', minWidth: '100%', padding: 14 }
+                  ]}>
                     <Text style={styles.featureTitle}>Discover Content</Text>
                     <Text style={styles.featureDesc}>
                       Find articles, post updates, and follow topics like DeepMind's AlphaFold.
                     </Text>
                   </View>
 
-                  <View style={styles.featureGridItem}>
+                  <View style={[
+                    styles.featureGridItem,
+                    isMobile && { width: '100%', minWidth: '100%', padding: 14 }
+                  ]}>
                     <Text style={styles.featureTitle}>Find Your People</Text>
                     <Text style={styles.featureDesc}>
                       Build networks with student researchers, academics, and global science enthusiasts.
                     </Text>
                   </View>
 
-                  <View style={styles.featureGridItem}>
+                  <View style={[
+                    styles.featureGridItem,
+                    isMobile && { width: '100%', minWidth: '100%', padding: 14 }
+                  ]}>
                     <Text style={styles.featureTitle}>Filing & Storage</Text>
                     <Text style={styles.featureDesc}>
                       Keep track of your research, find academic papers, and organize your bibliography.
@@ -311,9 +444,16 @@ export default function WelcomeScreen() {
                 </View>
 
                 {/* Actions */}
-                <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
+                <View style={[
+                  styles.heroActionsRow, 
+                  { marginTop: 20 },
+                  isMobile && { gap: 16 }
+                ]}>
                   <TouchableOpacity 
-                    style={styles.primaryCtaBtn} 
+                    style={[
+                      styles.primaryCtaBtn,
+                      isMobile && { paddingVertical: 11, paddingHorizontal: 20 }
+                    ]} 
                     onPress={handleOpenAuthModal}
                     activeOpacity={0.8}
                   >
@@ -347,43 +487,75 @@ export default function WelcomeScreen() {
         {/* TAB 4: COMMUNITY (FULL COVER BACKGROUND) */}
         {/* ============================================================ */}
         {activeTab === 'community' && (
-          <View style={styles.communityHeroContainer}>
+          <View style={[
+            styles.communityHeroContainer,
+            isMobile && { minHeight: Platform.OS === 'web' ? ('100dvh' as any) : 600 }
+          ]}>
             {/* Full Screen Background Image */}
             <Image
               source={COMMUNITY_FULL_BG}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
-              contentPosition="center"
+              contentPosition={isMobile ? "right center" : "center"}
               priority="high"
             />
 
+            {/* Mobile Contrast Layer */}
+            {isMobile && (
+              <View 
+                style={[
+                  StyleSheet.absoluteFill, 
+                  { backgroundColor: 'rgba(250, 251, 249, 0.5)' }
+                ]} 
+                pointerEvents="none" 
+              />
+            )}
+
             {/* Content Overlay */}
-            <View style={styles.communityContentInner}>
+            <View style={[
+              styles.communityContentInner,
+              isMobile && { paddingHorizontal: isSmallMobile ? 18 : 24, paddingTop: 76, paddingBottom: 36 }
+            ]}>
               <View style={styles.communityContentBlock}>
-                <Text style={styles.editorialTitle}>Meet the BooffIn Community</Text>
-                <Text style={styles.editorialSubtitle}>
+                <Text style={[
+                  styles.editorialTitle,
+                  isMobile && { fontSize: isSmallMobile ? 24 : 28 }
+                ]}>
+                  Meet the BooffIn Community
+                </Text>
+                <Text style={[
+                  styles.editorialSubtitle,
+                  isMobile && { fontSize: 14.5, marginBottom: 18 }
+                ]}>
                   Where curious minds, researchers, and creators come together to share the shape of life
                 </Text>
 
-                <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionHeading}>A Global Network</Text>
-                  <Text style={styles.bodyParagraph}>
+                <View style={[styles.sectionBlock, isMobile && { marginBottom: 18 }]}>
+                  <Text style={[styles.sectionHeading, isMobile && { fontSize: 18 }]}>A Global Network</Text>
+                  <Text style={[styles.bodyParagraph, isMobile && { fontSize: 14, lineHeight: 21 }]}>
                     BooffIn is home to thousands of student researchers, PhD candidates, and science enthusiasts who are passionate about sharing knowledge. From late-night breakthrough discussions to collaborative reviews, find your place in a thriving network designed for curious minds.
                   </Text>
                 </View>
 
-                <View style={styles.sectionBlock}>
-                  <Text style={styles.sectionHeading}>How to Participate</Text>
+                <View style={[styles.sectionBlock, isMobile && { marginBottom: 18 }]}>
+                  <Text style={[styles.sectionHeading, isMobile && { fontSize: 18 }]}>How to Participate</Text>
                   <View style={styles.bulletList}>
-                    <Text style={styles.bulletItem}>• Join dedicated interest groups (e.g., AI in Science, Neuroscience)</Text>
-                    <Text style={styles.bulletItem}>• Participate in live discussions & Q&As</Text>
-                    <Text style={styles.bulletItem}>• Share your latest research & insights with peers</Text>
+                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Join dedicated interest groups (e.g., AI in Science, Neuroscience)</Text>
+                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Participate in live discussions & Q&As</Text>
+                    <Text style={[styles.bulletItem, isMobile && { fontSize: 14, lineHeight: 21 }]}>• Share your latest research & insights with peers</Text>
                   </View>
                 </View>
 
-                <View style={[styles.heroActionsRow, { marginTop: 24 }]}>
+                <View style={[
+                  styles.heroActionsRow, 
+                  { marginTop: 20 },
+                  isMobile && { gap: 16 }
+                ]}>
                   <TouchableOpacity 
-                    style={styles.primaryCtaBtn} 
+                    style={[
+                      styles.primaryCtaBtn,
+                      isMobile && { paddingVertical: 11, paddingHorizontal: 20 }
+                    ]} 
                     onPress={handleOpenAuthModal}
                     activeOpacity={0.8}
                   >
@@ -414,7 +586,10 @@ export default function WelcomeScreen() {
         )}
 
         {activeTab !== 'welcome' && activeTab !== 'about' && activeTab !== 'features' && activeTab !== 'community' && (
-          <View style={styles.mainContainer}>
+          <View style={[
+            styles.mainContainer,
+            isMobile && { paddingHorizontal: 18, paddingTop: 80 }
+          ]}>
 
             {/* ============================================================ */}
             {/* TAB 5: IN-PAGE EMBEDDED PRIVACY POLICY */}
