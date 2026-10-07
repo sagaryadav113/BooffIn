@@ -1,7 +1,3 @@
-// ============================================================================
-// BOOFFIN — OFFICIAL MULTI-PAGE LANDING EXPERIENCE & AUTHENTICATION PORTAL
-// ============================================================================
-
 import React, { useState } from 'react';
 import {
   View,
@@ -14,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Modal,
+  ImageBackground,
   useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -24,11 +21,13 @@ import {
   ArrowLeft 
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { colors, radii, spacing, typography, layout } from '../../theme';
 import { GoogleIcon } from '../../components/core/GoogleIcon';
 import { useAuthStore } from '../../store/useAuthStore';
 import { isProfileComplete } from '../../api/authService';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../constants/legalPolicies';
 
+const WELCOME_HERO_BG = require('../../../assets/images/welcome-hero.jpg');
 const WELCOME_FULL_BG = require('../../../assets/images/welcome-bg.png');
 const ABOUT_FULL_BG = require('../../../assets/images/about-bg.png');
 const FEATURES_FULL_BG = require('../../../assets/images/features-bg.png');
@@ -92,6 +91,95 @@ export default function WelcomeScreen() {
     setIsAuthModalOpen(false);
     router.push('/(auth)/signup');
   };
+
+  // ============================================================
+  // NATIVE MOBILE APP (iOS / Android APK) - EXACT ORIGINAL VIEW
+  // ============================================================
+  if (Platform.OS !== 'web') {
+    return (
+      <View style={nativeStyles.outerContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <ImageBackground
+          source={WELCOME_HERO_BG}
+          style={nativeStyles.backgroundImage}
+          resizeMode="cover"
+        >
+          <SafeAreaView style={nativeStyles.safeArea}>
+            <ScrollView
+              contentContainerStyle={nativeStyles.scrollContent}
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Top Artwork Spacer - preserves visibility for the illustration & tagline */}
+              <View style={nativeStyles.artworkSpacer} />
+
+              {/* Bottom Actions Section */}
+              <View style={nativeStyles.bottomSection}>
+                {authError && (
+                  <View style={nativeStyles.errorContainer}>
+                    <Text style={nativeStyles.errorText}>{authError}</Text>
+                  </View>
+                )}
+
+                {/* Sign up for free */}
+                <TouchableOpacity
+                  style={nativeStyles.signUpButton}
+                  onPress={handleSignUp}
+                  disabled={isLoading}
+                  activeOpacity={0.88}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sign up for free"
+                >
+                  <Text style={nativeStyles.signUpButtonText}>Sign up for free</Text>
+                </TouchableOpacity>
+
+                {/* Continue with Google */}
+                <TouchableOpacity
+                  style={nativeStyles.googleButton}
+                  onPress={handleGoogleAuth}
+                  disabled={isLoading}
+                  activeOpacity={0.88}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue with Google"
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color={colors.textPrimary} />
+                  ) : (
+                    <>
+                      <GoogleIcon size={20} />
+                      <Text style={nativeStyles.googleButtonText}>Continue with Google</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Continue with Email */}
+                <TouchableOpacity
+                  style={nativeStyles.emailButton}
+                  onPress={handleEmailAuth}
+                  disabled={isLoading}
+                  activeOpacity={0.88}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue with email"
+                >
+                  <Mail size={19} color={colors.textPrimary} strokeWidth={2} />
+                  <Text style={nativeStyles.emailButtonText}>Continue with email</Text>
+                </TouchableOpacity>
+
+                {/* Legal Footer */}
+                <View style={nativeStyles.legalContainer}>
+                  <Text style={nativeStyles.legalText}>
+                    By continuing, you agree to BooffIn's{' '}
+                    <Text style={nativeStyles.legalLink} onPress={() => router.push('/(auth)/terms' as any)}>Terms of Use</Text> and{' '}
+                    <Text style={nativeStyles.legalLink} onPress={() => router.push('/(auth)/privacy' as any)}>Privacy Policy</Text>.
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </ImageBackground>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -1363,6 +1451,127 @@ const styles = StyleSheet.create({
   modalLegalLink: {
     color: '#047857',
     fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+});
+
+const nativeStyles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  safeArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    maxWidth: 440,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  artworkSpacer: {
+    flex: 1,
+    minHeight: 400,
+    width: '100%',
+  },
+  bottomSection: {
+    width: '100%',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    paddingTop: spacing.xs,
+  },
+  errorContainer: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    marginBottom: spacing.xs,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+  },
+  errorText: {
+    ...typography.caption,
+    color: colors.accentRed,
+    textAlign: 'center',
+    fontSize: 13,
+  },
+  signUpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: layout.buttonHeights.lg,
+    backgroundColor: colors.brandDarkGreen,
+    borderRadius: radii.md,
+    shadowColor: colors.brandDarkGreen,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  signUpButtonText: {
+    ...typography.bodyBold,
+    color: colors.white,
+    fontSize: 15,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: layout.buttonHeights.lg,
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.md,
+  },
+  googleButtonText: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  emailButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: layout.buttonHeights.lg,
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.md,
+  },
+  emailButtonText: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  legalContainer: {
+    paddingTop: spacing.xs,
+    alignItems: 'center',
+  },
+  legalText: {
+    ...typography.micro,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    fontSize: 11.5,
+  },
+  legalLink: {
+    color: colors.textSecondary,
     textDecorationLine: 'underline',
   },
 });
