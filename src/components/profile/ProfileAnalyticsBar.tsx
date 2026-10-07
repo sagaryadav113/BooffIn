@@ -12,7 +12,7 @@ import {
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { radii, spacing, typography } from '../../theme';
 
 export interface ProfileAnalyticsBarProps {
   totalViews?: number;
@@ -58,7 +58,7 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
       {/* Left: Icon, Title & Real Views in last 28d */}
       <View style={styles.leftContent}>
         <View style={styles.iconBadge}>
-          <Activity size={15} color="#FFFFFF" />
+          <Activity size={16} color="#FFFFFF" strokeWidth={2.4} />
         </View>
 
         <View style={styles.textContainer}>
@@ -66,19 +66,26 @@ export const ProfileAnalyticsBar: React.FC<ProfileAnalyticsBarProps> = ({
             RESEARCH IMPACT
           </Text>
           <View style={styles.viewsRow}>
-            <Text style={styles.colonText}>:</Text>
-            <Text style={styles.viewsValue}>
+            <Text style={styles.viewsValue} numberOfLines={1}>
               {formatStatNumber(totalViews)}
             </Text>
-            <Text style={styles.viewsLabel}>Impressions (last 28d)</Text>
+            <Text
+              style={styles.viewsLabel}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              Impressions (28d)
+            </Text>
           </View>
         </View>
       </View>
 
       {/* Right: View Analytics Action Pill */}
       <View style={styles.actionPill}>
-        <Text style={styles.actionText}>View Analytics</Text>
-        <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.4} />
+        <Text style={styles.actionText} numberOfLines={1}>
+          View Analytics
+        </Text>
+        <ChevronRight size={13} color="#FFFFFF" strokeWidth={2.5} />
       </View>
     </TouchableOpacity>
   );
@@ -89,84 +96,84 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#064E3B', // Rich dark green
+    backgroundColor: '#064E3B', // Deep Emerald Green
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: '#047857',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 3,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginVertical: spacing.sm,
     shadowColor: '#064E3B',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
     shadowRadius: 6,
     elevation: 3,
+    overflow: 'hidden',
   },
   leftContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: spacing.sm,
-    marginRight: spacing.xs,
+    minWidth: 0,
+    gap: 10,
+    marginRight: 8,
   },
   iconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: radii.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   textContainer: {
-    flexDirection: 'column',
+    flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
   },
   title: {
-    ...typography.captionBold,
-    fontSize: 11,
-    letterSpacing: 0.6,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 10.5,
+    letterSpacing: 0.7,
+    color: 'rgba(255, 255, 255, 0.85)',
     fontWeight: '700',
+    textTransform: 'uppercase',
   },
   viewsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: 4,
-    marginTop: 1.5,
-  },
-  colonText: {
-    ...typography.captionBold,
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 2,
+    flexShrink: 1,
+    minWidth: 0,
   },
   viewsValue: {
-    ...typography.bodyBold,
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '800',
     color: '#FFFFFF',
+    flexShrink: 0,
   },
   viewsLabel: {
-    ...typography.caption,
     fontSize: 11.5,
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: 'rgba(255, 255, 255, 0.82)',
     fontWeight: '500',
+    flexShrink: 1,
   },
   actionPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    paddingHorizontal: spacing.sm + 3,
-    paddingVertical: 5.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.32)',
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+    flexShrink: 0,
   },
   actionText: {
-    ...typography.microBold,
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
   },
 });
-
