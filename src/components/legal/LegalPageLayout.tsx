@@ -71,17 +71,6 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
                 Terms
               </Typography>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navLink}
-              onPress={() => router.push('/guidelines')}
-            >
-              <Typography
-                variant="captionBold"
-                color={document.id === 'guidelines' ? colors.brandGreen : colors.textSecondary}
-              >
-                Guidelines
-              </Typography>
-            </TouchableOpacity>
           </View>
         </View>
       </View>

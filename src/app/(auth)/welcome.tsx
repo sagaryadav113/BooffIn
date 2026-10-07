@@ -19,7 +19,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
   Mail, 
   X, 
-  ArrowLeft 
+  ArrowLeft,
+  Menu,
+  ChevronRight,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography, layout } from '../../theme';
@@ -61,6 +63,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
   const [activeTab, setActiveTab] = useState<LandingTab>(resolveTab(propTab || searchParams?.tab));
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   React.useEffect(() => {
     const nextTab = resolveTab(propTab || searchParams?.tab);
@@ -239,107 +242,216 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
           {/* Brand Logo */}
           <TouchableOpacity 
             style={styles.logoBtn} 
-            onPress={() => handleTabChange('home')} 
+            onPress={() => {
+              setIsMobileMenuOpen(false);
+              handleTabChange('home');
+            }} 
             activeOpacity={0.8}
           >
-            <Text style={[styles.logoText, isSmallMobile && { fontSize: 20 }]}>BooffIn</Text>
+            <Text style={[styles.logoText, isSmallMobile && { fontSize: 22 }]}>BooffIn</Text>
           </TouchableOpacity>
 
-          {/* Nav Links */}
+          {isMobile ? (
+            /* Mobile Right Action Bar: Sign In Pill + Hamburger Toggle */
+            <View style={styles.mobileHeaderRight}>
+              <TouchableOpacity 
+                style={styles.mobileHeaderSignInBtn} 
+                onPress={handleOpenAuthModal}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.mobileHeaderSignInText}>Sign In</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.mobileMenuToggleBtn} 
+                onPress={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Toggle Navigation Menu"
+              >
+                {isMobileMenuOpen ? (
+                  <X size={22} color="#0F172A" strokeWidth={2.2} />
+                ) : (
+                  <Menu size={22} color="#0F172A" strokeWidth={2.2} />
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            /* Desktop Nav Links */
+            <View style={styles.navLinks}>
+              <TouchableOpacity 
+                style={[
+                  styles.navItem, 
+                  activeTab === 'home' && styles.navItemActive
+                ]} 
+                onPress={() => handleTabChange('home')}
+              >
+                <Text style={[
+                  styles.navItemText, 
+                  activeTab === 'home' && styles.navItemTextActive
+                ]}>
+                  Home
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.navItem, activeTab === 'about' && styles.navItemActive]} 
+                onPress={() => handleTabChange('about')}
+              >
+                <Text style={[
+                  styles.navItemText, 
+                  activeTab === 'about' && styles.navItemTextActive
+                ]}>
+                  About
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.navItem, activeTab === 'features' && styles.navItemActive]} 
+                onPress={() => handleTabChange('features')}
+              >
+                <Text style={[
+                  styles.navItemText, 
+                  activeTab === 'features' && styles.navItemTextActive
+                ]}>
+                  Features
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.navItem, activeTab === 'community' && styles.navItemActive]} 
+                onPress={() => handleTabChange('community')}
+              >
+                <Text style={[
+                  styles.navItemText, 
+                  activeTab === 'community' && styles.navItemTextActive
+                ]}>
+                  Community
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.navItem, activeTab === 'privacy' && styles.navItemActive]} 
+                onPress={() => handleTabChange('privacy')}
+              >
+                <Text style={[
+                  styles.navItemText, 
+                  activeTab === 'privacy' && styles.navItemTextActive
+                ]}>
+                  Privacy Policy
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.navItem, activeTab === 'terms' && styles.navItemActive]} 
+                onPress={() => handleTabChange('terms')}
+              >
+                <Text style={[
+                  styles.navItemText, 
+                  activeTab === 'terms' && styles.navItemTextActive
+                ]}>
+                  Terms
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.navSignInBtn} 
+                onPress={handleOpenAuthModal}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.navSignInText}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Mobile Navigation Dropdown Menu */}
+        {isMobile && isMobileMenuOpen && (
           <View style={[
-            styles.navLinks, 
-            isMobile && { gap: isSmallMobile ? 6 : 10, flexWrap: 'wrap', justifyContent: 'flex-end' }
+            styles.mobileMenuDropdown, 
+            { top: topInset + (isSmallMobile ? 50 : 58) }
           ]}>
             <TouchableOpacity 
-              style={[
-                styles.navItem, 
-                activeTab === 'home' && styles.navItemActive
-              ]} 
-              onPress={() => handleTabChange('home')}
+              style={[styles.mobileMenuItem, activeTab === 'home' && styles.mobileMenuItemActive]} 
+              onPress={() => {
+                setIsMobileMenuOpen(false);
+                handleTabChange('home');
+              }}
             >
-              <Text style={[
-                styles.navItemText, 
-                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
-                activeTab === 'home' && styles.navItemTextActive
-              ]}>
-                Home
-              </Text>
+              <Text style={[styles.mobileMenuItemText, activeTab === 'home' && styles.mobileMenuItemTextActive]}>Home</Text>
+              <ChevronRight size={16} color={activeTab === 'home' ? '#047857' : '#94A3B8'} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.navItem, activeTab === 'about' && styles.navItemActive]} 
-              onPress={() => handleTabChange('about')}
+              style={[styles.mobileMenuItem, activeTab === 'about' && styles.mobileMenuItemActive]} 
+              onPress={() => {
+                setIsMobileMenuOpen(false);
+                handleTabChange('about');
+              }}
             >
-              <Text style={[
-                styles.navItemText, 
-                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
-                activeTab === 'about' && styles.navItemTextActive
-              ]}>
-                About
-              </Text>
+              <Text style={[styles.mobileMenuItemText, activeTab === 'about' && styles.mobileMenuItemTextActive]}>About</Text>
+              <ChevronRight size={16} color={activeTab === 'about' ? '#047857' : '#94A3B8'} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.navItem, activeTab === 'features' && styles.navItemActive]} 
-              onPress={() => handleTabChange('features')}
+              style={[styles.mobileMenuItem, activeTab === 'features' && styles.mobileMenuItemActive]} 
+              onPress={() => {
+                setIsMobileMenuOpen(false);
+                handleTabChange('features');
+              }}
             >
-              <Text style={[
-                styles.navItemText, 
-                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
-                activeTab === 'features' && styles.navItemTextActive
-              ]}>
-                Features
-              </Text>
+              <Text style={[styles.mobileMenuItemText, activeTab === 'features' && styles.mobileMenuItemTextActive]}>Features</Text>
+              <ChevronRight size={16} color={activeTab === 'features' ? '#047857' : '#94A3B8'} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.navItem, activeTab === 'community' && styles.navItemActive]} 
-              onPress={() => handleTabChange('community')}
+              style={[styles.mobileMenuItem, activeTab === 'community' && styles.mobileMenuItemActive]} 
+              onPress={() => {
+                setIsMobileMenuOpen(false);
+                handleTabChange('community');
+              }}
             >
-              <Text style={[
-                styles.navItemText, 
-                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
-                activeTab === 'community' && styles.navItemTextActive
-              ]}>
-                Community
-              </Text>
+              <Text style={[styles.mobileMenuItemText, activeTab === 'community' && styles.mobileMenuItemTextActive]}>Community</Text>
+              <ChevronRight size={16} color={activeTab === 'community' ? '#047857' : '#94A3B8'} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.navItem, activeTab === 'privacy' && styles.navItemActive]} 
-              onPress={() => handleTabChange('privacy')}
+              style={[styles.mobileMenuItem, activeTab === 'privacy' && styles.mobileMenuItemActive]} 
+              onPress={() => {
+                setIsMobileMenuOpen(false);
+                handleTabChange('privacy');
+              }}
             >
-              <Text style={[
-                styles.navItemText, 
-                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
-                activeTab === 'privacy' && styles.navItemTextActive
-              ]}>
-                Privacy Policy
-              </Text>
+              <Text style={[styles.mobileMenuItemText, activeTab === 'privacy' && styles.mobileMenuItemTextActive]}>Privacy Policy</Text>
+              <ChevronRight size={16} color={activeTab === 'privacy' ? '#047857' : '#94A3B8'} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.navItem, activeTab === 'terms' && styles.navItemActive]} 
-              onPress={() => handleTabChange('terms')}
+              style={[styles.mobileMenuItem, activeTab === 'terms' && styles.mobileMenuItemActive]} 
+              onPress={() => {
+                setIsMobileMenuOpen(false);
+                handleTabChange('terms');
+              }}
             >
-              <Text style={[
-                styles.navItemText, 
-                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
-                activeTab === 'terms' && styles.navItemTextActive
-              ]}>
-                Terms
-              </Text>
+              <Text style={[styles.mobileMenuItemText, activeTab === 'terms' && styles.mobileMenuItemTextActive]}>Terms of Service</Text>
+              <ChevronRight size={16} color={activeTab === 'terms' ? '#047857' : '#94A3B8'} />
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.navSignInBtn, isSmallMobile && { paddingHorizontal: 4 }]} 
-              onPress={handleOpenAuthModal}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.navSignInText, isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 }]}>Sign In</Text>
-            </TouchableOpacity>
+            <View style={styles.mobileMenuDivider} />
+
+            <View style={styles.mobileMenuCtaContainer}>
+              <TouchableOpacity 
+                style={styles.mobileMenuPrimaryBtn} 
+                onPress={() => {
+                  setIsMobileMenuOpen(false);
+                  handleOpenAuthModal();
+                }}
+              >
+                <Text style={styles.mobileMenuPrimaryText}>Get Started (Free)</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
       </View>
 
       {/* 2. MAIN SCROLLABLE CONTENT AREA */}
@@ -367,8 +479,8 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
             {/* Left Content Overlay */}
             <View style={[
               styles.welcomeContentInner,
-              { paddingTop: topInset + (isMobile ? 72 : 88) },
-              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingBottom: 36 }
+              { paddingTop: topInset + (isMobile ? 70 : 88) },
+              isMobile && { paddingHorizontal: isSmallMobile ? 14 : 18, paddingBottom: 28 }
             ]}>
               {/* Editorial Plinth Card on Mobile */}
               <View style={[
@@ -377,7 +489,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
               ]}>
                 <Text style={[
                   styles.heroPreTitle,
-                  isMobile && { fontSize: isSmallMobile ? 21 : 24 }
+                  isMobile && { fontSize: 13, letterSpacing: 0.5, textTransform: 'uppercase', color: '#047857', fontWeight: '700', marginBottom: 4 }
                 ]}>
                   Welcome to BooffIn
                 </Text>
@@ -385,13 +497,13 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
                 <View style={styles.brandTitleBlock}>
                   <Text style={[
                     styles.heroLets,
-                    isMobile && { fontSize: 17 }
+                    isMobile && { fontSize: 16 }
                   ]}>
                     Let’s
                   </Text>
                   <Text style={[
                     styles.heroBrandTitle,
-                    isMobile && { fontSize: isSmallMobile ? 36 : 42 }
+                    isMobile && { fontSize: isSmallMobile ? 32 : 36 }
                   ]}>
                     BooffIn
                   </Text>
@@ -399,26 +511,26 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
                 <Text style={[
                   styles.heroTagline,
-                  isMobile && { fontSize: 16, marginBottom: 8 }
+                  isMobile && { fontSize: 15, fontWeight: '600', color: '#1E293B', marginBottom: 6 }
                 ]}>
                   Research finds its people.
                 </Text>
 
                 <Text style={[
                   styles.heroDescription,
-                  isMobile && { fontSize: 13.5, lineHeight: 20, marginBottom: 20 }
+                  isMobile && { fontSize: 13, lineHeight: 19, color: '#475569', marginBottom: 16 }
                 ]}>
-                  Connect our researchers, share insights, and discover the science of finding you platforms.
+                  Connect with researchers, share insights, and discover the science of finding you platforms.
                 </Text>
 
                 <View style={[
                   styles.heroActionsRow,
-                  isMobile && { gap: 14 }
+                  isMobile && { flexDirection: 'row', gap: 10, width: '100%' }
                 ]}>
                   <TouchableOpacity 
                     style={[
                       styles.primaryCtaBtn,
-                      isMobile && { paddingVertical: 11, paddingHorizontal: 20 }
+                      isMobile && { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }
                     ]} 
                     onPress={handleOpenAuthModal}
                     activeOpacity={0.8}
@@ -427,11 +539,14 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
                   </TouchableOpacity>
 
                   <TouchableOpacity 
-                    style={styles.secondaryLinkBtn} 
+                    style={[
+                      styles.secondaryLinkBtn,
+                      isMobile && { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', borderRadius: 8 }
+                    ]} 
                     onPress={handleOpenAuthModal}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.secondaryLinkText}>Log In</Text>
+                    <Text style={[styles.secondaryLinkText, isMobile && { color: '#0F172A', fontWeight: '600' }]}>Log In</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1005,15 +1120,93 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   editorialPlinthCardMobile: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
+    borderColor: 'rgba(226, 232, 240, 0.9)',
+    borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+  },
+  mobileHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mobileHeaderSignInBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#0F172A',
+  },
+  mobileHeaderSignInText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  mobileMenuToggleBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.05)',
+  },
+  mobileMenuDropdown: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    zIndex: 99,
+  },
+  mobileMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  mobileMenuItemActive: {
+    backgroundColor: 'rgba(4, 120, 87, 0.08)',
+  },
+  mobileMenuItemText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#334155',
+  },
+  mobileMenuItemTextActive: {
+    fontWeight: '700',
+    color: '#047857',
+  },
+  mobileMenuDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 6,
+  },
+  mobileMenuCtaContainer: {
+    paddingHorizontal: 4,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
+  mobileMenuPrimaryBtn: {
+    backgroundColor: '#047857',
+    paddingVertical: 11,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mobileMenuPrimaryText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13.5,
   },
   editorialPlinthHeader: {
     marginBottom: 24,
