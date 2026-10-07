@@ -37,6 +37,7 @@ export default function RootLayout() {
       !firstSegment ||
       firstSegment === '(auth)' ||
       firstSegment === 'auth' ||
+      firstSegment === 'welcome' ||
       firstSegment === 'privacy' ||
       firstSegment === 'terms' ||
       firstSegment === 'orcid-callback' ||
