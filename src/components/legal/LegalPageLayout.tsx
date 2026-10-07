@@ -56,7 +56,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.navLink}
-              onPress={() => router.push('/privacy')}
+              onPress={() => router.push('/welcome/policy' as any)}
             >
               <Typography
                 variant="captionBold"
@@ -67,7 +67,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navLink}
-              onPress={() => router.push('/terms')}
+              onPress={() => router.push('/welcome/terms' as any)}
             >
               <Typography
                 variant="captionBold"

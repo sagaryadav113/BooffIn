@@ -70,7 +70,22 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
     setActiveTab(nextTab);
   }, [propTab, searchParams?.tab]);
 
-  const handleTabChange = (tab: LandingTab | 'welcome') => {
+  const handleTabChange = (tab: LandingTab | 'welcome' | 'policy') => {
+    if (tab === 'privacy' || tab === 'policy') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+      router.push('/welcome/policy' as any);
+      return;
+    }
+    if (tab === 'terms') {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+      router.push('/welcome/terms' as any);
+      return;
+    }
+
     const target: LandingTab = (tab === 'welcome' || tab === 'home') ? 'home' : (tab as LandingTab);
     setActiveTab(target);
     try {
@@ -997,7 +1012,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
                   style={styles.modalLegalLink} 
                   onPress={() => {
                     setIsAuthModalOpen(false);
-                    setActiveTab('terms');
+                    router.push('/welcome/terms' as any);
                   }}
                 >
                   Terms of Service
@@ -1007,7 +1022,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
                   style={styles.modalLegalLink} 
                   onPress={() => {
                     setIsAuthModalOpen(false);
-                    setActiveTab('privacy');
+                    router.push('/welcome/policy' as any);
                   }}
                 >
                   Privacy Policy
