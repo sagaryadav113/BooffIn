@@ -34,9 +34,13 @@ const ABOUT_FULL_BG = require('../../../assets/images/about-bg.png');
 const FEATURES_FULL_BG = require('../../../assets/images/features-bg.png');
 const COMMUNITY_FULL_BG = require('../../../assets/images/community-bg.png');
 
-type LandingTab = 'welcome' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
+export type LandingTab = 'home' | 'welcome' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
 
-export default function WelcomeScreen() {
+interface WelcomeScreenProps {
+  initialTab?: LandingTab;
+}
+
+export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProps = {}) {
   const insets = useSafeAreaInsets();
   const searchParams = useLocalSearchParams<{ tab?: string }>();
   const { width } = useWindowDimensions();
@@ -46,18 +50,33 @@ export default function WelcomeScreen() {
 
   const topInset = Math.max(insets.top, Platform.OS === 'web' ? (isMobile ? 22 : 14) : 0);
 
-  const initialTab: LandingTab = (searchParams?.tab && ['welcome', 'about', 'features', 'community', 'privacy', 'terms'].includes(searchParams.tab))
-    ? (searchParams.tab as LandingTab)
-    : 'welcome';
+  const resolveTab = (t?: string): LandingTab => {
+    if (!t) return 'home';
+    if (t === 'welcome' || t === 'home') return 'home';
+    if (['about', 'features', 'community', 'privacy', 'terms'].includes(t)) {
+      return t as LandingTab;
+    }
+    return 'home';
+  };
 
-  const [activeTab, setActiveTab] = useState<LandingTab>(initialTab);
+  const [activeTab, setActiveTab] = useState<LandingTab>(resolveTab(propTab || searchParams?.tab));
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   React.useEffect(() => {
-    if (searchParams?.tab && ['welcome', 'about', 'features', 'community', 'privacy', 'terms'].includes(searchParams.tab)) {
-      setActiveTab(searchParams.tab as LandingTab);
+    const nextTab = resolveTab(propTab || searchParams?.tab);
+    setActiveTab(nextTab);
+  }, [propTab, searchParams?.tab]);
+
+  const handleTabChange = (tab: LandingTab) => {
+    const target = tab === 'welcome' ? 'home' : tab;
+    setActiveTab(target);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    if (Platform.OS === 'web') {
+      router.replace(`/welcome/${target}` as any);
     }
-  }, [searchParams?.tab]);
+  };
 
   const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
   const isLoading = useAuthStore((s) => s.isLoading);
