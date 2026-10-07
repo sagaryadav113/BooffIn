@@ -1,8 +1,16 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { BottomTabBar } from '../../components/layout/BottomTabBar';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function TabsLayout() {
+  const isInitialized = useAuthStore((s) => s.isInitialized);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  if (isInitialized && !isAuthenticated) {
+    return <Redirect href="/(auth)/welcome" />;
+  }
+
   return (
     <Tabs
       tabBar={(props) => <BottomTabBar {...props} />}

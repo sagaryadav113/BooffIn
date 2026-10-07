@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors, shadows } from '../theme';
@@ -14,8 +14,12 @@ import { prewarmHypedFeeds } from '../api/hypedFeedService';
 
 export default function RootLayout() {
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
+  const isInitialized = useAuthStore((s) => s.isInitialized);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const currentUser = useAuthStore((s) => s.user);
   const { isDesktop } = useResponsiveLayout();
+  const segments = useSegments();
+  const router = useRouter();
 
   // Track live user presence across all active sessions in real-time
   useUserPresence();
@@ -23,6 +27,25 @@ export default function RootLayout() {
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  // Global Auth Guard: Restrict unauthenticated users from entering protected app routes via browser URLs
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const firstSegment = segments[0] as string | undefined;
+    const isPublicRoute =
+      !firstSegment ||
+      firstSegment === '(auth)' ||
+      firstSegment === 'auth' ||
+      firstSegment === 'privacy' ||
+      firstSegment === 'terms' ||
+      firstSegment === 'orcid-callback' ||
+      firstSegment === 'reset-password';
+
+    if (!isAuthenticated && !isPublicRoute) {
+      router.replace('/(auth)/welcome');
+    }
+  }, [isInitialized, isAuthenticated, segments, router]);
 
   // Pre-warm Explore domain feeds in the background for 0ms instant loading
   useEffect(() => {

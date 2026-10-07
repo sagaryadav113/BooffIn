@@ -15,15 +15,26 @@ import { Divider } from '../core/Divider';
 import { colors, spacing, radii } from '../../theme';
 import { LegalDocument } from '../../constants/legalPolicies';
 
+import { useAuthStore } from '../../store/useAuthStore';
+
 interface LegalPageLayoutProps {
   document: LegalDocument;
 }
 
 export function LegalPageLayout({ document }: LegalPageLayoutProps) {
   const router = useRouter();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const handleEmailPress = (email: string) => {
     Linking.openURL(`mailto:${email}`);
+  };
+
+  const handleHomeNavigation = () => {
+    if (isAuthenticated) {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/(auth)/welcome');
+    }
   };
 
   return (
@@ -33,17 +44,11 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
         <View style={styles.headerContent}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/');
-              }
-            }}
-            accessibilityLabel="Go back"
+            onPress={handleHomeNavigation}
+            accessibilityLabel="BooffIn Home"
           >
             <Icon name="ArrowLeft" size="md" color={colors.textPrimary} />
-            <Typography variant="bodyBold" color={colors.textPrimary} style={{ marginLeft: 8 }}>
+            <Typography variant="bodyBold" color={colors.brandGreen} style={{ marginLeft: 8, fontSize: 18, fontWeight: '800' }}>
               BooffIn
             </Typography>
           </TouchableOpacity>
@@ -57,7 +62,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
                 variant="captionBold"
                 color={document.id === 'privacy' ? colors.brandGreen : colors.textSecondary}
               >
-                Privacy
+                Privacy Policy
               </Typography>
             </TouchableOpacity>
             <TouchableOpacity
@@ -68,7 +73,15 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
                 variant="captionBold"
                 color={document.id === 'terms' ? colors.brandGreen : colors.textSecondary}
               >
-                Terms
+                Terms of Service
+              </Typography>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.authCtaButton}
+              onPress={handleHomeNavigation}
+            >
+              <Typography variant="captionBold" color="#FFFFFF">
+                {isAuthenticated ? 'Go to App' : 'Sign In / Join'}
               </Typography>
             </TouchableOpacity>
           </View>
@@ -218,6 +231,12 @@ const styles = StyleSheet.create({
   navLink: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
+  },
+  authCtaButton: {
+    backgroundColor: colors.brandGreen,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.full,
   },
   scroll: {
     flex: 1,
