@@ -134,13 +134,23 @@ export const PRIVACY_POLICY: LegalDocument = {
       ],
     },
     {
-      title: '3. Scholarly Data and ORCID Integration',
+      title: '3. Google OAuth & Third-Party Authentication Data',
+      content: [
+        'When you choose to sign in using Google OAuth, BooffIn accesses basic profile information authorized by you: your email address, full name, and profile picture.',
+        'Purpose: This information is used strictly to create, authenticate, and manage your BooffIn researcher profile.',
+        'Google API Services User Data Policy Compliance (Limited Use): BooffIn\'s use and transfer to any other app of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.',
+        'Data Sharing Restrictions: We do not transfer, sell, or disclose Google user data to third-party marketing brokers, data aggregators, or external AI model training pipelines.',
+        'Revocation: You can revoke BooffIn\'s access to your Google account at any time via your Google Account Permissions (https://myaccount.google.com/permissions) or request complete account deletion within BooffIn settings.',
+      ],
+    },
+    {
+      title: '4. Scholarly Data and ORCID Integration',
       content: [
         'When you connect your ORCID record via OAuth2, BooffIn retrieves authorized publication metadata to populate your research portfolio. We do not store your ORCID login credentials.',
       ],
     },
     {
-      title: '4. How We Use Your Information',
+      title: '5. How We Use Your Information',
       content: [
         'To operate, maintain, and provide researcher profiles, paper feeds, topic discovery, and community interactions.',
         'To calculate community HYPE rankings and deliver personalized academic recommendations without selling personal data to advertisers.',
@@ -148,26 +158,26 @@ export const PRIVACY_POLICY: LegalDocument = {
       ],
     },
     {
-      title: '5. Zero Selling of Personal Data',
+      title: '6. Zero Selling of Personal Data',
       content: [
         'BooffIn NEVER sells, rents, or trades your personal information, reading history, or research topics to third-party data brokers or marketing aggregators.',
       ],
     },
     {
-      title: '6. Data Storage, Security, and Row Level Security',
+      title: '7. Data Storage, Security, and Row Level Security',
       content: [
         'Your data is encrypted in transit (TLS 1.3/HTTPS) and at rest. Database access is strictly governed by PostgreSQL Row Level Security (RLS) policies, ensuring users only access authorized records.',
       ],
     },
     {
-      title: '7. Your Rights and Account Deletion',
+      title: '8. Your Rights and Account Deletion',
       content: [
-        'You have the right to access, correct, export, or delete your personal account at any time via Settings -> Account -> Delete Account or by emailing privacy@letsbooffin.com.',
-        'Upon account deletion, all personal profile data is permanently removed, subject only to legitimate legal or security retention requirements.',
+        'You have the right to access, correct, export, or delete your personal account at any time via Settings -> Account -> Delete Account or by emailing privacy@letsbooffin.com or admin@letsbooffin.com.',
+        'Upon account deletion, all personal profile data and authentication records are permanently removed, subject only to legitimate legal or security retention requirements.',
       ],
     },
     {
-      title: '8. Privacy Contacts and Governance',
+      title: '9. Privacy Contacts and Governance',
       content: [
         'For inquiries regarding data protection, GDPR, CCPA, or India Digital Personal Data Protection Act compliance, contact privacy@letsbooffin.com or admin@letsbooffin.com.',
       ],
