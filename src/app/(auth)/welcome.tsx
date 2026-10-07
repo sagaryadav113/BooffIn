@@ -225,15 +225,28 @@ export default function WelcomeScreen() {
           {/* Nav Links */}
           <View style={[
             styles.navLinks, 
-            isMobile && { gap: isSmallMobile ? 8 : 12 }
+            isMobile && { gap: isSmallMobile ? 6 : 10, flexWrap: 'wrap', justifyContent: 'flex-end' }
           ]}>
+            <TouchableOpacity 
+              style={[styles.navItem, activeTab === 'welcome' && styles.navItemActive]} 
+              onPress={() => setActiveTab('welcome')}
+            >
+              <Text style={[
+                styles.navItemText, 
+                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
+                activeTab === 'welcome' && styles.navItemTextActive
+              ]}>
+                Home
+              </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity 
               style={[styles.navItem, activeTab === 'about' && styles.navItemActive]} 
               onPress={() => setActiveTab('about')}
             >
               <Text style={[
                 styles.navItemText, 
-                isMobile && { fontSize: isSmallMobile ? 12 : 13 },
+                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
                 activeTab === 'about' && styles.navItemTextActive
               ]}>
                 About
@@ -246,7 +259,7 @@ export default function WelcomeScreen() {
             >
               <Text style={[
                 styles.navItemText, 
-                isMobile && { fontSize: isSmallMobile ? 12 : 13 },
+                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
                 activeTab === 'features' && styles.navItemTextActive
               ]}>
                 Features
@@ -259,10 +272,36 @@ export default function WelcomeScreen() {
             >
               <Text style={[
                 styles.navItemText, 
-                isMobile && { fontSize: isSmallMobile ? 12 : 13 },
+                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
                 activeTab === 'community' && styles.navItemTextActive
               ]}>
                 Community
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.navItem, activeTab === 'privacy' && styles.navItemActive]} 
+              onPress={() => setActiveTab('privacy')}
+            >
+              <Text style={[
+                styles.navItemText, 
+                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
+                activeTab === 'privacy' && styles.navItemTextActive
+              ]}>
+                Privacy Policy
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.navItem, activeTab === 'terms' && styles.navItemActive]} 
+              onPress={() => setActiveTab('terms')}
+            >
+              <Text style={[
+                styles.navItemText, 
+                isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
+                activeTab === 'terms' && styles.navItemTextActive
+              ]}>
+                Terms
               </Text>
             </TouchableOpacity>
 
@@ -271,7 +310,7 @@ export default function WelcomeScreen() {
               onPress={handleOpenAuthModal}
               activeOpacity={0.7}
             >
-              <Text style={[styles.navSignInText, isMobile && { fontSize: isSmallMobile ? 12 : 13 }]}>Sign In</Text>
+              <Text style={[styles.navSignInText, isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 }]}>Sign In</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -437,16 +476,6 @@ export default function WelcomeScreen() {
                     <Text style={styles.bulletItem}>• Make scientific insight accessible to everyone</Text>
                   </View>
                 </View>
-
-                {/* Footer */}
-                <View style={styles.inlineFooter}>
-                  <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                    <Text style={styles.footerLink}>Privacy Policy</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                    <Text style={styles.footerLink}>Terms of Service</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             </View>
           </View>
@@ -566,16 +595,6 @@ export default function WelcomeScreen() {
                     <Text style={styles.secondaryLinkText}>Start For Free</Text>
                   </TouchableOpacity>
                 </View>
-
-                {/* Footer */}
-                <View style={styles.inlineFooter}>
-                  <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                    <Text style={styles.footerLink}>Privacy Policy</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                    <Text style={styles.footerLink}>Terms of Service</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             </View>
           </View>
@@ -666,16 +685,6 @@ export default function WelcomeScreen() {
                     <Text style={styles.secondaryLinkText}>Browse Groups</Text>
                   </TouchableOpacity>
                 </View>
-
-                {/* Footer */}
-                <View style={styles.inlineFooter}>
-                  <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                    <Text style={styles.footerLink}>Privacy Policy</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                    <Text style={styles.footerLink}>Terms of Service</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             </View>
           </View>
@@ -717,14 +726,6 @@ export default function WelcomeScreen() {
                   </View>
                 ))}
 
-                <View style={styles.inlineFooter}>
-                  <TouchableOpacity onPress={() => setActiveTab('terms')}>
-                    <Text style={styles.footerLink}>Switch to Terms of Service</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setActiveTab('welcome')}>
-                    <Text style={styles.footerLink}>Back to Home</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             )}
 
@@ -757,14 +758,6 @@ export default function WelcomeScreen() {
                   </View>
                 ))}
 
-                <View style={styles.inlineFooter}>
-                  <TouchableOpacity onPress={() => setActiveTab('privacy')}>
-                    <Text style={styles.footerLink}>Switch to Privacy Policy</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setActiveTab('welcome')}>
-                    <Text style={styles.footerLink}>Back to Home</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             )}
           </View>
