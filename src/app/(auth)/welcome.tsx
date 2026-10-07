@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
   Mail, 
   X, 
@@ -36,10 +37,13 @@ const COMMUNITY_FULL_BG = require('../../../assets/images/community-bg.png');
 type LandingTab = 'welcome' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
 
 export default function WelcomeScreen() {
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 960;
   const isMobile = width < 768;
   const isSmallMobile = width < 480;
+
+  const topInset = Math.max(insets.top, Platform.OS === 'web' ? (isMobile ? 22 : 14) : 0);
 
   const [activeTab, setActiveTab] = useState<LandingTab>('welcome');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -188,7 +192,14 @@ export default function WelcomeScreen() {
       {/* 1. TOP HEADER NAVIGATION */}
       <View style={[
         styles.headerContainer, 
-        isMobile && { paddingHorizontal: isSmallMobile ? 12 : 18, paddingVertical: 14 }
+        {
+          paddingTop: topInset + (isMobile ? 10 : 16),
+          paddingBottom: isMobile ? 10 : 16,
+          paddingHorizontal: isMobile ? (isSmallMobile ? 14 : 20) : 36,
+          backgroundColor: Platform.OS === 'web' ? 'rgba(250, 251, 249, 0.96)' : 'transparent',
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(226, 232, 240, 0.8)',
+        }
       ]}>
         <View style={styles.headerInner}>
           {/* Brand Logo */}
@@ -197,13 +208,13 @@ export default function WelcomeScreen() {
             onPress={() => setActiveTab('welcome')} 
             activeOpacity={0.8}
           >
-            <Text style={[styles.logoText, isSmallMobile && { fontSize: 21 }]}>BooffIn</Text>
+            <Text style={[styles.logoText, isSmallMobile && { fontSize: 20 }]}>BooffIn</Text>
           </TouchableOpacity>
 
           {/* Nav Links */}
           <View style={[
             styles.navLinks, 
-            isMobile && { gap: isSmallMobile ? 10 : 14 }
+            isMobile && { gap: isSmallMobile ? 8 : 12 }
           ]}>
             <TouchableOpacity 
               style={[styles.navItem, activeTab === 'about' && styles.navItemActive]} 
@@ -211,7 +222,7 @@ export default function WelcomeScreen() {
             >
               <Text style={[
                 styles.navItemText, 
-                isMobile && { fontSize: 13 },
+                isMobile && { fontSize: isSmallMobile ? 12 : 13 },
                 activeTab === 'about' && styles.navItemTextActive
               ]}>
                 About
@@ -224,7 +235,7 @@ export default function WelcomeScreen() {
             >
               <Text style={[
                 styles.navItemText, 
-                isMobile && { fontSize: 13 },
+                isMobile && { fontSize: isSmallMobile ? 12 : 13 },
                 activeTab === 'features' && styles.navItemTextActive
               ]}>
                 Features
@@ -237,7 +248,7 @@ export default function WelcomeScreen() {
             >
               <Text style={[
                 styles.navItemText, 
-                isMobile && { fontSize: 13 },
+                isMobile && { fontSize: isSmallMobile ? 12 : 13 },
                 activeTab === 'community' && styles.navItemTextActive
               ]}>
                 Community
@@ -245,11 +256,11 @@ export default function WelcomeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.navSignInBtn, isSmallMobile && { paddingHorizontal: 6 }]} 
+              style={[styles.navSignInBtn, isSmallMobile && { paddingHorizontal: 4 }]} 
               onPress={handleOpenAuthModal}
               activeOpacity={0.7}
             >
-              <Text style={[styles.navSignInText, isMobile && { fontSize: 13 }]}>Sign In</Text>
+              <Text style={[styles.navSignInText, isMobile && { fontSize: isSmallMobile ? 12 : 13 }]}>Sign In</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -280,7 +291,8 @@ export default function WelcomeScreen() {
             {/* Left Content Overlay */}
             <View style={[
               styles.welcomeContentInner,
-              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingTop: 76, paddingBottom: 36 }
+              { paddingTop: topInset + (isMobile ? 72 : 88) },
+              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingBottom: 36 }
             ]}>
               {/* Editorial Plinth Card on Mobile */}
               <View style={[
@@ -371,7 +383,8 @@ export default function WelcomeScreen() {
             {/* Content Overlay */}
             <View style={[
               styles.aboutContentInner,
-              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingTop: 76, paddingBottom: 36 }
+              { paddingTop: topInset + (isMobile ? 72 : 88) },
+              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingBottom: 36 }
             ]}>
               <View style={styles.aboutContentBlock}>
                 {/* Header Plinth */}
@@ -448,7 +461,8 @@ export default function WelcomeScreen() {
             {/* Content Overlay */}
             <View style={[
               styles.featuresContentInner,
-              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingTop: 76, paddingBottom: 36 }
+              { paddingTop: topInset + (isMobile ? 72 : 88) },
+              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingBottom: 36 }
             ]}>
               <View style={styles.featuresContentBlock}>
                 {/* Header Plinth */}
@@ -576,7 +590,8 @@ export default function WelcomeScreen() {
             {/* Content Overlay */}
             <View style={[
               styles.communityContentInner,
-              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingTop: 76, paddingBottom: 36 }
+              { paddingTop: topInset + (isMobile ? 72 : 88) },
+              isMobile && { paddingHorizontal: isSmallMobile ? 16 : 20, paddingBottom: 36 }
             ]}>
               <View style={styles.communityContentBlock}>
                 {/* Header Plinth */}
@@ -658,7 +673,8 @@ export default function WelcomeScreen() {
         {activeTab !== 'welcome' && activeTab !== 'about' && activeTab !== 'features' && activeTab !== 'community' && (
           <View style={[
             styles.mainContainer,
-            isMobile && { paddingHorizontal: 18, paddingTop: 80 }
+            { paddingTop: topInset + (isMobile ? 72 : 88) },
+            isMobile && { paddingHorizontal: 18 }
           ]}>
 
             {/* ============================================================ */}
