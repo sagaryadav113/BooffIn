@@ -244,6 +244,98 @@ export async function getPaperMetrics(paperId: string): Promise<PaperMetrics> {
   return defaultMetrics;
 }
 
+/**
+ * Retrieves metrics for multiple paper IDs in a single batch operation.
+ * Eliminates N-query waterfalls and populates in-memory cache instantly.
+ */
+export async function getBatchPaperMetrics(paperIds: string[]): Promise<Map<string, PaperMetrics>> {
+  const result = new Map<string, PaperMetrics>();
+  if (!paperIds || paperIds.length === 0) return result;
+
+  const missingIds: string[] = [];
+
+  for (const rawId of paperIds) {
+    const id = rawId.trim();
+    if (inMemoryMetricsCache.has(id)) {
+      result.set(id, inMemoryMetricsCache.get(id)!);
+    } else {
+      missingIds.push(id);
+    }
+  }
+
+  if (missingIds.length === 0) {
+    return result;
+  }
+
+  // 1. Try local storage in parallel
+  const stillMissing: string[] = [];
+  await Promise.all(
+    missingIds.map(async (id) => {
+      try {
+        const raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${id}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          inMemoryMetricsCache.set(id, parsed);
+          result.set(id, parsed);
+          return;
+        }
+      } catch {}
+      stillMissing.push(id);
+    })
+  );
+
+  if (stillMissing.length === 0) {
+    return result;
+  }
+
+  // 2. Query Supabase in a single batch query
+  try {
+    const { data } = await supabase
+      .from('paper_metrics')
+      .select('*')
+      .in('paper_id', stillMissing);
+
+    if (data && data.length > 0) {
+      data.forEach((row: any) => {
+        const metrics: PaperMetrics = {
+          paperId: row.paper_id,
+          views: row.views || 1,
+          uniqueReaders: row.unique_readers || 1,
+          impactSum: row.impact_sum || 0,
+          impactCount: row.impact_count || 0,
+          claritySum: row.clarity_sum || 0,
+          clarityCount: row.clarity_count || 0,
+          visualsSum: row.visuals_sum || 0,
+          visualsCount: row.visuals_count || 0,
+          impactAvg: row.impact_count > 0 ? row.impact_sum / row.impact_count : 0,
+          clarityAvg: row.clarity_count > 0 ? row.clarity_sum / row.clarity_count : 0,
+          visualsAvg: row.visuals_count > 0 ? row.visuals_sum / row.visuals_count : 0,
+          communityRating: row.community_rating || 0,
+          ratingScore: row.rating_score || 0,
+          popularityScore: row.popularity_score || 0,
+          hypeScore: row.hype_score || 0,
+          viewsLastHour: row.views_last_hour || 1,
+          viewsLast24h: row.views_last_24h || 1,
+          trendScore: row.trend_score || 0,
+        };
+        inMemoryMetricsCache.set(row.paper_id, metrics);
+        result.set(row.paper_id, metrics);
+      });
+    }
+  } catch {}
+
+  // 3. Populate default fallback for any remaining
+  for (const id of stillMissing) {
+    if (!result.has(id)) {
+      const def = createDefaultPaperMetrics(id);
+      inMemoryMetricsCache.set(id, def);
+      result.set(id, def);
+    }
+  }
+
+  return result;
+}
+
 const STORAGE_KEY_PREFIX_VIEWS = 'booffin_paper_real_views_';
 
 interface StoredViewEntry {

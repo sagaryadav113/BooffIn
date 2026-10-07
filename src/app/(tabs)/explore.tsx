@@ -37,7 +37,12 @@ import { useTopicStore } from '../../store/useTopicStore';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
-import { getHypedDomainData, HypedDomainData } from '../../api/hypedFeedService';
+import {
+  getHypedDomainData,
+  getCachedHypedDomainDataSync,
+  getCachedHypedDomainData,
+  HypedDomainData,
+} from '../../api/hypedFeedService';
 import { subscribeToPaperRead } from '../../api/hypeScoreService';
 import { Paper, UserProfile } from '../../types';
 
@@ -96,8 +101,10 @@ export default function ExploreScreen() {
   // Add Interests modal state
   const [isAddInterestsVisible, setIsAddInterestsVisible] = useState(false);
 
-  // Hyped feed data state
-  const [hypedData, setHypedData] = useState<HypedDomainData | null>(null);
+  // Hyped feed data state initialized with synchronous cache if available
+  const [hypedData, setHypedData] = useState<HypedDomainData | null>(() => {
+    return getCachedHypedDomainDataSync(params.tab || 'For You', '48h', userInterests);
+  });
   const [isLoadingHyped, setIsLoadingHyped] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -118,11 +125,24 @@ export default function ExploreScreen() {
     }
   }, [userInterests, activeTab, params.tab]);
 
-  // Load domain-specific or personalized hyped feed
-  const loadHypedFeed = useCallback(async (domain: string, tf: '48h' | 'week' | 'all') => {
-    setIsLoadingHyped(true);
+  // Load domain-specific or personalized hyped feed with instant SWR resolution
+  const loadHypedFeed = useCallback(async (domain: string, tf: '48h' | 'week' | 'all', forceFresh: boolean = false) => {
+    const syncCached = getCachedHypedDomainDataSync(domain, tf, userInterests);
+    if (syncCached) {
+      setHypedData(syncCached);
+    } else {
+      const diskCached = await getCachedHypedDomainData(domain, tf, userInterests);
+      if (diskCached) {
+        setHypedData(diskCached);
+      }
+    }
+
+    if (!syncCached) {
+      setIsLoadingHyped(true);
+    }
+
     try {
-      const data = await getHypedDomainData(domain, tf, userInterests);
+      const data = await getHypedDomainData(domain, tf, userInterests, forceFresh);
       setHypedData(data);
     } catch (e) {
       console.warn('[ExploreScreen] Error loading hyped domain data:', e);
@@ -151,7 +171,7 @@ export default function ExploreScreen() {
         fetchPapers(),
         fetchTopics(currentUser?.id),
         fetchFeed('For You', currentUser?.id),
-        loadHypedFeed(activeTab, timeframe),
+        loadHypedFeed(activeTab, timeframe, true),
       ]);
     } catch {}
   }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed, activeTab, timeframe, loadHypedFeed]);
@@ -173,6 +193,11 @@ export default function ExploreScreen() {
     try {
       Haptics.selectionAsync();
     } catch {}
+    // Instantaneous memory cache swap before state transition
+    const cached = getCachedHypedDomainDataSync(tab, timeframe, userInterests);
+    if (cached) {
+      setHypedData(cached);
+    }
     setActiveTab(tab);
   };
 
@@ -180,6 +205,10 @@ export default function ExploreScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
+    const cached = getCachedHypedDomainDataSync(activeTab, tf, userInterests);
+    if (cached) {
+      setHypedData(cached);
+    }
     setTimeframe(tf);
   };
 

@@ -1,14 +1,12 @@
 import { Paper, UserProfile } from '../types';
-import { supabase } from './client';
+import { supabase, appStorage } from './client';
 import { searchPapers } from './search/providers/paperSearchProvider';
 import { usePaperStore } from '../store/usePaperStore';
 import {
-  getPaperMetrics,
-  getReadPapersRegistry,
+  getBatchPaperMetrics,
   getDetailedReadPapersRegistry,
   calculate48hHypeScore,
   subscribeToPaperRead,
-  PaperMetrics,
 } from './hypeScoreService';
 
 export interface HypedDomainData {
@@ -18,17 +16,73 @@ export interface HypedDomainData {
   researchers: UserProfile[];
 }
 
-// In-memory cache for speed and offline stability
+// In-memory cache for ultra-fast 0ms instant tab rendering
 const domainFeedCache = new Map<string, { timestamp: number; data: HypedDomainData }>();
-const CACHE_TTL_MS = 2 * 60 * 1000;
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes fresh in-memory TTL
+const STORAGE_KEY_HYPED_FEED_PREFIX = 'booffin_hyped_feed_v2_';
+
+/**
+ * Builds standard cache key for domain + timeframe + interests
+ */
+function buildCacheKey(
+  domain: string,
+  timeframe: '48h' | 'week' | 'month' | 'all',
+  userInterests: string[] = []
+): string {
+  const normDomain = (domain || '').trim().toLowerCase();
+  const sortedInterests = [...userInterests].sort().join(',');
+  return `${normDomain}_${timeframe}_${sortedInterests}`;
+}
+
+/**
+ * Returns in-memory cached data immediately (0ms synchronous lookup)
+ */
+export function getCachedHypedDomainDataSync(
+  domain: string,
+  timeframe: '48h' | 'week' | 'month' | 'all' = '48h',
+  userInterests: string[] = []
+): HypedDomainData | null {
+  const key = buildCacheKey(domain, timeframe, userInterests);
+  const item = domainFeedCache.get(key);
+  if (item) {
+    return item.data;
+  }
+  return null;
+}
+
+/**
+ * Returns persisted disk cached data immediately without waiting for network
+ */
+export async function getCachedHypedDomainData(
+  domain: string,
+  timeframe: '48h' | 'week' | 'month' | 'all' = '48h',
+  userInterests: string[] = []
+): Promise<HypedDomainData | null> {
+  const syncData = getCachedHypedDomainDataSync(domain, timeframe, userInterests);
+  if (syncData) return syncData;
+
+  const key = buildCacheKey(domain, timeframe, userInterests);
+  try {
+    const raw = await appStorage.getItem(`${STORAGE_KEY_HYPED_FEED_PREFIX}${key}`);
+    if (raw) {
+      const data: HypedDomainData = JSON.parse(raw);
+      domainFeedCache.set(key, { timestamp: Date.now(), data });
+      return data;
+    }
+  } catch {}
+  return null;
+}
 
 export function invalidateDomainFeedCache() {
   domainFeedCache.clear();
 }
 
-// Automatically invalidate domain cache whenever any paper is read across the app
+// Invalidate in-memory timestamps smoothly on paper read so background revalidation triggers
 subscribeToPaperRead(() => {
-  invalidateDomainFeedCache();
+  // Mark in-memory cache as stale without deleting data, keeping SWR instant
+  for (const [key, val] of domainFeedCache.entries()) {
+    domainFeedCache.set(key, { timestamp: 0, data: val.data });
+  }
 });
 
 /**
@@ -142,7 +196,6 @@ export const SCIENTIFIC_DOMAINS: Record<
 
 /**
  * Checks if a paper relates strictly to a target scientific domain
- * Prevents cross-contamination (e.g. Neuroscience papers showing in AI)
  */
 export function isPaperInDomain(paper: Paper, domain: string): boolean {
   const normDomain = domain.trim().toLowerCase();
@@ -152,7 +205,6 @@ export function isPaperInDomain(paper: Paper, domain: string): boolean {
 
   const titleLower = (paper.title || '').toLowerCase();
   const abstractLower = (paper.abstract || '').toLowerCase();
-  const journalLower = (paper.journal || '').toLowerCase();
   const topicsLower = (paper.topics || []).map((t) => (t || '').toLowerCase());
   const combinedText = `${titleLower} ${abstractLower} ${topicsLower.join(' ')}`;
 
@@ -164,7 +216,6 @@ export function isPaperInDomain(paper: Paper, domain: string): boolean {
   // 2. Predefined domain configuration
   const config = SCIENTIFIC_DOMAINS[normDomain];
   if (config) {
-    // Check exclusions (e.g. nursing/clinical papers shouldn't match AI just because journal was 'computational intelligence')
     if (config.excludedTerms && config.excludedTerms.some((term) => titleLower.includes(term))) {
       return false;
     }
@@ -188,7 +239,6 @@ export function isPaperInDomain(paper: Paper, domain: string): boolean {
     );
   }
 
-  // Multi-word phrase or all words present
   if (titleLower.includes(normDomain) || topicsLower.some((t) => t.includes(normDomain))) {
     return true;
   }
@@ -196,8 +246,7 @@ export function isPaperInDomain(paper: Paper, domain: string): boolean {
 }
 
 /**
- * Derives authentic, verified top researchers in the user's selected domain
- * with maximum trending HYPE score in the last 48 hours.
+ * Derives top researchers with fast 2.5s network timeout and instant fallbacks
  */
 async function deriveTopResearchers(
   papers: Paper[],
@@ -207,15 +256,20 @@ async function deriveTopResearchers(
   const researchers: UserProfile[] = [];
   const seenIds = new Set<string>();
 
-  // 1. Fetch genuine OpenAlex scholars matching this scientific interest/domain
+  // 1. Fetch genuine OpenAlex scholars with timeout to prevent blocking UI
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
     const oaUrl = `https://api.openalex.org/authors?search=${encodeURIComponent(
       cleanDomain
-    )}&sort=cited_by_count:desc&per-page=10&select=id,display_name,display_name_alternatives,last_known_institution,works_count,cited_by_count,orcid,x_concepts&mailto=dev@booffin.science`;
+    )}&sort=cited_by_count:desc&per-page=6&select=id,display_name,last_known_institution,works_count,cited_by_count,orcid,x_concepts&mailto=dev@booffin.science`;
 
     const res = await fetch(oaUrl, {
+      signal: controller.signal,
       headers: { 'User-Agent': 'BooffIn/1.0 (hyped-scholars; dev@booffin.science)' },
     });
+    clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();
@@ -236,7 +290,6 @@ async function deriveTopResearchers(
           .map((c: any) => c.display_name)
           .filter(Boolean);
 
-        // Calculate authentic 48h trending HYPE score from verified citations and recent publication velocity
         const calculatedHype = citations > 0
           ? Math.min(5.0, Math.max(3.8, parseFloat((3.6 + Math.log10(citations) * 0.26 + Math.min(0.3, works * 0.002)).toFixed(1))))
           : 4.0;
@@ -268,9 +321,7 @@ async function deriveTopResearchers(
         seenIds.add(openAlexId);
       }
     }
-  } catch (err) {
-    console.warn('[deriveTopResearchers] OpenAlex error:', err);
-  }
+  } catch {}
 
   // 2. Also check verified registered scholars in Supabase
   try {
@@ -311,46 +362,70 @@ async function deriveTopResearchers(
     }
   } catch {}
 
-  // 3. Sort strictly by trending HYPE score descending in the last 48 hours
   researchers.sort((a, b) => (b.hypeScore || 0) - (a.hypeScore || 0));
-
-  return researchers.slice(0, 6);
+  return researchers.slice(0, 5);
 }
 
 /**
- * Fetches domain-specific Hyped feed:
- * 1. 48-Hour HYPE Algorithm scoring
- * 2. Strict domain boundary enforcement (zero cross-contamination)
- * 3. Personalized 'For You' curation across all user added interests
+ * Fetches domain-specific Hyped feed with Stale-While-Revalidate (SWR) support.
+ * Returns in-memory or persisted disk cache in 0ms, then updates cache in background.
  */
 export async function getHypedDomainData(
   domain: string,
   timeframe: '48h' | 'week' | 'month' | 'all' = '48h',
-  userInterests: string[] = []
+  userInterests: string[] = [],
+  forceFresh: boolean = false
 ): Promise<HypedDomainData> {
-  const normDomain = domain.trim().toLowerCase();
-  const cacheKey = `${normDomain}_${timeframe}_${userInterests.join(',')}`;
+  const normDomain = (domain || 'For You').trim().toLowerCase();
+  const cacheKey = buildCacheKey(domain, timeframe, userInterests);
 
+  // 1. Fast in-memory check (return immediately if fresh and not forced)
   const cached = domainFeedCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+  if (!forceFresh && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return cached.data;
   }
 
+  // 2. Fast disk cache check if in-memory missing
+  if (!forceFresh && !cached) {
+    try {
+      const raw = await appStorage.getItem(`${STORAGE_KEY_HYPED_FEED_PREFIX}${cacheKey}`);
+      if (raw) {
+        const diskData: HypedDomainData = JSON.parse(raw);
+        domainFeedCache.set(cacheKey, { timestamp: Date.now(), data: diskData });
+        // Return disk data immediately and trigger background refresh
+        fetchFreshHypedDomainData(domain, timeframe, userInterests, cacheKey).catch(() => {});
+        return diskData;
+      }
+    } catch {}
+  }
+
+  // 3. Fetch fresh data
+  return fetchFreshHypedDomainData(domain, timeframe, userInterests, cacheKey);
+}
+
+/**
+ * Executes fresh network retrieval for hyped papers & researchers
+ */
+async function fetchFreshHypedDomainData(
+  domain: string,
+  timeframe: '48h' | 'week' | 'month' | 'all',
+  userInterests: string[],
+  cacheKey: string
+): Promise<HypedDomainData> {
+  const normDomain = (domain || 'For You').trim().toLowerCase();
   let finalPapers: Paper[] = [];
 
-  // CASE 1: Personalized "For You" Feed across all user added interests, or global "Hyped" feed
+  // CASE 1: Personalized "For You" or global "Hyped" feed
   if (normDomain === 'for you' || normDomain === 'all' || normDomain === 'hyped') {
     const interests =
       normDomain === 'hyped'
-        ? ['Neuroscience', 'Artificial Intelligence', 'Biomedical Engineering', 'Biotech', 'Physics']
+        ? ['Neuroscience', 'Artificial Intelligence', 'Biotech']
         : userInterests.length > 0
-        ? userInterests
+        ? userInterests.slice(0, 3)
         : ['Neuroscience', 'Artificial Intelligence', 'Biotech'];
 
     const subFeeds = await Promise.all(
-      interests.slice(0, 5).map((interest) =>
-        fetchSingleDomainHyped(interest, timeframe, 4)
-      )
+      interests.map((interest) => fetchSingleDomainHyped(interest, timeframe, 5))
     );
 
     const merged: Paper[] = [];
@@ -372,24 +447,21 @@ export async function getHypedDomainData(
       }
     }
 
-    // Sort by 48h HYPE score descending
     merged.sort(
-      (a, b) =>
-        ((b as any).calculatedHype || 0) - ((a as any).calculatedHype || 0)
+      (a, b) => ((b as any).calculatedHype || 0) - ((a as any).calculatedHype || 0)
     );
-    finalPapers = merged.slice(0, 10);
+    finalPapers = merged.slice(0, 5);
   } else {
     // CASE 2: Specific scientific domain (e.g. "Neuroscience", "Artificial Intelligence")
-    finalPapers = await fetchSingleDomainHyped(domain, timeframe, 10);
+    finalPapers = await fetchSingleDomainHyped(domain, timeframe, 5);
   }
 
-  // Pre-seed into usePaperStore so any click anywhere on these papers opens immediately
+  // Pre-seed into usePaperStore so any click opens instantly
   try {
     const addPaper = usePaperStore.getState().addPaper;
     finalPapers.forEach((p) => addPaper(p));
   } catch {}
 
-  // 3. Derive real Top Researchers from the actual authors of these papers
   const researchDomain =
     normDomain === 'for you' || normDomain === 'all'
       ? userInterests[0] || 'Neuroscience'
@@ -403,18 +475,28 @@ export async function getHypedDomainData(
     researchers: domainResearchers,
   };
 
+  // Persist to in-memory cache
   domainFeedCache.set(cacheKey, { timestamp: Date.now(), data: result });
+
+  // Persist to disk storage asynchronously
+  try {
+    appStorage.setItem(
+      `${STORAGE_KEY_HYPED_FEED_PREFIX}${cacheKey}`,
+      JSON.stringify(result)
+    ).catch(() => {});
+  } catch {}
+
   return result;
 }
 
 /**
- * Evaluates, ranks and returns hyped papers for a single scientific domain
- * using the 48-Hour HYPE Algorithm
+ * Evaluates, ranks and returns top 5 hyped papers for a single scientific domain
+ * using batch database operations
  */
 async function fetchSingleDomainHyped(
   domain: string,
   timeframe: '48h' | 'week' | 'month' | 'all',
-  limit: number = 10
+  limit: number = 5
 ): Promise<Paper[]> {
   const normDomain = domain.trim().toLowerCase();
 
@@ -425,20 +507,16 @@ async function fetchSingleDomainHyped(
     readCandidates = allDetailed
       .filter((item) => isPaperInDomain(item.paper, domain))
       .map((item) => ({ paper: item.paper, lastReadAt: item.lastReadAt }));
-  } catch (err) {
-    console.warn('[fetchSingleDomainHyped] Read registry error:', err);
-  }
+  } catch {}
 
   // 2. Fetch live papers specifically for this domain
   let liveCandidates: { paper: Paper; lastReadAt: number }[] = [];
   try {
     const domainConfig = SCIENTIFIC_DOMAINS[normDomain];
     const searchQuery = domainConfig?.searchTerms || domain;
-    const searchResults = await searchPapers(searchQuery, 12);
+    const searchResults = await searchPapers(searchQuery, 6);
 
-    // Filter live papers so only genuine domain matches are included
     const filteredLive = searchResults.filter((sp) => {
-      // Exclude if already in readCandidates
       const isAlreadyRead = readCandidates.some(
         (rc) =>
           rc.paper.id === sp.id ||
@@ -451,56 +529,88 @@ async function fetchSingleDomainHyped(
     });
 
     liveCandidates = filteredLive.map((p) => ({ paper: p, lastReadAt: 0 }));
-  } catch (err) {
-    console.warn('[fetchSingleDomainHyped] Live search error:', err);
-  }
+  } catch {}
 
-  // Combine candidates
-  const allCandidates = [...readCandidates, ...liveCandidates];
+  const allCandidates = [...readCandidates, ...liveCandidates].slice(0, 10);
+  if (allCandidates.length === 0) return [];
 
-  // 3. Compute 48-Hour HYPE score for all candidate papers
-  const scored = await Promise.all(
-    allCandidates.map(async ({ paper, lastReadAt }) => {
-      const metrics = await getPaperMetrics(paper.id);
-      const hype = calculate48hHypeScore(paper, metrics, lastReadAt);
-      return {
-        paper: {
-          ...paper,
-          calculatedHype: hype,
-        },
-        hype,
-        lastReadAt,
-        views: metrics.views,
-        views24h: metrics.viewsLast24h,
-      };
-    })
-  );
+  // 3. Batch fetch metrics for all candidates in ONE single database call
+  const candidateIds = allCandidates.map((c) => c.paper.id);
+  const metricsMap = await getBatchPaperMetrics(candidateIds);
 
-  // 4. Sort: rated papers with authentic hype > 0 take priority,
-  // then papers are ranked by genuine 48h readership momentum & citations
+  // 4. Compute 48-Hour HYPE scores
+  const scored = allCandidates.map(({ paper, lastReadAt }) => {
+    const metrics = metricsMap.get(paper.id) || {
+      paperId: paper.id,
+      views: 0,
+      uniqueReaders: 0,
+      impactSum: 0,
+      impactCount: 0,
+      claritySum: 0,
+      clarityCount: 0,
+      visualsSum: 0,
+      visualsCount: 0,
+      impactAvg: 0,
+      clarityAvg: 0,
+      visualsAvg: 0,
+      communityRating: 0,
+      ratingScore: 0,
+      popularityScore: 0,
+      hypeScore: 0,
+      viewsLastHour: 0,
+      viewsLast24h: 0,
+      trendScore: 0,
+    };
+    const hype = calculate48hHypeScore(paper, metrics, lastReadAt);
+    return {
+      paper: {
+        ...paper,
+        calculatedHype: hype,
+      },
+      hype,
+      lastReadAt,
+      views: metrics.views,
+      views24h: metrics.viewsLast24h,
+    };
+  });
+
+  // 5. Rank by 48h readership momentum & hype score
   scored.sort((a, b) => {
-    // 1. Rated papers with authentic community HYPE score come first
     if (a.hype > 0 && b.hype === 0) return -1;
     if (b.hype > 0 && a.hype === 0) return 1;
     if (a.hype > 0 && b.hype > 0) {
       return b.hype - a.hype || b.views24h - a.views24h;
     }
 
-    // 2. Unrated papers: rank by real engagement in the timeframe (views, discussions, citations)
     if (timeframe === '48h' || timeframe === 'week') {
       const aMomentum = (a.views24h * 4) + (a.views || 0) + (a.paper.discussionCount || 0) * 3 + (a.lastReadAt ? 15 : 0);
       const bMomentum = (b.views24h * 4) + (b.views || 0) + (b.paper.discussionCount || 0) * 3 + (b.lastReadAt ? 15 : 0);
       if (bMomentum !== aMomentum) return bMomentum - aMomentum;
       return (b.paper.citationCount || 0) - (a.paper.citationCount || 0);
     }
-    if (timeframe === 'month') {
-      return (b.views - a.views) || ((b.paper.citationCount || 0) - (a.paper.citationCount || 0));
-    }
-    return (
-      (b.paper.citationCount || 0) - (a.paper.citationCount || 0) ||
-      b.views - a.views
-    );
+    return (b.paper.citationCount || 0) - (a.paper.citationCount || 0) || b.views - a.views;
   });
 
   return scored.slice(0, limit).map((s) => s.paper);
+}
+
+/**
+ * Pre-warms Explore feeds in the background during app boot or idle time.
+ * Populates memory cache so that when user taps "Explore", feed loads with 0ms delay.
+ */
+export function prewarmHypedFeeds(userInterests: string[] = []) {
+  const targetDomains = [
+    'For You',
+    'Hyped',
+    ...(userInterests.length > 0 ? userInterests.slice(0, 2) : ['Neuroscience', 'Artificial Intelligence']),
+  ];
+
+  // Execute in background without awaiting
+  setTimeout(async () => {
+    for (const domain of targetDomains) {
+      try {
+        await getHypedDomainData(domain, '48h', userInterests);
+      } catch {}
+    }
+  }, 1000);
 }

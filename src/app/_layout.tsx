@@ -10,9 +10,11 @@ import { useAuthStore } from '../store/useAuthStore';
 import { DesktopLayoutShell } from '../components/desktop/DesktopLayoutShell';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { useUserPresence } from '../hooks/useUserPresence';
+import { prewarmHypedFeeds } from '../api/hypedFeedService';
 
 export default function RootLayout() {
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
+  const currentUser = useAuthStore((s) => s.user);
   const { isDesktop } = useResponsiveLayout();
 
   // Track live user presence across all active sessions in real-time
@@ -21,6 +23,12 @@ export default function RootLayout() {
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  // Pre-warm Explore domain feeds in the background for 0ms instant loading
+  useEffect(() => {
+    const interests = currentUser?.researchInterests || [];
+    prewarmHypedFeeds(interests);
+  }, [currentUser?.id]);
 
   const stackContent = (
     <Stack
