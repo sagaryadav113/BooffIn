@@ -251,13 +251,16 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
             isMobile && { gap: isSmallMobile ? 6 : 10, flexWrap: 'wrap', justifyContent: 'flex-end' }
           ]}>
             <TouchableOpacity 
-              style={[styles.navItem, activeTab === 'welcome' && styles.navItemActive]} 
+              style={[
+                styles.navItem, 
+                (activeTab === 'welcome' || activeTab === 'home' || !['about', 'features', 'community', 'privacy', 'terms'].includes(activeTab)) && styles.navItemActive
+              ]} 
               onPress={() => handleTabChange('welcome')}
             >
               <Text style={[
                 styles.navItemText, 
                 isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
-                activeTab === 'welcome' && styles.navItemTextActive
+                (activeTab === 'welcome' || activeTab === 'home' || !['about', 'features', 'community', 'privacy', 'terms'].includes(activeTab)) && styles.navItemTextActive
               ]}>
                 Home
               </Text>
@@ -347,7 +350,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
         {/* ============================================================ */}
         {/* TAB 1: WELCOME / HOME (FULL COVER BACKGROUND) */}
         {/* ============================================================ */}
-        {activeTab === 'welcome' && (
+        {(activeTab === 'welcome' || activeTab === 'home' || !['about', 'features', 'community', 'privacy', 'terms'].includes(activeTab)) && (
           <View style={[
             styles.welcomeHeroContainer,
             isMobile && { minHeight: Platform.OS === 'web' ? ('100dvh' as any) : 600 }
@@ -713,7 +716,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
           </View>
         )}
 
-        {activeTab !== 'welcome' && activeTab !== 'about' && activeTab !== 'features' && activeTab !== 'community' && (
+        {(activeTab === 'privacy' || activeTab === 'terms') && (
           <View style={[
             styles.mainContainer,
             { paddingTop: topInset + (isMobile ? 72 : 88) },
