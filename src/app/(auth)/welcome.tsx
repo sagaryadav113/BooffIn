@@ -34,7 +34,7 @@ const ABOUT_FULL_BG = require('../../../assets/images/about-bg.png');
 const FEATURES_FULL_BG = require('../../../assets/images/features-bg.png');
 const COMMUNITY_FULL_BG = require('../../../assets/images/community-bg.png');
 
-export type LandingTab = 'home' | 'welcome' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
+export type LandingTab = 'home' | 'about' | 'features' | 'community' | 'privacy' | 'terms';
 
 interface WelcomeScreenProps {
   initialTab?: LandingTab;
@@ -51,12 +51,12 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
   const topInset = Math.max(insets.top, Platform.OS === 'web' ? (isMobile ? 22 : 14) : 0);
 
   const resolveTab = (t?: string): LandingTab => {
-    if (!t) return 'welcome';
-    if (t === 'welcome' || t === 'home') return 'welcome';
+    if (!t) return 'home';
+    if (t === 'home' || t === 'welcome') return 'home';
     if (['about', 'features', 'community', 'privacy', 'terms'].includes(t)) {
       return t as LandingTab;
     }
-    return 'welcome';
+    return 'home';
   };
 
   const [activeTab, setActiveTab] = useState<LandingTab>(resolveTab(propTab || searchParams?.tab));
@@ -67,14 +67,14 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
     setActiveTab(nextTab);
   }, [propTab, searchParams?.tab]);
 
-  const handleTabChange = (tab: LandingTab) => {
-    const target = (tab === 'home' || tab === 'welcome') ? 'welcome' : tab;
+  const handleTabChange = (tab: LandingTab | 'welcome') => {
+    const target: LandingTab = (tab === 'welcome' || tab === 'home') ? 'home' : (tab as LandingTab);
     setActiveTab(target);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     if (Platform.OS === 'web') {
-      if (target === 'welcome') {
+      if (target === 'home') {
         router.replace('/(auth)/welcome' as any);
       } else {
         router.replace(`/(auth)/welcome?tab=${target}` as any);
@@ -239,7 +239,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
           {/* Brand Logo */}
           <TouchableOpacity 
             style={styles.logoBtn} 
-            onPress={() => handleTabChange('welcome')} 
+            onPress={() => handleTabChange('home')} 
             activeOpacity={0.8}
           >
             <Text style={[styles.logoText, isSmallMobile && { fontSize: 20 }]}>BooffIn</Text>
@@ -253,14 +253,14 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
             <TouchableOpacity 
               style={[
                 styles.navItem, 
-                (activeTab === 'welcome' || activeTab === 'home' || !['about', 'features', 'community', 'privacy', 'terms'].includes(activeTab)) && styles.navItemActive
+                activeTab === 'home' && styles.navItemActive
               ]} 
-              onPress={() => handleTabChange('welcome')}
+              onPress={() => handleTabChange('home')}
             >
               <Text style={[
                 styles.navItemText, 
                 isMobile && { fontSize: isSmallMobile ? 11.5 : 12.5 },
-                (activeTab === 'welcome' || activeTab === 'home' || !['about', 'features', 'community', 'privacy', 'terms'].includes(activeTab)) && styles.navItemTextActive
+                activeTab === 'home' && styles.navItemTextActive
               ]}>
                 Home
               </Text>
@@ -348,9 +348,9 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
         showsVerticalScrollIndicator={false}
       >
         {/* ============================================================ */}
-        {/* TAB 1: WELCOME / HOME (FULL COVER BACKGROUND) */}
+        {/* TAB 1: HOME (FULL COVER BACKGROUND) */}
         {/* ============================================================ */}
-        {(activeTab === 'welcome' || activeTab === 'home' || !['about', 'features', 'community', 'privacy', 'terms'].includes(activeTab)) && (
+        {activeTab === 'home' && (
           <View style={[
             styles.welcomeHeroContainer,
             isMobile && { minHeight: Platform.OS === 'web' ? ('100dvh' as any) : 600 }
@@ -730,11 +730,11 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
               <View style={styles.embeddedLegalContainer}>
                 <TouchableOpacity 
                   style={styles.backToHomeBtn} 
-                  onPress={() => handleTabChange('welcome')}
+                  onPress={() => handleTabChange('home')}
                   activeOpacity={0.7}
                 >
                   <ArrowLeft size={16} color="#047857" />
-                  <Text style={styles.backToHomeText}>Back to Welcome</Text>
+                  <Text style={styles.backToHomeText}>Back to Home</Text>
                 </TouchableOpacity>
 
                 <Text style={styles.legalTitle}>{PRIVACY_POLICY.title}</Text>
@@ -762,11 +762,11 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
               <View style={styles.embeddedLegalContainer}>
                 <TouchableOpacity 
                   style={styles.backToHomeBtn} 
-                  onPress={() => handleTabChange('welcome')}
+                  onPress={() => handleTabChange('home')}
                   activeOpacity={0.7}
                 >
                   <ArrowLeft size={16} color="#047857" />
-                  <Text style={styles.backToHomeText}>Back to Welcome</Text>
+                  <Text style={styles.backToHomeText}>Back to Home</Text>
                 </TouchableOpacity>
 
                 <Text style={styles.legalTitle}>{TERMS_OF_SERVICE.title}</Text>
