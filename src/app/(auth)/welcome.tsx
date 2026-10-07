@@ -14,7 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
   Mail, 
@@ -38,6 +38,7 @@ type LandingTab = 'welcome' | 'about' | 'features' | 'community' | 'privacy' | '
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
+  const searchParams = useLocalSearchParams<{ tab?: string }>();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 960;
   const isMobile = width < 768;
@@ -45,8 +46,18 @@ export default function WelcomeScreen() {
 
   const topInset = Math.max(insets.top, Platform.OS === 'web' ? (isMobile ? 22 : 14) : 0);
 
-  const [activeTab, setActiveTab] = useState<LandingTab>('welcome');
+  const initialTab: LandingTab = (searchParams?.tab && ['welcome', 'about', 'features', 'community', 'privacy', 'terms'].includes(searchParams.tab))
+    ? (searchParams.tab as LandingTab)
+    : 'welcome';
+
+  const [activeTab, setActiveTab] = useState<LandingTab>(initialTab);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (searchParams?.tab && ['welcome', 'about', 'features', 'community', 'privacy', 'terms'].includes(searchParams.tab)) {
+      setActiveTab(searchParams.tab as LandingTab);
+    }
+  }, [searchParams?.tab]);
 
   const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
   const isLoading = useAuthStore((s) => s.isLoading);
@@ -173,8 +184,8 @@ export default function WelcomeScreen() {
                 <View style={nativeStyles.legalContainer}>
                   <Text style={nativeStyles.legalText}>
                     By continuing, you agree to BooffIn's{' '}
-                    <Text style={nativeStyles.legalLink} onPress={() => router.push('/(auth)/terms' as any)}>Terms of Use</Text> and{' '}
-                    <Text style={nativeStyles.legalLink} onPress={() => router.push('/(auth)/privacy' as any)}>Privacy Policy</Text>.
+                    <Text style={nativeStyles.legalLink} onPress={() => router.push('/terms' as any)}>Terms of Use</Text> and{' '}
+                    <Text style={nativeStyles.legalLink} onPress={() => router.push('/privacy' as any)}>Privacy Policy</Text>.
                   </Text>
                 </View>
               </View>

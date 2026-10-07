@@ -1,7 +1,7 @@
 import React from 'react';
-import { LegalPageLayout } from '../components/legal/LegalPageLayout';
-import { PRIVACY_POLICY } from '../constants/legalPolicies';
+import { Redirect } from 'expo-router';
 
 export default function PrivacyScreen() {
-  return <LegalPageLayout document={PRIVACY_POLICY} />;
+  return <Redirect href="/(auth)/welcome?tab=privacy" />;
 }
+

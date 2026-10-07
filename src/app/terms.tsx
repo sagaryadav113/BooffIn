@@ -1,7 +1,7 @@
 import React from 'react';
-import { LegalPageLayout } from '../components/legal/LegalPageLayout';
-import { TERMS_OF_SERVICE } from '../constants/legalPolicies';
+import { Redirect } from 'expo-router';
 
 export default function TermsScreen() {
-  return <LegalPageLayout document={TERMS_OF_SERVICE} />;
+  return <Redirect href="/(auth)/welcome?tab=terms" />;
 }
+

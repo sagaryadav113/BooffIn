@@ -390,17 +390,6 @@ export default function HelpSettingsScreen() {
                       style={{ flex: 1, marginRight: spacing.sm }}
                     />
                   )}
-                  {activePolicyModal === 'guidelines' && (
-                    <Button
-                      title="Open Web Page"
-                      variant="outline"
-                      onPress={() => {
-                        setActivePolicyModal(null);
-                        router.push('/guidelines');
-                      }}
-                      style={{ flex: 1, marginRight: spacing.sm }}
-                    />
-                  )}
                   <Button
                     title="Close"
                     variant="secondary"
