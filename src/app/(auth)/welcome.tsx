@@ -51,12 +51,12 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
   const topInset = Math.max(insets.top, Platform.OS === 'web' ? (isMobile ? 22 : 14) : 0);
 
   const resolveTab = (t?: string): LandingTab => {
-    if (!t) return 'home';
-    if (t === 'welcome' || t === 'home') return 'home';
+    if (!t) return 'welcome';
+    if (t === 'welcome' || t === 'home') return 'welcome';
     if (['about', 'features', 'community', 'privacy', 'terms'].includes(t)) {
       return t as LandingTab;
     }
-    return 'home';
+    return 'welcome';
   };
 
   const [activeTab, setActiveTab] = useState<LandingTab>(resolveTab(propTab || searchParams?.tab));
@@ -68,13 +68,17 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
   }, [propTab, searchParams?.tab]);
 
   const handleTabChange = (tab: LandingTab) => {
-    const target = tab === 'welcome' ? 'home' : tab;
+    const target = (tab === 'home' || tab === 'welcome') ? 'welcome' : tab;
     setActiveTab(target);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     if (Platform.OS === 'web') {
-      router.replace(`/welcome/${target}` as any);
+      if (target === 'welcome') {
+        router.replace('/(auth)/welcome' as any);
+      } else {
+        router.replace(`/(auth)/welcome?tab=${target}` as any);
+      }
     }
   };
 
@@ -235,7 +239,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
           {/* Brand Logo */}
           <TouchableOpacity 
             style={styles.logoBtn} 
-            onPress={() => setActiveTab('welcome')} 
+            onPress={() => handleTabChange('welcome')} 
             activeOpacity={0.8}
           >
             <Text style={[styles.logoText, isSmallMobile && { fontSize: 20 }]}>BooffIn</Text>
@@ -248,7 +252,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
           ]}>
             <TouchableOpacity 
               style={[styles.navItem, activeTab === 'welcome' && styles.navItemActive]} 
-              onPress={() => setActiveTab('welcome')}
+              onPress={() => handleTabChange('welcome')}
             >
               <Text style={[
                 styles.navItemText, 
@@ -261,7 +265,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
             <TouchableOpacity 
               style={[styles.navItem, activeTab === 'about' && styles.navItemActive]} 
-              onPress={() => setActiveTab('about')}
+              onPress={() => handleTabChange('about')}
             >
               <Text style={[
                 styles.navItemText, 
@@ -274,7 +278,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
             <TouchableOpacity 
               style={[styles.navItem, activeTab === 'features' && styles.navItemActive]} 
-              onPress={() => setActiveTab('features')}
+              onPress={() => handleTabChange('features')}
             >
               <Text style={[
                 styles.navItemText, 
@@ -287,7 +291,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
             <TouchableOpacity 
               style={[styles.navItem, activeTab === 'community' && styles.navItemActive]} 
-              onPress={() => setActiveTab('community')}
+              onPress={() => handleTabChange('community')}
             >
               <Text style={[
                 styles.navItemText, 
@@ -300,7 +304,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
             <TouchableOpacity 
               style={[styles.navItem, activeTab === 'privacy' && styles.navItemActive]} 
-              onPress={() => setActiveTab('privacy')}
+              onPress={() => handleTabChange('privacy')}
             >
               <Text style={[
                 styles.navItemText, 
@@ -313,7 +317,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
             <TouchableOpacity 
               style={[styles.navItem, activeTab === 'terms' && styles.navItemActive]} 
-              onPress={() => setActiveTab('terms')}
+              onPress={() => handleTabChange('terms')}
             >
               <Text style={[
                 styles.navItemText, 
@@ -723,7 +727,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
               <View style={styles.embeddedLegalContainer}>
                 <TouchableOpacity 
                   style={styles.backToHomeBtn} 
-                  onPress={() => setActiveTab('welcome')}
+                  onPress={() => handleTabChange('welcome')}
                   activeOpacity={0.7}
                 >
                   <ArrowLeft size={16} color="#047857" />
@@ -755,7 +759,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
               <View style={styles.embeddedLegalContainer}>
                 <TouchableOpacity 
                   style={styles.backToHomeBtn} 
-                  onPress={() => setActiveTab('welcome')}
+                  onPress={() => handleTabChange('welcome')}
                   activeOpacity={0.7}
                 >
                   <ArrowLeft size={16} color="#047857" />
