@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ViewStyle, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
@@ -13,6 +14,7 @@ export interface HeaderProps {
   onRightPress?: () => void;
   rightElement?: React.ReactNode;
   style?: ViewStyle;
+  disableSafeArea?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,7 +25,13 @@ export const Header: React.FC<HeaderProps> = ({
   onRightPress,
   rightElement,
   style,
+  disableSafeArea = false,
 }) => {
+  const insets = useSafeAreaInsets();
+  const topInset = disableSafeArea
+    ? 0
+    : Math.max(insets.top, Platform.OS === 'android' ? 12 : 0);
+
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -35,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { paddingTop: topInset + spacing.sm }, style]}>
       <View style={styles.leftSection}>
         {showBack && (
           <TouchableOpacity
