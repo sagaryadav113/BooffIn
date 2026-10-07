@@ -21,6 +21,11 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
   const pathname = usePathname();
   const currentUser = useAuthStore((s) => s.user);
 
+  // If on mobile (APK or mobile screen width) or on Admin Portal, render directly without public desktop shell
+  if (!isDesktop || pathname.includes('/admin') || pathname === '/admin') {
+    return <>{children}</>;
+  }
+
   const isStandalonePage =
     pathname.includes('(auth)') ||
     pathname.includes('/login') ||
@@ -30,14 +35,14 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
     pathname.includes('/email') ||
     pathname.includes('/forgot-password') ||
     pathname.includes('/privacy') ||
+    pathname.includes('/policy') ||
     pathname.includes('/terms') ||
     pathname === '/privacy' ||
     pathname === '/terms' ||
-    pathname === '/' ||
-    pathname === '';
+    pathname === '/policy';
 
-  // If on mobile, admin portal, standalone/legal/auth pages, or unauthenticated, render children directly
-  if (!isDesktop || !currentUser?.id || pathname.includes('/admin') || pathname === '/admin' || isStandalonePage) {
+  // If on Auth/Welcome/Login/Signup/Legal page, render children directly without global in-app header
+  if (isStandalonePage) {
     return <>{children}</>;
   }
 
