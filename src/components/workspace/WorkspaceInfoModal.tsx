@@ -12,6 +12,7 @@ import {
   Platform,
   FlatList,
   Linking,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -25,6 +26,8 @@ import {
   Link2,
   Users,
   Shield,
+  ShieldCheck,
+  Crown,
   Lock,
   LogOut,
   Trash2,
@@ -37,11 +40,16 @@ import {
   Flag,
   Ban,
   UserMinus,
+  UserCheck,
+  UserX,
+  Sliders,
+  Settings,
   AlertTriangle,
+  ChevronRight,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { Workspace, WorkspaceMember } from '../../types/workspace';
+import { Workspace, WorkspaceMember, WorkspaceMemberRole } from '../../types/workspace';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { workspaceService } from '../../api/workspaceService';
@@ -63,6 +71,10 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
 }) => {
   const currentUser = useAuthStore((s) => s.user);
   const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
+  const updateMemberRole = useWorkspaceStore((s) => s.updateMemberRole);
+  const removeMember = useWorkspaceStore((s) => s.removeMember);
+  const banMember = useWorkspaceStore((s) => s.banMember);
+  const leaveWorkspace = useWorkspaceStore((s) => s.leaveWorkspace);
 
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
@@ -71,11 +83,41 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const [editedName, setEditedName] = useState(workspace.name || '');
   const [isSavingName, setIsSavingName] = useState(false);
   const [showMembersList, setShowMembersList] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Selected Member for Role / Kick / Ban Action Sheet
+  const [selectedMember, setSelectedMember] = useState<WorkspaceMember | null>(null);
+  const [showMemberActionModal, setShowMemberActionModal] = useState(false);
+  const [isUpdatingMemberAction, setIsUpdatingMemberAction] = useState(false);
+
+  // Pod Collaboration Permission Controls
+  const [showPermissionsSection, setShowPermissionsSection] = useState(false);
+  const [onlyAdminsPost, setOnlyAdminsPost] = useState(
+    Boolean(workspace.settings?.only_admins_post)
+  );
+  const [onlyAdminsInvite, setOnlyAdminsInvite] = useState(
+    Boolean(workspace.settings?.only_admins_invite)
+  );
+  const [onlyAdminsPin, setOnlyAdminsPin] = useState(
+    Boolean(workspace.settings?.only_admins_pin)
+  );
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
 
   const isOwner = workspace.owner_id === currentUser?.id;
   const isDM = workspace.type === 'dm';
   const partner = workspace.other_user;
+
+  // Determine current user's role in this pod
+  const myMembership = useMemo(() => {
+    return members.find((m) => m.user_id === currentUser?.id);
+  }, [members, currentUser?.id]);
+
+  const myRole: WorkspaceMemberRole = isOwner
+    ? 'owner'
+    : (myMembership?.role || workspace.my_role || 'member');
+
+  const canManageRoles = isOwner || myRole === 'owner' || myRole === 'admin';
 
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -84,6 +126,18 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
+  // Filtered members list based on in-modal search
+  const displayedMembers = useMemo(() => {
+    if (!memberSearchQuery.trim()) return members;
+    const q = memberSearchQuery.toLowerCase();
+    return members.filter((m) => {
+      const nameMatch = (m.profile?.fullName || '').toLowerCase().includes(q);
+      const handleMatch = (m.profile?.handle || '').toLowerCase().includes(q);
+      const roleMatch = (m.role || '').toLowerCase().includes(q);
+      return nameMatch || handleMatch || roleMatch;
+    });
+  }, [members, memberSearchQuery]);
+
   // Load members when modal opens
   useEffect(() => {
     if (!visible) {
@@ -91,12 +145,18 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
       setShowMembersList(false);
       setShowOptionsMenu(false);
       setShowReportModal(false);
+      setSelectedMember(null);
+      setShowMemberActionModal(false);
+      setMemberSearchQuery('');
       return;
     }
 
     setEditedName(workspace.name || '');
+    setOnlyAdminsPost(Boolean(workspace.settings?.only_admins_post));
+    setOnlyAdminsInvite(Boolean(workspace.settings?.only_admins_invite));
+    setOnlyAdminsPin(Boolean(workspace.settings?.only_admins_pin));
 
-    async function loadMembers() {
+    async function fetchMembers() {
       setIsLoadingMembers(true);
       const res = await workspaceService.getWorkspaceMembers(workspace.id);
       if (res.members) {
@@ -105,7 +165,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
       setIsLoadingMembers(false);
     }
 
-    loadMembers();
+    fetchMembers();
   }, [visible, workspace.id, workspace.name]);
 
   // Handle Copy Invite Link
@@ -274,6 +334,221 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
       setIsSubmittingReport(false);
       setShowReportModal(false);
       console.warn('Report error:', err);
+    }
+  };
+
+  // Handle Role Change
+  const handleChangeMemberRole = async (newRole: WorkspaceMemberRole) => {
+    if (!selectedMember || !workspace.id) return;
+    setIsUpdatingMemberAction(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    const res = await updateMemberRole(workspace.id, selectedMember.user_id, newRole);
+    setIsUpdatingMemberAction(false);
+    setShowMemberActionModal(false);
+
+    if (res.success) {
+      setMembers((curr) =>
+        curr.map((m) =>
+          m.user_id === selectedMember.user_id ? { ...m, role: newRole } : m
+        )
+      );
+      if (Platform.OS === 'web') {
+        window.alert(`Updated ${selectedMember.profile?.fullName || 'member'} role to ${newRole}.`);
+      } else {
+        Alert.alert('Role Updated', `${selectedMember.profile?.fullName || 'Member'} is now a ${newRole}.`);
+      }
+    } else {
+      if (Platform.OS === 'web') {
+        window.alert(res.error || 'Failed to update role');
+      } else {
+        Alert.alert('Error', res.error || 'Failed to update member role');
+      }
+    }
+  };
+
+  // Handle Remove Member (Kick)
+  const handleKickMember = async () => {
+    if (!selectedMember || !workspace.id) return;
+    const target = selectedMember;
+    setShowMemberActionModal(false);
+
+    const executeKick = async () => {
+      setIsUpdatingMemberAction(true);
+      const res = await removeMember(workspace.id, target.user_id);
+      setIsUpdatingMemberAction(false);
+      if (res.success) {
+        setMembers((curr) => curr.filter((m) => m.user_id !== target.user_id));
+        if (Platform.OS === 'web') {
+          window.alert(`${target.profile?.fullName || 'Member'} has been removed from the pod.`);
+        } else {
+          Alert.alert('Member Removed', `${target.profile?.fullName || 'Member'} has been removed from this pod.`);
+        }
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(res.error || 'Failed to remove member');
+        } else {
+          Alert.alert('Error', res.error || 'Failed to remove member');
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Remove ${target.profile?.fullName || 'this member'} from the pod?`)) {
+        executeKick();
+      }
+    } else {
+      Alert.alert(
+        'Remove Member',
+        `Are you sure you want to remove ${target.profile?.fullName || 'this member'} from the pod?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: executeKick },
+        ]
+      );
+    }
+  };
+
+  // Handle Ban Member
+  const handleBanMember = async () => {
+    if (!selectedMember || !workspace.id) return;
+    const target = selectedMember;
+    setShowMemberActionModal(false);
+
+    const executeBan = async () => {
+      setIsUpdatingMemberAction(true);
+      const res = await banMember(workspace.id, target.user_id, 'Banned by pod admin');
+      setIsUpdatingMemberAction(false);
+      if (res.success) {
+        setMembers((curr) => curr.filter((m) => m.user_id !== target.user_id));
+        if (Platform.OS === 'web') {
+          window.alert(`${target.profile?.fullName || 'Member'} has been banned from the pod.`);
+        } else {
+          Alert.alert('Member Banned', `${target.profile?.fullName || 'Member'} has been banned and added to the blocklist.`);
+        }
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(res.error || 'Failed to ban member');
+        } else {
+          Alert.alert('Error', res.error || 'Failed to ban member');
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Ban ${target.profile?.fullName || 'this member'} from the pod? They will be permanently blocked from rejoining.`)) {
+        executeBan();
+      }
+    } else {
+      Alert.alert(
+        'Ban Member',
+        `Are you sure you want to ban ${target.profile?.fullName || 'this member'}? They will be permanently blocked from rejoining this pod.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Ban & Block', style: 'destructive', onPress: executeBan },
+        ]
+      );
+    }
+  };
+
+  // Toggle Pod Permission Settings
+  const handleTogglePermission = async (key: 'only_admins_post' | 'only_admins_invite' | 'only_admins_pin') => {
+    if (!canManageRoles) return;
+    setIsSavingPermissions(true);
+    let nextPost = onlyAdminsPost;
+    let nextInvite = onlyAdminsInvite;
+    let nextPin = onlyAdminsPin;
+
+    if (key === 'only_admins_post') {
+      nextPost = !onlyAdminsPost;
+      setOnlyAdminsPost(nextPost);
+    } else if (key === 'only_admins_invite') {
+      nextInvite = !onlyAdminsInvite;
+      setOnlyAdminsInvite(nextInvite);
+    } else if (key === 'only_admins_pin') {
+      nextPin = !onlyAdminsPin;
+      setOnlyAdminsPin(nextPin);
+    }
+
+    try {
+      const updatedSettings = {
+        ...(workspace.settings || {}),
+        only_admins_post: nextPost,
+        only_admins_invite: nextInvite,
+        only_admins_pin: nextPin,
+      };
+      await workspaceService.updateWorkspaceDetails(workspace.id, { settings: updatedSettings });
+      await loadWorkspaces(true);
+    } catch (err) {
+      console.warn('Failed to update pod permissions:', err);
+    } finally {
+      setIsSavingPermissions(false);
+    }
+  };
+
+  // Leave or Delete Pod Handler
+  const handleLeaveOrDeletePod = async () => {
+    if (isOwner) {
+      const confirmDelete = async () => {
+        setIsActionLoading(true);
+        try {
+          await workspaceService.leaveWorkspace(workspace.id);
+          await loadWorkspaces(true);
+          onClose();
+          router.replace('/workspace' as any);
+        } catch (err) {
+          console.warn('Delete pod error:', err);
+        } finally {
+          setIsActionLoading(false);
+        }
+      };
+
+      if (Platform.OS === 'web') {
+        if (window.confirm('Are you sure you want to delete this pod? All discussions and shared items will be permanently removed.')) {
+          confirmDelete();
+        }
+      } else {
+        Alert.alert(
+          'Delete Research Pod',
+          'Are you sure you want to delete this pod? All data will be permanently removed.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete Pod', style: 'destructive', onPress: confirmDelete },
+          ]
+        );
+      }
+    } else {
+      const confirmLeave = async () => {
+        setIsActionLoading(true);
+        try {
+          const res = await leaveWorkspace(workspace.id);
+          if (res.success) {
+            onClose();
+            router.replace('/workspace' as any);
+          }
+        } catch (err) {
+          console.warn('Leave pod error:', err);
+        } finally {
+          setIsActionLoading(false);
+        }
+      };
+
+      if (Platform.OS === 'web') {
+        if (window.confirm('Are you sure you want to leave this research pod?')) {
+          confirmLeave();
+        }
+      } else {
+        Alert.alert(
+          'Leave Research Pod',
+          'Are you sure you want to leave this pod?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Leave Pod', style: 'destructive', onPress: confirmLeave },
+          ]
+        );
+      }
     }
   };
 
@@ -455,23 +730,25 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
           {/* Settings & Info Items */}
           <View style={styles.menuSection}>
             {/* 1. Invite Link */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleCopyInviteLink}
-              style={styles.menuRow}
-            >
-              <View style={styles.menuIconWrap}>
-                <Link2 size={22} color="#0F172A" strokeWidth={2} />
-              </View>
-              <View style={styles.menuTextCol}>
-                <Text style={styles.menuTitle}>Invite link</Text>
-                <Text style={styles.menuSubtitle} numberOfLines={1}>
-                  {copiedLink ? '✓ Copied to clipboard!' : `https://booffin.com/join/${workspace.id.slice(0, 10)}...`}
-                </Text>
-              </View>
-            </TouchableOpacity>
+            {!isDM && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleCopyInviteLink}
+                style={styles.menuRow}
+              >
+                <View style={styles.menuIconWrap}>
+                  <Link2 size={22} color="#0F172A" strokeWidth={2} />
+                </View>
+                <View style={styles.menuTextCol}>
+                  <Text style={styles.menuTitle}>Invite link</Text>
+                  <Text style={styles.menuSubtitle} numberOfLines={1}>
+                    {copiedLink ? '✓ Copied to clipboard!' : `https://booffin.com/join/${workspace.id.slice(0, 10)}...`}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
 
-            {/* 2. People / Members */}
+            {/* 2. People / Members (Expanded List & Roles) */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setShowMembersList(!showMembersList)}
@@ -483,7 +760,12 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               <View style={styles.menuTextCol}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text style={styles.menuTitle}>People</Text>
-                  <Text style={styles.memberCountBadge}>{members.length || 1}</Text>
+                  <View style={styles.capacityBadgeContainer}>
+                    <Text style={styles.memberCountBadge}>
+                      {members.length}
+                      {workspace.type === 'inner_circle' ? '/25' : ''}
+                    </Text>
+                  </View>
                 </View>
                 <Text style={styles.menuSubtitle} numberOfLines={1}>
                   {isLoadingMembers ? 'Loading members...' : membersSubtitle}
@@ -491,43 +773,188 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               </View>
             </TouchableOpacity>
 
-            {/* Expanded Member List */}
+            {/* Expanded Member List with In-Modal Search & Role Controls */}
             {showMembersList && (
               <View style={styles.expandedMembersList}>
-                {members.map((m) => (
-                  <TouchableOpacity
-                    key={m.id || m.user_id}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      if (m.user_id) {
-                        onClose();
-                        router.push(`/profile/${m.user_id}`);
-                      }
-                    }}
-                    style={styles.memberRow}
-                  >
-                    <Avatar
-                      uri={m.profile?.avatarUrl || undefined}
-                      name={m.profile?.fullName || 'Researcher'}
-                      size="sm"
+                {/* Member Search Bar */}
+                {members.length > 3 && (
+                  <View style={styles.memberSearchInputWrap}>
+                    <Search size={14} color="#94A3B8" />
+                    <TextInput
+                      value={memberSearchQuery}
+                      onChangeText={setMemberSearchQuery}
+                      placeholder="Search pod members or roles..."
+                      placeholderTextColor="#94A3B8"
+                      style={styles.memberSearchInput}
                     />
-                    <View style={styles.memberInfoCol}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Text style={styles.memberName}>{m.profile?.fullName || 'Collaborator'}</Text>
-                        {m.profile?.orcidVerified && (
-                          <CheckCircle2 size={13} color="#164E3F" strokeWidth={2.5} />
-                        )}
+                    {memberSearchQuery.length > 0 && (
+                      <TouchableOpacity onPress={() => setMemberSearchQuery('')}>
+                        <X size={14} color="#64748B" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {displayedMembers.map((m) => {
+                  const isUserOwner = m.role === 'owner' || m.user_id === workspace.owner_id;
+                  const isUserAdmin = m.role === 'admin';
+                  const isUserMod = m.role === 'moderator';
+
+                  return (
+                    <TouchableOpacity
+                      key={m.id || m.user_id}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        if (canManageRoles && !isUserOwner && m.user_id !== currentUser?.id) {
+                          setSelectedMember(m);
+                          setShowMemberActionModal(true);
+                        } else if (m.user_id) {
+                          onClose();
+                          router.push(`/profile/${m.user_id}`);
+                        }
+                      }}
+                      style={styles.memberRow}
+                    >
+                      <Avatar
+                        uri={m.profile?.avatarUrl || undefined}
+                        name={m.profile?.fullName || 'Researcher'}
+                        size="sm"
+                      />
+                      <View style={styles.memberInfoCol}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Text style={styles.memberName}>{m.profile?.fullName || 'Collaborator'}</Text>
+                          {m.profile?.orcidVerified && (
+                            <CheckCircle2 size={13} color="#164E3F" strokeWidth={2.5} />
+                          )}
+                        </View>
+                        <Text style={styles.memberAcademicSub} numberOfLines={1}>
+                          {m.profile?.academicTitle || m.profile?.institution || `@${m.profile?.handle || 'user'}`}
+                        </Text>
                       </View>
-                      <Text style={styles.memberRole}>
-                        {m.role === 'owner' ? 'Owner • PI' : m.profile?.academicTitle || 'Member'}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+
+                      {/* Role Pill Badge */}
+                      <View
+                        style={[
+                          styles.rolePill,
+                          isUserOwner
+                            ? styles.rolePillOwner
+                            : isUserAdmin
+                            ? styles.rolePillAdmin
+                            : isUserMod
+                            ? styles.rolePillMod
+                            : styles.rolePillMember,
+                        ]}
+                      >
+                        {isUserOwner ? (
+                          <Crown size={10} color="#164E3F" />
+                        ) : isUserAdmin ? (
+                          <ShieldCheck size={10} color="#2563EB" />
+                        ) : isUserMod ? (
+                          <Shield size={10} color="#7C3AED" />
+                        ) : null}
+                        <Text
+                          style={[
+                            styles.rolePillText,
+                            isUserOwner
+                              ? styles.rolePillTextOwner
+                              : isUserAdmin
+                              ? styles.rolePillTextAdmin
+                              : isUserMod
+                              ? styles.rolePillTextMod
+                              : styles.rolePillTextMember,
+                          ]}
+                        >
+                          {isUserOwner ? 'Owner • PI' : isUserAdmin ? 'Admin' : isUserMod ? 'Moderator' : 'Member'}
+                        </Text>
+                      </View>
+
+                      {/* Action trigger chevron for admins */}
+                      {canManageRoles && !isUserOwner && m.user_id !== currentUser?.id && (
+                        <MoreHorizontal size={16} color="#94A3B8" style={{ marginLeft: 4 }} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 
-            {/* 3. Privacy & Safety - Opens https://letsbooffin.com/welcome/policy in browser */}
+            {/* 3. Pod Collaboration & Permissions Controls (Groups & Inner Circles) */}
+            {!isDM && canManageRoles && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowPermissionsSection(!showPermissionsSection)}
+                style={styles.menuRow}
+              >
+                <View style={styles.menuIconWrap}>
+                  <Sliders size={22} color="#0F172A" strokeWidth={2} />
+                </View>
+                <View style={styles.menuTextCol}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={styles.menuTitle}>Pod Permissions</Text>
+                    <ChevronRight size={16} color="#94A3B8" />
+                  </View>
+                  <Text style={styles.menuSubtitle}>
+                    Control message posting, invitations, and announcement modes
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Expanded Permissions Switches */}
+            {showPermissionsSection && !isDM && canManageRoles && (
+              <View style={styles.expandedPermissionsCard}>
+                <View style={styles.permissionToggleRow}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={styles.permissionToggleTitle}>Announcement Mode</Text>
+                    <Text style={styles.permissionToggleDesc}>
+                      Only Admins and PI can post messages in this pod
+                    </Text>
+                  </View>
+                  <Switch
+                    value={onlyAdminsPost}
+                    onValueChange={() => handleTogglePermission('only_admins_post')}
+                    trackColor={{ false: '#E2E8F0', true: '#164E3F' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+
+                <View style={styles.permissionToggleDivider} />
+
+                <View style={styles.permissionToggleRow}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={styles.permissionToggleTitle}>Admin-Only Invites</Text>
+                    <Text style={styles.permissionToggleDesc}>
+                      Require Admin approval to invite or add new researchers
+                    </Text>
+                  </View>
+                  <Switch
+                    value={onlyAdminsInvite}
+                    onValueChange={() => handleTogglePermission('only_admins_invite')}
+                    trackColor={{ false: '#E2E8F0', true: '#164E3F' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+
+                <View style={styles.permissionToggleDivider} />
+
+                <View style={styles.permissionToggleRow}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={styles.permissionToggleTitle}>Admin Pin & Schedule</Text>
+                    <Text style={styles.permissionToggleDesc}>
+                      Only Admins can pin announcements and schedule lab events
+                    </Text>
+                  </View>
+                  <Switch
+                    value={onlyAdminsPin}
+                    onValueChange={() => handleTogglePermission('only_admins_pin')}
+                    trackColor={{ false: '#E2E8F0', true: '#164E3F' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* 4. Privacy & Safety */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -556,6 +983,33 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                 </Text>
               </View>
             </TouchableOpacity>
+
+            {/* 5. Leave or Delete Pod Button */}
+            {!isDM && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleLeaveOrDeletePod}
+                style={[styles.menuRow, { marginTop: 8 }]}
+              >
+                <View style={styles.menuIconWrap}>
+                  {isOwner ? (
+                    <Trash2 size={22} color="#DC2626" strokeWidth={2} />
+                  ) : (
+                    <LogOut size={22} color="#DC2626" strokeWidth={2} />
+                  )}
+                </View>
+                <View style={styles.menuTextCol}>
+                  <Text style={[styles.menuTitle, { color: '#DC2626' }]}>
+                    {isOwner ? 'Delete Research Pod' : 'Leave Research Pod'}
+                  </Text>
+                  <Text style={styles.menuSubtitle}>
+                    {isOwner
+                      ? 'Permanently delete this pod and remove all members'
+                      : 'Leave this conversation and exit the inner circle'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Hairline Divider */}
@@ -573,6 +1027,124 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
             </View>
           </View>
         </ScrollView>
+
+        {/* Member Role & Moderation Action Sheet Modal */}
+        <Modal
+          visible={showMemberActionModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowMemberActionModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.optionsOverlay}
+            activeOpacity={1}
+            onPress={() => setShowMemberActionModal(false)}
+          >
+            <View style={styles.optionsSheet}>
+              <View style={styles.optionsHandleBar} />
+              <View style={styles.memberActionHeader}>
+                <Avatar
+                  uri={selectedMember?.profile?.avatarUrl || undefined}
+                  name={selectedMember?.profile?.fullName || 'Researcher'}
+                  size="md"
+                />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.memberActionName}>
+                    {selectedMember?.profile?.fullName || 'Researcher'}
+                  </Text>
+                  <Text style={styles.memberActionRoleLabel}>
+                    Current Role: {selectedMember?.role ? selectedMember.role.toUpperCase() : 'MEMBER'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 1. Assign / Demote Admin */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                disabled={isUpdatingMemberAction}
+                onPress={() =>
+                  handleChangeMemberRole(
+                    selectedMember?.role === 'admin' ? 'member' : 'admin'
+                  )
+                }
+                style={styles.optionsItemRow}
+              >
+                <ShieldCheck size={20} color="#2563EB" />
+                <Text style={[styles.optionsItemText, { color: '#2563EB' }]}>
+                  {selectedMember?.role === 'admin' ? 'Demote to Member' : 'Make Pod Admin'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* 2. Assign / Demote Moderator */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                disabled={isUpdatingMemberAction}
+                onPress={() =>
+                  handleChangeMemberRole(
+                    selectedMember?.role === 'moderator' ? 'member' : 'moderator'
+                  )
+                }
+                style={styles.optionsItemRow}
+              >
+                <Shield size={20} color="#7C3AED" />
+                <Text style={[styles.optionsItemText, { color: '#7C3AED' }]}>
+                  {selectedMember?.role === 'moderator' ? 'Remove Moderator' : 'Make Pod Moderator'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* 3. View Profile */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (selectedMember?.user_id) {
+                    setShowMemberActionModal(false);
+                    onClose();
+                    router.push(`/profile/${selectedMember.user_id}`);
+                  }
+                }}
+                style={styles.optionsItemRow}
+              >
+                <UserCheck size={20} color="#0F172A" />
+                <Text style={styles.optionsItemText}>View Researcher Profile</Text>
+              </TouchableOpacity>
+
+              {/* 4. Remove Member (Kick) */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                disabled={isUpdatingMemberAction}
+                onPress={handleKickMember}
+                style={styles.optionsItemRow}
+              >
+                <UserMinus size={20} color="#DC2626" />
+                <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+                  Remove from Pod (Kick)
+                </Text>
+              </TouchableOpacity>
+
+              {/* 5. Ban Member */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                disabled={isUpdatingMemberAction}
+                onPress={handleBanMember}
+                style={styles.optionsItemRow}
+              >
+                <Ban size={20} color="#DC2626" />
+                <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+                  Ban Member Permanently
+                </Text>
+              </TouchableOpacity>
+
+              {/* Cancel Button */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowMemberActionModal(false)}
+                style={styles.optionsCancelBtn}
+              >
+                <Text style={styles.optionsCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Options Modal (Report, Block, Unfollow) */}
         <Modal
@@ -1042,5 +1614,127 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  capacityBadgeContainer: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  memberSearchInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    marginHorizontal: 12,
+    marginVertical: 6,
+    height: 36,
+    gap: 6,
+  },
+  memberSearchInput: {
+    flex: 1,
+    fontSize: 12,
+    color: '#0F172A',
+  },
+  memberAcademicSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  rolePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
+  },
+  rolePillOwner: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  rolePillAdmin: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  rolePillMod: {
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  rolePillMember: {
+    backgroundColor: '#F1F5F9',
+  },
+  rolePillText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  rolePillTextOwner: {
+    color: '#164E3F',
+  },
+  rolePillTextAdmin: {
+    color: '#2563EB',
+  },
+  rolePillTextMod: {
+    color: '#7C3AED',
+  },
+  rolePillTextMember: {
+    color: '#64748B',
+  },
+  expandedPermissionsCard: {
+    backgroundColor: '#F8FAFC',
+    marginHorizontal: 16,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  permissionToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  permissionToggleTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  permissionToggleDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  permissionToggleDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 6,
+  },
+  memberActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 8,
+  },
+  memberActionName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  memberActionRoleLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#164E3F',
+    marginTop: 2,
   },
 });

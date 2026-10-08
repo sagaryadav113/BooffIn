@@ -131,6 +131,17 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const communities = useWorkspaceStore((s) => s.communities);
   const innerCircles = useWorkspaceStore((s) => s.innerCircles);
 
+  // User Role & Permissions (Step 2: Roles & Permissions)
+  const isOwner = workspace.owner_id === currentUser?.id;
+  const myMembership = members.find((m) => m.user_id === currentUser?.id);
+  const myRole = isOwner ? 'owner' : (myMembership?.role || 'member');
+  const isAdminOrOwner = isOwner || myRole === 'owner' || myRole === 'admin';
+  const isModOrAbove = isAdminOrOwner || myRole === 'moderator';
+
+  const canPost = !workspace.settings?.only_admins_post || isAdminOrOwner;
+  const canInvite = !workspace.settings?.only_admins_invite || isAdminOrOwner;
+  const canPin = !workspace.settings?.only_admins_pin || isAdminOrOwner;
+
   // Discussions State
   const [inputText, setInputText] = useState('');
   const [showDoiModal, setShowDoiModal] = useState(false);
@@ -394,6 +405,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   // Toggle Pin Message to Pod
   const handleTogglePinMessage = async () => {
     if (!selectedMessage) return;
+    if (!canPin) {
+      if (Platform.OS === 'web') window.alert('Only Pod Admins can pin announcements.');
+      else Alert.alert('Permission Denied', 'Only Pod Admins can pin announcements in this pod.');
+      return;
+    }
     const msgId = selectedMessage.id;
     setShowMessageActionMenu(false);
     try {
@@ -624,7 +640,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => setShowInviteModal(true)}
+            onPress={() => {
+              if (!canInvite) {
+                if (Platform.OS === 'web') window.alert('Only Pod Admins can invite new members to this pod.');
+                else Alert.alert('Permission Denied', 'Only Pod Admins can invite new members to this pod.');
+                return;
+              }
+              setShowInviteModal(true);
+            }}
             style={styles.headerIconBtn}
           >
             <Plus size={20} color="#164E3F" strokeWidth={2.5} />
@@ -1032,52 +1055,63 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             </View>
           )}
 
-          {/* Bottom Capsule Input Dock */}
-          <View style={styles.bottomDockContainer}>
-            <View style={styles.inputCapsule}>
-              <TouchableOpacity
-                onPress={handlePickImage}
-                style={styles.mediaIconBtn}
-                disabled={isUploadingMedia}
-              >
-                {isUploadingMedia ? <ActivityIndicator size="small" color="#164E3F" /> : <Camera size={19} color="#164E3F" />}
-              </TouchableOpacity>
+          {/* Bottom Capsule Input Dock / Announcement Mode Dock */}
+          {canPost ? (
+            <View style={styles.bottomDockContainer}>
+              <View style={styles.inputCapsule}>
+                <TouchableOpacity
+                  onPress={handlePickImage}
+                  style={styles.mediaIconBtn}
+                  disabled={isUploadingMedia}
+                >
+                  {isUploadingMedia ? <ActivityIndicator size="small" color="#164E3F" /> : <Camera size={19} color="#164E3F" />}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setShowDoiModal(true)}
+                  style={styles.mediaIconBtn}
+                >
+                  <Paperclip size={18} color="#164E3F" />
+                </TouchableOpacity>
+
+                <TextInput
+                  value={inputText}
+                  onChangeText={handleInputChange}
+                  placeholder={`Message ${workspace.name || 'pod'}... (use @ to mention)`}
+                  placeholderTextColor="#94A3B8"
+                  style={styles.textInput}
+                  multiline
+                  maxLength={2000}
+                />
+
+                <TouchableOpacity
+                  onPress={() => {
+                    if (Platform.OS === 'web') window.alert('Voice memo ready.');
+                  }}
+                  style={styles.mediaIconBtn}
+                >
+                  <Mic size={19} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
-                onPress={() => setShowDoiModal(true)}
-                style={styles.mediaIconBtn}
+                onPress={handleSendMessage}
+                disabled={(!inputText.trim() && !attachedDoi) || isSending}
+                style={[styles.detachedSendBtn, (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled]}
               >
-                <Paperclip size={18} color="#164E3F" />
-              </TouchableOpacity>
-
-              <TextInput
-                value={inputText}
-                onChangeText={handleInputChange}
-                placeholder={`Message ${workspace.name || 'pod'}... (use @ to mention)`}
-                placeholderTextColor="#94A3B8"
-                style={styles.textInput}
-                multiline
-                maxLength={2000}
-              />
-
-              <TouchableOpacity
-                onPress={() => {
-                  if (Platform.OS === 'web') window.alert('Voice memo ready.');
-                }}
-                style={styles.mediaIconBtn}
-              >
-                <Mic size={19} color="#94A3B8" />
+                {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              onPress={handleSendMessage}
-              disabled={(!inputText.trim() && !attachedDoi) || isSending}
-              style={[styles.detachedSendBtn, (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled]}
-            >
-              {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
-            </TouchableOpacity>
-          </View>
+          ) : (
+            <View style={styles.announcementModeDockContainer}>
+              <View style={styles.announcementModeDock}>
+                <Lock size={15} color="#047857" />
+                <Text style={styles.announcementModeDockText}>
+                  Only Pod Admins & Leads can send messages in Announcement Mode.
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
 
@@ -2494,6 +2528,30 @@ const styles = StyleSheet.create({
   forwardWsType: {
     fontSize: 11,
     color: '#64748B',
+  },
+  announcementModeDockContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  announcementModeDock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+  },
+  announcementModeDockText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#065F46',
   },
 });
 

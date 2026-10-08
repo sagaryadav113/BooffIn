@@ -64,6 +64,16 @@ interface WorkspaceState {
     workspaceId: string,
     targetUserId: string
   ) => Promise<{ success: boolean; error: string | null }>;
+  updateMemberRole: (
+    workspaceId: string,
+    targetUserId: string,
+    newRole: 'owner' | 'admin' | 'moderator' | 'member'
+  ) => Promise<{ success: boolean; error: string | null }>;
+  banMember: (
+    workspaceId: string,
+    targetUserId: string,
+    reason?: string
+  ) => Promise<{ success: boolean; error: string | null }>;
   leaveWorkspace: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
   loadMessages: (workspaceId: string) => Promise<void>;
   sendMessage: (params: {
@@ -269,6 +279,30 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   removeMember: async (workspaceId: string, targetUserId: string) => {
     const res = await workspaceService.removeWorkspaceMember(workspaceId, targetUserId);
+    if (res.success) {
+      set((state) => ({
+        members: state.members.filter((m) => m.user_id !== targetUserId),
+      }));
+      await get().loadWorkspaceDetails(workspaceId);
+    }
+    return res;
+  },
+
+  updateMemberRole: async (workspaceId: string, targetUserId: string, newRole) => {
+    const res = await workspaceService.updateMemberRole(workspaceId, targetUserId, newRole);
+    if (res.success) {
+      set((state) => ({
+        members: state.members.map((m) =>
+          m.user_id === targetUserId ? { ...m, role: newRole } : m
+        ),
+      }));
+      await get().loadWorkspaceDetails(workspaceId);
+    }
+    return res;
+  },
+
+  banMember: async (workspaceId: string, targetUserId: string, reason) => {
+    const res = await workspaceService.banWorkspaceMember(workspaceId, targetUserId, reason);
     if (res.success) {
       set((state) => ({
         members: state.members.filter((m) => m.user_id !== targetUserId),

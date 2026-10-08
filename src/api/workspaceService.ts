@@ -1671,11 +1671,73 @@ export const workspaceService = {
   },
 
   /**
-   * Update workspace details (e.g. name, description, avatar_url)
+   * Update member role in workspace (e.g. promote to admin / moderator or demote to member)
+   */
+  async updateMemberRole(
+    workspaceId: string,
+    targetUserId: string,
+    newRole: 'owner' | 'admin' | 'moderator' | 'member'
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const { error } = await supabase
+        .from('workspace_members')
+        .update({ role: newRole })
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', targetUserId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to update member role' };
+    }
+  },
+
+  /**
+   * Ban member from workspace and remove from membership
+   */
+  async banWorkspaceMember(
+    workspaceId: string,
+    targetUserId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { success: false, error: 'User not authenticated' };
+
+      // 1. Insert into workspace_blocks
+      await supabase.from('workspace_blocks').upsert({
+        workspace_id: workspaceId,
+        user_id: targetUserId,
+        blocked_by: user.id,
+        reason: reason || 'Banned by pod admin',
+      });
+
+      // 2. Remove from workspace_members
+      const { error: delErr } = await supabase
+        .from('workspace_members')
+        .delete()
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', targetUserId);
+
+      if (delErr) {
+        return { success: false, error: delErr.message };
+      }
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to ban member' };
+    }
+  },
+
+  /**
+   * Update workspace details (e.g. name, description, avatar_url, settings)
    */
   async updateWorkspaceDetails(
     workspaceId: string,
-    updates: { name?: string; description?: string; avatar_url?: string }
+    updates: { name?: string; description?: string; avatar_url?: string; settings?: any }
   ): Promise<{ success: boolean; error: string | null }> {
     try {
       const { error } = await supabase
