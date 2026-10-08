@@ -163,6 +163,16 @@ interface WorkspaceState {
     member_ids?: string[];
   }) => Promise<{ workspace: Workspace | null; error: string | null }>;
   joinCommunity: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
+  updateWorkspaceDetails: (
+    workspaceId: string,
+    updates: {
+      name?: string;
+      description?: string | null;
+      avatar_url?: string | null;
+      banner_url?: string | null;
+      settings?: Record<string, any>;
+    }
+  ) => Promise<{ success: boolean; error: string | null }>;
   togglePinWorkspace: (workspaceId: string) => Promise<{ success: boolean; isPinned: boolean; error: string | null }>;
   toggleArchiveWorkspace: (workspaceId: string) => Promise<{ success: boolean; isArchived: boolean; error: string | null }>;
   setMuteWorkspace: (
@@ -611,6 +621,42 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
 
     return await workspaceService.togglePinWorkspace(currentUser.id, workspaceId);
+  },
+
+  updateWorkspaceDetails: async (workspaceId, updates) => {
+    try {
+      // Optimistically update store lists
+      set((state) => {
+        const updater = (w: Workspace) =>
+          w.id === workspaceId
+            ? {
+                ...w,
+                ...(updates.name !== undefined ? { name: updates.name } : {}),
+                ...(updates.description !== undefined ? { description: updates.description } : {}),
+                ...(updates.avatar_url !== undefined ? { avatar_url: updates.avatar_url } : {}),
+                ...(updates.banner_url !== undefined ? { banner_url: updates.banner_url } : {}),
+                ...(updates.settings !== undefined
+                  ? { settings: { ...(w.settings || {}), ...updates.settings } }
+                  : {}),
+              }
+            : w;
+
+        return {
+          dms: state.dms.map(updater),
+          communities: state.communities.map(updater),
+          innerCircles: state.innerCircles.map(updater),
+          activeWorkspace: state.activeWorkspace?.id === workspaceId ? updater(state.activeWorkspace) : state.activeWorkspace,
+        };
+      });
+
+      const res = await workspaceService.updateWorkspaceDetails(workspaceId, updates);
+      if (res.success) {
+        await get().loadWorkspaces(true);
+      }
+      return res;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
   },
 
   toggleArchiveWorkspace: async (workspaceId: string) => {

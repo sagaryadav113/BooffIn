@@ -65,6 +65,7 @@ import {
   User,
   Sparkles as SparklesIcon,
   Download,
+  BookOpen,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -87,6 +88,7 @@ import {
 } from '../../types/workspace';
 import { WorkspaceDoiCard } from './WorkspaceDoiCard';
 import { WorkspaceInfoModal } from './WorkspaceInfoModal';
+import { WorkspaceExportModal } from './WorkspaceExportModal';
 import { ImageViewerModal } from '../modals/ImageViewerModal';
 import { VoiceNotePlayer } from '../chat/VoiceNotePlayer';
 import { VoiceNoteRecorder } from '../chat/VoiceNoteRecorder';
@@ -218,10 +220,25 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
-  // Filtered & Searched Messages
+  // Filtered & Searched Messages (with Step 4 Ephemeral Filtering)
   const displayedMessages = useMemo(() => {
     let list = messages;
+
+    // Ephemeral message filtering if enabled by pod admin
+    const timer = workspace.settings?.ephemeral_timer;
+    if (timer && timer !== 'off') {
+      const now = Date.now();
+      let maxAgeMs = 24 * 60 * 60 * 1000;
+      if (timer === '7d') maxAgeMs = 7 * 24 * 60 * 60 * 1000;
+      else if (timer === '30d') maxAgeMs = 30 * 24 * 60 * 60 * 1000;
+
+      list = list.filter((m) => {
+        const msgTime = new Date(m.created_at).getTime();
+        return now - msgTime < maxAgeMs;
+      });
+    }
 
     // Filter by type if active
     if (activeChatFilter === 'papers') {
@@ -249,7 +266,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     }
 
     return list;
-  }, [messages, activeChatFilter, chatSearchQuery]);
+  }, [messages, activeChatFilter, chatSearchQuery, workspace.settings?.ephemeral_timer]);
 
   // Pinned Message
   const pinnedMessage = useMemo(() => {
@@ -900,6 +917,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         </TouchableOpacity>
 
         <View style={styles.headerRightActions}>
+          {/* Quick Export Lab Record Button */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowExportModal(true)}
+            style={styles.headerIconBtn}
+          >
+            <BookOpen size={18} color="#164E3F" />
+          </TouchableOpacity>
+
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => setShowSearchBar((v) => !v)}
@@ -924,6 +950,21 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Step 4: Disappearing / Ephemeral Messages Header Pill */}
+      {workspace.settings?.ephemeral_timer && workspace.settings.ephemeral_timer !== 'off' && (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setShowInfoModal(true)}
+          style={styles.ephemeralBannerStrip}
+        >
+          <Clock size={12} color="#164E3F" />
+          <Text style={styles.ephemeralBannerText}>
+            Disappearing messages: {workspace.settings.ephemeral_timer === '24h' ? '24 Hours' : workspace.settings.ephemeral_timer === '7d' ? '7 Days' : '30 Days'}
+          </Text>
+          <Text style={styles.ephemeralBannerSub}>• Tap to adjust</Text>
+        </TouchableOpacity>
+      )}
 
       {/* 1b. In-Pod Search & Filter Strip */}
       {showSearchBar && (
@@ -1928,6 +1969,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         visible={showInfoModal}
         onClose={() => setShowInfoModal(false)}
         workspace={workspace}
+      />
+
+      {/* Step 4: Academic Lab Record Export Modal */}
+      <WorkspaceExportModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        workspace={workspace}
+        messages={messages}
+        members={members}
       />
 
       {/* Full-Screen Image Viewer Modal */}
@@ -3479,6 +3529,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748B',
     marginTop: 1,
+  },
+  ephemeralBannerStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 5,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DCFCE7',
+  },
+  ephemeralBannerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#164E3F',
+  },
+  ephemeralBannerSub: {
+    fontSize: 11,
+    color: '#059669',
   },
 });
 

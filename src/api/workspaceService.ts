@@ -754,6 +754,42 @@ export const workspaceService = {
   },
 
   /**
+   * Update workspace details (name, description, avatar, settings)
+   */
+  async updateWorkspaceDetails(
+    workspaceId: string,
+    updates: {
+      name?: string;
+      description?: string | null;
+      avatar_url?: string | null;
+      banner_url?: string | null;
+      settings?: Record<string, any>;
+    }
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const payload: any = { updated_at: new Date().toISOString() };
+      if (updates.name !== undefined) payload.name = updates.name.trim();
+      if (updates.description !== undefined) payload.description = updates.description ? updates.description.trim() : null;
+      if (updates.avatar_url !== undefined) payload.avatar_url = updates.avatar_url;
+      if (updates.banner_url !== undefined) payload.banner_url = updates.banner_url;
+      if (updates.settings !== undefined) payload.settings = updates.settings;
+
+      const { error } = await supabase
+        .from('workspaces')
+        .update(payload)
+        .eq('id', workspaceId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to update workspace details' };
+    }
+  },
+
+  /**
    * Fetch messages for a workspace with sender profiles
    */
   async getMessages(
@@ -1732,27 +1768,6 @@ export const workspaceService = {
     }
   },
 
-  /**
-   * Update workspace details (e.g. name, description, avatar_url, settings)
-   */
-  async updateWorkspaceDetails(
-    workspaceId: string,
-    updates: { name?: string; description?: string; avatar_url?: string; settings?: any }
-  ): Promise<{ success: boolean; error: string | null }> {
-    try {
-      const { error } = await supabase
-        .from('workspaces')
-        .update(updates)
-        .eq('id', workspaceId);
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-      return { success: true, error: null };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Failed to update workspace' };
-    }
-  },
 
   /**
    * Saved Items (Inner Circle)

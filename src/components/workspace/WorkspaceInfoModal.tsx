@@ -47,18 +47,26 @@ import {
   AlertTriangle,
   ChevronRight,
   FolderOpen,
+  Camera,
+  Image as ImageIcon,
+  Clock,
+  BookOpen,
+  Sparkles,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { Workspace, WorkspaceMember, WorkspaceMemberRole } from '../../types/workspace';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { workspaceService } from '../../api/workspaceService';
 import { blockUser, reportContent } from '../../api/moderationService';
 import { unfollowUser } from '../../api/socialService';
+import { uploadPostImage } from '../../api/storageService';
 import { Avatar } from '../core/Avatar';
 import { GroupCollageAvatar } from './GroupCollageAvatar';
 import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
+import { WorkspaceExportModal } from './WorkspaceExportModal';
 
 interface WorkspaceInfoModalProps {
   visible: boolean;
@@ -78,14 +86,19 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const removeMember = useWorkspaceStore((s) => s.removeMember);
   const banMember = useWorkspaceStore((s) => s.banMember);
   const leaveWorkspace = useWorkspaceStore((s) => s.leaveWorkspace);
+  const clearChatHistory = useWorkspaceStore((s) => s.clearChatHistory);
+  const setMuteWorkspace = useWorkspaceStore((s) => s.setMuteWorkspace);
+  const updateWorkspaceDetails = useWorkspaceStore((s) => s.updateWorkspaceDetails);
 
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(Boolean(workspace.is_muted));
   const [showMediaGalleryModal, setShowMediaGalleryModal] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(workspace.name || '');
+  const [editedDescription, setEditedDescription] = useState(workspace.description || '');
   const [isSavingName, setIsSavingName] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [showMembersList, setShowMembersList] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
@@ -107,6 +120,20 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
     Boolean(workspace.settings?.only_admins_pin)
   );
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+
+  // Step 4: Advanced Mute & Notification Scope
+  const [showMuteOptionsModal, setShowMuteOptionsModal] = useState(false);
+  const [muteDuration, setMuteDuration] = useState<'8h' | '1w' | 'always'>('8h');
+  const [muteScope, setMuteScope] = useState<'all' | 'mentions_only'>('all');
+
+  // Step 4: Disappearing / Ephemeral Messages
+  const [showEphemeralModal, setShowEphemeralModal] = useState(false);
+  const [ephemeralTimer, setEphemeralTimer] = useState<'off' | '24h' | '7d' | '30d'>(
+    workspace.settings?.ephemeral_timer || 'off'
+  );
+
+  // Step 4: Export Lab Record Modal
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const isOwner = workspace.owner_id === currentUser?.id;
   const isDM = workspace.type === 'dm';
@@ -149,6 +176,9 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
       setShowMembersList(false);
       setShowOptionsMenu(false);
       setShowReportModal(false);
+      setShowMuteOptionsModal(false);
+      setShowEphemeralModal(false);
+      setShowExportModal(false);
       setSelectedMember(null);
       setShowMemberActionModal(false);
       setMemberSearchQuery('');
@@ -156,6 +186,9 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
     }
 
     setEditedName(workspace.name || '');
+    setEditedDescription(workspace.description || workspace.settings?.topic || '');
+    setIsMuted(Boolean(workspace.is_muted));
+    setEphemeralTimer(workspace.settings?.ephemeral_timer || 'off');
     setOnlyAdminsPost(Boolean(workspace.settings?.only_admins_post));
     setOnlyAdminsInvite(Boolean(workspace.settings?.only_admins_invite));
     setOnlyAdminsPin(Boolean(workspace.settings?.only_admins_pin));
@@ -170,7 +203,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
     }
 
     fetchMembers();
-  }, [visible, workspace.id, workspace.name]);
+  }, [visible, workspace.id, workspace.name, workspace.description, workspace.settings, workspace.is_muted]);
 
   // Handle Copy Invite Link
   const handleCopyInviteLink = async () => {
@@ -193,34 +226,162 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
     }
   };
 
-  // Toggle Mute
+  // Toggle Mute / Open Advanced Mute Sheet
   const handleToggleMute = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    setIsMuted(!isMuted);
-    if (Platform.OS === 'web') {
-      window.alert(!isMuted ? 'Notifications muted for this conversation.' : 'Notifications unmuted.');
+    setShowMuteOptionsModal(true);
+  };
+
+  // Save Mute Option
+  const handleConfirmMute = async (duration: '8h' | '1w' | 'always', scope: 'all' | 'mentions_only') => {
+    if (!currentUser?.id) return;
+    let until: string | null = null;
+    const now = new Date();
+    if (duration === '8h') {
+      until = new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString();
+    } else if (duration === '1w') {
+      until = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    const res = await setMuteWorkspace(workspace.id, true, until);
+    if (res.success) {
+      setIsMuted(true);
+      setShowMuteOptionsModal(false);
+      const durationLabel = duration === '8h' ? '8 hours' : duration === '1w' ? '1 week' : 'Always';
+      if (Platform.OS === 'web') {
+        window.alert(`Notifications muted for ${durationLabel}.`);
+      } else {
+        Alert.alert('Notifications Muted', `Notifications muted for ${durationLabel}.`);
+      }
     }
   };
 
-  // Save edited workspace name
+  const handleUnmute = async () => {
+    if (!currentUser?.id) return;
+    const res = await setMuteWorkspace(workspace.id, false, null);
+    if (res.success) {
+      setIsMuted(false);
+      setShowMuteOptionsModal(false);
+      if (Platform.OS === 'web') {
+        window.alert('Notifications unmuted.');
+      } else {
+        Alert.alert('Unmuted', 'Notifications unmuted for this conversation.');
+      }
+    }
+  };
+
+  // Step 4: Pick Avatar Image
+  const handlePickAvatar = async () => {
+    if (!canManageRoles) {
+      if (Platform.OS === 'web') window.alert('Only Admins and PI can change the pod icon.');
+      else Alert.alert('Permission Denied', 'Only Admins and PI can change the pod icon.');
+      return;
+    }
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setIsUploadingAvatar(true);
+        const uploadRes = await uploadPostImage(currentUser?.id || 'pod_avatar', result.assets[0]);
+        const avatarUrl = uploadRes.url || result.assets[0].uri;
+        await updateWorkspaceDetails(workspace.id, { avatar_url: avatarUrl });
+        setIsUploadingAvatar(false);
+        if (Platform.OS === 'web') window.alert('Pod icon updated successfully!');
+        else Alert.alert('Icon Updated', 'Pod icon has been updated.');
+      }
+    } catch (err: any) {
+      setIsUploadingAvatar(false);
+      console.warn('Avatar pick error:', err);
+    }
+  };
+
+  // Save edited workspace name & topic description
   const handleSaveName = async () => {
     const trimmed = editedName.trim();
-    if (!trimmed || trimmed === workspace.name) {
-      setIsEditingName(false);
+    const trimmedDesc = editedDescription.trim();
+    if (!trimmed) {
+      if (Platform.OS === 'web') window.alert('Pod name cannot be empty.');
+      else Alert.alert('Invalid Name', 'Pod name cannot be empty.');
       return;
     }
 
     setIsSavingName(true);
     try {
-      await workspaceService.updateWorkspaceDetails(workspace.id, { name: trimmed });
-      await loadWorkspaces(true);
+      await updateWorkspaceDetails(workspace.id, {
+        name: trimmed,
+        description: trimmedDesc || null,
+        settings: {
+          ...(workspace.settings || {}),
+          topic: trimmedDesc || null,
+        },
+      });
       setIsEditingName(false);
     } catch (err) {
-      console.warn('Failed to update workspace name:', err);
+      console.warn('Failed to update workspace name/topic:', err);
     } finally {
       setIsSavingName(false);
+    }
+  };
+
+  // Step 4: Set Ephemeral Timer
+  const handleSetEphemeralTimer = async (timer: 'off' | '24h' | '7d' | '30d') => {
+    if (!canManageRoles) return;
+    try {
+      setEphemeralTimer(timer);
+      const updatedSettings = {
+        ...(workspace.settings || {}),
+        ephemeral_timer: timer,
+      };
+      await updateWorkspaceDetails(workspace.id, { settings: updatedSettings });
+      setShowEphemeralModal(false);
+      if (Platform.OS === 'web') {
+        window.alert(timer === 'off' ? 'Disappearing messages turned off.' : `Disappearing messages set to ${timer}.`);
+      } else {
+        Alert.alert('Disappearing Messages', timer === 'off' ? 'Disappearing messages turned off.' : `Disappearing messages set to ${timer}.`);
+      }
+    } catch (err) {
+      console.warn('Ephemeral timer error:', err);
+    }
+  };
+
+  // Step 4: Clear Chat History
+  const handleClearChatHistory = () => {
+    const executeClear = async () => {
+      setIsActionLoading(true);
+      try {
+        await clearChatHistory(workspace.id);
+        if (Platform.OS === 'web') {
+          window.alert('Pod chat history cleared.');
+        } else {
+          Alert.alert('History Cleared', 'All messages have been cleared from this device.');
+        }
+      } catch (err: any) {
+        console.warn('Clear history error:', err);
+      } finally {
+        setIsActionLoading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to clear the chat history for this pod? This will remove messages on your device.')) {
+        executeClear();
+      }
+    } else {
+      Alert.alert(
+        'Clear Chat History',
+        'Are you sure you want to clear chat history? All messages will be removed from your device.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Clear History', style: 'destructive', onPress: executeClear },
+        ]
+      );
     }
   };
 
@@ -596,6 +757,12 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                   name={displayName}
                   size="xl"
                 />
+              ) : workspace.avatar_url ? (
+                <Avatar
+                  uri={workspace.avatar_url}
+                  name={displayName}
+                  size="xl"
+                />
               ) : workspace.type === 'inner_circle' ? (
                 <GroupCollageAvatar size={84} name={displayName} />
               ) : (
@@ -605,61 +772,121 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                   size="xl"
                 />
               )}
+
+              {/* Camera Icon Overlay to Pick Custom Pod Avatar */}
+              {!isDM && canManageRoles && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handlePickAvatar}
+                  disabled={isUploadingAvatar}
+                  style={styles.avatarEditOverlayBtn}
+                >
+                  {isUploadingAvatar ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Camera size={15} color="#FFFFFF" strokeWidth={2.2} />
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
 
-            {/* Editable Title */}
+            {/* Editable Title & Description / Topic */}
             {isEditingName ? (
-              <View style={styles.editNameRow}>
+              <View style={styles.editPodCard}>
+                <Text style={styles.editSectionLabel}>Pod Name</Text>
                 <TextInput
                   value={editedName}
                   onChangeText={setEditedName}
+                  placeholder="e.g., Quantum Biology Working Group"
+                  placeholderTextColor="#94A3B8"
                   style={styles.editNameInput}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={handleSaveName}
+                  maxLength={60}
                 />
-                <TouchableOpacity
-                  disabled={isSavingName}
-                  onPress={handleSaveName}
-                  style={styles.saveNameBtn}
-                >
-                  {isSavingName ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.saveNameBtnText}>Save</Text>
-                  )}
-                </TouchableOpacity>
+
+                <Text style={[styles.editSectionLabel, { marginTop: 10 }]}>
+                  Research Scope / Topic
+                </Text>
+                <TextInput
+                  value={editedDescription}
+                  onChangeText={setEditedDescription}
+                  placeholder="Describe focus, research goals, or reading schedule..."
+                  placeholderTextColor="#94A3B8"
+                  style={styles.editDescInput}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={240}
+                />
+                <Text style={styles.charCountLabel}>{editedDescription.length}/240</Text>
+
+                <View style={styles.editActionsRow}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEditedName(workspace.name || '');
+                      setEditedDescription(workspace.description || workspace.settings?.topic || '');
+                      setIsEditingName(false);
+                    }}
+                    style={styles.cancelEditBtn}
+                  >
+                    <Text style={styles.cancelEditBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    disabled={isSavingName}
+                    onPress={handleSaveName}
+                    style={styles.saveNameBtn}
+                  >
+                    {isSavingName ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.saveNameBtnText}>Save Changes</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : (
-              <Text style={styles.groupTitle} numberOfLines={2}>
-                {displayName}
-              </Text>
+              <>
+                <Text style={styles.groupTitle} numberOfLines={2}>
+                  {displayName}
+                </Text>
+                {(workspace.description || workspace.settings?.topic) && (
+                  <Text style={styles.groupDescriptionSnippet} numberOfLines={3}>
+                    {workspace.description || workspace.settings?.topic}
+                  </Text>
+                )}
+              </>
             )}
 
             {/* Subtitle Action */}
-            {!isDM ? (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setIsEditingName(!isEditingName)}
-                style={styles.changeNameBtn}
-              >
-                <Text style={styles.changeNameText}>Change name and image</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  if (partner?.id) {
-                    onClose();
-                    router.push(`/profile/${partner.id}`);
-                  }
-                }}
-                style={styles.changeNameBtn}
-              >
-                <Text style={styles.changeNameText}>
-                  {partner?.academicTitle ? `${partner.academicTitle} • ` : ''}View Profile
-                </Text>
-              </TouchableOpacity>
+            {!isEditingName && (
+              !isDM ? (
+                canManageRoles && (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => setIsEditingName(true)}
+                    style={styles.changeNameBtn}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Edit3 size={13} color="#3B82F6" />
+                      <Text style={styles.changeNameText}>Edit Pod Name & Topic</Text>
+                    </View>
+                  </TouchableOpacity>
+                )
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (partner?.id) {
+                      onClose();
+                      router.push(`/profile/${partner.id}`);
+                    }
+                  }}
+                  style={styles.changeNameBtn}
+                >
+                  <Text style={styles.changeNameText}>
+                    {partner?.academicTitle ? `${partner.academicTitle} • ` : ''}View Profile
+                  </Text>
+                </TouchableOpacity>
+              )
             )}
           </View>
 
@@ -978,7 +1205,78 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               </View>
             </TouchableOpacity>
 
-            {/* 4. Privacy & Safety */}
+            {/* Disappearing / Ephemeral Messages Setting (Inner Circles / Groups) */}
+            {!isDM && canManageRoles && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowEphemeralModal(true)}
+                style={styles.menuRow}
+              >
+                <View style={styles.menuIconWrap}>
+                  <Clock size={22} color="#0F172A" strokeWidth={2} />
+                </View>
+                <View style={styles.menuTextCol}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={styles.menuTitle}>Disappearing messages</Text>
+                    <View style={styles.ephemeralBadgeContainer}>
+                      <Text style={styles.ephemeralBadgeText}>
+                        {ephemeralTimer === 'off'
+                          ? 'Off'
+                          : ephemeralTimer === '24h'
+                          ? '24 Hours'
+                          : ephemeralTimer === '7d'
+                          ? '7 Days'
+                          : '30 Days'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.menuSubtitle}>
+                    {ephemeralTimer === 'off'
+                      ? 'Messages remain in pod history indefinitely'
+                      : `Messages automatically disappear after ${ephemeralTimer}`}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Export Academic Lab Record & Chat Transcript */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowExportModal(true)}
+              style={styles.menuRow}
+            >
+              <View style={styles.menuIconWrap}>
+                <BookOpen size={22} color="#164E3F" strokeWidth={2} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={[styles.menuTitle, { color: '#164E3F' }]}>Export Lab Record</Text>
+                  <ChevronRight size={16} color="#94A3B8" />
+                </View>
+                <Text style={styles.menuSubtitle}>
+                  Download or share formatted Markdown, DOI bibliography, and chat logs
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Clear Chat History */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleClearChatHistory}
+              style={styles.menuRow}
+            >
+              <View style={styles.menuIconWrap}>
+                <Trash2 size={22} color="#64748B" strokeWidth={2} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <Text style={styles.menuTitle}>Clear chat history</Text>
+                <Text style={styles.menuSubtitle}>
+                  Remove all messages from this device
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Privacy & Safety */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -1008,7 +1306,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               </View>
             </TouchableOpacity>
 
-            {/* 5. Leave or Delete Pod Button */}
+            {/* Leave or Delete Pod Button */}
             {!isDM && (
               <TouchableOpacity
                 activeOpacity={0.7}
@@ -1312,6 +1610,159 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
           onClose={() => setShowMediaGalleryModal(false)}
           messages={messages}
           chatTitle={displayName}
+        />
+
+        {/* Step 4: Advanced Mute Options Modal */}
+        <Modal
+          visible={showMuteOptionsModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowMuteOptionsModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.optionsOverlay}
+            activeOpacity={1}
+            onPress={() => setShowMuteOptionsModal(false)}
+          >
+            <View style={styles.optionsSheet}>
+              <View style={styles.optionsHandleBar} />
+              <Text style={styles.optionsSheetTitle}>Mute Notifications</Text>
+              <Text style={styles.muteModalSub}>
+                Choose how long to silence notifications from {displayName}.
+              </Text>
+
+              {isMuted && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={handleUnmute}
+                  style={[styles.optionsItemRow, { backgroundColor: '#F0FDF4', borderRadius: 10, paddingHorizontal: 12 }]}
+                >
+                  <Bell size={20} color="#164E3F" />
+                  <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>
+                    Unmute Notifications
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleConfirmMute('8h', muteScope)}
+                style={styles.optionsItemRow}
+              >
+                <Clock size={20} color="#0F172A" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.optionsItemText}>For 8 hours</Text>
+                  <Text style={styles.optionsItemSubText}>Silence until later today</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleConfirmMute('1w', muteScope)}
+                style={styles.optionsItemRow}
+              >
+                <Clock size={20} color="#0F172A" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.optionsItemText}>For 1 week</Text>
+                  <Text style={styles.optionsItemSubText}>Silence for 7 days</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleConfirmMute('always', muteScope)}
+                style={styles.optionsItemRow}
+              >
+                <BellOff size={20} color="#DC2626" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>Always / Until turned back on</Text>
+                  <Text style={styles.optionsItemSubText}>Indefinitely mute all notifications</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowMuteOptionsModal(false)}
+                style={styles.optionsCancelBtn}
+              >
+                <Text style={styles.optionsCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Step 4: Disappearing Messages Selector Modal */}
+        <Modal
+          visible={showEphemeralModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowEphemeralModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.optionsOverlay}
+            activeOpacity={1}
+            onPress={() => setShowEphemeralModal(false)}
+          >
+            <View style={styles.optionsSheet}>
+              <View style={styles.optionsHandleBar} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}>
+                <Clock size={18} color="#164E3F" />
+                <Text style={[styles.optionsSheetTitle, { marginBottom: 0 }]}>Disappearing Messages</Text>
+              </View>
+              <Text style={styles.muteModalSub}>
+                When enabled, new discussions and shared files sent in this pod will automatically disappear for all members after the selected duration.
+              </Text>
+
+              {[
+                { id: 'off', label: 'Off', sub: 'Messages remain in pod history indefinitely' },
+                { id: '24h', label: '24 Hours', sub: 'Ephemeral daily lab notes & quick discussions' },
+                { id: '7d', label: '7 Days', sub: 'Weekly sprints and temporary collaboration' },
+                { id: '30d', label: '30 Days', sub: 'Monthly archive lifecycle' },
+              ].map((opt) => (
+                <TouchableOpacity
+                  key={opt.id}
+                  activeOpacity={0.7}
+                  onPress={() => handleSetEphemeralTimer(opt.id as any)}
+                  style={[
+                    styles.optionsItemRow,
+                    ephemeralTimer === opt.id && { backgroundColor: '#F0FDF4', borderRadius: 10, paddingHorizontal: 12 },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.optionsItemText,
+                        ephemeralTimer === opt.id && { color: '#164E3F', fontWeight: '800' },
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                    <Text style={styles.optionsItemSubText}>{opt.sub}</Text>
+                  </View>
+                  {ephemeralTimer === opt.id && (
+                    <CheckCircle2 size={18} color="#164E3F" strokeWidth={2.5} />
+                  )}
+                </TouchableOpacity>
+              ))}
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowEphemeralModal(false)}
+                style={styles.optionsCancelBtn}
+              >
+                <Text style={styles.optionsCancelText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Step 4: Export Academic Lab Record Modal */}
+        <WorkspaceExportModal
+          visible={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          workspace={workspace}
+          messages={messages}
+          members={members}
         />
       </SafeAreaView>
     </Modal>
@@ -1767,6 +2218,113 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#164E3F',
+    marginTop: 2,
+  },
+  avatarEditOverlayBtn: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#164E3F',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  editPodCard: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginVertical: 8,
+  },
+  editSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  editDescInput: {
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#0F172A',
+    minHeight: 64,
+    textAlignVertical: 'top',
+  },
+  charCountLabel: {
+    fontSize: 10,
+    color: '#94A3B8',
+    alignSelf: 'flex-end',
+    marginTop: 3,
+  },
+  editActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 10,
+  },
+  cancelEditBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelEditBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  groupDescriptionSnippet: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 16,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  ephemeralBadgeContainer: {
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  ephemeralBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#164E3F',
+  },
+  muteModalSub: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  optionsItemSubText: {
+    fontSize: 12,
+    color: '#94A3B8',
     marginTop: 2,
   },
 });
