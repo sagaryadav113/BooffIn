@@ -81,6 +81,8 @@ export type WorkspaceMessageType =
   | 'e2ee_cipher'
   | 'image'
   | 'poll'
+  | 'audio'
+  | 'voice_note'
   | 'document';
 
 export interface WorkspacePollOption {
@@ -95,6 +97,11 @@ export interface WorkspacePollData {
   totalVotes: number;
 }
 
+export interface WorkspaceAudioMetadata {
+  duration: number; // in seconds
+  waveform?: number[];
+}
+
 export type WorkspaceReactionsMap = Record<string, string[]>; // emoji -> array of user_ids
 
 export interface WorkspaceMessage {
@@ -105,6 +112,7 @@ export interface WorkspaceMessage {
   message_type: WorkspaceMessageType;
   doi_metadata: DoiMetadata | null;
   poll_data?: WorkspacePollData | null;
+  audio_metadata?: WorkspaceAudioMetadata | null;
   attachments?: any;
   reactions?: WorkspaceReactionsMap | null;
   is_edited?: boolean;

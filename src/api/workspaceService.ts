@@ -11,6 +11,7 @@ import {
   WorkspaceSubscriptionTier,
   WorkspaceType,
   WorkspaceMessageType,
+  WorkspaceAudioMetadata,
   DoiMetadata,
   WorkspaceSummaryStats,
 } from '../types/workspace';
@@ -825,6 +826,7 @@ export const workspaceService = {
     content: string;
     message_type?: WorkspaceMessageType;
     doi_metadata?: DoiMetadata | null;
+    audio_metadata?: WorkspaceAudioMetadata | null;
     reply_to_id?: string | null;
     media_urls?: string[] | null;
     e2ee_ciphertext?: string | null;

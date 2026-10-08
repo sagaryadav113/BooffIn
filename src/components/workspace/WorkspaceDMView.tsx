@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,8 @@ import {
   CornerUpRight,
   Smile,
   ShieldAlert,
+  Mic,
+  FolderOpen,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -58,6 +60,9 @@ import {
 import { WorkspaceDoiCard } from './WorkspaceDoiCard';
 import { WorkspaceInfoModal } from './WorkspaceInfoModal';
 import { ImageViewerModal } from '../modals/ImageViewerModal';
+import { VoiceNotePlayer } from '../chat/VoiceNotePlayer';
+import { VoiceNoteRecorder } from '../chat/VoiceNoteRecorder';
+import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -68,6 +73,7 @@ import { blockUser, reportContent } from '../../api/moderationService';
 import { unfollowUser } from '../../api/socialService';
 
 const QUICK_EMOJIS = ['❤️', '👍', '🔬', '🔥', '👏', '💡', '🎉'];
+type ChatFilterType = 'all' | 'media' | 'papers' | 'audio' | 'polls';
 
 interface WorkspaceDMViewProps {
   workspace: Workspace;
@@ -94,6 +100,17 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
   const [localPartner, setLocalPartner] = useState<any>(workspace.other_user || null);
   const [inputText, setInputText] = useState('');
+
+  // Voice Note Recording State
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+
+  // Chat Media Gallery Modal State
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+
+  // Search & Filter State
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [activeChatFilter, setActiveChatFilter] = useState<ChatFilterType>('all');
 
   // Replying To State
   const [replyingTo, setReplyingTo] = useState<WorkspaceMessage | null>(null);
@@ -141,7 +158,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
 
   // Local poll voting state for optimistic interactions
-  const [localPollVotes, setLocalPollVotes] = useState<Record<string, string>>({}); // messageId -> optionId
+  const [localPollVotes, setLocalPollVotes] = useState<Record<string, string>>({});
 
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
@@ -196,6 +213,49 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   }, [workspace.id, workspace.other_user, workspace.dm_participant_a, workspace.dm_participant_b, currentUser?.id]);
 
   const partner = localPartner || workspace.other_user;
+
+  // Filtered messages based on in-chat search & filter pills
+  const displayedMessages = useMemo(() => {
+    return messages.filter((m) => {
+      // 1. Text Search query
+      if (chatSearchQuery.trim()) {
+        const q = chatSearchQuery.toLowerCase();
+        const contentMatch = m.content?.toLowerCase().includes(q);
+        const doiMatch = m.doi_metadata?.title?.toLowerCase().includes(q);
+        const senderMatch = m.sender?.fullName?.toLowerCase().includes(q);
+        if (!contentMatch && !doiMatch && !senderMatch) return false;
+      }
+
+      // 2. Tab Filter
+      if (activeChatFilter === 'media') {
+        const hasImg =
+          m.message_type === 'image' ||
+          Boolean(m.media_urls && m.media_urls.length > 0) ||
+          m.content === '📷 Shared photo';
+        return hasImg && !m.is_deleted;
+      }
+      if (activeChatFilter === 'papers') {
+        return Boolean(m.doi_metadata) && !m.is_deleted;
+      }
+      if (activeChatFilter === 'audio') {
+        return (
+          (m.message_type === 'audio' ||
+            m.message_type === 'voice_note' ||
+            Boolean(m.audio_metadata) ||
+            m.content.startsWith('🎙️ Voice Note')) &&
+          !m.is_deleted
+        );
+      }
+      if (activeChatFilter === 'polls') {
+        return (
+          (m.message_type === 'poll' || m.content.startsWith('📊 Poll:')) &&
+          !m.is_deleted
+        );
+      }
+
+      return true;
+    });
+  }, [messages, chatSearchQuery, activeChatFilter]);
 
   // --- Handlers: Reactions ---
   const handleToggleReaction = async (messageId: string, emoji: string) => {
@@ -353,6 +413,30 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       console.warn('Forward error:', err);
     } finally {
       setForwardingTargetId(null);
+    }
+  };
+
+  // Voice Note Send Handler
+  const handleSendVoiceNote = async (audioData: { duration: number; waveform: number[]; uri?: string }) => {
+    setIsRecordingVoice(false);
+    const replyId = replyingTo?.id || null;
+
+    const res = await sendMessage({
+      workspace_id: workspace.id,
+      content: '🎙️ Voice Note',
+      message_type: 'audio',
+      audio_metadata: {
+        duration: audioData.duration,
+        waveform: audioData.waveform,
+      },
+      reply_to_id: replyId,
+    });
+
+    if (res.success) {
+      setReplyingTo(null);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
   };
 
@@ -622,6 +706,12 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
     const isImage = !isDeleted && (item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo');
     const isPoll = !isDeleted && (item.message_type === 'poll' || item.content.startsWith('📊 Poll:'));
+    const isAudio =
+      !isDeleted &&
+      (item.message_type === 'audio' ||
+        item.message_type === 'voice_note' ||
+        Boolean(item.audio_metadata) ||
+        item.content.startsWith('🎙️ Voice Note'));
 
     // Parse poll options if poll message
     let pollQuestionText = '';
@@ -678,6 +768,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 ? styles.doiBubble
                 : isPoll
                 ? styles.pollBubble
+                : isAudio
+                ? isMe
+                  ? styles.myBubble
+                  : styles.otherBubble
                 : isMe
                 ? styles.myBubble
                 : styles.otherBubble,
@@ -728,6 +822,16 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               </View>
             ) : (
               <>
+                {/* Voice Note / Audio Player */}
+                {isAudio && (
+                  <VoiceNotePlayer
+                    audioUrl={item.media_urls?.[0]}
+                    duration={item.audio_metadata?.duration || 18}
+                    waveform={item.audio_metadata?.waveform}
+                    isMe={isMe}
+                  />
+                )}
+
                 {/* DOI Paper Attachment */}
                 {item.doi_metadata && (
                   <WorkspaceDoiCard doiMeta={item.doi_metadata} />
@@ -803,7 +907,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 )}
 
                 {/* Text Content */}
-                {item.content && !hasDoi && !isPoll && (!isImage || (item.content !== '📷 Shared photo' && item.content !== msgImageUrl)) ? (
+                {item.content && !hasDoi && !isPoll && !isAudio && (!isImage || (item.content !== '📷 Shared photo' && item.content !== msgImageUrl)) ? (
                   <Text
                     style={[
                       styles.messageText,
@@ -944,23 +1048,105 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           </Text>
         </TouchableOpacity>
 
-        {/* 3-dot Options Menu (MoreVertical) */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setShowOptionsMenu(true)}
-          style={styles.moreButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <MoreVertical size={20} color="#164E3F" />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.headerRightActions}>
+          {/* Search Trigger */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowSearchBar(!showSearchBar)}
+            style={styles.headerActionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Search size={19} color={showSearchBar ? '#164E3F' : '#64748B'} />
+          </TouchableOpacity>
 
-      {/* Date Capsule: Today */}
-      <View style={styles.dateCapsuleContainer}>
-        <View style={styles.dateCapsule}>
-          <Text style={styles.dateCapsuleText}>Today</Text>
+          {/* Media & Papers Gallery Trigger */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowGalleryModal(true)}
+            style={styles.headerActionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <FolderOpen size={19} color="#64748B" />
+          </TouchableOpacity>
+
+          {/* 3-dot Options Menu */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowOptionsMenu(true)}
+            style={styles.headerActionBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MoreVertical size={20} color="#164E3F" />
+          </TouchableOpacity>
         </View>
       </View>
+
+      {/* In-Chat Search & Filter Strip */}
+      {showSearchBar && (
+        <View style={styles.chatSearchContainer}>
+          <View style={styles.chatSearchInputRow}>
+            <Search size={15} color="#64748B" />
+            <TextInput
+              value={chatSearchQuery}
+              onChangeText={setChatSearchQuery}
+              placeholder="Search conversation..."
+              placeholderTextColor="#94A3B8"
+              style={styles.chatSearchInput}
+              autoFocus
+            />
+            {chatSearchQuery.trim() ? (
+              <TouchableOpacity onPress={() => setChatSearchQuery('')}>
+                <X size={15} color="#64748B" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {/* Filter Pills Strip */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsRow}>
+            {(['all', 'media', 'papers', 'audio', 'polls'] as ChatFilterType[]).map((filter) => {
+              const isActive = activeChatFilter === filter;
+              const label =
+                filter === 'all'
+                  ? 'All'
+                  : filter === 'media'
+                  ? '📷 Photos'
+                  : filter === 'papers'
+                  ? '📄 Papers'
+                  : filter === 'audio'
+                  ? '🎙️ Voice'
+                  : '📊 Polls';
+
+              return (
+                <TouchableOpacity
+                  key={filter}
+                  activeOpacity={0.7}
+                  onPress={() => setActiveChatFilter(filter)}
+                  style={[styles.filterPill, isActive && styles.filterPillActive]}
+                >
+                  <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {chatSearchQuery.trim() && (
+            <Text style={styles.searchMatchCountText}>
+              {displayedMessages.length} message{displayedMessages.length === 1 ? '' : 's'} found
+            </Text>
+          )}
+        </View>
+      )}
+
+      {/* Date Capsule: Today */}
+      {!showSearchBar && (
+        <View style={styles.dateCapsuleContainer}>
+          <View style={styles.dateCapsule}>
+            <Text style={styles.dateCapsuleText}>Today</Text>
+          </View>
+        </View>
+      )}
 
       {/* Messages List */}
       {isMessagesLoading && messages.length === 0 ? (
@@ -971,7 +1157,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       ) : (
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={displayedMessages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessageItem}
           contentContainerStyle={styles.messagesList}
@@ -984,46 +1170,53 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 size="lg"
               />
               <Text style={styles.emptyTitle}>
-                {partner?.fullName || 'Researcher'}
+                {chatSearchQuery.trim() || activeChatFilter !== 'all'
+                  ? 'No matching messages'
+                  : partner?.fullName || 'Researcher'}
               </Text>
               <Text style={styles.emptyBio}>
-                {partner?.academicTitle || 'Academic Researcher'}
-                {partner?.institution ? ` · ${partner.institution}` : ''}
+                {chatSearchQuery.trim() || activeChatFilter !== 'all'
+                  ? 'Try searching with another keyword or clearing filters.'
+                  : `${partner?.academicTitle || 'Academic Researcher'}${partner?.institution ? ` · ${partner.institution}` : ''}`}
               </Text>
-              <View style={styles.mutualFollowBadge}>
-                <CheckCircle2 size={13} color="#164E3F" />
-                <Text style={styles.mutualFollowText}>Mutual Follow Verified</Text>
-              </View>
-              <Text style={styles.emptyPrompt}>
-                You can now message each other directly and collaborate on research papers.
-              </Text>
+              {!chatSearchQuery && activeChatFilter === 'all' && (
+                <>
+                  <View style={styles.mutualFollowBadge}>
+                    <CheckCircle2 size={13} color="#164E3F" />
+                    <Text style={styles.mutualFollowText}>Mutual Follow Verified</Text>
+                  </View>
+                  <Text style={styles.emptyPrompt}>
+                    You can now message each other directly and collaborate on research papers.
+                  </Text>
 
-              {/* Quick Starter Chips */}
-              <View style={styles.quickStartersRow}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setInputText('Hey! What are you working on today?')}
-                  style={styles.quickStarterChip}
-                >
-                  <Text style={styles.quickStarterChipText}>👋 Say Hello</Text>
-                </TouchableOpacity>
+                  {/* Quick Starter Chips */}
+                  <View style={styles.quickStartersRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setInputText('Hey! What are you working on today?')}
+                      style={styles.quickStarterChip}
+                    >
+                      <Text style={styles.quickStarterChipText}>👋 Say Hello</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setInputText('Looks awesome! Still on for discussing that project later?')}
-                  style={styles.quickStarterChip}
-                >
-                  <Text style={styles.quickStarterChipText}>🔬 Project Review</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setInputText('Looks awesome! Still on for discussing that project later?')}
+                      style={styles.quickStarterChip}
+                    >
+                      <Text style={styles.quickStarterChipText}>🔬 Project Review</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setShowDoiModal(true)}
-                  style={styles.quickStarterChip}
-                >
-                  <Text style={styles.quickStarterChipText}>📄 Share DOI Paper</Text>
-                </TouchableOpacity>
-              </View>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setShowDoiModal(true)}
+                      style={styles.quickStarterChip}
+                    >
+                      <Text style={styles.quickStarterChipText}>📄 Share DOI Paper</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
             </View>
           }
         />
@@ -1085,57 +1278,82 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       )}
 
-      {/* Bottom Input Dock with Photo Upload, Attachment Menu (Voting/DOI), and Send */}
-      <View style={styles.bottomDockContainer}>
-        {/* Capsule Input */}
-        <View style={styles.inputCapsule}>
-          {/* 1. Camera icon: Direct Photo Upload */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handlePickImage}
-            style={styles.mediaIconBtn}
-          >
-            <Camera size={20} color="#64748B" />
-          </TouchableOpacity>
+      {/* Live Voice Note Recorder Dock */}
+      {isRecordingVoice ? (
+        <VoiceNoteRecorder
+          onSendVoiceNote={handleSendVoiceNote}
+          onCancel={() => setIsRecordingVoice(false)}
+        />
+      ) : (
+        /* Bottom Input Dock with Photo, Voice Note (Mic), Attachment Menu, and Send */
+        <View style={styles.bottomDockContainer}>
+          {/* Capsule Input */}
+          <View style={styles.inputCapsule}>
+            {/* 1. Camera icon: Direct Photo Upload */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handlePickImage}
+              style={styles.mediaIconBtn}
+            >
+              <Camera size={19} color="#64748B" />
+            </TouchableOpacity>
 
-          <TextInput
-            ref={textInputRef}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
-            placeholderTextColor="#94A3B8"
-            style={styles.textInput}
-            multiline
-            maxLength={2000}
-          />
+            <TextInput
+              ref={textInputRef}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
+              placeholderTextColor="#94A3B8"
+              style={styles.textInput}
+              multiline
+              maxLength={2000}
+            />
 
-          {/* 2. Paperclip Attachment: Voting / Poll, DOI, Documents */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setShowAttachMenu(true)}
-            style={styles.mediaIconBtn}
-          >
-            <Paperclip size={20} color="#64748B" />
-          </TouchableOpacity>
-        </View>
+            {/* 2. Paperclip Attachment */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowAttachMenu(true)}
+              style={styles.mediaIconBtn}
+            >
+              <Paperclip size={19} color="#64748B" />
+            </TouchableOpacity>
+          </View>
 
-        {/* Detached Circular Green Send Button */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          disabled={(!inputText.trim() && !attachedDoi) || isSending}
-          onPress={handleSend}
-          style={[
-            styles.detachedSendBtn,
-            (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled,
-          ]}
-        >
-          {isSending ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+          {/* Voice Note Mic Button or Detached Send Button */}
+          {!inputText.trim() && !attachedDoi ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setIsRecordingVoice(true)}
+              style={styles.detachedMicBtn}
+            >
+              <Mic size={18} color="#FFFFFF" />
+            </TouchableOpacity>
           ) : (
-            <Send size={16} color="#FFFFFF" />
+            <TouchableOpacity
+              activeOpacity={0.8}
+              disabled={isSending}
+              onPress={handleSend}
+              style={styles.detachedSendBtn}
+            >
+              {isSending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Send size={16} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
-      </View>
+        </View>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Chat Media, Papers, Audio & Polls Gallery */}
+      {/* ------------------------------------------------------------- */}
+      <ChatMediaGalleryModal
+        visible={showGalleryModal}
+        onClose={() => setShowGalleryModal(false)}
+        messages={messages}
+        chatTitle={partner?.fullName || workspace.name || 'Chat Media'}
+      />
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: Message Long-Press Context Menu & Emoji Reaction Bar */}
@@ -1558,7 +1776,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       </Modal>
 
-      {/* Modal: Options Menu (Report, Block, Unfollow) */}
+      {/* Modal: Options Menu (Report, Block, Unfollow, Media Gallery) */}
       <Modal
         visible={showOptionsMenu}
         transparent
@@ -1576,7 +1794,20 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               {partner?.fullName || 'Options'}
             </Text>
 
-            {/* 1. Report */}
+            {/* 1. Media & Files */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowGalleryModal(true);
+              }}
+              style={styles.optionsItemRow}
+            >
+              <FolderOpen size={20} color="#164E3F" />
+              <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>View Media, Papers & Links</Text>
+            </TouchableOpacity>
+
+            {/* 2. Report */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -1589,7 +1820,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>Report</Text>
             </TouchableOpacity>
 
-            {/* 2. Block */}
+            {/* 3. Block */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleBlock}
@@ -1599,7 +1830,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>Block</Text>
             </TouchableOpacity>
 
-            {/* 3. Unfollow */}
+            {/* 4. Unfollow */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleUnfollow}
@@ -1716,7 +1947,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <View style={styles.doiSearchRow}>
               <TextInput
                 value={doiQuery}
-                onChangeText={setdoiQuery => setDoiQuery(setdoiQuery)}
+                onChangeText={(val) => setDoiQuery(val)}
                 placeholder="Paste DOI (e.g. 10.1038/...)"
                 placeholderTextColor="#94A3B8"
                 style={styles.doiInput}
@@ -1815,8 +2046,69 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
-  moreButton: {
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  headerActionBtn: {
     padding: 6,
+  },
+  /* In-Chat Search Bar */
+  chatSearchContainer: {
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  chatSearchInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 36,
+  },
+  chatSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+    paddingBottom: 2,
+  },
+  filterPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterPillActive: {
+    backgroundColor: '#164E3F',
+    borderColor: '#164E3F',
+  },
+  filterPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+  },
+  searchMatchCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#164E3F',
+    marginTop: 6,
   },
   dateCapsuleContainer: {
     alignItems: 'center',
@@ -2293,7 +2585,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     paddingHorizontal: 6,
   },
-  detachedSendBtn: {
+  detachedMicBtn: {
     width: 42,
     height: 42,
     borderRadius: 21,
@@ -2301,8 +2593,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  detachedSendBtnDisabled: {
-    backgroundColor: '#CBD5E1',
+  detachedSendBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -2314,6 +2611,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#0F172A',
+    marginTop: 12,
   },
   emptyBio: {
     fontSize: 13,
