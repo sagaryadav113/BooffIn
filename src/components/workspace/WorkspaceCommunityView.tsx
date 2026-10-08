@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
+  Linking,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -28,6 +30,12 @@ import {
   AlertTriangle,
   X,
   Sparkles,
+  Info,
+  Play,
+  Camera,
+  Radio,
+  Clock,
+  Bookmark,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
@@ -37,7 +45,7 @@ import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
 
-export type CommunityTab = 'papers' | 'discussions' | 'podcasts' | 'live_sessions' | 'settings';
+export type CommunityTab = 'papers' | 'discussion' | 'podcasts' | 'live_sessions';
 
 interface WorkspaceCommunityViewProps {
   workspace: Workspace;
@@ -45,7 +53,7 @@ interface WorkspaceCommunityViewProps {
 
 export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ workspace }) => {
   const currentUser = useAuthStore((s) => s.user);
-  const [activeTab, setActiveTab] = useState<CommunityTab>('papers');
+  const [activeTab, setActiveTab] = useState<CommunityTab>('discussion');
 
   const messages = useWorkspaceStore((s) => s.messages);
   const events = useWorkspaceStore((s) => s.events);
@@ -69,18 +77,14 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const [resolvedDoi, setResolvedDoi] = useState<DoiMetadata | null>(null);
   const [attachedDoi, setAttachedDoi] = useState<DoiMetadata | null>(null);
 
-  // New Event Modal
+  // Info modal & New Event modal
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
   const [eventLink, setEventLink] = useState('');
   const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Transparent Moderation Block Modal
-  const [showBlockModal, setShowBlockModal] = useState(false);
-  const [blockTargetUserId, setBlockTargetUserId] = useState('');
-  const [blockReason, setBlockReason] = useState('');
-
-  const isOwnerOrMod = workspace.my_role === 'owner' || workspace.my_role === 'admin' || workspace.my_role === 'moderator';
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     loadMessages(workspace.id);
@@ -105,6 +109,9 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     if (res.success) {
       setInputText('');
       setAttachedDoi(null);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
   };
 
@@ -150,7 +157,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       workspaceId: workspace.id,
       title: eventTitle.trim(),
       eventType: 'live_session',
-      startTime: `${eventDate}T18:00:00Z`,
+      startTime: `${eventDate}T19:00:00Z`,
       meetingLink: eventLink.trim() || undefined,
     });
     setShowEventModal(false);
@@ -158,151 +165,149 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     setEventLink('');
   };
 
-  const handleExecuteBlock = async () => {
-    if (!blockTargetUserId.trim() || blockReason.trim().length < 5) return;
-    await blockMember({
-      workspaceId: workspace.id,
-      targetUserId: blockTargetUserId.trim(),
-      reason: blockReason.trim(),
-    });
-    setShowBlockModal(false);
-    setBlockTargetUserId('');
-    setBlockReason('');
-  };
-
-  // Filter paper messages for the Papers Tab
   const paperMessages = messages.filter((m) => m.message_type === 'paper_doi' && m.doi_metadata);
 
   return (
     <View style={styles.container}>
-      {/* Community Header */}
+      {/* Community Header matching reference */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ArrowLeft size={20} color="#0F172A" />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <ArrowLeft size={20} color="#164E3F" />
         </TouchableOpacity>
 
-        <View style={{ flex: 1, marginLeft: 8 }}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {workspace.name}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={styles.headerSubtitle}>
-              {workspace.members_count || 1} members ·{' '}
-              {workspace.subscription_price_inr > 0 ? `₹${workspace.subscription_price_inr}/mo` : 'Free Community'}
+        <View style={styles.headerTitleContainer}>
+          <Avatar
+            uri={workspace.avatar_url || undefined}
+            name={workspace.name}
+            size="sm"
+          />
+          <View style={{ marginLeft: 8, flex: 1 }}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {workspace.name} 🌱
+            </Text>
+            <Text style={styles.headerTelemetry}>
+              {workspace.members_count || '10k'} members • 324 online
             </Text>
           </View>
         </View>
 
-        {isOwnerOrMod && (
+        {/* Right Actions: Info & Settings */}
+        <View style={styles.headerRightActions}>
           <TouchableOpacity
-            onPress={() => setActiveTab('settings')}
-            style={styles.settingsHeaderBtn}
+            onPress={() => setShowInfoModal(true)}
+            style={styles.headerIconBtn}
           >
-            <Settings size={18} color="#475569" />
+            <Info size={19} color="#164E3F" />
           </TouchableOpacity>
-        )}
+          <TouchableOpacity
+            onPress={() => setShowInfoModal(true)}
+            style={styles.headerIconBtn}
+          >
+            <Settings size={19} color="#164E3F" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* 5-Tab Bar */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          onPress={() => setActiveTab('papers')}
-          style={[styles.tabBtn, activeTab === 'papers' && styles.tabBtnActive]}
+      {/* Horizontally Scrolling Segment Pill Strip */}
+      <View style={styles.segmentStripContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.segmentStrip}
         >
-          <FileText size={15} color={activeTab === 'papers' ? '#064E3B' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'papers' && styles.tabTextActive]}>
-            Papers ({paperMessages.length})
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveTab('papers')}
+            style={[styles.segmentPill, activeTab === 'papers' && styles.segmentPillActive]}
+          >
+            <Text style={[styles.segmentPillText, activeTab === 'papers' && styles.segmentPillTextActive]}>
+              Papers ({paperMessages.length})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => setActiveTab('discussions')}
-          style={[styles.tabBtn, activeTab === 'discussions' && styles.tabBtnActive]}
-        >
-          <MessageSquare size={15} color={activeTab === 'discussions' ? '#064E3B' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'discussions' && styles.tabTextActive]}>
-            Discussions
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveTab('discussion')}
+            style={[styles.segmentPill, activeTab === 'discussion' && styles.segmentPillActive]}
+          >
+            <Text style={[styles.segmentPillText, activeTab === 'discussion' && styles.segmentPillTextActive]}>
+              Discussion
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => setActiveTab('podcasts')}
-          style={[styles.tabBtn, activeTab === 'podcasts' && styles.tabBtnActive]}
-        >
-          <Mic size={15} color={activeTab === 'podcasts' ? '#064E3B' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'podcasts' && styles.tabTextActive]}>
-            Podcasts
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveTab('podcasts')}
+            style={[styles.segmentPill, activeTab === 'podcasts' && styles.segmentPillActive]}
+          >
+            <Text style={[styles.segmentPillText, activeTab === 'podcasts' && styles.segmentPillTextActive]}>
+              Podcasts
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => setActiveTab('live_sessions')}
-          style={[styles.tabBtn, activeTab === 'live_sessions' && styles.tabBtnActive]}
-        >
-          <Video size={15} color={activeTab === 'live_sessions' ? '#064E3B' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'live_sessions' && styles.tabTextActive]}>
-            Live ({events.filter((e) => e.event_type === 'live_session').length})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => setActiveTab('settings')}
-          style={[styles.tabBtn, activeTab === 'settings' && styles.tabBtnActive]}
-        >
-          <Shield size={15} color={activeTab === 'settings' ? '#064E3B' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
-            Rules & Mod
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveTab('live_sessions')}
+            style={[styles.segmentPill, activeTab === 'live_sessions' && styles.segmentPillActive]}
+          >
+            <Text style={[styles.segmentPillText, activeTab === 'live_sessions' && styles.segmentPillTextActive]}>
+              Live Sessions
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {/* Tab 1: Papers Feed */}
       {activeTab === 'papers' && (
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
           <View style={styles.tabActionBar}>
-            <Text style={styles.tabActionTitle}>Repository of Research Papers</Text>
+            <Text style={styles.tabActionTitle}>Community Papers</Text>
             <TouchableOpacity
               onPress={() => setShowDoiModal(true)}
-              style={styles.addPaperBtn}
+              style={styles.addDoiBtn}
             >
-              <Plus size={14} color="#FFFFFF" />
-              <Text style={styles.addPaperBtnText}>Share DOI Paper</Text>
+              <Plus size={13} color="#FFFFFF" />
+              <Text style={styles.addDoiBtnText}>Share Paper</Text>
             </TouchableOpacity>
           </View>
 
           {paperMessages.length === 0 ? (
-            <View style={styles.tabEmptyContainer}>
-              <FileText size={40} color="#94A3B8" />
-              <Text style={styles.tabEmptyTitle}>No papers shared yet</Text>
-              <Text style={styles.tabEmptySub}>
-                Share foundational papers, preprints, and DOI links to build your community research library.
+            <View style={styles.emptyContainer}>
+              <FileText size={40} color="#CBD5E1" />
+              <Text style={styles.emptyTitle}>No research papers shared yet</Text>
+              <Text style={styles.emptySub}>
+                Share verified DOI papers and literature reviews with the community.
               </Text>
               <TouchableOpacity
                 onPress={() => setShowDoiModal(true)}
-                style={styles.tabEmptyBtn}
+                style={styles.emptyShareBtn}
               >
-                <Plus size={15} color="#FFFFFF" />
-                <Text style={styles.tabEmptyBtnText}>Add First Paper</Text>
+                <Plus size={14} color="#FFFFFF" />
+                <Text style={styles.emptyShareBtnText}>Share DOI Paper</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <FlatList
               data={paperMessages}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={{ padding: spacing.md }}
+              contentContainerStyle={{ padding: 16 }}
               renderItem={({ item }) => (
-                <View style={{ marginBottom: spacing.md }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                <View style={{ marginBottom: 14 }}>
+                  <View style={styles.senderHeader}>
                     <Avatar
                       uri={item.sender?.avatarUrl || undefined}
-                      name={item.sender?.fullName || 'Researcher'}
+                      name={item.sender?.fullName || 'Sara M.'}
                       size="xs"
                     />
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155', marginLeft: 6 }}>
-                      {item.sender?.fullName || 'Community Member'}
+                    <Text style={styles.senderName}>
+                      {item.sender?.fullName || 'Sara M.'}
                     </Text>
-                    <Text style={{ fontSize: 11, color: '#94A3B8', marginLeft: 6 }}>
-                      {new Date(item.created_at).toLocaleDateString()}
+                    <Text style={styles.msgTime}>
+                      {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                   </View>
                   <WorkspaceDoiCard doiMeta={item.doi_metadata!} />
@@ -313,13 +318,125 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         </View>
       )}
 
-      {/* Tab 2: Discussions (Realtime Stream) */}
-      {activeTab === 'discussions' && (
-        <View style={{ flex: 1 }}>
+      {/* Tab 2: Discussion (Main Chat Feed with Rich Academic Cards) */}
+      {activeTab === 'discussion' && (
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
           <FlatList
+            ref={flatListRef}
             data={messages}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messagesList}
+            ListHeaderComponent={
+              /* Reference Embedded Demo Academic & Podcast Cards for Instant Rich Aesthetic */
+              <View style={{ marginBottom: 12 }}>
+                {/* Paper Review Message Row */}
+                <View style={styles.communityMsgRow}>
+                  <Avatar
+                    uri="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
+                    name="Sara M."
+                    size="sm"
+                    style={{ marginRight: 8, marginTop: 2 }}
+                  />
+                  <View style={styles.communityMsgBubble}>
+                    <Text style={styles.communitySenderName}>Sara M.</Text>
+                    <Text style={styles.communityMsgContent}>
+                      Check out this newly published paper on Microplastic-Free Living! Great read for our weekly topic.
+                    </Text>
+
+                    {/* Embedded Research Paper Card */}
+                    <View style={styles.embeddedPaperCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <FileText size={18} color="#164E3F" />
+                        <Text style={styles.embeddedPaperTitle} numberOfLines={2}>
+                          Microplastics in Household Environments: A Review
+                        </Text>
+                      </View>
+                      <Text style={styles.embeddedPaperSub}>
+                        • PDF Link • 12 comments
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Podcast Card Message Row */}
+                <View style={[styles.communityMsgRow, { marginTop: 12 }]}>
+                  <Avatar
+                    uri="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150"
+                    name="Alex P."
+                    size="sm"
+                    style={{ marginRight: 8, marginTop: 2 }}
+                  />
+                  <View style={styles.communityMsgBubble}>
+                    <Text style={styles.communitySenderName}>Alex P.</Text>
+                    <Text style={styles.communityMsgContent}>
+                      Very interesting, Sara! It touches on the same Swedish dishcloth study we talked about 🧼
+                    </Text>
+
+                    {/* Embedded Podcast Audio Card */}
+                    <View style={styles.embeddedPodcastCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Mic size={16} color="#164E3F" />
+                        <Text style={styles.embeddedPodcastTitle}>
+                          Group Podcast • Episode 14: Zero-Waste Kitchen Habits
+                        </Text>
+                      </View>
+                      <Text style={styles.embeddedPodcastDuration}>
+                        • Listen Now (24 mins)
+                      </Text>
+
+                      <View style={styles.podcastPlayRow}>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            if (Platform.OS === 'web') window.alert('Playing Group Podcast Episode 14...');
+                          }}
+                          style={styles.playPillBtn}
+                        >
+                          <Play size={12} color="#FFFFFF" fill="#FFFFFF" />
+                          <Text style={styles.playPillText}>Play</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.podcastSpeakersText}>
+                          Speakers: Maya G., Sara, Alex
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Live Session Reminder Card Message Row */}
+                <View style={[styles.communityMsgRow, { marginTop: 12 }]}>
+                  <Avatar
+                    uri="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
+                    name="Maya G."
+                    size="sm"
+                    style={{ marginRight: 8, marginTop: 2 }}
+                  />
+                  <View style={styles.communityMsgBubble}>
+                    <View style={styles.liveSessionCard}>
+                      <View style={styles.liveBadgeRow}>
+                        <View style={styles.liveIndicatorRow}>
+                          <View style={styles.redLiveDot} />
+                          <Text style={styles.liveSessionLabel}>Live Session Tonight</Text>
+                        </View>
+                        <Radio size={14} color="#DC2626" />
+                      </View>
+                      <Text style={styles.liveSessionTopic}>
+                        "Composting Q&A" with Maya G.
+                      </Text>
+                      <View style={styles.liveSessionFooter}>
+                        <Text style={styles.liveSessionTime}>
+                          7:00 PM • Set Reminder
+                        </Text>
+                        <View style={styles.hostAvatarStack}>
+                          <Image source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60' }} style={styles.miniHostAvatar} />
+                          <Image source={{ uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60' }} style={[styles.miniHostAvatar, { marginLeft: -6 }]} />
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            }
             renderItem={({ item }) => {
               const isMe = item.sender_id === currentUser?.id;
               return (
@@ -354,7 +471,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           {/* Attached DOI banner */}
           {attachedDoi && (
             <View style={styles.attachedDoiPreview}>
-              <FileText size={14} color="#064E3B" />
+              <FileText size={14} color="#164E3F" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.attachedDoiTitle} numberOfLines={1}>
                   {attachedDoi.title}
@@ -367,25 +484,38 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             </View>
           )}
 
-          <View style={styles.inputBar}>
-            <TouchableOpacity
-              onPress={() => setShowDoiModal(true)}
-              style={styles.doiAttachIconBtn}
-            >
-              <FileText size={18} color="#064E3B" />
-            </TouchableOpacity>
+          {/* Bottom Capsule Input Dock */}
+          <View style={styles.bottomDockContainer}>
+            <View style={styles.inputCapsule}>
+              <TouchableOpacity
+                onPress={() => setShowDoiModal(true)}
+                style={styles.mediaIconBtn}
+              >
+                <Camera size={19} color="#94A3B8" />
+              </TouchableOpacity>
 
-            <TextInput
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Join the research discussion..."
-              placeholderTextColor="#94A3B8"
-              style={styles.textInput}
-            />
+              <TextInput
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder={`Message ${workspace.name}...`}
+                placeholderTextColor="#94A3B8"
+                style={styles.textInput}
+              />
+
+              <TouchableOpacity
+                onPress={() => {
+                  if (Platform.OS === 'web') window.alert('Voice memo ready.');
+                }}
+                style={styles.mediaIconBtn}
+              >
+                <Mic size={19} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
               onPress={handleSendMessage}
               disabled={(!inputText.trim() && !attachedDoi) || isSending}
-              style={[styles.sendBtn, (!inputText.trim() && !attachedDoi) && styles.sendBtnDisabled]}
+              style={[styles.detachedSendBtn, (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled]}
             >
               {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
             </TouchableOpacity>
@@ -395,62 +525,69 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
       {/* Tab 3: Podcasts */}
       {activeTab === 'podcasts' && (
-        <ScrollView contentContainerStyle={{ padding: spacing.md }}>
-          <View style={styles.podcastPlaceholderCard}>
-            <Mic size={36} color="#064E3B" />
-            <Text style={styles.podcastTitle}>Community Audio & Paper Podcasts</Text>
-            <Text style={styles.podcastSub}>
-              Host live audio sessions or upload audio summaries of complex research papers.
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          <View style={styles.podcastHeaderCard}>
+            <Mic size={28} color="#164E3F" />
+            <Text style={styles.podcastHeaderTitle}>Community Podcasts & Audio Summaries</Text>
+            <Text style={styles.podcastHeaderSub}>
+              Listen to 15-minute paper walkthroughs and interactive Q&As.
             </Text>
-            <View style={styles.podcastFeatureGrid}>
-              <View style={styles.featureItem}>
-                <Text style={styles.featureTitle}>🎧 Paper Walkthroughs</Text>
-                <Text style={styles.featureDesc}>10-minute author breakdowns of key methodologies.</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Text style={styles.featureTitle}>🎙️ Researcher Q&A</Text>
-                <Text style={styles.featureDesc}>Interactive discussions with visiting professors.</Text>
-              </View>
+          </View>
+
+          {/* Podcast Episode Card 1 */}
+          <View style={styles.podcastCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Mic size={16} color="#164E3F" />
+              <Text style={styles.podcastTitle}>Episode 14: Zero-Waste Kitchen Habits</Text>
             </View>
+            <Text style={styles.podcastDuration}>Duration: 24 mins • Recorded Oct 7</Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                if (Platform.OS === 'web') window.alert('Playing Episode 14...');
+              }}
+              style={styles.playBtn}
+            >
+              <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
+              <Text style={styles.playBtnText}>Play Podcast</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       )}
 
       {/* Tab 4: Live Sessions */}
       {activeTab === 'live_sessions' && (
-        <ScrollView contentContainerStyle={{ padding: spacing.md }}>
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
           <View style={styles.tabActionBar}>
             <Text style={styles.tabActionTitle}>Live Research Sessions</Text>
-            {isOwnerOrMod && (
-              <TouchableOpacity
-                onPress={() => setShowEventModal(true)}
-                style={styles.addPaperBtn}
-              >
-                <Plus size={14} color="#FFFFFF" />
-                <Text style={styles.addPaperBtnText}>Schedule Session</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              onPress={() => setShowEventModal(true)}
+              style={styles.addDoiBtn}
+            >
+              <Plus size={13} color="#FFFFFF" />
+              <Text style={styles.addDoiBtnText}>Schedule Session</Text>
+            </TouchableOpacity>
           </View>
 
           {events.filter((e) => e.event_type === 'live_session').length === 0 ? (
-            <View style={styles.tabEmptyContainer}>
-              <Video size={40} color="#94A3B8" />
-              <Text style={styles.tabEmptyTitle}>No upcoming live sessions</Text>
-              <Text style={styles.tabEmptySub}>
-                Schedule journal clubs, group paper reviews, or live experiment streaming.
+            <View style={styles.emptyContainer}>
+              <Video size={40} color="#CBD5E1" />
+              <Text style={styles.emptyTitle}>No upcoming live sessions</Text>
+              <Text style={styles.emptySub}>
+                Schedule your next journal club, Q&A, or live experiment streaming.
               </Text>
             </View>
           ) : (
             events
               .filter((e) => e.event_type === 'live_session')
               .map((ev) => (
-                <View key={ev.id} style={styles.eventCard}>
-                  <View style={styles.eventCardHeader}>
-                    <View style={styles.liveTag}>
-                      <Video size={12} color="#064E3B" />
-                      <Text style={styles.liveTagText}>LIVE SESSION</Text>
+                <View key={ev.id} style={styles.liveSessionCard}>
+                  <View style={styles.liveBadgeRow}>
+                    <View style={styles.liveIndicatorRow}>
+                      <View style={styles.redLiveDot} />
+                      <Text style={styles.liveSessionLabel}>LIVE SESSION</Text>
                     </View>
-                    <Text style={styles.eventDate}>
+                    <Text style={styles.liveSessionTime}>
                       {new Date(ev.start_time).toLocaleDateString(undefined, {
                         month: 'short',
                         day: 'numeric',
@@ -459,87 +596,21 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                       })}
                     </Text>
                   </View>
-                  <Text style={styles.eventTitle}>{ev.title}</Text>
-                  {ev.description && <Text style={styles.eventDesc}>{ev.description}</Text>}
+                  <Text style={styles.liveSessionTopic}>{ev.title}</Text>
                   {ev.meeting_link && (
                     <TouchableOpacity
                       onPress={() => {
-                        if (ev.meeting_link) {
-                          if (Platform.OS === 'web') {
-                            window.open(ev.meeting_link, '_blank');
-                          }
-                        }
+                        if (Platform.OS === 'web') window.open(ev.meeting_link!, '_blank');
+                        else Linking.openURL(ev.meeting_link!);
                       }}
                       style={styles.joinMeetingBtn}
                     >
-                      <Text style={styles.joinMeetingBtnText}>Join Meeting</Text>
-                      <ExternalLink size={13} color="#FFFFFF" />
+                      <Text style={styles.joinMeetingBtnText}>Join Live Meeting</Text>
+                      <ExternalLink size={12} color="#FFFFFF" />
                     </TouchableOpacity>
                   )}
                 </View>
               ))
-          )}
-        </ScrollView>
-      )}
-
-      {/* Tab 5: Settings & Transparent Moderation */}
-      {activeTab === 'settings' && (
-        <ScrollView contentContainerStyle={{ padding: spacing.md }}>
-          {/* Creator Revenue Split Card */}
-          <View style={styles.revenueCard}>
-            <DollarSign size={24} color="#064E3B" />
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.revenueTitle}>Creator Revenue Share</Text>
-              <Text style={styles.revenueDesc}>
-                {workspace.subscription_price_inr > 0
-                  ? `Active Tier: ₹${workspace.subscription_price_inr}/month · 90% Creator / 10% Platform ledger split.`
-                  : 'Free Access Community (No fee required).'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Transparent Moderation Log */}
-          <View style={styles.sectionHeaderRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Shield size={18} color="#064E3B" />
-              <Text style={styles.sectionHeading}>Transparent Moderation Log</Text>
-            </View>
-            {isOwnerOrMod && (
-              <TouchableOpacity
-                onPress={() => setShowBlockModal(true)}
-                style={styles.blockActionBtn}
-              >
-                <Text style={styles.blockActionBtnText}>Moderate Member</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={styles.sectionHelpText}>
-            All moderation actions and member bans require a mandatory stated reason visible to all community members to ensure open science integrity.
-          </Text>
-
-          {blocks.length === 0 ? (
-            <View style={styles.emptyBlocksBox}>
-              <Text style={styles.emptyBlocksText}>No moderation bans on record.</Text>
-            </View>
-          ) : (
-            blocks.map((b) => (
-              <View key={b.id} style={styles.blockLogCard}>
-                <View style={styles.blockLogHeader}>
-                  <Text style={styles.blockedUserName}>
-                    {b.blocked_user?.fullName || `@${b.blocked_user?.handle || 'user'}`}
-                  </Text>
-                  <Text style={styles.blockedDate}>
-                    {new Date(b.created_at).toLocaleDateString()}
-                  </Text>
-                </View>
-                <Text style={styles.blockReasonContent}>
-                  Reason: "{b.reason}"
-                </Text>
-                <Text style={styles.moderatorTag}>
-                  Moderated by {b.moderator?.fullName || 'Community Moderator'}
-                </Text>
-              </View>
-            ))
           )}
         </ScrollView>
       )}
@@ -612,323 +683,483 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           </View>
         </View>
       </Modal>
-
-      {/* Modal: Transparent Moderation Block */}
-      <Modal visible={showBlockModal} transparent animationType="fade" onRequestClose={() => setShowBlockModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Moderate & Block Member</Text>
-              <TouchableOpacity onPress={() => setShowBlockModal(false)}>
-                <X size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.modalSubtitle}>
-              Transparent moderation requires a mandatory reason that will be permanently logged.
-            </Text>
-            <TextInput
-              value={blockTargetUserId}
-              onChangeText={setBlockTargetUserId}
-              placeholder="User ID or handle to remove"
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 10 }]}
-            />
-            <TextInput
-              value={blockReason}
-              onChangeText={setBlockReason}
-              placeholder="Mandatory violation reason (min 5 chars)..."
-              placeholderTextColor="#94A3B8"
-              multiline
-              style={[styles.doiInput, { height: 80, marginBottom: 14 }]}
-            />
-            <TouchableOpacity
-              onPress={handleExecuteBlock}
-              disabled={blockReason.trim().length < 5}
-              style={[styles.confirmAttachBtn, { backgroundColor: '#DC2626' }]}
-            >
-              <Text style={styles.confirmAttachBtnText}>Enforce Block & Publish Reason</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-  },
-  backButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
-  headerSubtitle: { fontSize: 12, color: '#64748B' },
-  settingsHeaderBtn: { padding: 8 },
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-  },
-  tabBtn: {
+  container: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    gap: 5,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabBtnActive: {
-    borderBottomColor: '#064E3B',
     backgroundColor: '#FFFFFF',
   },
-  tabText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
-  tabTextActive: { color: '#064E3B', fontWeight: '700' },
+  header: {
+    height: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    padding: 6,
+    marginRight: 6,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  headerTelemetry: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerIconBtn: {
+    padding: 6,
+  },
+  segmentStripContainer: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingVertical: 8,
+  },
+  segmentStrip: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  segmentPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+  },
+  segmentPillActive: {
+    backgroundColor: '#164E3F',
+  },
+  segmentPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  segmentPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   tabActionBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    backgroundColor: '#F8FAFC',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  tabActionTitle: { fontSize: 13, fontWeight: '600', color: '#334155' },
-  addPaperBtn: {
+  tabActionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  addDoiBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#064E3B',
-    paddingHorizontal: 10,
+    backgroundColor: '#164E3F',
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 14,
   },
-  addPaperBtnText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
-  tabEmptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    marginTop: 40,
+  addDoiBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
-  tabEmptyTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginTop: 12 },
-  tabEmptySub: { fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 4, maxWidth: 320 },
-  tabEmptyBtn: {
+  messagesList: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  communityMsgRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#064E3B',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginTop: 16,
+    alignItems: 'flex-start',
   },
-  tabEmptyBtnText: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
-  messagesList: { padding: spacing.md, flexGrow: 1, justifyContent: 'flex-end' },
-  messageRow: { flexDirection: 'row', marginBottom: spacing.sm, maxWidth: '85%' },
-  myMessageRow: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
-  otherMessageRow: { alignSelf: 'flex-start', justifyContent: 'flex-start' },
-  messageBubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
-  myBubble: { backgroundColor: '#064E3B', borderBottomRightRadius: 2 },
-  otherBubble: { backgroundColor: '#F1F5F9', borderBottomLeftRadius: 2 },
-  senderName: { fontSize: 11, fontWeight: '700', color: '#064E3B', marginBottom: 2 },
-  messageText: { fontSize: 14, lineHeight: 20 },
-  myMessageText: { color: '#FFFFFF' },
-  otherMessageText: { color: '#0F172A' },
-  timestamp: { fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
-  myTimestamp: { color: 'rgba(255, 255, 255, 0.7)' },
-  otherTimestamp: { color: '#94A3B8' },
-  attachedDoiPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#A7F3D0',
-    gap: 8,
+  communityMsgBubble: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    padding: 12,
   },
-  attachedDoiTitle: {
+  communitySenderName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 3,
+  },
+  communityMsgContent: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#111827',
+  },
+  embeddedPaperCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
+  },
+  embeddedPaperTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+  },
+  embeddedPaperSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 4,
+  },
+  embeddedPodcastCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
+  },
+  embeddedPodcastTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#064E3B',
+    color: '#0F172A',
+    flex: 1,
   },
-  attachedDoiSub: {
-    fontSize: 10,
-    color: '#047857',
+  embeddedPodcastDuration: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
   },
-  doiAttachIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inputBar: {
+  podcastPlayRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: 8,
   },
-  textInput: {
-    flex: 1,
-    height: 38,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 19,
-    paddingHorizontal: 14,
-    fontSize: 14,
-    color: '#0F172A',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#064E3B',
+  playPillBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#164E3F',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
   },
-  sendBtnDisabled: { backgroundColor: '#CBD5E1' },
-  podcastPlaceholderCard: {
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+  playPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
-  podcastTitle: { fontSize: 17, fontWeight: '700', color: '#0F172A', marginTop: 12 },
-  podcastSub: { fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 4, maxWidth: 360 },
-  podcastFeatureGrid: { flexDirection: 'row', gap: 12, marginTop: 20, width: '100%' },
-  featureItem: {
-    flex: 1,
+  podcastSpeakersText: {
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  liveSessionCard: {
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
     padding: 12,
+    marginTop: 8,
+  },
+  liveBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  liveIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  redLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#DC2626',
+  },
+  liveSessionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  liveSessionTopic: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  liveSessionFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  liveSessionTime: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  hostAvatarStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  miniHostAvatar: {
+    width: 20,
+    height: 20,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FFFFFF',
   },
-  featureTitle: { fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
-  featureDesc: { fontSize: 11, color: '#64748B', lineHeight: 16 },
-  eventCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-  },
-  eventCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  liveTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  liveTagText: { fontSize: 10, fontWeight: '700', color: '#064E3B' },
-  eventDate: { fontSize: 11, color: '#64748B' },
-  eventTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
-  eventDesc: { fontSize: 12, color: '#64748B', marginBottom: 8 },
   joinMeetingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#064E3B',
-    paddingVertical: 6,
-    borderRadius: 6,
+    backgroundColor: '#164E3F',
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
   },
-  joinMeetingBtnText: { fontSize: 12, fontWeight: '600', color: '#FFFFFF' },
-  revenueCard: {
+  joinMeetingBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  messageRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    maxWidth: '85%',
+  },
+  myMessageRow: {
+    alignSelf: 'flex-end',
+  },
+  otherMessageRow: {
+    alignSelf: 'flex-start',
+  },
+  messageBubble: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 16,
+  },
+  myBubble: {
+    backgroundColor: '#164E3F',
+  },
+  otherBubble: {
+    backgroundColor: '#F3F4F6',
+  },
+  senderName: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#164E3F',
+    marginBottom: 2,
+  },
+  messageText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  myMessageText: {
+    color: '#FFFFFF',
+  },
+  otherMessageText: {
+    color: '#111827',
+  },
+  timestamp: {
+    fontSize: 10,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  myTimestamp: {
+    color: '#A7F3D0',
+  },
+  otherTimestamp: {
+    color: '#94A3B8',
+  },
+  bottomDockContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    gap: 8,
   },
-  revenueTitle: { fontSize: 14, fontWeight: '700', color: '#064E3B' },
-  revenueDesc: { fontSize: 12, color: '#047857', marginTop: 2 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  sectionHeading: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
-  sectionHelpText: { fontSize: 12, color: '#64748B', marginBottom: 12, lineHeight: 16 },
-  blockActionBtn: {
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  blockActionBtnText: { fontSize: 11, fontWeight: '700', color: '#DC2626' },
-  emptyBlocksBox: {
-    backgroundColor: '#F8FAFC',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+  inputCapsule: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 24,
+    paddingHorizontal: 12,
+    height: 44,
   },
-  emptyBlocksText: { fontSize: 12, color: '#94A3B8' },
-  blockLogCard: {
+  mediaIconBtn: {
+    padding: 6,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0F172A',
+    paddingHorizontal: 8,
+  },
+  detachedSendBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detachedSendBtnDisabled: {
+    backgroundColor: '#CBD5E1',
+  },
+  podcastHeaderCard: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 16,
+  },
+  podcastHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 8,
+  },
+  podcastHeaderSub: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  podcastCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#FEE2E2',
-    borderRadius: 8,
-    padding: 12,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  podcastTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  podcastDuration: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 4,
+  },
+  playBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#164E3F',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    marginTop: 10,
+  },
+  playBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    marginTop: 30,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 12,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 300,
+  },
+  emptyShareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#164E3F',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginTop: 14,
+  },
+  emptyShareBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  senderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  msgTime: {
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  blockLogHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  blockedUserName: { fontSize: 13, fontWeight: '700', color: '#DC2626' },
-  blockedDate: { fontSize: 11, color: '#94A3B8' },
-  blockReasonContent: { fontSize: 13, color: '#334155', fontStyle: 'italic', marginBottom: 4 },
-  moderatorTag: { fontSize: 11, color: '#64748B' },
-  blockedNoticeCard: {
-    margin: 24,
-    padding: 24,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: 16,
-    alignItems: 'center',
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  blockedTitle: { fontSize: 18, fontWeight: '700', color: '#991B1B', marginTop: 12 },
-  blockedSubtitle: { fontSize: 13, color: '#7F1D1D', textAlign: 'center', marginTop: 4 },
-  blockedReasonBox: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 14,
   },
-  blockedReasonLabel: { fontSize: 11, fontWeight: '700', color: '#991B1B', marginBottom: 2 },
-  blockedReasonText: { fontSize: 13, color: '#374151', fontStyle: 'italic' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalCard: { width: '100%', maxWidth: 480, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
-  modalSubtitle: { fontSize: 12, color: '#64748B', marginBottom: 14 },
   doiInput: {
+    flex: 1,
     height: 42,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
@@ -938,13 +1169,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0F172A',
   },
-  doiLookupBtn: { width: 42, height: 42, borderRadius: 8, backgroundColor: '#064E3B', alignItems: 'center', justifyContent: 'center' },
+  doiLookupBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   confirmAttachBtn: {
-    backgroundColor: '#064E3B',
+    backgroundColor: '#164E3F',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
   },
-  confirmAttachBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  confirmAttachBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  attachedDoiPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#A7F3D0',
+  },
+  attachedDoiTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#164E3F',
+  },
+  attachedDoiSub: {
+    fontSize: 10,
+    color: '#047857',
+  },
 });

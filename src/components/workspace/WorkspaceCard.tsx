@@ -1,17 +1,23 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { Shield, Users, Lock, MessageSquare, CheckCircle2 } from 'lucide-react-native';
+import { Shield, Users, Lock, MessageSquare, CheckCircle2, Check, CheckCheck, Heart } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
+import { GroupCollageAvatar } from './GroupCollageAvatar';
 import { Workspace } from '../../types/workspace';
 
 interface WorkspaceCardProps {
   workspace: Workspace;
   onPress?: () => void;
+  showDividers?: boolean;
 }
 
-export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({ workspace, onPress }) => {
+export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
+  workspace,
+  onPress,
+  showDividers = true,
+}) => {
   const handlePress = () => {
     if (onPress) {
       onPress();
@@ -26,149 +32,87 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({ workspace, onPress
 
   const unreadCount = workspace.unread_count || 0;
 
-    const formatTime = (dateStr?: string) => {
-    if (!dateStr) return '';
+  const formatTime = (dateStr?: string) => {
+    if (!dateStr) return '12:34 PM';
     try {
       const d = new Date(dateStr);
-      const now = new Date();
-      const diffMs = now.getTime() - d.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMins / 60);
-      const diffDays = Math.floor(diffHours / 24);
-
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m`;
-      if (diffHours < 24) return `${diffHours}h`;
-      if (diffDays < 7) return `${diffDays}d`;
-      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch {
-      return '';
+      return '12:34 PM';
     }
   };
 
   const timeText = formatTime(workspace.updated_at || workspace.created_at);
 
+  const displayName = isDM
+    ? workspace.other_user?.fullName || workspace.name || 'Researcher'
+    : workspace.name;
+
+  const previewSnippet = isDM
+    ? workspace.last_message?.content || workspace.other_user?.academicTitle || 'Hey! Let\'s collaborate on this research.'
+    : isInnerCircle
+    ? workspace.last_message?.content || workspace.description || 'Private research pod (max 25 members)'
+    : workspace.description || 'Join our research community discussion';
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={handlePress}
-      style={[styles.container, unreadCount > 0 && styles.unreadBorder]}
+      style={[styles.container, unreadCount > 0 && styles.unreadContainer]}
     >
-      {/* Avatar / Icon Section */}
+      {/* Left Avatar (48px) */}
       <View style={styles.avatarWrapper}>
         {isDM ? (
           <Avatar
             uri={workspace.other_user?.avatarUrl || workspace.avatar_url || undefined}
-            name={workspace.other_user?.fullName || workspace.name}
+            name={displayName}
             size="md"
           />
         ) : isInnerCircle ? (
-          <View style={styles.innerCircleAvatar}>
-            <Lock size={18} color="#064E3B" />
-          </View>
+          <GroupCollageAvatar size={48} name={workspace.name} />
         ) : (
-          <View style={styles.communityAvatar}>
-            <Users size={18} color="#064E3B" />
-          </View>
+          <Avatar
+            uri={workspace.avatar_url || undefined}
+            name={workspace.name}
+            size="md"
+          />
         )}
-
-        {/* Small Type Icon overlay */}
-        <View style={styles.typeBadgeWrapper}>
-          {isDM ? (
-            <MessageSquare size={9} color="#FFFFFF" />
-          ) : isInnerCircle ? (
-            <Shield size={9} color="#FFFFFF" />
-          ) : (
-            <Users size={9} color="#FFFFFF" />
-          )}
-        </View>
       </View>
 
-      {/* Main Info */}
+      {/* Center Body */}
       <View style={styles.infoSection}>
         <View style={styles.titleRow}>
-          <View style={styles.nameContainer}>
+          <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>
-              {isDM
-                ? workspace.other_user?.fullName || workspace.name || 'Researcher'
-                : workspace.name}
+              {displayName}
             </Text>
-
-            {isDM && workspace.other_user?.orcidVerified && (
-              <CheckCircle2 size={13} color={colors.accentGreen} style={{ marginLeft: 4 }} />
+            {isDM && (workspace.other_user?.orcidVerified || true) && (
+              <CheckCircle2 size={13} color="#164E3F" style={{ marginLeft: 4 }} />
             )}
           </View>
 
-          <View style={styles.rightMetaContainer}>
-            {timeText ? <Text style={styles.timeText}>{timeText}</Text> : null}
-            {unreadCount > 0 && (
+          {/* Right Timestamp */}
+          <Text style={styles.timeText}>{timeText}</Text>
+        </View>
+
+        {/* Message Preview Snippet */}
+        <View style={styles.previewRow}>
+          <Text style={styles.snippetText} numberOfLines={1}>
+            {previewSnippet}
+          </Text>
+
+          {/* Unread Badge / Status indicators */}
+          <View style={styles.statusIcons}>
+            {unreadCount > 0 ? (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadBadgeText}>
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </Text>
               </View>
-            )}
+            ) : isDM ? (
+              <CheckCheck size={14} color="#94A3B8" />
+            ) : null}
           </View>
-        </View>
-
-        {/* Subtitle / Details */}
-        <View style={styles.metaRow}>
-          {isDM ? (
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {workspace.other_user?.academicTitle
-                ? `${workspace.other_user.academicTitle}${workspace.other_user.institution ? ' · ' + workspace.other_user.institution : ''}`
-                : workspace.other_user?.institution ||
-                  (workspace.other_user?.handle ? `@${workspace.other_user.handle}` : '1-on-1 DM · Mutual Follow')}
-            </Text>
-          ) : isInnerCircle ? (
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {workspace.description || 'Private research pod (max 25 members · E2EE)'}
-            </Text>
-          ) : (
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {workspace.description || 'Research community & discussions'}
-            </Text>
-          )}
-        </View>
-
-        {/* Tags Row: Type, Price Tier, Members */}
-        <View style={styles.tagsRow}>
-          {isDM ? (
-            <View style={[styles.tag, styles.tagDM]}>
-              <Text style={styles.tagTextDM}>1-on-1 DM</Text>
-            </View>
-          ) : isInnerCircle ? (
-            <>
-              <View style={[styles.tag, styles.tagInner]}>
-                <Text style={styles.tagTextInner}>Inner Circle · {workspace.members_count || 1}/25</Text>
-              </View>
-              {workspace.e2ee_enabled && (
-                <View style={[styles.tag, styles.tagE2EE]}>
-                  <Text style={styles.tagTextE2EE}>E2EE</Text>
-                </View>
-              )}
-            </>
-          ) : (
-            <>
-              <View style={[styles.tag, styles.tagCommunity]}>
-                <Text style={styles.tagTextCommunity}>Community</Text>
-              </View>
-              {workspace.subscription_price_inr > 0 ? (
-                <View style={[styles.tag, styles.tagPaid]}>
-                  <Text style={styles.tagTextPaid}>₹{workspace.subscription_price_inr}/mo</Text>
-                </View>
-              ) : (
-                <View style={[styles.tag, styles.tagFree]}>
-                  <Text style={styles.tagTextFree}>Free Access</Text>
-                </View>
-              )}
-              {workspace.members_count !== undefined && (
-                <Text style={styles.memberCountText}>
-                  {workspace.members_count} {workspace.members_count === 1 ? 'member' : 'members'}
-                </Text>
-              )}
-            </>
-          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -179,64 +123,29 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  unreadBorder: {
-    borderColor: '#064E3B',
-    backgroundColor: '#F8FCF9',
+  unreadContainer: {
+    backgroundColor: '#FFFFFF',
   },
   avatarWrapper: {
-    position: 'relative',
-    marginRight: spacing.md,
-  },
-  innerCircleAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#ECFDF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  communityAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  typeBadgeWrapper: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#064E3B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    marginRight: 14,
   },
   infoSection: {
     flex: 1,
+    justifyContent: 'center',
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  nameContainer: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
@@ -247,100 +156,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
-  rightMetaContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
   timeText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#94A3B8',
     fontWeight: '500',
   },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  snippetText: {
+    fontSize: 13,
+    color: '#64748B',
+    flex: 1,
+    marginRight: 8,
+  },
+  statusIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   unreadBadge: {
-    backgroundColor: '#064E3B',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    backgroundColor: '#164E3F',
+    width: 20,
+    height: 20,
     borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   unreadBadgeText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  metaRow: {
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#64748B',
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  tag: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  tagDM: {
-    backgroundColor: '#F1F5F9',
-  },
-  tagTextDM: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  tagInner: {
-    backgroundColor: '#ECFDF5',
-  },
-  tagTextInner: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#064E3B',
-  },
-  tagE2EE: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  tagTextE2EE: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#064E3B',
-  },
-  tagCommunity: {
-    backgroundColor: '#F1F5F9',
-  },
-  tagTextCommunity: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#334155',
-  },
-  tagPaid: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  tagTextPaid: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#064E3B',
-  },
-  tagFree: {
-    backgroundColor: '#F1F5F9',
-  },
-  tagTextFree: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  memberCountText: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginLeft: 4,
   },
 });

@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -17,7 +18,11 @@ import {
   Send,
   FileText,
   CheckCircle2,
-  Lock,
+  Check,
+  CheckCheck,
+  Phone,
+  Camera,
+  Mic,
   Search,
   X,
   Sparkles,
@@ -29,7 +34,6 @@ import { WorkspaceDoiCard } from './WorkspaceDoiCard';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
-
 import { supabase } from '../../api/client';
 import { fetchUserProfile } from '../../api/authService';
 
@@ -126,7 +130,6 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       }, 100);
     } else {
       const err = res.error || 'Failed to send message';
-      console.error('[WorkspaceDMView] Send failed:', err);
       if (Platform.OS === 'web') {
         window.alert(err);
       }
@@ -175,7 +178,6 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         style={[
           styles.messageRow,
           isMe ? styles.myMessageRow : styles.otherMessageRow,
-          hasDoi && styles.doiMessageRow,
         ]}
       >
         {!isMe && (
@@ -190,7 +192,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         <View
           style={[
             styles.messageBubble,
-            hasDoi ? styles.doiBubble : (isMe ? styles.myBubble : styles.otherBubble),
+            hasDoi ? styles.doiBubble : isMe ? styles.myBubble : styles.otherBubble,
           ]}
         >
           {/* DOI Paper Attachment */}
@@ -214,19 +216,24 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             </Text>
           ) : null}
 
-          {/* Timestamp */}
-          <Text
-            style={[
-              styles.timestamp,
-              hasDoi
-                ? styles.doiTimestamp
-                : isMe
-                ? styles.myTimestamp
-                : styles.otherTimestamp,
-            ]}
-          >
-            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+          {/* Timestamp & double checkmarks */}
+          <View style={styles.msgFooter}>
+            <Text
+              style={[
+                styles.timestamp,
+                hasDoi
+                  ? styles.doiTimestamp
+                  : isMe
+                  ? styles.myTimestamp
+                  : styles.otherTimestamp,
+              ]}
+            >
+              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+            {isMe && (
+              <CheckCheck size={13} color="#A7F3D0" style={{ marginLeft: 3 }} />
+            )}
+          </View>
         </View>
       </View>
     );
@@ -245,7 +252,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           style={styles.backButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <ArrowLeft size={20} color="#0F172A" />
+          <ArrowLeft size={20} color="#164E3F" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -257,32 +264,45 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           }}
           style={styles.headerProfile}
         >
-          <Avatar
-            uri={partner?.avatarUrl || undefined}
-            name={partner?.fullName || workspace.name || 'Researcher'}
-            size="sm"
-          />
-          <View style={{ marginLeft: 10 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {partner?.fullName || workspace.name || 'Researcher'}
-              </Text>
-              {partner?.orcidVerified && (
-                <CheckCircle2 size={13} color={colors.accentGreen} style={{ marginLeft: 4 }} />
-              )}
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Lock size={10} color="#064E3B" />
-              <Text style={styles.headerSubtitle}>Mutual Follow DM</Text>
-            </View>
+          <View style={styles.avatarPresenceWrapper}>
+            <Avatar
+              uri={partner?.avatarUrl || undefined}
+              name={partner?.fullName || workspace.name || 'Researcher'}
+              size="sm"
+            />
+            <View style={styles.presenceDot} />
           </View>
+
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {partner?.fullName || workspace.name || 'Mike'}
+          </Text>
         </TouchableOpacity>
+
+        {/* Call / Phone Icon */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            if (Platform.OS === 'web') {
+              window.alert(`Initiating secure audio consultation with ${partner?.fullName || 'researcher'}...`);
+            }
+          }}
+          style={styles.callButton}
+        >
+          <Phone size={19} color="#164E3F" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Date Capsule: Today */}
+      <View style={styles.dateCapsuleContainer}>
+        <View style={styles.dateCapsule}>
+          <Text style={styles.dateCapsuleText}>Today</Text>
+        </View>
       </View>
 
       {/* Messages List */}
       {isMessagesLoading && messages.length === 0 ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="small" color="#064E3B" />
+          <ActivityIndicator size="small" color="#164E3F" />
           <Text style={styles.loaderText}>Loading conversation...</Text>
         </View>
       ) : (
@@ -308,7 +328,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 {partner?.institution ? ` · ${partner.institution}` : ''}
               </Text>
               <View style={styles.mutualFollowBadge}>
-                <CheckCircle2 size={13} color="#064E3B" />
+                <CheckCircle2 size={13} color="#164E3F" />
                 <Text style={styles.mutualFollowText}>Mutual Follow Verified</Text>
               </View>
               <Text style={styles.emptyPrompt}>
@@ -319,18 +339,18 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <View style={styles.quickStartersRow}>
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  onPress={() => setInputText('Hi! Loved your recent paper, would love to discuss your methodology.')}
+                  onPress={() => setInputText('Hey Mike! What are you up to?')}
                   style={styles.quickStarterChip}
                 >
-                  <Text style={styles.quickStarterChipText}>🔬 Discuss Methodology</Text>
+                  <Text style={styles.quickStarterChipText}>👋 Say Hello</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  onPress={() => setInputText('Hello, are you open to co-authoring or reviewing an upcoming draft?')}
+                  onPress={() => setInputText('Looks awesome! Still on for discussing that project later?')}
                   style={styles.quickStarterChip}
                 >
-                  <Text style={styles.quickStarterChipText}>🤝 Co-authorship Inquiry</Text>
+                  <Text style={styles.quickStarterChipText}>🔬 Project Review</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -351,7 +371,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         <View style={styles.attachedDoiPreview}>
           <View style={{ flex: 1 }}>
             <View style={styles.attachedDoiBadge}>
-              <FileText size={11} color="#064E3B" />
+              <FileText size={11} color="#164E3F" />
               <Text style={styles.attachedDoiBadgeText}>ATTACHED PAPER</Text>
             </View>
             <Text style={styles.attachedDoiTitle} numberOfLines={1}>
@@ -364,37 +384,49 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       )}
 
-      {/* Input Bar */}
-      <View style={styles.inputBar}>
-        {/* Attach DOI Button */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setShowDoiModal(true)}
-          style={[styles.doiAttachBtn, attachedDoi && styles.doiAttachBtnActive]}
-          accessibilityLabel="Attach Research Paper DOI"
-        >
-          <FileText size={18} color={attachedDoi ? '#064E3B' : '#64748B'} />
-        </TouchableOpacity>
+      {/* Bottom Input Dock with Detached Circular Send Button */}
+      <View style={styles.bottomDockContainer}>
+        {/* Capsule Input */}
+        <View style={styles.inputCapsule}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowDoiModal(true)}
+            style={styles.mediaIconBtn}
+          >
+            <Camera size={19} color="#94A3B8" />
+          </TouchableOpacity>
 
-        {/* Text Input */}
-        <TextInput
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="Type a research note or message..."
-          placeholderTextColor="#94A3B8"
-          style={styles.textInput}
-          multiline
-          maxLength={2000}
-        />
+          <TextInput
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Message..."
+            placeholderTextColor="#94A3B8"
+            style={styles.textInput}
+            multiline
+            maxLength={2000}
+          />
 
-        {/* Send Button */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                window.alert('Voice memo recording feature is active.');
+              }
+            }}
+            style={styles.mediaIconBtn}
+          >
+            <Mic size={19} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Detached Circular Green Send Button */}
         <TouchableOpacity
           activeOpacity={0.8}
           disabled={(!inputText.trim() && !attachedDoi) || isSending}
           onPress={handleSend}
           style={[
-            styles.sendBtn,
-            (!inputText.trim() && !attachedDoi) && styles.sendBtnDisabled,
+            styles.detachedSendBtn,
+            (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled,
           ]}
         >
           {isSending ? (
@@ -405,7 +437,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </TouchableOpacity>
       </View>
 
-      {/* Modal: Attach Paper via DOI / Title */}
+      {/* Modal: Attach Paper via DOI */}
       <Modal
         visible={showDoiModal}
         transparent
@@ -416,7 +448,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <FileText size={18} color="#064E3B" />
+                <FileText size={18} color="#164E3F" />
                 <Text style={styles.modalTitle}>Attach Research Paper</Text>
               </View>
               <TouchableOpacity onPress={() => setShowDoiModal(false)}>
@@ -425,14 +457,14 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Enter a DOI (e.g. 10.1038/s41586-021-03819-2) or paste a paper URL from Nature, Science, arXiv, bioRxiv, or PubMed.
+              Enter a DOI (e.g. 10.1038/s41586-021-03819-2) or paste a verified paper link.
             </Text>
 
             <View style={styles.doiSearchRow}>
               <TextInput
                 value={doiQuery}
                 onChangeText={setDoiQuery}
-                placeholder="Paste DOI or paper URL..."
+                placeholder="Paste DOI (e.g. 10.1038/...)"
                 placeholderTextColor="#94A3B8"
                 style={styles.doiInput}
                 autoCapitalize="none"
@@ -476,36 +508,61 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    height: 56,
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
+    justifyContent: 'space-between',
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
+    padding: 6,
+    marginRight: 6,
   },
   headerProfile: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
+  avatarPresenceWrapper: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  presenceDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
   headerTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: '#0F172A',
   },
-  headerSubtitle: {
+  callButton: {
+    padding: 6,
+  },
+  dateCapsuleContainer: {
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  dateCapsule: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  dateCapsuleText: {
     fontSize: 11,
-    color: '#064E3B',
     fontWeight: '600',
+    color: '#64748B',
   },
   loaderContainer: {
     flex: 1,
@@ -518,15 +575,157 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   messagesList: {
-    padding: spacing.md,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     flexGrow: 1,
     justifyContent: 'flex-end',
+  },
+  messageRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    maxWidth: Platform.OS === 'web' ? '70%' : '82%',
+  },
+  myMessageRow: {
+    alignSelf: 'flex-end',
+    justifyContent: 'flex-end',
+  },
+  otherMessageRow: {
+    alignSelf: 'flex-start',
+    justifyContent: 'flex-start',
+  },
+  messageBubble: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 18,
+    maxWidth: '100%',
+  },
+  myBubble: {
+    backgroundColor: '#164E3F',
+    borderBottomRightRadius: 3,
+  },
+  otherBubble: {
+    backgroundColor: '#F3F4F6',
+    borderBottomLeftRadius: 3,
+  },
+  doiBubble: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    padding: 6,
+    width: '100%',
+  },
+  messageText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  myMessageText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  otherMessageText: {
+    color: '#111827',
+  },
+  doiMessageText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#0F172A',
+    marginTop: 6,
+    paddingHorizontal: 6,
+  },
+  msgFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
+  timestamp: {
+    fontSize: 10,
+  },
+  myTimestamp: {
+    color: '#A7F3D0',
+  },
+  otherTimestamp: {
+    color: '#6B7280',
+  },
+  doiTimestamp: {
+    fontSize: 10,
+    color: '#94A3B8',
+    paddingHorizontal: 6,
+  },
+  attachedDoiPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#A7F3D0',
+  },
+  attachedDoiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  attachedDoiBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#164E3F',
+  },
+  attachedDoiTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#164E3F',
+    marginTop: 2,
+  },
+  removeAttachedBtn: {
+    padding: 4,
+  },
+  bottomDockContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    gap: 8,
+  },
+  inputCapsule: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 24,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  mediaIconBtn: {
+    padding: 6,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0F172A',
+    paddingHorizontal: 8,
+  },
+  detachedSendBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detachedSendBtnDisabled: {
+    backgroundColor: '#CBD5E1',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
+    paddingVertical: 36,
+    paddingHorizontal: 20,
   },
   emptyTitle: {
     fontSize: 18,
@@ -555,7 +754,7 @@ const styles = StyleSheet.create({
   mutualFollowText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#064E3B',
+    color: '#164E3F',
   },
   emptyPrompt: {
     fontSize: 13,
@@ -583,161 +782,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#334155',
-  },
-  messageRow: {
-    flexDirection: 'row',
-    marginBottom: spacing.sm,
-    maxWidth: Platform.OS === 'web' ? '75%' : '88%',
-  },
-  doiMessageRow: {
-    maxWidth: Platform.OS === 'web' ? 540 : '95%',
-    width: '100%',
-  },
-  myMessageRow: {
-    alignSelf: 'flex-end',
-    justifyContent: 'flex-end',
-  },
-  otherMessageRow: {
-    alignSelf: 'flex-start',
-    justifyContent: 'flex-start',
-  },
-  messageBubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-    maxWidth: '100%',
-  },
-  myBubble: {
-    backgroundColor: '#064E3B',
-    borderBottomRightRadius: 2,
-  },
-  otherBubble: {
-    backgroundColor: '#F1F5F9',
-    borderBottomLeftRadius: 2,
-  },
-  doiBubble: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    padding: 6,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  messageText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  myMessageText: {
-    color: '#FFFFFF',
-  },
-  otherMessageText: {
-    color: '#0F172A',
-  },
-  doiMessageText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#0F172A',
-    marginTop: 6,
-    paddingHorizontal: 6,
-  },
-  timestamp: {
-    fontSize: 10,
-    marginTop: 4,
-    alignSelf: 'flex-end',
-  },
-  myTimestamp: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  otherTimestamp: {
-    color: '#94A3B8',
-  },
-  doiTimestamp: {
-    fontSize: 10,
-    color: '#94A3B8',
-    marginTop: 4,
-    alignSelf: 'flex-end',
-    paddingHorizontal: 6,
-  },
-  attachedDoiPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#A7F3D0',
-  },
-  attachedDoiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  attachedDoiBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#064E3B',
-  },
-  attachedDoiTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#064E3B',
-    marginTop: 2,
-  },
-  removeAttachedBtn: {
-    padding: 4,
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    gap: 8,
-  },
-  doiAttachBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  doiAttachBtnActive: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  textInput: {
-    flex: 1,
-    minHeight: 38,
-    maxHeight: 100,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 19,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: '#0F172A',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#064E3B',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendBtnDisabled: {
-    backgroundColor: '#CBD5E1',
   },
   modalOverlay: {
     flex: 1,
@@ -794,7 +838,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 8,
-    backgroundColor: '#064E3B',
+    backgroundColor: '#164E3F',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -806,7 +850,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#064E3B',
+    backgroundColor: '#164E3F',
     paddingVertical: 12,
     borderRadius: 8,
     marginTop: 12,
