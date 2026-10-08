@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { colors, spacing, layout, typography } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 
 export interface AppHeaderProps {
   title?: string;
@@ -16,6 +17,8 @@ export interface AppHeaderProps {
   showSearch?: boolean;
   onSearch?: () => void;
   onSearchPress?: () => void;
+  showWorkspace?: boolean;
+  onWorkspacePress?: () => void;
   showCreate?: boolean;
   onCreatePress?: () => void;
   rightIcon?: IconName;
@@ -35,6 +38,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   showSearch = false,
   onSearch,
   onSearchPress,
+  showWorkspace = false,
+  onWorkspacePress,
   showCreate = false,
   onCreatePress,
   rightIcon,
@@ -43,6 +48,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   rightAction,
   style,
 }) => {
+  const workspaceUnread = useWorkspaceStore((s) => s.unreadTotal);
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -110,6 +116,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Icon name="Search" size="sm" color={colors.textPrimary} />
+          </TouchableOpacity>
+        )}
+
+        {showWorkspace && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="BooffIn Workspace"
+            onPress={onWorkspacePress || (() => router.push('/workspace' as any))}
+            style={[styles.iconButton, styles.workspaceButton]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Icon name="Layers" size="sm" color="#FFFFFF" />
+            {workspaceUnread > 0 && (
+              <View style={styles.workspaceBadge}>
+                <Typography style={styles.workspaceBadgeText}>
+                  {workspaceUnread > 99 ? '99+' : workspaceUnread}
+                </Typography>
+              </View>
+            )}
           </TouchableOpacity>
         )}
 
@@ -184,5 +209,27 @@ const styles = StyleSheet.create({
   },
   createButton: {
     backgroundColor: colors.black,
+  },
+  workspaceButton: {
+    backgroundColor: '#064E3B',
+    borderWidth: 1,
+    borderColor: '#047857',
+    position: 'relative',
+  },
+  workspaceBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: colors.background,
+  },
+  workspaceBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

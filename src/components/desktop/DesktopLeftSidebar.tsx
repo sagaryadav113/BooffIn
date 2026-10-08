@@ -14,9 +14,11 @@ import {
   Settings,
   HelpCircle,
   Download,
+  Layers,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { InstallAppModal } from '../modals/InstallAppModal';
@@ -30,6 +32,7 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
 }) => {
   const pathname = usePathname();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const workspaceUnread = useWorkspaceStore((s) => s.unreadTotal);
   const currentUser = useAuthStore((s) => s.user);
   const { hasNativePrompt, promptInstall } = usePWAInstall();
   const [showInstallModal, setShowInstallModal] = useState(false);
@@ -47,6 +50,7 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
 
   const isHomeActive = pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/index';
   const isExploreActive = pathname.includes('explore');
+  const isWorkspaceActive = pathname.includes('workspace');
   const isTopicsActive = pathname.includes('topic');
   const isNotificationsActive = pathname.includes('notifications');
   const isProfileActive = pathname.includes('profile');
@@ -66,6 +70,14 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
       icon: Compass,
       isActive: isExploreActive,
       onPress: () => router.push('/(tabs)/explore'),
+    },
+    {
+      id: 'workspace',
+      label: 'Workspace',
+      icon: Layers,
+      badge: workspaceUnread,
+      isActive: isWorkspaceActive,
+      onPress: () => router.push('/workspace' as any),
     },
     {
       id: 'researchers',
@@ -97,9 +109,7 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
         if (onOpenMessages) {
           onOpenMessages();
         } else {
-          // Trigger messages dock
-          const dockToggle = document.getElementById('booffin-desktop-messages-toggle');
-          if (dockToggle) dockToggle.click();
+          router.push('/workspace' as any);
         }
       },
     },

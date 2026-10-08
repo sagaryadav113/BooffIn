@@ -9,3 +9,4 @@ export * from './moderationService';
 export * from './storageService';
 export * from './orcidService';
 export * from './analyticsService';
+export * from './workspaceService';

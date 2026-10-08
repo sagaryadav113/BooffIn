@@ -150,8 +150,8 @@ export default function HomeScreen() {
           isRefreshing={isRefreshing}
           showSearch
           onSearch={() => router.push('/search')}
-          showCreate
-          onCreatePress={() => router.push('/(tabs)/create')}
+          showWorkspace
+          onWorkspacePress={() => router.push('/workspace' as any)}
         />
       )}
 

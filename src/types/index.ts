@@ -10,3 +10,4 @@ export * from './moderation';
 export * from './settings';
 export * from './scholar';
 export * from './analytics';
+export * from './workspace';

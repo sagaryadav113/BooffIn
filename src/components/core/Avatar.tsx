@@ -32,13 +32,19 @@ export const Avatar: React.FC<AvatarProps> = ({
 }) => {
   const pixelSize = typeof size === 'number' ? size : sizeMap[size] || layout.avatarSizes.md;
   const imageSource = uri || url;
+  const safeName = name && typeof name === 'string' ? name : 'User';
   const getInitials = (n: string) => {
-    return n
-      .split(' ')
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
+    if (!n || typeof n !== 'string') return 'U';
+    return (
+      n
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => part[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'U'
+    );
   };
 
   return (
@@ -58,7 +64,7 @@ export const Avatar: React.FC<AvatarProps> = ({
           ]}
         >
           <Text style={[styles.initials, { fontSize: Math.max(10, pixelSize * 0.38) }]}>
-            {getInitials(name)}
+            {getInitials(safeName)}
           </Text>
         </View>
       )}

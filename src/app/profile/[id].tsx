@@ -31,8 +31,10 @@ import {
   Lock,
   UserX,
   Flag,
+  MessageSquare,
 } from 'lucide-react-native';
 import { blockUser, unblockUser } from '../../api/moderationService';
+import { workspaceService } from '../../api/workspaceService';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -100,6 +102,36 @@ export default function OtherResearcherProfileScreen() {
 
   const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
   const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
+  const [isMessageLoading, setIsMessageLoading] = useState(false);
+
+  const handleStartDM = async () => {
+    if (!researcher?.id) return;
+    setIsMessageLoading(true);
+    try {
+      const res = await workspaceService.getOrCreateDMWorkspace(researcher.id);
+      if (res.workspaceId) {
+        router.push(`/workspace/${res.workspaceId}` as any);
+      } else {
+        const msg =
+          res.error ||
+          'Direct messaging requires a mutual follow between researchers. Both researchers must follow each other to start a conversation.';
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert('Mutual Follow Required', msg);
+        }
+      }
+    } catch (err: any) {
+      const errorMsg = err.message || 'Failed to start direct message.';
+      if (Platform.OS === 'web') {
+        window.alert(errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
+    } finally {
+      setIsMessageLoading(false);
+    }
+  };
 
   const loadResearcherPosts = useCallback(async (userId: string) => {
     if (!userId) return;
@@ -578,7 +610,7 @@ export default function OtherResearcherProfileScreen() {
             />
 
             <View style={styles.actionButtonsGroup}>
-              {/* Follow Button */}
+              {/* Follow / Edit Profile Button */}
               {!researcher.isBlocked && (
                 <Button
                   title={isOwnProfile ? 'Edit Profile' : isFollowing ? 'Following' : 'Follow'}
@@ -588,6 +620,19 @@ export default function OtherResearcherProfileScreen() {
                   disabled={isFollowLoading}
                   onPress={handleFollowToggle}
                   style={styles.followButton}
+                />
+              )}
+
+              {/* BooffIn Workspace 1-on-1 DM Button */}
+              {!isOwnProfile && !researcher.isBlocked && (
+                <Button
+                  title="Message"
+                  variant="outline"
+                  size="sm"
+                  loading={isMessageLoading}
+                  disabled={isMessageLoading}
+                  onPress={handleStartDM}
+                  style={styles.messageButton}
                 />
               )}
             </View>
@@ -980,6 +1025,11 @@ const styles = StyleSheet.create({
   followButton: {
     minWidth: 90,
     borderRadius: radii.full,
+  },
+  messageButton: {
+    minWidth: 90,
+    borderRadius: radii.full,
+    borderColor: '#064E3B',
   },
   nameSection: {
     marginBottom: spacing.xs,
