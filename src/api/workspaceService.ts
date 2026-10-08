@@ -12,6 +12,11 @@ import {
   WorkspaceType,
   WorkspaceMessageType,
   WorkspaceAudioMetadata,
+  WorkspacePostMetadata,
+  WorkspaceProfileMetadata,
+  WorkspaceInviteMetadata,
+  WorkspaceDocumentMetadata,
+  WorkspaceCallMetadata,
   DoiMetadata,
   WorkspaceSummaryStats,
 } from '../types/workspace';
@@ -827,6 +832,11 @@ export const workspaceService = {
     message_type?: WorkspaceMessageType;
     doi_metadata?: DoiMetadata | null;
     audio_metadata?: WorkspaceAudioMetadata | null;
+    post_metadata?: WorkspacePostMetadata | null;
+    profile_metadata?: WorkspaceProfileMetadata | null;
+    workspace_invite_metadata?: WorkspaceInviteMetadata | null;
+    document_metadata?: WorkspaceDocumentMetadata | null;
+    call_metadata?: WorkspaceCallMetadata | null;
     reply_to_id?: string | null;
     media_urls?: string[] | null;
     e2ee_ciphertext?: string | null;

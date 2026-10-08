@@ -83,6 +83,10 @@ export type WorkspaceMessageType =
   | 'poll'
   | 'audio'
   | 'voice_note'
+  | 'post'
+  | 'profile'
+  | 'workspace_invite'
+  | 'call_log'
   | 'document';
 
 export interface WorkspacePollOption {
@@ -102,6 +106,50 @@ export interface WorkspaceAudioMetadata {
   waveform?: number[];
 }
 
+export interface WorkspacePostMetadata {
+  id: string;
+  title: string;
+  author_name: string;
+  author_avatar?: string | null;
+  snippet?: string;
+  upvotes?: number;
+  tags?: string[];
+}
+
+export interface WorkspaceProfileMetadata {
+  id: string;
+  fullName: string;
+  handle: string;
+  avatarUrl?: string | null;
+  academicTitle?: string | null;
+  institution?: string | null;
+  orcidVerified?: boolean;
+}
+
+export interface WorkspaceInviteMetadata {
+  id: string;
+  name: string;
+  type: 'inner_circle' | 'community';
+  avatarUrl?: string | null;
+  description?: string | null;
+  members_count?: number;
+}
+
+export interface WorkspaceDocumentMetadata {
+  name: string;
+  sizeBytes: number;
+  fileUrl: string;
+  mimeType: string;
+  pageCount?: number;
+}
+
+export interface WorkspaceCallMetadata {
+  call_id: string;
+  call_type: 'audio' | 'video';
+  duration_seconds: number;
+  status: 'completed' | 'missed' | 'declined';
+}
+
 export type WorkspaceReactionsMap = Record<string, string[]>; // emoji -> array of user_ids
 
 export interface WorkspaceMessage {
@@ -113,6 +161,11 @@ export interface WorkspaceMessage {
   doi_metadata: DoiMetadata | null;
   poll_data?: WorkspacePollData | null;
   audio_metadata?: WorkspaceAudioMetadata | null;
+  post_metadata?: WorkspacePostMetadata | null;
+  profile_metadata?: WorkspaceProfileMetadata | null;
+  workspace_invite_metadata?: WorkspaceInviteMetadata | null;
+  document_metadata?: WorkspaceDocumentMetadata | null;
+  call_metadata?: WorkspaceCallMetadata | null;
   attachments?: any;
   reactions?: WorkspaceReactionsMap | null;
   is_edited?: boolean;
