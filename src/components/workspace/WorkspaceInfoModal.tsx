@@ -46,6 +46,7 @@ import {
   Settings,
   AlertTriangle,
   ChevronRight,
+  FolderOpen,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -57,6 +58,7 @@ import { blockUser, reportContent } from '../../api/moderationService';
 import { unfollowUser } from '../../api/socialService';
 import { Avatar } from '../core/Avatar';
 import { GroupCollageAvatar } from './GroupCollageAvatar';
+import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
 
 interface WorkspaceInfoModalProps {
   visible: boolean;
@@ -70,6 +72,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   workspace,
 }) => {
   const currentUser = useAuthStore((s) => s.user);
+  const messages = useWorkspaceStore((s) => s.messages);
   const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
   const updateMemberRole = useWorkspaceStore((s) => s.updateMemberRole);
   const removeMember = useWorkspaceStore((s) => s.removeMember);
@@ -79,6 +82,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [showMediaGalleryModal, setShowMediaGalleryModal] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(workspace.name || '');
   const [isSavingName, setIsSavingName] = useState(false);
@@ -954,6 +958,26 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               </View>
             )}
 
+            {/* Media, links, and docs (Vault Gallery) */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowMediaGalleryModal(true)}
+              style={styles.menuRow}
+            >
+              <View style={styles.menuIconWrap}>
+                <FolderOpen size={22} color="#0F172A" strokeWidth={2} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={styles.menuTitle}>Media, links, and docs</Text>
+                  <ChevronRight size={16} color="#94A3B8" />
+                </View>
+                <Text style={styles.menuSubtitle}>
+                  Figures, preprint PDFs, audio notes, and DOI links
+                </Text>
+              </View>
+            </TouchableOpacity>
+
             {/* 4. Privacy & Safety */}
             <TouchableOpacity
               activeOpacity={0.7}
@@ -1281,6 +1305,14 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
             </View>
           </View>
         </Modal>
+
+        {/* Media, Links, and Documents Vault Gallery Modal */}
+        <ChatMediaGalleryModal
+          visible={showMediaGalleryModal}
+          onClose={() => setShowMediaGalleryModal(false)}
+          messages={messages}
+          chatTitle={displayName}
+        />
       </SafeAreaView>
     </Modal>
   );

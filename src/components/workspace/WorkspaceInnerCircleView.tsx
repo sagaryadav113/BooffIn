@@ -62,6 +62,9 @@ import {
   Heart,
   Vote,
   BarChart2,
+  User,
+  Sparkles as SparklesIcon,
+  Download,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -77,15 +80,46 @@ import {
   WorkspaceSavedItem,
   WorkspaceMember,
   DoiMetadata,
+  WorkspaceDocumentMetadata,
+  WorkspacePostMetadata,
+  WorkspaceProfileMetadata,
+  WorkspaceInviteMetadata,
 } from '../../types/workspace';
 import { WorkspaceDoiCard } from './WorkspaceDoiCard';
 import { WorkspaceInfoModal } from './WorkspaceInfoModal';
 import { ImageViewerModal } from '../modals/ImageViewerModal';
+import { VoiceNotePlayer } from '../chat/VoiceNotePlayer';
+import { VoiceNoteRecorder } from '../chat/VoiceNoteRecorder';
+import { ChatDocumentCard } from '../chat/ChatDocumentCard';
+import { ChatPostCard } from '../chat/ChatPostCard';
+import { ChatProfileCard } from '../chat/ChatProfileCard';
+import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
 import { uploadPostImage } from '../../api/storageService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
+
+const SAMPLE_POD_MANUSCRIPTS = [
+  {
+    name: 'Quantum_Entanglement_Macroscopic_State_2026.pdf',
+    sizeBytes: 1024 * 840,
+    pageCount: 14,
+    fileUrl: 'https://arxiv.org/pdf/2103.00020.pdf',
+  },
+  {
+    name: 'CRISPR_Targeting_Efficiency_Protocol_v3.pdf',
+    sizeBytes: 1024 * 1250,
+    pageCount: 22,
+    fileUrl: 'https://arxiv.org/pdf/2103.00020.pdf',
+  },
+  {
+    name: 'Deep_Brain_Stimulation_Neural_Plasticity_Dataset.pdf',
+    sizeBytes: 1024 * 510,
+    pageCount: 8,
+    fileUrl: 'https://arxiv.org/pdf/2103.00020.pdf',
+  },
+];
 
 export type InnerCircleTab = 'discussions' | 'calendar' | 'jobs' | 'bookmarked';
 
@@ -242,6 +276,242 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<string | null>(null);
+
+  // Step 3: Voice Note Recording State
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+
+  // Step 3: Attachment & Rich Card Modals
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showDocumentPickerModal, setShowDocumentPickerModal] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [isCreatingPoll, setIsCreatingPoll] = useState(false);
+  const [localPollVotes, setLocalPollVotes] = useState<Record<string, string>>({});
+
+  const [showPostPickerModal, setShowPostPickerModal] = useState(false);
+  const [postTitleInput, setPostTitleInput] = useState('');
+  const [postSnippetInput, setPostSnippetInput] = useState('');
+
+  const [showProfilePickerModal, setShowProfilePickerModal] = useState(false);
+  const [userSearchText, setUserSearchText] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState<any[]>([]);
+  const [isSearchingProfileUsers, setIsSearchingProfileUsers] = useState(false);
+
+  const [showInvitePickerModal, setShowInvitePickerModal] = useState(false);
+
+  // Step 3: Voice Note Send Handler
+  const handleSendVoiceNote = async (audioData: { duration: number; waveform: number[]; uri?: string }) => {
+    setIsRecordingVoice(false);
+    const replyId = replyingTo?.id || null;
+
+    const res = await sendMessage({
+      workspace_id: workspace.id,
+      content: '🎙️ Voice Note',
+      message_type: 'audio',
+      audio_metadata: {
+        duration: audioData.duration,
+        waveform: audioData.waveform,
+      },
+      reply_to_id: replyId,
+    });
+
+    if (res.success) {
+      setReplyingTo(null);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  };
+
+  // Step 3: Poll Creation Handler
+  const handleCreatePoll = async () => {
+    const q = pollQuestion.trim();
+    const validOpts = pollOptions.map((o) => o.trim()).filter(Boolean);
+    if (!q || validOpts.length < 2) {
+      if (Platform.OS === 'web') {
+        window.alert('Please enter a question and at least 2 options for the poll.');
+      } else {
+        Alert.alert('Incomplete Poll', 'Please enter a question and at least 2 options.');
+      }
+      return;
+    }
+
+    setIsCreatingPoll(true);
+    try {
+      const res = await sendMessage({
+        workspace_id: workspace.id,
+        content: `📊 Poll: ${q}\n${validOpts.map((opt) => `• ${opt}`).join('\n')}`,
+        message_type: 'poll',
+        doi_metadata: null,
+        reply_to_id: replyingTo?.id || null,
+      });
+
+      if (res.success) {
+        setShowPollModal(false);
+        setShowAttachMenu(false);
+        setPollQuestion('');
+        setPollOptions(['', '']);
+        setReplyingTo(null);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    } catch (err: any) {
+      console.warn('Create poll error:', err);
+    } finally {
+      setIsCreatingPoll(false);
+    }
+  };
+
+  // Step 3: Handle Poll Voting
+  const handleVote = (messageId: string, optionId: string) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setLocalPollVotes((prev) => ({
+      ...prev,
+      [messageId]: prev[messageId] === optionId ? '' : optionId,
+    }));
+  };
+
+  // Step 3: Share Document / PDF Manuscript Handler
+  const handleAttachDocument = async (doc: { name: string; sizeBytes: number; pageCount: number; fileUrl: string }) => {
+    setShowDocumentPickerModal(false);
+    setShowAttachMenu(false);
+    const docMeta: WorkspaceDocumentMetadata = {
+      name: doc.name,
+      sizeBytes: doc.sizeBytes,
+      fileUrl: doc.fileUrl,
+      mimeType: 'application/pdf',
+      pageCount: doc.pageCount,
+    };
+
+    await sendMessage({
+      workspace_id: workspace.id,
+      content: `📄 Manuscript: ${doc.name}`,
+      message_type: 'document',
+      document_metadata: docMeta,
+      reply_to_id: replyingTo?.id || null,
+    });
+
+    setReplyingTo(null);
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
+  // Step 3: Share BooffIn Post Handler
+  const handleSharePost = async () => {
+    const title = postTitleInput.trim();
+    if (!title) return;
+
+    setShowPostPickerModal(false);
+    setShowAttachMenu(false);
+    const postMeta: WorkspacePostMetadata = {
+      id: `post_${Date.now()}`,
+      title,
+      author_name: currentUser?.fullName || currentUser?.handle || 'BooffIn Researcher',
+      author_avatar: currentUser?.avatarUrl || null,
+      snippet: postSnippetInput.trim() || 'New research findings, experiment data, and academic analysis shared on BooffIn.',
+      upvotes: 42,
+      tags: ['Biotechnology', 'PeerReview', 'Preprint'],
+    };
+
+    setPostTitleInput('');
+    setPostSnippetInput('');
+
+    await sendMessage({
+      workspace_id: workspace.id,
+      content: `🔬 BooffIn Post: ${title}`,
+      message_type: 'post',
+      post_metadata: postMeta,
+      reply_to_id: replyingTo?.id || null,
+    });
+
+    setReplyingTo(null);
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
+  // Step 3: Search Users for Profile Sharing
+  const handleSearchProfileUsers = async (query: string) => {
+    setUserSearchText(query);
+    const clean = query.trim().replace(/^@/, '');
+    if (!clean || clean.length < 2) {
+      setUserSearchResults([]);
+      return;
+    }
+
+    setIsSearchingProfileUsers(true);
+    try {
+      const results = await searchBooffInUsers(clean, 5);
+      setUserSearchResults(results);
+    } catch {
+      setUserSearchResults([]);
+    } finally {
+      setIsSearchingProfileUsers(false);
+    }
+  };
+
+  // Step 3: Share Researcher Profile Handler
+  const handleShareProfile = async (userProfile: any) => {
+    setShowProfilePickerModal(false);
+    setShowAttachMenu(false);
+    setUserSearchText('');
+    setUserSearchResults([]);
+
+    const profileMeta: WorkspaceProfileMetadata = {
+      id: userProfile.id,
+      fullName: userProfile.fullName || userProfile.name || 'Researcher',
+      handle: userProfile.handle || userProfile.username || 'researcher',
+      avatarUrl: userProfile.avatarUrl || userProfile.avatar_url || null,
+      academicTitle: userProfile.academicTitle || userProfile.title || 'Academic Researcher',
+      institution: userProfile.institution || null,
+      orcidVerified: Boolean(userProfile.orcidVerified || userProfile.orcid_verified),
+    };
+
+    await sendMessage({
+      workspace_id: workspace.id,
+      content: `👤 Researcher Profile: ${profileMeta.fullName}`,
+      message_type: 'profile',
+      profile_metadata: profileMeta,
+      reply_to_id: replyingTo?.id || null,
+    });
+
+    setReplyingTo(null);
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
+  // Step 3: Share Workspace / Pod Invite Handler
+  const handleShareWorkspaceInvite = async (targetWs: Workspace) => {
+    setShowInvitePickerModal(false);
+    setShowAttachMenu(false);
+    const inviteMeta: WorkspaceInviteMetadata = {
+      id: targetWs.id,
+      name: targetWs.name || 'Research Pod',
+      type: targetWs.type === 'inner_circle' ? 'inner_circle' : 'community',
+      avatarUrl: targetWs.avatar_url || null,
+      description: targetWs.description || 'Join our private research pod to collaborate on active projects and papers.',
+      members_count: targetWs.members_count || 5,
+    };
+
+    await sendMessage({
+      workspace_id: workspace.id,
+      content: `🏛️ Workspace Invite: ${inviteMeta.name}`,
+      message_type: 'workspace_invite',
+      workspace_invite_metadata: inviteMeta,
+      reply_to_id: replyingTo?.id || null,
+    });
+
+    setReplyingTo(null);
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
 
   const handlePickImage = async () => {
     try {
@@ -829,12 +1099,44 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             renderItem={({ item }) => {
               const isMe = item.sender_id === currentUser?.id;
               const isPinnedThis = item.is_pinned || item.id === localPinnedMessageId;
+              const isDeleted = Boolean(item.is_deleted);
               const msgImageUrl =
                 (item.media_urls && item.media_urls.length > 0 ? item.media_urls[0] : null) ||
                 (Array.isArray(item.attachments) && item.attachments[0]?.url ? item.attachments[0].url : null) ||
                 (typeof item.content === 'string' && (item.content.startsWith('http') || item.content.includes('/profile-media/')) ? item.content : null);
 
-              const isImage = item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo';
+              const isImage = !isDeleted && (item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo');
+              const isAudio =
+                !isDeleted &&
+                (item.message_type === 'audio' ||
+                  item.message_type === 'voice_note' ||
+                  Boolean(item.audio_metadata) ||
+                  item.content.startsWith('🎙️ Voice Note'));
+              const isDocument = !isDeleted && (item.message_type === 'document' || Boolean(item.document_metadata));
+              const isPoll = !isDeleted && (item.message_type === 'poll' || item.content.startsWith('📊 Poll:'));
+              const isPost = !isDeleted && (item.message_type === 'post' || Boolean(item.post_metadata));
+              const isProfile = !isDeleted && (item.message_type === 'profile' || Boolean(item.profile_metadata));
+              const isWorkspaceInvite = !isDeleted && (item.message_type === 'workspace_invite' || Boolean(item.workspace_invite_metadata));
+
+              // Parse poll options if poll message
+              let pollQuestionText = '';
+              let pollOptionItems: Array<{ id: string; text: string }> = [];
+              if (isPoll) {
+                const lines = item.content.split('\n').filter(Boolean);
+                pollQuestionText = lines[0].replace('📊 Poll:', '').trim();
+                pollOptionItems = lines.slice(1).map((line: string, idx: number) => ({
+                  id: `opt_${idx}`,
+                  text: line.replace(/^[•\-\d\.]+\s*/, '').trim(),
+                }));
+                if (pollOptionItems.length === 0) {
+                  pollOptionItems = [
+                    { id: 'opt_0', text: 'Agree / Support' },
+                    { id: 'opt_1', text: 'Needs Revision' },
+                  ];
+                }
+              }
+
+              const mySelectedVote = localPollVotes[item.id];
 
               // Reactions summary
               const reactionsMap: Record<string, string[]> = (item.reactions as Record<string, string[]>) || {};
@@ -888,11 +1190,41 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                       </View>
                     )}
 
-                    {/* DOI Card */}
+                    {/* DOI Paper Card */}
                     {item.doi_metadata && <WorkspaceDoiCard doiMeta={item.doi_metadata} />}
 
+                    {/* Voice Note / Audio Player */}
+                    {isAudio && (
+                      <VoiceNotePlayer
+                        audioUrl={item.media_urls?.[0]}
+                        duration={item.audio_metadata?.duration || 18}
+                        waveform={item.audio_metadata?.waveform}
+                        isMe={isMe}
+                      />
+                    )}
+
+                    {/* Shared Document / PDF Manuscript Card */}
+                    {isDocument && item.document_metadata && (
+                      <ChatDocumentCard docMeta={item.document_metadata} isMe={isMe} />
+                    )}
+
+                    {/* Shared BooffIn Post Card */}
+                    {isPost && item.post_metadata && (
+                      <ChatPostCard postMeta={item.post_metadata} isMe={isMe} />
+                    )}
+
+                    {/* Shared Researcher Profile Card */}
+                    {isProfile && item.profile_metadata && (
+                      <ChatProfileCard profileMeta={item.profile_metadata} isMe={isMe} />
+                    )}
+
+                    {/* Shared Workspace / Pod Invite Card */}
+                    {isWorkspaceInvite && item.workspace_invite_metadata && (
+                      <ChatWorkspaceInviteCard inviteMeta={item.workspace_invite_metadata} isMe={isMe} />
+                    )}
+
                     {/* Image Attachment */}
-                    {isImage && !item.is_deleted && (
+                    {isImage && !isDeleted && (
                       <TouchableOpacity
                         activeOpacity={0.88}
                         onPress={() => {
@@ -925,14 +1257,58 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                       </TouchableOpacity>
                     )}
 
+                    {/* Interactive Poll / Consensus Voting */}
+                    {isPoll && (
+                      <View style={styles.pollMsgContainer}>
+                        <View style={styles.pollHeader}>
+                          <BarChart2 size={16} color="#164E3F" />
+                          <Text style={styles.pollBadgeText}>RESEARCH POLL</Text>
+                        </View>
+                        <Text style={styles.pollQuestionTitle}>{pollQuestionText || item.content}</Text>
+
+                        <View style={styles.pollOptionsList}>
+                          {pollOptionItems.map((opt) => {
+                            const isSelected = mySelectedVote === opt.id;
+                            return (
+                              <TouchableOpacity
+                                key={opt.id}
+                                activeOpacity={0.7}
+                                onPress={() => handleVote(item.id, opt.id)}
+                                style={[styles.pollOptionBtn, isSelected && styles.pollOptionBtnSelected]}
+                              >
+                                <View style={[styles.pollProgressFill, { width: isSelected ? '100%' : '0%' }]} />
+                                <View style={styles.pollOptionContent}>
+                                  <View style={[styles.pollRadio, isSelected && styles.pollRadioSelected]}>
+                                    {isSelected && <View style={styles.pollRadioInner} />}
+                                  </View>
+                                  <Text style={[styles.pollOptionText, isSelected && styles.pollOptionTextSelected]}>
+                                    {opt.text}
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
+
                     {/* Deleted or Regular Message Content */}
-                    {item.is_deleted ? (
+                    {isDeleted ? (
                       <View style={styles.deletedMsgWrap}>
                         <Text style={[styles.deletedMsgText, isMe && { color: '#D1FAE5' }]}>
                           🚫 This message was deleted
                         </Text>
                       </View>
-                    ) : item.content && (!isImage || (item.content !== '📷 Shared photo' && item.content !== msgImageUrl)) ? (
+                    ) : item.content &&
+                      !isImage &&
+                      !isAudio &&
+                      !isDocument &&
+                      !isPost &&
+                      !isProfile &&
+                      !isWorkspaceInvite &&
+                      !isPoll &&
+                      item.content !== '📷 Shared photo' &&
+                      item.content !== msgImageUrl ? (
                       renderMessageContent(item.content, isMe)
                     ) : null}
 
@@ -1055,53 +1431,58 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             </View>
           )}
 
-          {/* Bottom Capsule Input Dock / Announcement Mode Dock */}
+          {/* Bottom Capsule Input Dock / Voice Note Recorder / Announcement Mode Dock */}
           {canPost ? (
-            <View style={styles.bottomDockContainer}>
-              <View style={styles.inputCapsule}>
-                <TouchableOpacity
-                  onPress={handlePickImage}
-                  style={styles.mediaIconBtn}
-                  disabled={isUploadingMedia}
-                >
-                  {isUploadingMedia ? <ActivityIndicator size="small" color="#164E3F" /> : <Camera size={19} color="#164E3F" />}
-                </TouchableOpacity>
+            isRecordingVoice ? (
+              <VoiceNoteRecorder
+                onSendVoiceNote={handleSendVoiceNote}
+                onCancel={() => setIsRecordingVoice(false)}
+              />
+            ) : (
+              <View style={styles.bottomDockContainer}>
+                <View style={styles.inputCapsule}>
+                  <TouchableOpacity
+                    onPress={handlePickImage}
+                    style={styles.mediaIconBtn}
+                    disabled={isUploadingMedia}
+                  >
+                    {isUploadingMedia ? <ActivityIndicator size="small" color="#164E3F" /> : <Camera size={19} color="#164E3F" />}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setShowAttachMenu(true)}
+                    style={styles.mediaIconBtn}
+                  >
+                    <Paperclip size={18} color="#164E3F" />
+                  </TouchableOpacity>
+
+                  <TextInput
+                    value={inputText}
+                    onChangeText={handleInputChange}
+                    placeholder={`Message ${workspace.name || 'pod'}... (use @ to mention)`}
+                    placeholderTextColor="#94A3B8"
+                    style={styles.textInput}
+                    multiline
+                    maxLength={2000}
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => setIsRecordingVoice(true)}
+                    style={styles.mediaIconBtn}
+                  >
+                    <Mic size={19} color="#164E3F" />
+                  </TouchableOpacity>
+                </View>
 
                 <TouchableOpacity
-                  onPress={() => setShowDoiModal(true)}
-                  style={styles.mediaIconBtn}
+                  onPress={handleSendMessage}
+                  disabled={(!inputText.trim() && !attachedDoi) || isSending}
+                  style={[styles.detachedSendBtn, (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled]}
                 >
-                  <Paperclip size={18} color="#164E3F" />
-                </TouchableOpacity>
-
-                <TextInput
-                  value={inputText}
-                  onChangeText={handleInputChange}
-                  placeholder={`Message ${workspace.name || 'pod'}... (use @ to mention)`}
-                  placeholderTextColor="#94A3B8"
-                  style={styles.textInput}
-                  multiline
-                  maxLength={2000}
-                />
-
-                <TouchableOpacity
-                  onPress={() => {
-                    if (Platform.OS === 'web') window.alert('Voice memo ready.');
-                  }}
-                  style={styles.mediaIconBtn}
-                >
-                  <Mic size={19} color="#94A3B8" />
+                  {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
                 </TouchableOpacity>
               </View>
-
-              <TouchableOpacity
-                onPress={handleSendMessage}
-                disabled={(!inputText.trim() && !attachedDoi) || isSending}
-                style={[styles.detachedSendBtn, (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled]}
-              >
-                {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
-              </TouchableOpacity>
-            </View>
+            )
           ) : (
             <View style={styles.announcementModeDockContainer}>
               <View style={styles.announcementModeDock}>
@@ -1557,6 +1938,374 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         onClose={() => setViewerVisible(false)}
         authorName={workspace.name || 'Shared photo'}
       />
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Attachment Menu (Step 3: Media, Documents & Polls)     */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showAttachMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAttachMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAttachMenu(false)}
+        >
+          <View style={styles.attachMenuCard}>
+            <Text style={styles.attachMenuHeaderTitle}>Share with Research Pod</Text>
+
+            {/* 1. Research Manuscript PDF */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                setShowDocumentPickerModal(true);
+              }}
+              style={styles.attachMenuOptionRow}
+            >
+              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                <FileText size={20} color="#DC2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachOptionTitle}>Research Manuscript / PDF</Text>
+                <Text style={styles.attachOptionSubtitle}>Share papers, protocols, and preprints</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 2. Photo / Lab Figure */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                handlePickImage();
+              }}
+              style={styles.attachMenuOptionRow}
+            >
+              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#FDF2F8' }]}>
+                <ImageIcon size={20} color="#DB2777" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachOptionTitle}>Photo / Lab Figure</Text>
+                <Text style={styles.attachOptionSubtitle}>Share microscope slides, plots, and figures</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 3. Research Poll / Consensus Voting */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                setShowPollModal(true);
+              }}
+              style={styles.attachMenuOptionRow}
+            >
+              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                <Vote size={20} color="#164E3F" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachOptionTitle}>Research Poll / Vote</Text>
+                <Text style={styles.attachOptionSubtitle}>Ask pod members to vote on methodologies</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 4. BooffIn Post */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                setShowPostPickerModal(true);
+              }}
+              style={styles.attachMenuOptionRow}
+            >
+              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#FDF4FF' }]}>
+                <SparklesIcon size={20} color="#9333EA" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachOptionTitle}>BooffIn Discussion Post</Text>
+                <Text style={styles.attachOptionSubtitle}>Embed linked academic discussion</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 5. Researcher Profile */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                setShowProfilePickerModal(true);
+              }}
+              style={styles.attachMenuOptionRow}
+            >
+              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                <User size={20} color="#164E3F" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachOptionTitle}>Researcher Profile</Text>
+                <Text style={styles.attachOptionSubtitle}>Share contact card with ORCID badge</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 6. DOI Paper Link */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                setShowDoiModal(true);
+              }}
+              style={styles.attachMenuOptionRow}
+            >
+              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#EFF6FF' }]}>
+                <FileText size={20} color="#2563EB" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachOptionTitle}>DOI Paper Citation</Text>
+                <Text style={styles.attachOptionSubtitle}>Resolve paper via OpenAlex / CrossRef</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowAttachMenu(false)}
+              style={styles.attachMenuCancelBtn}
+            >
+              <Text style={styles.attachMenuCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Create Research Poll (Step 3)                          */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showPollModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPollModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <BarChart2 size={20} color="#164E3F" />
+                <Text style={styles.modalTitle}>Create Research Poll</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowPollModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>Ask your pod collaborators to reach consensus on hypotheses or methods.</Text>
+
+            <TextInput
+              value={pollQuestion}
+              onChangeText={setPollQuestion}
+              placeholder="Question (e.g. Which reagent protocol should we use?)"
+              placeholderTextColor="#94A3B8"
+              style={[styles.doiInput, { marginBottom: 14 }]}
+            />
+
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 8 }}>Options</Text>
+            {pollOptions.map((opt, idx) => (
+              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <TextInput
+                  value={opt}
+                  onChangeText={(txt) => {
+                    const next = [...pollOptions];
+                    next[idx] = txt;
+                    setPollOptions(next);
+                  }}
+                  placeholder={`Option ${idx + 1}`}
+                  placeholderTextColor="#94A3B8"
+                  style={[styles.doiInput, { flex: 1 }]}
+                />
+                {pollOptions.length > 2 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setPollOptions((prev) => prev.filter((_, i) => i !== idx));
+                    }}
+                    style={{ padding: 4 }}
+                  >
+                    <Trash2 size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+
+            {pollOptions.length < 6 && (
+              <TouchableOpacity
+                onPress={() => setPollOptions((prev) => [...prev, ''])}
+                style={styles.addOptionBtn}
+              >
+                <Plus size={14} color="#164E3F" />
+                <Text style={styles.addOptionBtnText}>Add Option</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={handleCreatePoll}
+              disabled={isCreatingPoll || !pollQuestion.trim()}
+              style={[styles.confirmAttachBtn, (!pollQuestion.trim() || isCreatingPoll) && { opacity: 0.6 }]}
+            >
+              {isCreatingPoll ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.confirmAttachBtnText}>Post Poll to Pod</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Select Document / Manuscript PDF (Step 3)              */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showDocumentPickerModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDocumentPickerModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <FileText size={20} color="#DC2626" />
+                <Text style={styles.modalTitle}>Attach Manuscript / PDF</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowDocumentPickerModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>Select a preprint manuscript or protocol document to share with the pod.</Text>
+
+            {SAMPLE_POD_MANUSCRIPTS.map((doc, i) => (
+              <TouchableOpacity
+                key={i}
+                activeOpacity={0.7}
+                onPress={() => handleAttachDocument(doc)}
+                style={styles.sampleDocRow}
+              >
+                <View style={[styles.sampleDocIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                  <FileText size={20} color="#DC2626" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.sampleDocName} numberOfLines={1}>{doc.name}</Text>
+                  <Text style={styles.sampleDocSub}>PDF • {doc.pageCount} pages • {(doc.sizeBytes / 1024).toFixed(0)} KB</Text>
+                </View>
+                <Text style={styles.invitePill}>Attach</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Share BooffIn Discussion Post (Step 3)                 */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showPostPickerModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPostPickerModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <SparklesIcon size={20} color="#9333EA" />
+                <Text style={styles.modalTitle}>Share Discussion Post</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowPostPickerModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>Embed a scientific topic or discovery post into the pod.</Text>
+
+            <TextInput
+              value={postTitleInput}
+              onChangeText={setPostTitleInput}
+              placeholder="Post Title (e.g. Breakthrough in Room-Temp Superconductors)"
+              placeholderTextColor="#94A3B8"
+              style={[styles.doiInput, { marginBottom: 10 }]}
+            />
+            <TextInput
+              value={postSnippetInput}
+              onChangeText={setPostSnippetInput}
+              placeholder="Post summary or key scientific takeaway..."
+              placeholderTextColor="#94A3B8"
+              style={[styles.doiInput, { marginBottom: 14 }]}
+              multiline
+              numberOfLines={3}
+            />
+
+            <TouchableOpacity
+              onPress={handleSharePost}
+              disabled={!postTitleInput.trim()}
+              style={[styles.confirmAttachBtn, !postTitleInput.trim() && { opacity: 0.6 }]}
+            >
+              <Text style={styles.confirmAttachBtnText}>Share Post with Pod</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Share Researcher Profile (Step 3)                      */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showProfilePickerModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowProfilePickerModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <User size={20} color="#164E3F" />
+                <Text style={styles.modalTitle}>Share Researcher Profile</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowProfilePickerModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>Search and share verified researcher contact cards.</Text>
+
+            <TextInput
+              value={userSearchText}
+              onChangeText={handleSearchProfileUsers}
+              placeholder="Search researcher name or @handle..."
+              placeholderTextColor="#94A3B8"
+              style={[styles.doiInput, { marginBottom: 10 }]}
+            />
+
+            {isSearchingProfileUsers ? (
+              <ActivityIndicator size="small" color="#164E3F" style={{ marginVertical: 12 }} />
+            ) : (
+              userSearchResults.map((user) => (
+                <TouchableOpacity
+                  key={user.id}
+                  activeOpacity={0.7}
+                  onPress={() => handleShareProfile(user)}
+                  style={styles.searchUserRow}
+                >
+                  <Avatar uri={user.avatarUrl} name={user.fullName || user.handle} size="sm" />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={styles.searchUserName}>{user.fullName || `@${user.handle}`}</Text>
+                    <Text style={styles.searchUserSub}>{user.academicTitle || user.institution || 'Researcher'}</Text>
+                  </View>
+                  <Text style={styles.invitePill}>Share</Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -2552,6 +3301,184 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#065F46',
+  },
+  attachMenuCard: {
+    width: '92%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  attachMenuHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 14,
+  },
+  attachMenuOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  attachOptionIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachOptionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  attachOptionSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  attachMenuCancelBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  attachMenuCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  pollMsgContainer: {
+    width: 250,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginVertical: 4,
+  },
+  pollHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  pollBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#164E3F',
+    letterSpacing: 0.6,
+  },
+  pollQuestionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 10,
+  },
+  pollOptionsList: {
+    gap: 6,
+  },
+  pollOptionBtn: {
+    position: 'relative',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    overflow: 'hidden',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  pollOptionBtnSelected: {
+    borderColor: '#164E3F',
+    backgroundColor: '#F0FDF4',
+  },
+  pollProgressFill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: '#D1FAE5',
+    opacity: 0.4,
+  },
+  pollOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pollRadio: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#94A3B8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pollRadioSelected: {
+    borderColor: '#164E3F',
+  },
+  pollRadioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#164E3F',
+  },
+  pollOptionText: {
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '500',
+  },
+  pollOptionTextSelected: {
+    fontWeight: '700',
+    color: '#164E3F',
+  },
+  addOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  addOptionBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#164E3F',
+  },
+  sampleDocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  sampleDocIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sampleDocName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  sampleDocSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
   },
 });
 
