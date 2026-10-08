@@ -95,6 +95,8 @@ export interface WorkspacePollData {
   totalVotes: number;
 }
 
+export type WorkspaceReactionsMap = Record<string, string[]>; // emoji -> array of user_ids
+
 export interface WorkspaceMessage {
   id: string;
   workspace_id: string;
@@ -104,11 +106,20 @@ export interface WorkspaceMessage {
   doi_metadata: DoiMetadata | null;
   poll_data?: WorkspacePollData | null;
   attachments?: any;
+  reactions?: WorkspaceReactionsMap | null;
+  is_edited?: boolean;
+  is_deleted?: boolean;
   e2ee_ciphertext: string | null;
   e2ee_nonce: string | null;
   media_urls: string[] | null;
   is_pinned: boolean;
   reply_to_id: string | null;
+  reply_to_message?: {
+    id: string;
+    sender_name: string;
+    content: string;
+    message_type?: string;
+  } | null;
   created_at: string;
   updated_at: string;
   sender?: WorkspaceSenderProfile;

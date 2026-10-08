@@ -70,6 +70,22 @@ interface WorkspaceState {
     e2ee_ciphertext?: string | null;
     e2ee_nonce?: string | null;
   }) => Promise<{ success: boolean; error: string | null }>;
+  toggleReaction: (
+    messageId: string,
+    emoji: string
+  ) => Promise<{ success: boolean; reactions: Record<string, string[]>; error: string | null }>;
+  editMessage: (
+    messageId: string,
+    newContent: string
+  ) => Promise<{ success: boolean; error: string | null }>;
+  deleteMessage: (
+    messageId: string,
+    deleteForEveryone?: boolean
+  ) => Promise<{ success: boolean; error: string | null }>;
+  forwardMessage: (
+    targetWorkspaceId: string,
+    message: WorkspaceMessage
+  ) => Promise<{ success: boolean; error: string | null }>;
   markAsRead: (workspaceId: string) => Promise<void>;
   loadEvents: (workspaceId: string) => Promise<void>;
   createEvent: (params: {
@@ -294,6 +310,100 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 
+  toggleReaction: async (messageId, emoji) => {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser) return { success: false, reactions: {}, error: 'Not authenticated' };
+
+    // Optimistic local update
+    let updatedReactions: Record<string, string[]> = {};
+    set((state) => {
+      const msgs = state.messages.map((m) => {
+        if (m.id === messageId) {
+          const current = { ...(m.reactions || {}) };
+          const users = Array.isArray(current[emoji]) ? [...current[emoji]] : [];
+          const idx = users.indexOf(currentUser.id);
+          if (idx > -1) {
+            users.splice(idx, 1);
+          } else {
+            users.push(currentUser.id);
+          }
+          if (users.length > 0) {
+            current[emoji] = users;
+          } else {
+            delete current[emoji];
+          }
+          updatedReactions = current;
+          return { ...m, reactions: current };
+        }
+        return m;
+      });
+      return { messages: msgs };
+    });
+
+    try {
+      const res = await workspaceService.toggleReaction(messageId, emoji, currentUser.id);
+      if (res.error) {
+        return { success: false, reactions: updatedReactions, error: res.error };
+      }
+      return { success: true, reactions: res.reactions, error: null };
+    } catch (err: any) {
+      return { success: false, reactions: updatedReactions, error: err.message };
+    }
+  },
+
+  editMessage: async (messageId, newContent) => {
+    // Optimistic update
+    set((state) => ({
+      messages: state.messages.map((m) =>
+        m.id === messageId
+          ? { ...m, content: newContent.trim(), is_edited: true, updated_at: new Date().toISOString() }
+          : m
+      ),
+    }));
+
+    try {
+      const res = await workspaceService.editMessage(messageId, newContent);
+      return res;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  deleteMessage: async (messageId, deleteForEveryone = true) => {
+    // Optimistic update
+    set((state) => ({
+      messages: deleteForEveryone
+        ? state.messages.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  content: '🚫 This message was deleted',
+                  is_deleted: true,
+                  media_urls: null,
+                  doi_metadata: null,
+                }
+              : m
+          )
+        : state.messages.filter((m) => m.id !== messageId),
+    }));
+
+    try {
+      const res = await workspaceService.deleteMessage(messageId, deleteForEveryone);
+      return res;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  forwardMessage: async (targetWorkspaceId, message) => {
+    try {
+      const res = await workspaceService.forwardMessage(targetWorkspaceId, message);
+      return res;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
   markAsRead: async (workspaceId: string) => {
     const currentUser = useAuthStore.getState().user;
     if (!currentUser) return;
@@ -435,13 +545,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'workspace_messages',
           filter: `workspace_id=eq.${workspaceId}`,
         },
         async (payload: any) => {
+          if (payload.eventType === 'DELETE') {
+            const oldId = payload.old?.id;
+            if (oldId) {
+              set((state) => ({
+                messages: state.messages.filter((m) => m.id !== oldId),
+              }));
+            }
+            return;
+          }
+
           const newMsg = payload.new;
+          if (!newMsg || !newMsg.id) return;
+
           // Fetch sender profile if not populated
           let senderProfile = undefined;
           if (newMsg.sender_id) {
@@ -490,6 +612,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             content: newMsg.content,
             message_type: isImg ? 'image' : (newMsg.message_type || (newMsg.doi_metadata ? 'paper_doi' : 'text')),
             doi_metadata: newMsg.doi_metadata || (newMsg.attachments?.doi_metadata ?? null),
+            reactions: newMsg.reactions || null,
+            is_edited: newMsg.is_edited || false,
+            is_deleted: newMsg.is_deleted || false,
             e2ee_ciphertext: newMsg.e2ee_ciphertext || null,
             e2ee_nonce: newMsg.e2ee_nonce || null,
             media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
@@ -500,9 +625,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             sender: senderProfile,
           };
 
+          if (payload.eventType === 'UPDATE') {
+            set((state) => ({
+              messages: state.messages.map((m) => (m.id === messageObj.id ? { ...m, ...messageObj } : m)),
+            }));
+            return;
+          }
+
+          // INSERT event
           set((state) => {
             if (state.messages.some((m) => m.id === messageObj.id)) {
-              return state;
+              return {
+                messages: state.messages.map((m) => (m.id === messageObj.id ? { ...m, ...messageObj } : m)),
+              };
             }
             return {
               messages: [...state.messages, messageObj],

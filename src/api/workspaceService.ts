@@ -746,6 +746,9 @@ export const workspaceService = {
         });
       }
 
+      const rawMap = new Map<string, any>();
+      rawList.forEach((m: any) => rawMap.set(m.id, m));
+
       const messages: WorkspaceMessage[] = rawList.map((m: any) => {
         let extractedMedia: string[] | null = null;
         if (Array.isArray(m.media_urls) && m.media_urls.length > 0) {
@@ -772,6 +775,19 @@ export const workspaceService = {
 
         const isImgType = (extractedMedia && extractedMedia.length > 0) || m.message_type === 'image';
 
+        // Resolve parent reply message info
+        let replyInfo = null;
+        if (m.reply_to_id && rawMap.has(m.reply_to_id)) {
+          const parent = rawMap.get(m.reply_to_id);
+          const parentSender = senderMap.get(parent.sender_id);
+          replyInfo = {
+            id: parent.id,
+            sender_name: parentSender?.fullName || parentSender?.handle || 'Researcher',
+            content: parent.content || (parent.doi_metadata ? 'Shared a research paper' : 'Attachment'),
+            message_type: parent.message_type,
+          };
+        }
+
         return {
           id: m.id,
           workspace_id: m.workspace_id,
@@ -779,11 +795,15 @@ export const workspaceService = {
           content: m.content,
           message_type: isImgType ? 'image' : (m.message_type || (m.doi_reference || m.doi_metadata ? 'paper_doi' : 'text')),
           doi_metadata: m.doi_metadata || (m.attachments?.doi_metadata ?? null),
+          reactions: m.reactions || null,
+          is_edited: m.is_edited || false,
+          is_deleted: m.is_deleted || false,
           e2ee_ciphertext: m.e2ee_ciphertext || null,
           e2ee_nonce: m.e2ee_nonce || null,
           media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
           is_pinned: m.is_pinned || false,
           reply_to_id: m.reply_to_id || null,
+          reply_to_message: replyInfo,
           created_at: m.created_at,
           updated_at: m.updated_at || m.created_at,
           sender: senderMap.get(m.sender_id),
@@ -943,8 +963,147 @@ export const workspaceService = {
         })
         .eq('workspace_id', workspaceId)
         .eq('user_id', userId);
-    } catch (err) {
-      console.warn('[workspaceService] markWorkspaceAsRead error:', err);
+    } catch {
+      // Non-fatal
+    }
+  },
+
+  /**
+   * Toggle emoji reaction on a message
+   */
+  async toggleReaction(
+    messageId: string,
+    emoji: string,
+    userId: string
+  ): Promise<{ reactions: Record<string, string[]>; error: string | null }> {
+    try {
+      const { data: msg, error: fetchErr } = await supabase
+        .from('workspace_messages')
+        .select('reactions')
+        .eq('id', messageId)
+        .single();
+
+      if (fetchErr && !fetchErr.message.includes('column')) {
+        return { reactions: {}, error: fetchErr.message };
+      }
+
+      let currentReactions: Record<string, string[]> = (msg?.reactions as any) || {};
+      if (typeof currentReactions !== 'object' || currentReactions === null || Array.isArray(currentReactions)) {
+        currentReactions = {};
+      }
+
+      const usersForEmoji = Array.isArray(currentReactions[emoji]) ? [...currentReactions[emoji]] : [];
+      const userIndex = usersForEmoji.indexOf(userId);
+
+      if (userIndex > -1) {
+        usersForEmoji.splice(userIndex, 1);
+      } else {
+        usersForEmoji.push(userId);
+      }
+
+      const updated = { ...currentReactions };
+      if (usersForEmoji.length > 0) {
+        updated[emoji] = usersForEmoji;
+      } else {
+        delete updated[emoji];
+      }
+
+      const { error: updateErr } = await supabase
+        .from('workspace_messages')
+        .update({ reactions: updated })
+        .eq('id', messageId);
+
+      if (updateErr) {
+        return { reactions: updated, error: updateErr.message };
+      }
+
+      return { reactions: updated, error: null };
+    } catch (err: any) {
+      return { reactions: {}, error: err.message || 'Failed to toggle reaction' };
+    }
+  },
+
+  /**
+   * Edit a sent message
+   */
+  async editMessage(
+    messageId: string,
+    newContent: string
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const { error } = await supabase
+        .from('workspace_messages')
+        .update({
+          content: newContent.trim(),
+          is_edited: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', messageId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to edit message' };
+    }
+  },
+
+  /**
+   * Delete a message (soft delete for everyone, or remove)
+   */
+  async deleteMessage(
+    messageId: string,
+    deleteForEveryone: boolean = true
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      if (deleteForEveryone) {
+        const { error } = await supabase
+          .from('workspace_messages')
+          .update({
+            content: '🚫 This message was deleted',
+            is_deleted: true,
+            media_urls: null,
+            attachments: [],
+            doi_metadata: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', messageId);
+
+        if (error) return { success: false, error: error.message };
+      } else {
+        // Delete row
+        const { error } = await supabase
+          .from('workspace_messages')
+          .delete()
+          .eq('id', messageId);
+
+        if (error) return { success: false, error: error.message };
+      }
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to delete message' };
+    }
+  },
+
+  /**
+   * Forward a message to another workspace/DM
+   */
+  async forwardMessage(
+    targetWorkspaceId: string,
+    message: WorkspaceMessage
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const res = await this.sendMessage({
+        workspace_id: targetWorkspaceId,
+        content: message.content,
+        message_type: message.message_type,
+        doi_metadata: message.doi_metadata,
+        media_urls: message.media_urls,
+      });
+      return { success: Boolean(res.message), error: res.error };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to forward message' };
     }
   },
 

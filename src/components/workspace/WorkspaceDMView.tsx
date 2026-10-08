@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
@@ -22,10 +23,8 @@ import {
   Check,
   CheckCheck,
   MoreVertical,
-  MoreHorizontal,
   Camera,
   Paperclip,
-  Mic,
   Search,
   X,
   Sparkles,
@@ -37,12 +36,25 @@ import {
   Plus,
   Vote,
   Maximize2,
+  Copy,
+  Reply,
+  Pencil,
+  Trash2,
+  CornerUpRight,
+  Smile,
+  ShieldAlert,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
-import { Workspace, WorkspaceMessage, DoiMetadata, WorkspacePollData, WorkspacePollOption } from '../../types/workspace';
+import {
+  Workspace,
+  WorkspaceMessage,
+  DoiMetadata,
+  WorkspacePollData,
+} from '../../types/workspace';
 import { WorkspaceDoiCard } from './WorkspaceDoiCard';
 import { WorkspaceInfoModal } from './WorkspaceInfoModal';
 import { ImageViewerModal } from '../modals/ImageViewerModal';
@@ -54,6 +66,8 @@ import { fetchUserProfile } from '../../api/authService';
 import { uploadPostImage } from '../../api/storageService';
 import { blockUser, reportContent } from '../../api/moderationService';
 import { unfollowUser } from '../../api/socialService';
+
+const QUICK_EMOJIS = ['❤️', '👍', '🔬', '🔥', '👏', '💡', '🎉'];
 
 interface WorkspaceDMViewProps {
   workspace: Workspace;
@@ -68,10 +82,36 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const loadMessages = useWorkspaceStore((s) => s.loadMessages);
   const sendMessage = useWorkspaceStore((s) => s.sendMessage);
   const subscribeToWorkspaceMessages = useWorkspaceStore((s) => s.subscribeToWorkspaceMessages);
+  const toggleReaction = useWorkspaceStore((s) => s.toggleReaction);
+  const editMessage = useWorkspaceStore((s) => s.editMessage);
+  const deleteMessage = useWorkspaceStore((s) => s.deleteMessage);
+  const forwardMessage = useWorkspaceStore((s) => s.forwardMessage);
+
+  // All workspaces for Forwarding
+  const dms = useWorkspaceStore((s) => s.dms);
+  const communities = useWorkspaceStore((s) => s.communities);
+  const innerCircles = useWorkspaceStore((s) => s.innerCircles);
 
   const [localPartner, setLocalPartner] = useState<any>(workspace.other_user || null);
   const [inputText, setInputText] = useState('');
-  
+
+  // Replying To State
+  const [replyingTo, setReplyingTo] = useState<WorkspaceMessage | null>(null);
+
+  // Long-Press Message Context Menu State
+  const [selectedMessage, setSelectedMessage] = useState<WorkspaceMessage | null>(null);
+  const [showMessageActionMenu, setShowMessageActionMenu] = useState(false);
+
+  // Edit Message Modal State
+  const [editingMessage, setEditingMessage] = useState<WorkspaceMessage | null>(null);
+  const [editInputText, setEditInputText] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Forward Message Modal State
+  const [forwardingMessage, setForwardingMessage] = useState<WorkspaceMessage | null>(null);
+  const [forwardSearch, setForwardSearch] = useState('');
+  const [forwardingTargetId, setForwardingTargetId] = useState<string | null>(null);
+
   // Options Sheet & Moderation State
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -104,6 +144,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const [localPollVotes, setLocalPollVotes] = useState<Record<string, string>>({}); // messageId -> optionId
 
   const flatListRef = useRef<FlatList>(null);
+  const textInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     loadMessages(workspace.id);
@@ -156,6 +197,165 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
   const partner = localPartner || workspace.other_user;
 
+  // --- Handlers: Reactions ---
+  const handleToggleReaction = async (messageId: string, emoji: string) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    await toggleReaction(messageId, emoji);
+  };
+
+  const handleLongPressMessage = (message: WorkspaceMessage) => {
+    if (message.is_deleted) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    setSelectedMessage(message);
+    setShowMessageActionMenu(true);
+  };
+
+  // --- Handlers: Message Actions ---
+  const handleSelectReactionFromMenu = async (emoji: string) => {
+    if (!selectedMessage) return;
+    const msgId = selectedMessage.id;
+    setShowMessageActionMenu(false);
+    setSelectedMessage(null);
+    await handleToggleReaction(msgId, emoji);
+  };
+
+  const handleReplyAction = () => {
+    if (!selectedMessage) return;
+    setReplyingTo(selectedMessage);
+    setShowMessageActionMenu(false);
+    setSelectedMessage(null);
+    setTimeout(() => {
+      textInputRef.current?.focus();
+    }, 150);
+  };
+
+  const handleCopyAction = async () => {
+    if (!selectedMessage) return;
+    const textToCopy = selectedMessage.content || '';
+    setShowMessageActionMenu(false);
+    setSelectedMessage(null);
+    if (textToCopy) {
+      await Clipboard.setStringAsync(textToCopy);
+      if (Platform.OS === 'web') {
+        window.alert('Message copied to clipboard');
+      } else {
+        Alert.alert('Copied', 'Message copied to clipboard');
+      }
+    }
+  };
+
+  const handleEditAction = () => {
+    if (!selectedMessage) return;
+    setEditingMessage(selectedMessage);
+    setEditInputText(selectedMessage.content);
+    setShowMessageActionMenu(false);
+    setSelectedMessage(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMessage || !editInputText.trim()) return;
+    setIsSavingEdit(true);
+    try {
+      await editMessage(editingMessage.id, editInputText.trim());
+      setEditingMessage(null);
+      setEditInputText('');
+    } catch (err) {
+      console.warn('Edit error:', err);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteAction = () => {
+    if (!selectedMessage) return;
+    const msg = selectedMessage;
+    setShowMessageActionMenu(false);
+    setSelectedMessage(null);
+
+    const isMyMsg = msg.sender_id === currentUser?.id;
+
+    if (Platform.OS === 'web') {
+      const confirmDelete = window.confirm(
+        isMyMsg
+          ? 'Delete this message for everyone?'
+          : 'Delete this message for yourself?'
+      );
+      if (confirmDelete) {
+        deleteMessage(msg.id, isMyMsg);
+      }
+    } else {
+      if (isMyMsg) {
+        Alert.alert(
+          'Delete Message',
+          'Choose how you want to delete this message:',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete for Me',
+              onPress: () => deleteMessage(msg.id, false),
+            },
+            {
+              text: 'Delete for Everyone',
+              style: 'destructive',
+              onPress: () => deleteMessage(msg.id, true),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Delete Message',
+          'Delete this message from your chat history?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete for Me',
+              style: 'destructive',
+              onPress: () => deleteMessage(msg.id, false),
+            },
+          ]
+        );
+      }
+    }
+  };
+
+  const handleForwardAction = () => {
+    if (!selectedMessage) return;
+    setForwardingMessage(selectedMessage);
+    setForwardSearch('');
+    setShowMessageActionMenu(false);
+    setSelectedMessage(null);
+  };
+
+  const handleExecuteForward = async (targetWs: Workspace) => {
+    if (!forwardingMessage) return;
+    setForwardingTargetId(targetWs.id);
+    try {
+      const res = await forwardMessage(targetWs.id, forwardingMessage);
+      if (res.success) {
+        setForwardingMessage(null);
+        if (Platform.OS === 'web') {
+          window.alert(`Message forwarded to ${targetWs.name || 'Chat'}`);
+        } else {
+          Alert.alert('Forwarded', `Message forwarded to ${targetWs.name || 'Chat'}`);
+        }
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(res.error || 'Failed to forward message');
+        } else {
+          Alert.alert('Forward Error', res.error || 'Failed to forward message');
+        }
+      }
+    } catch (err: any) {
+      console.warn('Forward error:', err);
+    } finally {
+      setForwardingTargetId(null);
+    }
+  };
+
   // Image Picker & Upload
   const handlePickImage = async () => {
     try {
@@ -189,7 +389,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             content: '📷 Shared photo',
             message_type: 'image',
             media_urls: [uploadRes.url],
+            reply_to_id: replyingTo?.id || null,
           });
+          setReplyingTo(null);
           setTimeout(() => {
             flatListRef.current?.scrollToEnd({ animated: true });
           }, 100);
@@ -223,21 +425,12 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
     setIsCreatingPoll(true);
     try {
-      const pollData: WorkspacePollData = {
-        question: q,
-        options: validOpts.map((text, idx) => ({
-          id: `opt_${Date.now()}_${idx}`,
-          text,
-          votes: [],
-        })),
-        totalVotes: 0,
-      };
-
       const res = await sendMessage({
         workspace_id: workspace.id,
         content: `📊 Poll: ${q}\n${validOpts.map((opt) => `• ${opt}`).join('\n')}`,
         message_type: 'poll',
         doi_metadata: null,
+        reply_to_id: replyingTo?.id || null,
       });
 
       if (res.success) {
@@ -245,6 +438,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         setShowAttachMenu(false);
         setPollQuestion('');
         setPollOptions(['', '']);
+        setReplyingTo(null);
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -357,16 +551,20 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     const trimmed = inputText.trim();
     if (!trimmed && !attachedDoi) return;
 
+    const replyId = replyingTo?.id || null;
+
     const res = await sendMessage({
       workspace_id: workspace.id,
       content: trimmed || (attachedDoi ? `Shared paper: ${attachedDoi.title}` : ''),
       message_type: attachedDoi ? 'paper_doi' : 'text',
       doi_metadata: attachedDoi,
+      reply_to_id: replyId,
     });
 
     if (res.success) {
       setInputText('');
       setAttachedDoi(null);
+      setReplyingTo(null);
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
@@ -412,16 +610,18 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     }
   };
 
+  // Render Single Message Item
   const renderMessageItem = ({ item }: { item: WorkspaceMessage }) => {
     const isMe = item.sender_id === currentUser?.id;
+    const isDeleted = Boolean(item.is_deleted);
     const hasDoi = Boolean(item.doi_metadata);
     const msgImageUrl =
       (item.media_urls && item.media_urls.length > 0 ? item.media_urls[0] : null) ||
       (Array.isArray(item.attachments) && item.attachments[0]?.url ? item.attachments[0].url : null) ||
       (typeof item.content === 'string' && (item.content.startsWith('http') || item.content.includes('/profile-media/')) ? item.content : null);
 
-    const isImage = item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo';
-    const isPoll = item.message_type === 'poll' || item.content.startsWith('📊 Poll:');
+    const isImage = !isDeleted && (item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo');
+    const isPoll = !isDeleted && (item.message_type === 'poll' || item.content.startsWith('📊 Poll:'));
 
     // Parse poll options if poll message
     let pollQuestionText = '';
@@ -443,6 +643,12 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
     const mySelectedVote = localPollVotes[item.id];
 
+    // Reactions calculations
+    const reactionsMap = item.reactions || {};
+    const reactionEntries = Object.entries(reactionsMap).filter(
+      ([, userIds]) => Array.isArray(userIds) && userIds.length > 0
+    );
+
     return (
       <View
         style={[
@@ -459,126 +665,249 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           />
         )}
 
-        <View
-          style={[
-            styles.messageBubble,
-            hasDoi
-              ? styles.doiBubble
-              : isPoll
-              ? styles.pollBubble
-              : isMe
-              ? styles.myBubble
-              : styles.otherBubble,
-          ]}
-        >
-          {/* DOI Paper Attachment */}
-          {item.doi_metadata && (
-            <WorkspaceDoiCard doiMeta={item.doi_metadata} />
-          )}
-
-          {/* Image Attachment with click to open full-screen lightbox */}
-          {isImage && (
-            <TouchableOpacity
-              activeOpacity={0.88}
-              onPress={() => {
-                if (msgImageUrl) {
-                  setViewerImages([msgImageUrl]);
-                  setViewerVisible(true);
-                }
-              }}
-              style={styles.imageMsgContainer}
-            >
-              {msgImageUrl ? (
-                <>
-                  <ExpoImage
-                    source={{ uri: msgImageUrl }}
-                    style={styles.imageMsg}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                  <View style={styles.imageOverlayBadge}>
-                    <Maximize2 size={12} color="#FFFFFF" />
-                    <Text style={styles.imageOverlayText}>View photo</Text>
-                  </View>
-                </>
-              ) : (
-                <View style={styles.imagePlaceholderBox}>
-                  <ImageIcon size={30} color="#94A3B8" />
-                  <Text style={styles.imagePlaceholderText}>Photo attachment</Text>
+        <View style={styles.bubbleWrapper}>
+          <TouchableOpacity
+            activeOpacity={0.92}
+            onLongPress={() => handleLongPressMessage(item)}
+            delayLongPress={280}
+            style={[
+              styles.messageBubble,
+              isDeleted
+                ? styles.deletedBubble
+                : hasDoi
+                ? styles.doiBubble
+                : isPoll
+                ? styles.pollBubble
+                : isMe
+                ? styles.myBubble
+                : styles.otherBubble,
+            ]}
+          >
+            {/* Quoted Reply Banner inside bubble */}
+            {item.reply_to_message && !isDeleted && (
+              <View
+                style={[
+                  styles.quotedBubbleBlock,
+                  isMe ? styles.quotedBubbleBlockMy : styles.quotedBubbleBlockOther,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.quotedAccentBar,
+                    isMe ? styles.quotedAccentBarMy : styles.quotedAccentBarOther,
+                  ]}
+                />
+                <View style={styles.quotedContentWrap}>
+                  <Text
+                    style={[
+                      styles.quotedSenderName,
+                      isMe ? styles.quotedSenderNameMy : styles.quotedSenderNameOther,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.reply_to_message.sender_name || 'Researcher'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.quotedSnippetText,
+                      isMe ? styles.quotedSnippetTextMy : styles.quotedSnippetTextOther,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.reply_to_message.content}
+                  </Text>
                 </View>
-              )}
-            </TouchableOpacity>
-          )}
-
-          {/* Interactive Poll / Voting */}
-          {isPoll && (
-            <View style={styles.pollMsgContainer}>
-              <View style={styles.pollHeader}>
-                <BarChart2 size={16} color="#164E3F" />
-                <Text style={styles.pollBadgeText}>RESEARCH POLL</Text>
               </View>
-              <Text style={styles.pollQuestionTitle}>{pollQuestionText || item.content}</Text>
+            )}
 
-              <View style={styles.pollOptionsList}>
-                {pollOptionItems.map((opt) => {
-                  const isSelected = mySelectedVote === opt.id;
-                  return (
-                    <TouchableOpacity
-                      key={opt.id}
-                      activeOpacity={0.7}
-                      onPress={() => handleVote(item.id, opt.id)}
-                      style={[styles.pollOptionBtn, isSelected && styles.pollOptionBtnSelected]}
-                    >
-                      <View style={[styles.pollProgressFill, { width: isSelected ? '100%' : '0%' }]} />
-                      <View style={styles.pollOptionContent}>
-                        <View style={[styles.pollRadio, isSelected && styles.pollRadioSelected]}>
-                          {isSelected && <View style={styles.pollRadioInner} />}
+            {/* Deleted Message Notice */}
+            {isDeleted ? (
+              <View style={styles.deletedContentRow}>
+                <ShieldAlert size={14} color="#94A3B8" />
+                <Text style={styles.deletedMessageText}>This message was deleted</Text>
+              </View>
+            ) : (
+              <>
+                {/* DOI Paper Attachment */}
+                {item.doi_metadata && (
+                  <WorkspaceDoiCard doiMeta={item.doi_metadata} />
+                )}
+
+                {/* Image Attachment with click to open full-screen lightbox */}
+                {isImage && (
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    onPress={() => {
+                      if (msgImageUrl) {
+                        setViewerImages([msgImageUrl]);
+                        setViewerVisible(true);
+                      }
+                    }}
+                    style={styles.imageMsgContainer}
+                  >
+                    {msgImageUrl ? (
+                      <>
+                        <ExpoImage
+                          source={{ uri: msgImageUrl }}
+                          style={styles.imageMsg}
+                          contentFit="cover"
+                          transition={200}
+                        />
+                        <View style={styles.imageOverlayBadge}>
+                          <Maximize2 size={12} color="#FFFFFF" />
+                          <Text style={styles.imageOverlayText}>View photo</Text>
                         </View>
-                        <Text style={[styles.pollOptionText, isSelected && styles.pollOptionTextSelected]}>
-                          {opt.text}
-                        </Text>
+                      </>
+                    ) : (
+                      <View style={styles.imagePlaceholderBox}>
+                        <ImageIcon size={30} color="#94A3B8" />
+                        <Text style={styles.imagePlaceholderText}>Photo attachment</Text>
                       </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {/* Interactive Poll / Voting */}
+                {isPoll && (
+                  <View style={styles.pollMsgContainer}>
+                    <View style={styles.pollHeader}>
+                      <BarChart2 size={16} color="#164E3F" />
+                      <Text style={styles.pollBadgeText}>RESEARCH POLL</Text>
+                    </View>
+                    <Text style={styles.pollQuestionTitle}>{pollQuestionText || item.content}</Text>
+
+                    <View style={styles.pollOptionsList}>
+                      {pollOptionItems.map((opt) => {
+                        const isSelected = mySelectedVote === opt.id;
+                        return (
+                          <TouchableOpacity
+                            key={opt.id}
+                            activeOpacity={0.7}
+                            onPress={() => handleVote(item.id, opt.id)}
+                            style={[styles.pollOptionBtn, isSelected && styles.pollOptionBtnSelected]}
+                          >
+                            <View style={[styles.pollProgressFill, { width: isSelected ? '100%' : '0%' }]} />
+                            <View style={styles.pollOptionContent}>
+                              <View style={[styles.pollRadio, isSelected && styles.pollRadioSelected]}>
+                                {isSelected && <View style={styles.pollRadioInner} />}
+                              </View>
+                              <Text style={[styles.pollOptionText, isSelected && styles.pollOptionTextSelected]}>
+                                {opt.text}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* Text Content */}
+                {item.content && !hasDoi && !isPoll && (!isImage || (item.content !== '📷 Shared photo' && item.content !== msgImageUrl)) ? (
+                  <Text
+                    style={[
+                      styles.messageText,
+                      isMe ? styles.myMessageText : styles.otherMessageText,
+                    ]}
+                  >
+                    {item.content}
+                  </Text>
+                ) : null}
+              </>
+            )}
+
+            {/* Timestamp & status footer */}
+            <View style={styles.msgFooter}>
+              {item.is_edited && !isDeleted && (
+                <Text
+                  style={[
+                    styles.editedLabel,
+                    isMe ? styles.myEditedLabel : styles.otherEditedLabel,
+                  ]}
+                >
+                  (edited) •{' '}
+                </Text>
+              )}
+              <Text
+                style={[
+                  styles.timestamp,
+                  isDeleted
+                    ? styles.deletedTimestamp
+                    : hasDoi || isPoll
+                    ? styles.doiTimestamp
+                    : isMe
+                    ? styles.myTimestamp
+                    : styles.otherTimestamp,
+                ]}
+              >
+                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+              {isMe && !isDeleted && (
+                <CheckCheck size={13} color="#34D399" style={{ marginLeft: 4 }} />
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {/* In-Bubble Emoji Reaction Badges Row */}
+          {reactionEntries.length > 0 && !isDeleted && (
+            <View
+              style={[
+                styles.reactionsBadgeRow,
+                isMe ? styles.myReactionsBadgeRow : styles.otherReactionsBadgeRow,
+              ]}
+            >
+              {reactionEntries.map(([emoji, userIds]) => {
+                const userReacted = currentUser?.id ? userIds.includes(currentUser.id) : false;
+                return (
+                  <TouchableOpacity
+                    key={emoji}
+                    activeOpacity={0.7}
+                    onPress={() => handleToggleReaction(item.id, emoji)}
+                    style={[
+                      styles.reactionBadgePill,
+                      userReacted && styles.reactionBadgePillActive,
+                    ]}
+                  >
+                    <Text style={styles.reactionBadgeEmoji}>{emoji}</Text>
+                    {userIds.length > 1 && (
+                      <Text
+                        style={[
+                          styles.reactionBadgeCount,
+                          userReacted && styles.reactionBadgeCountActive,
+                        ]}
+                      >
+                        {userIds.length}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setSelectedMessage(item);
+                  setShowMessageActionMenu(true);
+                }}
+                style={styles.addReactionBadgeBtn}
+              >
+                <Plus size={11} color="#64748B" />
+              </TouchableOpacity>
             </View>
           )}
-
-          {/* Text Content */}
-          {item.content && !hasDoi && !isPoll && (!isImage || (item.content !== '📷 Shared photo' && item.content !== msgImageUrl)) ? (
-            <Text
-              style={[
-                styles.messageText,
-                isMe ? styles.myMessageText : styles.otherMessageText,
-              ]}
-            >
-              {item.content}
-            </Text>
-          ) : null}
-
-          {/* Timestamp & double checkmarks */}
-          <View style={styles.msgFooter}>
-            <Text
-              style={[
-                styles.timestamp,
-                hasDoi || isPoll
-                  ? styles.doiTimestamp
-                  : isMe
-                  ? styles.myTimestamp
-                  : styles.otherTimestamp,
-              ]}
-            >
-              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-            {isMe && (
-              <CheckCheck size={14} color="#34D399" style={{ marginLeft: 4 }} />
-            )}
-          </View>
         </View>
       </View>
     );
   };
+
+  // Filtered list of forward targets
+  const allForwardTargets: Workspace[] = [...dms, ...innerCircles, ...communities].filter(
+    (w) => w.id !== workspace.id
+  );
+  const filteredForwardTargets = allForwardTargets.filter((w) =>
+    (w.name || w.other_user?.fullName || 'Chat')
+      .toLowerCase()
+      .includes(forwardSearch.toLowerCase())
+  );
 
   return (
     <KeyboardAvoidingView
@@ -615,7 +944,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           </Text>
         </TouchableOpacity>
 
-        {/* 3-dot Options Menu (MoreVertical) containing Report, Block, and Unfollow per Snapshot 2 */}
+        {/* 3-dot Options Menu (MoreVertical) */}
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={() => setShowOptionsMenu(true)}
@@ -708,6 +1037,36 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       )}
 
+      {/* Docked Quoted Reply Bar */}
+      {replyingTo && (
+        <View style={styles.replyingToDock}>
+          <View style={styles.replyingAccentBar} />
+          <View style={styles.replyingInfoWrap}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Reply size={12} color="#164E3F" />
+              <Text style={styles.replyingToLabel}>
+                Replying to{' '}
+                <Text style={styles.replyingToSender}>
+                  {replyingTo.sender?.fullName ||
+                    (replyingTo.sender_id === currentUser?.id ? 'Yourself' : partner?.fullName) ||
+                    'Researcher'}
+                </Text>
+              </Text>
+            </View>
+            <Text style={styles.replyingSnippetText} numberOfLines={1}>
+              {replyingTo.content || (replyingTo.doi_metadata ? '📄 Shared paper' : '📷 Photo')}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setReplyingTo(null)}
+            style={styles.replyCancelBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <X size={16} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Attached DOI Banner Preview */}
       {attachedDoi && (
         <View style={styles.attachedDoiPreview}>
@@ -730,7 +1089,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       <View style={styles.bottomDockContainer}>
         {/* Capsule Input */}
         <View style={styles.inputCapsule}>
-          {/* 1. Camera icon: Direct Photo Upload per Snapshot 2 */}
+          {/* 1. Camera icon: Direct Photo Upload */}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handlePickImage}
@@ -740,16 +1099,17 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           </TouchableOpacity>
 
           <TextInput
+            ref={textInputRef}
             value={inputText}
             onChangeText={setInputText}
-            placeholder="Message..."
+            placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
             placeholderTextColor="#94A3B8"
             style={styles.textInput}
             multiline
             maxLength={2000}
           />
 
-          {/* 2. Paperclip Attachment: Voting / Poll, DOI, Documents per Snapshot 2 */}
+          {/* 2. Paperclip Attachment: Voting / Poll, DOI, Documents */}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => setShowAttachMenu(true)}
@@ -776,6 +1136,263 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           )}
         </TouchableOpacity>
       </View>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Message Long-Press Context Menu & Emoji Reaction Bar */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showMessageActionMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMessageActionMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.actionMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMessageActionMenu(false)}
+        >
+          <View style={styles.actionMenuCard}>
+            {/* Top Quick Emoji Reactions Bar */}
+            <View style={styles.emojiReactionsRow}>
+              {QUICK_EMOJIS.map((emoji) => (
+                <TouchableOpacity
+                  key={emoji}
+                  activeOpacity={0.7}
+                  onPress={() => handleSelectReactionFromMenu(emoji)}
+                  style={styles.emojiReactionBtn}
+                >
+                  <Text style={styles.emojiReactionText}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.actionMenuDivider} />
+
+            {/* Action Items */}
+            {/* 1. Reply */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleReplyAction}
+              style={styles.actionMenuRow}
+            >
+              <Reply size={18} color="#164E3F" />
+              <Text style={styles.actionMenuRowText}>Reply</Text>
+            </TouchableOpacity>
+
+            {/* 2. Copy */}
+            {selectedMessage?.content && !selectedMessage.is_deleted && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleCopyAction}
+                style={styles.actionMenuRow}
+              >
+                <Copy size={18} color="#0F172A" />
+                <Text style={styles.actionMenuRowText}>Copy Text</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* 3. Forward */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleForwardAction}
+              style={styles.actionMenuRow}
+            >
+              <CornerUpRight size={18} color="#0F172A" />
+              <Text style={styles.actionMenuRowText}>Forward</Text>
+            </TouchableOpacity>
+
+            {/* 4. Edit (Only for own text messages) */}
+            {selectedMessage?.sender_id === currentUser?.id &&
+              !selectedMessage?.is_deleted &&
+              selectedMessage?.message_type === 'text' && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={handleEditAction}
+                  style={styles.actionMenuRow}
+                >
+                  <Pencil size={18} color="#0F172A" />
+                  <Text style={styles.actionMenuRowText}>Edit Message</Text>
+                </TouchableOpacity>
+              )}
+
+            {/* 5. Delete */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleDeleteAction}
+              style={styles.actionMenuRow}
+            >
+              <Trash2 size={18} color="#DC2626" />
+              <Text style={[styles.actionMenuRowText, { color: '#DC2626' }]}>
+                {selectedMessage?.sender_id === currentUser?.id ? 'Delete Message' : 'Delete for Me'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* 6. Report (If other user's message) */}
+            {selectedMessage?.sender_id !== currentUser?.id && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowMessageActionMenu(false);
+                  setShowReportModal(true);
+                }}
+                style={styles.actionMenuRow}
+              >
+                <Flag size={18} color="#DC2626" />
+                <Text style={[styles.actionMenuRowText, { color: '#DC2626' }]}>Report</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Edit Message */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={Boolean(editingMessage)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditingMessage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.editModalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Pencil size={18} color="#164E3F" />
+                <Text style={styles.modalTitle}>Edit Message</Text>
+              </View>
+              <TouchableOpacity onPress={() => setEditingMessage(null)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              value={editInputText}
+              onChangeText={setEditInputText}
+              placeholder="Edit your message..."
+              placeholderTextColor="#94A3B8"
+              style={styles.editTextInput}
+              multiline
+              autoFocus
+            />
+
+            <View style={styles.editModalButtonsRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setEditingMessage(null)}
+                style={styles.editCancelBtn}
+              >
+                <Text style={styles.editCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={isSavingEdit || !editInputText.trim()}
+                onPress={handleSaveEdit}
+                style={[
+                  styles.editSaveBtn,
+                  !editInputText.trim() && styles.editSaveBtnDisabled,
+                ]}
+              >
+                {isSavingEdit ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.editSaveBtnText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Forward Message Picker */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={Boolean(forwardingMessage)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setForwardingMessage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.forwardModalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <CornerUpRight size={18} color="#164E3F" />
+                <Text style={styles.modalTitle}>Forward Message</Text>
+              </View>
+              <TouchableOpacity onPress={() => setForwardingMessage(null)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Message preview snippet */}
+            <View style={styles.forwardPreviewSnippet}>
+              <Text style={styles.forwardPreviewLabel}>FORWARDING CONTENT</Text>
+              <Text style={styles.forwardPreviewText} numberOfLines={2}>
+                {forwardingMessage?.content || (forwardingMessage?.doi_metadata ? '📄 Research Paper' : '📷 Photo')}
+              </Text>
+            </View>
+
+            {/* Search destinations */}
+            <View style={styles.forwardSearchRow}>
+              <Search size={16} color="#94A3B8" />
+              <TextInput
+                value={forwardSearch}
+                onChangeText={setForwardSearch}
+                placeholder="Search chats, circles, communities..."
+                placeholderTextColor="#94A3B8"
+                style={styles.forwardSearchInput}
+              />
+            </View>
+
+            {/* Destinations List */}
+            <ScrollView style={styles.forwardTargetsList} showsVerticalScrollIndicator={false}>
+              {filteredForwardTargets.length === 0 ? (
+                <Text style={styles.forwardEmptyText}>No conversations found</Text>
+              ) : (
+                filteredForwardTargets.map((item) => {
+                  const title = item.name || item.other_user?.fullName || 'Workspace';
+                  const isPending = forwardingTargetId === item.id;
+                  return (
+                    <View key={item.id} style={styles.forwardTargetItem}>
+                      <Avatar
+                        uri={item.avatar_url || item.other_user?.avatarUrl || undefined}
+                        name={title}
+                        size="sm"
+                      />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.forwardTargetTitle} numberOfLines={1}>
+                          {title}
+                        </Text>
+                        <Text style={styles.forwardTargetType}>
+                          {item.type === 'dm'
+                            ? 'Direct Message'
+                            : item.type === 'inner_circle'
+                            ? 'Inner Circle'
+                            : 'Community'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        disabled={isPending}
+                        onPress={() => handleExecuteForward(item)}
+                        style={styles.forwardSendBtn}
+                      >
+                        {isPending ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.forwardSendBtnText}>Send</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Modal: Attachment Menu (Voting / Poll, DOI Paper, Photo Upload) */}
       <Modal
@@ -941,7 +1558,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       </Modal>
 
-      {/* Modal: Options Menu (Report, Block, Unfollow per Snapshot 2) */}
+      {/* Modal: Options Menu (Report, Block, Unfollow) */}
       <Modal
         visible={showOptionsMenu}
         transparent
@@ -1072,6 +1689,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           </View>
         </View>
       </Modal>
+
       {/* Modal: Attach Paper via DOI */}
       <Modal
         visible={showDoiModal}
@@ -1098,7 +1716,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <View style={styles.doiSearchRow}>
               <TextInput
                 value={doiQuery}
-                onChangeText={setDoiQuery}
+                onChangeText={setdoiQuery => setDoiQuery(setdoiQuery)}
                 placeholder="Paste DOI (e.g. 10.1038/...)"
                 placeholderTextColor="#94A3B8"
                 style={styles.doiInput}
@@ -1233,8 +1851,8 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: 'row',
-    marginBottom: 10,
-    maxWidth: Platform.OS === 'web' ? '70%' : '82%',
+    marginBottom: 12,
+    maxWidth: Platform.OS === 'web' ? '72%' : '84%',
   },
   myMessageRow: {
     alignSelf: 'flex-end',
@@ -1243,6 +1861,9 @@ const styles = StyleSheet.create({
   otherMessageRow: {
     alignSelf: 'flex-start',
     justifyContent: 'flex-start',
+  },
+  bubbleWrapper: {
+    maxWidth: '100%',
   },
   messageBubble: {
     paddingHorizontal: 14,
@@ -1257,6 +1878,29 @@ const styles = StyleSheet.create({
   otherBubble: {
     backgroundColor: '#F3F4F6',
     borderBottomLeftRadius: 3,
+  },
+  deletedBubble: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  deletedContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  deletedMessageText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    color: '#94A3B8',
+  },
+  deletedTimestamp: {
+    fontSize: 10,
+    color: '#CBD5E1',
   },
   doiBubble: {
     backgroundColor: '#FFFFFF',
@@ -1279,6 +1923,53 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
+  },
+  /* In-Bubble Quoted Reply */
+  quotedBubbleBlock: {
+    flexDirection: 'row',
+    padding: 6,
+    borderRadius: 8,
+    marginBottom: 6,
+  },
+  quotedBubbleBlockMy: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  quotedBubbleBlockOther: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  quotedAccentBar: {
+    width: 3,
+    borderRadius: 2,
+    marginRight: 8,
+  },
+  quotedAccentBarMy: {
+    backgroundColor: '#34D399',
+  },
+  quotedAccentBarOther: {
+    backgroundColor: '#164E3F',
+  },
+  quotedContentWrap: {
+    flex: 1,
+  },
+  quotedSenderName: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  quotedSenderNameMy: {
+    color: '#A7F3D0',
+  },
+  quotedSenderNameOther: {
+    color: '#164E3F',
+  },
+  quotedSnippetText: {
+    fontSize: 12,
+  },
+  quotedSnippetTextMy: {
+    color: '#E2E8F0',
+  },
+  quotedSnippetTextOther: {
+    color: '#475569',
   },
   imageMsgContainer: {
     width: 230,
@@ -1413,18 +2104,21 @@ const styles = StyleSheet.create({
   otherMessageText: {
     color: '#111827',
   },
-  doiMessageText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#0F172A',
-    marginTop: 6,
-    paddingHorizontal: 6,
-  },
   msgFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     marginTop: 4,
+  },
+  editedLabel: {
+    fontSize: 10,
+    fontStyle: 'italic',
+  },
+  myEditedLabel: {
+    color: '#A7F3D0',
+  },
+  otherEditedLabel: {
+    color: '#94A3B8',
   },
   timestamp: {
     fontSize: 10,
@@ -1439,6 +2133,93 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#94A3B8',
     paddingHorizontal: 6,
+  },
+  /* Reactions Badges */
+  reactionsBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+    alignItems: 'center',
+  },
+  myReactionsBadgeRow: {
+    justifyContent: 'flex-end',
+  },
+  otherReactionsBadgeRow: {
+    justifyContent: 'flex-start',
+  },
+  reactionBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  reactionBadgePillActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  reactionBadgeEmoji: {
+    fontSize: 12,
+  },
+  reactionBadgeCount: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  reactionBadgeCountActive: {
+    color: '#164E3F',
+  },
+  addReactionBadgeBtn: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* Docked Reply Bar */
+  replyingToDock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  replyingAccentBar: {
+    width: 3,
+    height: '100%',
+    minHeight: 28,
+    borderRadius: 2,
+    backgroundColor: '#164E3F',
+    marginRight: 10,
+  },
+  replyingInfoWrap: {
+    flex: 1,
+  },
+  replyingToLabel: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  replyingToSender: {
+    fontWeight: '700',
+    color: '#164E3F',
+  },
+  replyingSnippetText: {
+    fontSize: 12,
+    color: '#334155',
+    marginTop: 2,
+  },
+  replyCancelBtn: {
+    padding: 6,
   },
   uploadingMediaBanner: {
     flexDirection: 'row',
@@ -1533,7 +2314,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#0F172A',
-    marginTop: 12,
   },
   emptyBio: {
     fontSize: 13,
@@ -1585,6 +2365,196 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#334155',
   },
+  /* Action Menu Overlay & Card */
+  actionMenuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  actionMenuCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+  },
+  emojiReactionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emojiReactionBtn: {
+    padding: 6,
+    borderRadius: 20,
+  },
+  emojiReactionText: {
+    fontSize: 24,
+  },
+  actionMenuDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 12,
+  },
+  actionMenuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  actionMenuRowText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  /* Edit Modal */
+  editModalCard: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  editTextInput: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0F172A',
+    minHeight: 80,
+    textAlignVertical: 'top',
+    marginVertical: 14,
+  },
+  editModalButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  editCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  editCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  editSaveBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: '#164E3F',
+  },
+  editSaveBtnDisabled: {
+    backgroundColor: '#94A3B8',
+  },
+  editSaveBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  /* Forward Modal */
+  forwardModalCard: {
+    width: '100%',
+    maxWidth: 460,
+    maxHeight: '80%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  forwardPreviewSnippet: {
+    backgroundColor: '#F8FAFC',
+    borderLeftWidth: 3,
+    borderLeftColor: '#164E3F',
+    borderRadius: 6,
+    padding: 8,
+    marginVertical: 10,
+  },
+  forwardPreviewLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#164E3F',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  forwardPreviewText: {
+    fontSize: 12,
+    color: '#334155',
+  },
+  forwardSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 38,
+    marginBottom: 10,
+  },
+  forwardSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  forwardTargetsList: {
+    maxHeight: 260,
+  },
+  forwardEmptyText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+  forwardTargetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  forwardTargetTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  forwardTargetType: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  forwardSendBtn: {
+    backgroundColor: '#164E3F',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  forwardSendBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  /* Options Sheet & Modals */
   optionsOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
