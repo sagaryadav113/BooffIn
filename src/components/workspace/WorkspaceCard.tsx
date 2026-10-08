@@ -1,7 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { Shield, Users, Lock, MessageSquare, CheckCircle2, Check, CheckCheck, Heart } from 'lucide-react-native';
+import {
+  Shield,
+  Users,
+  Lock,
+  MessageSquare,
+  CheckCircle2,
+  Check,
+  CheckCheck,
+  Heart,
+  Pin,
+  BellOff,
+  Archive,
+} from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { GroupCollageAvatar } from './GroupCollageAvatar';
@@ -31,6 +43,9 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   const isInnerCircle = workspace.type === 'inner_circle';
 
   const unreadCount = workspace.unread_count || 0;
+  const isPinned = Boolean(workspace.is_pinned);
+  const isMuted = Boolean(workspace.is_muted);
+  const isArchived = Boolean(workspace.is_archived);
 
   const formatTime = (dateStr?: string) => {
     if (!dateStr) return '12:34 PM';
@@ -62,7 +77,11 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={handlePress}
-      style={[styles.container, unreadCount > 0 && styles.unreadContainer]}
+      style={[
+        styles.container,
+        unreadCount > 0 && styles.unreadContainer,
+        isPinned && styles.pinnedContainer,
+      ]}
     >
       {/* Left Avatar (48px) */}
       <View style={styles.avatarWrapper}>
@@ -87,13 +106,20 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
       <View style={styles.infoSection}>
         <View style={styles.titleRow}>
           <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>
+            {isPinned && (
+              <View style={styles.pinnedBadgeIcon}>
+                <Pin size={12} color="#164E3F" fill="#164E3F" />
+              </View>
+            )}
+            <Text style={[styles.name, isPinned && styles.pinnedNameText]} numberOfLines={1}>
               {displayName}
             </Text>
           </View>
 
-          {/* Right Timestamp */}
-          <Text style={styles.timeText}>{timeText}</Text>
+          {/* Right Timestamp & Icons */}
+          <View style={styles.timestampCol}>
+            <Text style={styles.timeText}>{timeText}</Text>
+          </View>
         </View>
 
         {/* Message Preview Snippet (1 single line) */}
@@ -104,6 +130,9 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
 
           {/* Unread Badge / Status indicators */}
           <View style={styles.statusIcons}>
+            {isMuted && (
+              <BellOff size={13} color="#94A3B8" style={{ marginRight: 4 }} />
+            )}
             {unreadCount > 0 ? (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadBadgeText}>
@@ -178,6 +207,21 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   statusIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pinnedContainer: {
+    backgroundColor: '#F8FAF9',
+  },
+  pinnedBadgeIcon: {
+    marginRight: 5,
+    transform: [{ rotate: '45deg' }],
+  },
+  pinnedNameText: {
+    color: '#0F172A',
+  },
+  timestampCol: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,

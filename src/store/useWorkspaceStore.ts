@@ -153,6 +153,15 @@ interface WorkspaceState {
     member_ids?: string[];
   }) => Promise<{ workspace: Workspace | null; error: string | null }>;
   joinCommunity: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
+  togglePinWorkspace: (workspaceId: string) => Promise<{ success: boolean; isPinned: boolean; error: string | null }>;
+  toggleArchiveWorkspace: (workspaceId: string) => Promise<{ success: boolean; isArchived: boolean; error: string | null }>;
+  setMuteWorkspace: (
+    workspaceId: string,
+    isMuted: boolean,
+    mutedUntil?: string | null
+  ) => Promise<{ success: boolean; isMuted: boolean; error: string | null }>;
+  clearChatHistory: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
+  deleteWorkspaceLocally: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
   refreshUnreadTotal: () => Promise<void>;
   subscribeToWorkspaceMessages: (workspaceId: string) => () => void;
   subscribeToGlobalWorkspaceUpdates: (userId: string) => () => void;
@@ -542,6 +551,90 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       await get().loadWorkspaces(true);
     }
     return res;
+  },
+
+  togglePinWorkspace: async (workspaceId: string) => {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser?.id) return { success: false, isPinned: false, error: 'Not authenticated' };
+
+    // Optimistically update store
+    let nextPinned = false;
+    set((state) => {
+      const target = state.dms.find((d) => d.id === workspaceId);
+      nextPinned = !target?.is_pinned;
+      const updatedDms = state.dms.map((d) =>
+        d.id === workspaceId ? { ...d, is_pinned: nextPinned } : d
+      );
+      // Sort pinned to top
+      updatedDms.sort((a, b) => {
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+        const timeA = new Date(a.updated_at || a.created_at).getTime();
+        const timeB = new Date(b.updated_at || b.created_at).getTime();
+        return timeB - timeA;
+      });
+      return { dms: updatedDms };
+    });
+
+    return await workspaceService.togglePinWorkspace(currentUser.id, workspaceId);
+  },
+
+  toggleArchiveWorkspace: async (workspaceId: string) => {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser?.id) return { success: false, isArchived: false, error: 'Not authenticated' };
+
+    // Optimistically update store
+    let nextArchived = false;
+    set((state) => {
+      const target = state.dms.find((d) => d.id === workspaceId);
+      nextArchived = !target?.is_archived;
+      const updatedDms = state.dms.map((d) =>
+        d.id === workspaceId ? { ...d, is_archived: nextArchived } : d
+      );
+      return { dms: updatedDms };
+    });
+
+    return await workspaceService.toggleArchiveWorkspace(currentUser.id, workspaceId);
+  },
+
+  setMuteWorkspace: async (workspaceId: string, isMuted: boolean, mutedUntil?: string | null) => {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser?.id) return { success: false, isMuted: false, error: 'Not authenticated' };
+
+    // Optimistically update store
+    set((state) => {
+      const updatedDms = state.dms.map((d) =>
+        d.id === workspaceId
+          ? { ...d, is_muted: isMuted, muted_until: mutedUntil || null }
+          : d
+      );
+      return { dms: updatedDms };
+    });
+
+    return await workspaceService.setMuteWorkspace(currentUser.id, workspaceId, isMuted, mutedUntil);
+  },
+
+  clearChatHistory: async (workspaceId: string) => {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser?.id) return { success: false, error: 'Not authenticated' };
+
+    // Clear local messages immediately
+    set({ messages: [] });
+
+    return await workspaceService.clearChatHistory(currentUser.id, workspaceId);
+  },
+
+  deleteWorkspaceLocally: async (workspaceId: string) => {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser?.id) return { success: false, error: 'Not authenticated' };
+
+    // Remove from local list immediately
+    set((state) => ({
+      dms: state.dms.filter((d) => d.id !== workspaceId),
+      activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
+    }));
+
+    return await workspaceService.deleteWorkspaceLocally(currentUser.id, workspaceId);
   },
 
   refreshUnreadTotal: async () => {

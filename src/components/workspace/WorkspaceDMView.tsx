@@ -52,6 +52,13 @@ import {
   FileUp,
   PhoneCall,
   PhoneMissed,
+  Pin,
+  PinOff,
+  Archive,
+  Bell,
+  BellOff,
+  Trash,
+  AlertTriangle,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -110,11 +117,21 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const editMessage = useWorkspaceStore((s) => s.editMessage);
   const deleteMessage = useWorkspaceStore((s) => s.deleteMessage);
   const forwardMessage = useWorkspaceStore((s) => s.forwardMessage);
+  const togglePinWorkspace = useWorkspaceStore((s) => s.togglePinWorkspace);
+  const toggleArchiveWorkspace = useWorkspaceStore((s) => s.toggleArchiveWorkspace);
+  const setMuteWorkspace = useWorkspaceStore((s) => s.setMuteWorkspace);
+  const clearChatHistory = useWorkspaceStore((s) => s.clearChatHistory);
+  const deleteWorkspaceLocally = useWorkspaceStore((s) => s.deleteWorkspaceLocally);
 
   // All workspaces for Forwarding and Workspace Invites
   const dms = useWorkspaceStore((s) => s.dms);
   const communities = useWorkspaceStore((s) => s.communities);
   const innerCircles = useWorkspaceStore((s) => s.innerCircles);
+
+  const currentDm = dms.find((d) => d.id === workspace.id) || workspace;
+  const isPinned = Boolean(currentDm.is_pinned);
+  const isMuted = Boolean(currentDm.is_muted);
+  const isArchived = Boolean(currentDm.is_archived);
 
   const [localPartner, setLocalPartner] = useState<any>(workspace.other_user || null);
   const [inputText, setInputText] = useState('');
@@ -167,8 +184,13 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const [postTitleInput, setPostTitleInput] = useState('');
   const [postSnippetInput, setPostSnippetInput] = useState('');
 
-  // Options Sheet & Moderation State
+  // Options Sheet & Chat Management State (Phase 4)
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showMuteModal, setShowMuteModal] = useState(false);
+  const [showClearHistoryModal, setShowClearHistoryModal] = useState(false);
+  const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
+  const [isProcessingChatAction, setIsProcessingChatAction] = useState(false);
+
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('Inappropriate behavior or spam');
   const [reportDetails, setReportDetails] = useState('');
@@ -906,6 +928,77 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     }
   };
 
+  // Phase 4: Chat Management Handlers
+  const handleTogglePin = async () => {
+    setShowOptionsMenu(false);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    await togglePinWorkspace(workspace.id);
+  };
+
+  const handleToggleArchive = async () => {
+    setShowOptionsMenu(false);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    await toggleArchiveWorkspace(workspace.id);
+    if (!isArchived) {
+      // If we just archived it, navigate back to list
+      router.back();
+    }
+  };
+
+  const handleOpenMuteSelector = () => {
+    setShowOptionsMenu(false);
+    setShowMuteModal(true);
+  };
+
+  const handleSelectMuteDuration = async (duration: '8h' | '1w' | 'always' | 'unmute') => {
+    setShowMuteModal(false);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+
+    if (duration === 'unmute') {
+      await setMuteWorkspace(workspace.id, false, null);
+      return;
+    }
+
+    let until: string | null = null;
+    const now = new Date();
+    if (duration === '8h') {
+      now.setHours(now.getHours() + 8);
+      until = now.toISOString();
+    } else if (duration === '1w') {
+      now.setDate(now.getDate() + 7);
+      until = now.toISOString();
+    }
+
+    await setMuteWorkspace(workspace.id, true, until);
+  };
+
+  const handleClearChatHistory = async () => {
+    setIsProcessingChatAction(true);
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+    await clearChatHistory(workspace.id);
+    setIsProcessingChatAction(false);
+    setShowClearHistoryModal(false);
+  };
+
+  const handleDeleteConversationLocally = async () => {
+    setIsProcessingChatAction(true);
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } catch {}
+    await deleteWorkspaceLocally(workspace.id);
+    setIsProcessingChatAction(false);
+    setShowDeleteChatModal(false);
+    router.replace('/workspace');
+  };
+
   // Render Single Message Item
   const renderMessageItem = ({ item }: { item: WorkspaceMessage }) => {
     const isMe = item.sender_id === currentUser?.id;
@@ -1294,9 +1387,26 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <View style={styles.presenceDot} />
           </View>
 
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {partner?.fullName || workspace.name || 'Researcher'}
-          </Text>
+          <View style={styles.headerTitleCol}>
+            <View style={styles.headerTitleRow}>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {partner?.fullName || workspace.name || 'Researcher'}
+              </Text>
+              {isPinned && (
+                <View style={styles.headerPinBadge}>
+                  <Pin size={11} color="#164E3F" fill="#164E3F" />
+                </View>
+              )}
+              {isMuted && (
+                <View style={styles.headerMuteBadge}>
+                  <BellOff size={11} color="#64748B" />
+                </View>
+              )}
+            </View>
+            <Text style={styles.headerSubtext} numberOfLines={1}>
+              {partner?.academicTitle || 'Active Researcher'}
+            </Text>
+          </View>
         </TouchableOpacity>
 
         <View style={styles.headerRightActions}>
@@ -2340,54 +2450,142 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           <View style={styles.optionsSheet}>
             <View style={styles.optionsHandleBar} />
             <Text style={styles.optionsSheetTitle}>
-              {partner?.fullName || 'Options'}
+              {partner?.fullName || 'Conversation Settings'}
             </Text>
 
-            {/* 1. Media & Files */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowOptionsMenu(false);
-                setShowGalleryModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <FolderOpen size={20} color="#164E3F" />
-              <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>View Media, Papers & Links</Text>
-            </TouchableOpacity>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }}>
+              {/* 1. Pin / Unpin Conversation */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleTogglePin}
+                style={styles.optionsItemRow}
+              >
+                {isPinned ? (
+                  <PinOff size={20} color="#164E3F" />
+                ) : (
+                  <Pin size={20} color="#164E3F" fill="#164E3F" />
+                )}
+                <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>
+                  {isPinned ? 'Unpin Conversation' : 'Pin Conversation'}
+                </Text>
+              </TouchableOpacity>
 
-            {/* 2. Report */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowOptionsMenu(false);
-                setShowReportModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <Flag size={20} color="#DC2626" />
-              <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>Report</Text>
-            </TouchableOpacity>
+              {/* 2. Archive / Unarchive Chat */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleToggleArchive}
+                style={styles.optionsItemRow}
+              >
+                <Archive size={20} color="#164E3F" />
+                <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>
+                  {isArchived ? 'Unarchive Chat' : 'Archive Chat'}
+                </Text>
+              </TouchableOpacity>
 
-            {/* 3. Block */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleBlock}
-              style={styles.optionsItemRow}
-            >
-              <Ban size={20} color="#DC2626" />
-              <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>Block</Text>
-            </TouchableOpacity>
+              {/* 3. Mute / Unmute Notifications */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleOpenMuteSelector}
+                style={styles.optionsItemRow}
+              >
+                {isMuted ? (
+                  <Bell size={20} color="#164E3F" />
+                ) : (
+                  <BellOff size={20} color="#164E3F" />
+                )}
+                <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>
+                  {isMuted ? 'Unmute Notifications' : 'Mute Notifications'}
+                </Text>
+              </TouchableOpacity>
 
-            {/* 4. Unfollow */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleUnfollow}
-              style={styles.optionsItemRow}
-            >
-              <UserMinus size={20} color="#DC2626" />
-              <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>Unfollow</Text>
-            </TouchableOpacity>
+              {/* 4. Media & Files */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  setShowGalleryModal(true);
+                }}
+                style={styles.optionsItemRow}
+              >
+                <FolderOpen size={20} color="#164E3F" />
+                <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>
+                  View Media, Papers & Links
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.optionsDivider} />
+
+              {/* 5. Clear Chat History */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  setShowClearHistoryModal(true);
+                }}
+                style={styles.optionsItemRow}
+              >
+                <Trash size={20} color="#D97706" />
+                <Text style={[styles.optionsItemText, { color: '#D97706' }]}>
+                  Clear Chat History
+                </Text>
+              </TouchableOpacity>
+
+              {/* 6. Delete Conversation Locally */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  setShowDeleteChatModal(true);
+                }}
+                style={styles.optionsItemRow}
+              >
+                <Trash2 size={20} color="#DC2626" />
+                <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+                  Delete Conversation
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.optionsDivider} />
+
+              {/* 7. Report */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  setShowReportModal(true);
+                }}
+                style={styles.optionsItemRow}
+              >
+                <Flag size={20} color="#64748B" />
+                <Text style={[styles.optionsItemText, { color: '#64748B' }]}>
+                  Report Researcher
+                </Text>
+              </TouchableOpacity>
+
+              {/* 8. Block */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleBlock}
+                style={styles.optionsItemRow}
+              >
+                <Ban size={20} color="#DC2626" />
+                <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+                  Block User
+                </Text>
+              </TouchableOpacity>
+
+              {/* 9. Unfollow */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleUnfollow}
+                style={styles.optionsItemRow}
+              >
+                <UserMinus size={20} color="#64748B" />
+                <Text style={[styles.optionsItemText, { color: '#64748B' }]}>
+                  Unfollow
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
 
             {/* Cancel */}
             <TouchableOpacity
@@ -2399,6 +2597,174 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Modal: Mute Duration Picker (Phase 4) */}
+      <Modal
+        visible={showMuteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMuteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <BellOff size={18} color="#164E3F" />
+                <Text style={styles.modalTitle}>
+                  {isMuted ? 'Notification Settings' : 'Mute Notifications'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowMuteModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              {isMuted
+                ? 'This conversation is currently muted. Choose to unmute or change duration.'
+                : 'Choose how long you want to mute notifications for this conversation:'}
+            </Text>
+
+            <View style={{ gap: 8, marginTop: 4 }}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleSelectMuteDuration('8h')}
+                style={styles.muteOptionCard}
+              >
+                <Text style={styles.muteOptionTitle}>8 Hours</Text>
+                <Text style={styles.muteOptionDesc}>Mute alerts until tomorrow morning</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleSelectMuteDuration('1w')}
+                style={styles.muteOptionCard}
+              >
+                <Text style={styles.muteOptionTitle}>1 Week</Text>
+                <Text style={styles.muteOptionDesc}>Pause alerts for 7 days</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleSelectMuteDuration('always')}
+                style={styles.muteOptionCard}
+              >
+                <Text style={styles.muteOptionTitle}>Always</Text>
+                <Text style={styles.muteOptionDesc}>Keep muted until you manually unmute</Text>
+              </TouchableOpacity>
+
+              {isMuted && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleSelectMuteDuration('unmute')}
+                  style={[styles.muteOptionCard, { borderColor: '#164E3F', backgroundColor: '#F0FDF4' }]}
+                >
+                  <Text style={[styles.muteOptionTitle, { color: '#164E3F' }]}>🔔 Unmute Notifications</Text>
+                  <Text style={styles.muteOptionDesc}>Resume receiving all message alerts</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Clear History Confirmation (Phase 4) */}
+      <Modal
+        visible={showClearHistoryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowClearHistoryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Trash size={18} color="#D97706" />
+                <Text style={styles.modalTitle}>Clear Chat History?</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowClearHistoryModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              This will remove all messages from your chat view. Other participants will still be able to see their copy of the conversation.
+            </Text>
+
+            <View style={styles.confirmModalActionsRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowClearHistoryModal(false)}
+                style={styles.confirmModalCancelBtn}
+              >
+                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={isProcessingChatAction}
+                onPress={handleClearChatHistory}
+                style={[styles.confirmModalDestructiveBtn, { backgroundColor: '#D97706' }]}
+              >
+                {isProcessingChatAction ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmModalDestructiveText}>Clear History</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Delete Conversation Confirmation (Phase 4) */}
+      <Modal
+        visible={showDeleteChatModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteChatModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={18} color="#DC2626" />
+                <Text style={styles.modalTitle}>Delete Conversation?</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowDeleteChatModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Are you sure you want to delete this conversation? It will be removed from your Messages list.
+            </Text>
+
+            <View style={styles.confirmModalActionsRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowDeleteChatModal(false)}
+                style={styles.confirmModalCancelBtn}
+              >
+                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={isProcessingChatAction}
+                onPress={handleDeleteConversationLocally}
+                style={styles.confirmModalDestructiveBtn}
+              >
+                {isProcessingChatAction ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmModalDestructiveText}>Delete Chat</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* Modal: Report */}
@@ -3692,6 +4058,89 @@ const styles = StyleSheet.create({
   },
   confirmAttachBtnText: {
     fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  /* Phase 4 Header & Modal Styles */
+  headerTitleCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerPinBadge: {
+    backgroundColor: '#ECFDF5',
+    padding: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    transform: [{ rotate: '45deg' }],
+  },
+  headerMuteBadge: {
+    backgroundColor: '#F1F5F9',
+    padding: 3,
+    borderRadius: 6,
+  },
+  headerSubtext: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  optionsDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 6,
+  },
+  muteOptionCard: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  muteOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  muteOptionDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  confirmModalActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 18,
+  },
+  confirmModalCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  confirmModalCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  confirmModalDestructiveBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  confirmModalDestructiveText: {
+    fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
   },

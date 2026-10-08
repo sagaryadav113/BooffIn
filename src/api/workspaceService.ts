@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import { fetchUserProfile } from './authService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Workspace,
   WorkspaceMember,
@@ -21,6 +22,41 @@ import {
   WorkspaceSummaryStats,
 } from '../types/workspace';
 import { resolvePaper } from './paperResolver';
+
+export interface UserChatPreferences {
+  pinned: string[];
+  archived: string[];
+  muted: Record<string, { isMuted: boolean; until?: string | null }>;
+  deleted: string[];
+  clearedAt: Record<string, string>;
+}
+
+async function getChatPreferences(userId: string): Promise<UserChatPreferences> {
+  try {
+    const raw = await AsyncStorage.getItem(`booffin_chat_prefs_${userId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        pinned: Array.isArray(parsed.pinned) ? parsed.pinned : [],
+        archived: Array.isArray(parsed.archived) ? parsed.archived : [],
+        muted: parsed.muted && typeof parsed.muted === 'object' ? parsed.muted : {},
+        deleted: Array.isArray(parsed.deleted) ? parsed.deleted : [],
+        clearedAt: parsed.clearedAt && typeof parsed.clearedAt === 'object' ? parsed.clearedAt : {},
+      };
+    }
+  } catch (err) {
+    console.warn('[workspaceService] Failed to load chat preferences:', err);
+  }
+  return { pinned: [], archived: [], muted: {}, deleted: [], clearedAt: {} };
+}
+
+async function saveChatPreferences(userId: string, prefs: UserChatPreferences): Promise<void> {
+  try {
+    await AsyncStorage.setItem(`booffin_chat_prefs_${userId}`, JSON.stringify(prefs));
+  } catch (err) {
+    console.warn('[workspaceService] Failed to save chat preferences:', err);
+  }
+}
 
 const TIER_PRICES: Record<WorkspaceSubscriptionTier, number> = {
   free: 0,
@@ -187,7 +223,29 @@ export const workspaceService = {
         }
       }
 
-      // 5. Fetch public discoverable communities not yet joined
+      // 5. Fetch user chat preferences (pinned, archived, muted, deleted)
+      const prefs = await getChatPreferences(userId);
+
+      // Filter deleted DMs and enrich with preference flags
+      const enrichedDms: Workspace[] = dms
+        .filter((dm) => !prefs.deleted.includes(dm.id))
+        .map((dm) => ({
+          ...dm,
+          is_pinned: prefs.pinned.includes(dm.id),
+          is_archived: prefs.archived.includes(dm.id),
+          is_muted: dm.is_muted || Boolean(prefs.muted[dm.id]?.isMuted),
+          muted_until: prefs.muted[dm.id]?.until || null,
+        }))
+        .sort((a, b) => {
+          // Pinned conversations always stay pinned at the top
+          if (a.is_pinned && !b.is_pinned) return -1;
+          if (!a.is_pinned && b.is_pinned) return 1;
+          const timeA = new Date(a.updated_at || a.created_at).getTime();
+          const timeB = new Date(b.updated_at || b.created_at).getTime();
+          return timeB - timeA;
+        });
+
+      // 6. Fetch public discoverable communities not yet joined
       const { data: discoverRows } = await supabase
         .from('workspaces')
         .select('*')
@@ -205,7 +263,7 @@ export const workspaceService = {
         }));
 
       return {
-        dms,
+        dms: enrichedDms,
         communities,
         innerCircles,
         discoverableCommunities,
@@ -817,7 +875,22 @@ export const workspaceService = {
       });
 
       // Reverse so oldest in the page is first
-      return { messages: messages.reverse(), error: null };
+      let orderedMessages = messages.reverse();
+
+      // Check if user cleared history for this workspace
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser?.id) {
+        const prefs = await getChatPreferences(authUser.id);
+        const clearedIso = prefs.clearedAt[workspaceId];
+        if (clearedIso) {
+          const clearedTime = new Date(clearedIso).getTime();
+          orderedMessages = orderedMessages.filter(
+            (m) => new Date(m.created_at).getTime() > clearedTime
+          );
+        }
+      }
+
+      return { messages: orderedMessages, error: null };
     } catch (err: any) {
       return { messages: [], error: err.message || 'Failed to load messages' };
     }
@@ -1701,6 +1774,128 @@ export const workspaceService = {
       return { success: true, error: null };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to remove saved item' };
+    }
+  },
+
+  /**
+   * Toggle Pin conversation for user
+   */
+  async togglePinWorkspace(
+    userId: string,
+    workspaceId: string
+  ): Promise<{ success: boolean; isPinned: boolean; error: string | null }> {
+    try {
+      const prefs = await getChatPreferences(userId);
+      const isCurrentlyPinned = prefs.pinned.includes(workspaceId);
+      const newPinned = isCurrentlyPinned
+        ? prefs.pinned.filter((id) => id !== workspaceId)
+        : [workspaceId, ...prefs.pinned];
+
+      await saveChatPreferences(userId, { ...prefs, pinned: newPinned });
+      return { success: true, isPinned: !isCurrentlyPinned, error: null };
+    } catch (err: any) {
+      return { success: false, isPinned: false, error: err.message || 'Failed to toggle pin' };
+    }
+  },
+
+  /**
+   * Toggle Archive conversation for user
+   */
+  async toggleArchiveWorkspace(
+    userId: string,
+    workspaceId: string
+  ): Promise<{ success: boolean; isArchived: boolean; error: string | null }> {
+    try {
+      const prefs = await getChatPreferences(userId);
+      const isCurrentlyArchived = prefs.archived.includes(workspaceId);
+      const newArchived = isCurrentlyArchived
+        ? prefs.archived.filter((id) => id !== workspaceId)
+        : [workspaceId, ...prefs.archived];
+
+      await saveChatPreferences(userId, { ...prefs, archived: newArchived });
+      return { success: true, isArchived: !isCurrentlyArchived, error: null };
+    } catch (err: any) {
+      return { success: false, isArchived: false, error: err.message || 'Failed to toggle archive' };
+    }
+  },
+
+  /**
+   * Mute or Unmute notifications for a conversation
+   */
+  async setMuteWorkspace(
+    userId: string,
+    workspaceId: string,
+    isMuted: boolean,
+    mutedUntil?: string | null
+  ): Promise<{ success: boolean; isMuted: boolean; error: string | null }> {
+    try {
+      const prefs = await getChatPreferences(userId);
+      const newMuted = {
+        ...prefs.muted,
+        [workspaceId]: { isMuted, until: mutedUntil || null },
+      };
+
+      await saveChatPreferences(userId, { ...prefs, muted: newMuted });
+
+      // Also update workspace_members in Supabase if a member record exists
+      try {
+        await supabase
+          .from('workspace_members')
+          .update({ is_muted: isMuted })
+          .eq('workspace_id', workspaceId)
+          .eq('user_id', userId);
+      } catch {}
+
+      return { success: true, isMuted, error: null };
+    } catch (err: any) {
+      return { success: false, isMuted: false, error: err.message || 'Failed to update mute status' };
+    }
+  },
+
+  /**
+   * Clear all messages in chat history for this user
+   */
+  async clearChatHistory(
+    userId: string,
+    workspaceId: string
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const prefs = await getChatPreferences(userId);
+      const newCleared = {
+        ...prefs.clearedAt,
+        [workspaceId]: new Date().toISOString(),
+      };
+
+      await saveChatPreferences(userId, { ...prefs, clearedAt: newCleared });
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to clear chat history' };
+    }
+  },
+
+  /**
+   * Delete conversation locally for this user
+   */
+  async deleteWorkspaceLocally(
+    userId: string,
+    workspaceId: string
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const prefs = await getChatPreferences(userId);
+      const newDeleted = Array.from(new Set([...prefs.deleted, workspaceId]));
+      const newPinned = prefs.pinned.filter((id) => id !== workspaceId);
+      const newArchived = prefs.archived.filter((id) => id !== workspaceId);
+
+      await saveChatPreferences(userId, {
+        ...prefs,
+        deleted: newDeleted,
+        pinned: newPinned,
+        archived: newArchived,
+      });
+
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to delete conversation locally' };
     }
   },
 

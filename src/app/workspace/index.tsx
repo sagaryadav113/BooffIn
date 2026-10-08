@@ -68,6 +68,9 @@ export default function WorkspaceHubScreen() {
   // Active Mobile / Desktop Tab: Strictly 3 Tabs
   const [activeTab, setActiveTab] = useState<WorkspaceTabType>('dm');
 
+  // DM sub-toggle: "all" vs "archived" (Phase 4)
+  const [dmFilter, setDmFilter] = useState<'all' | 'archived'>('all');
+
   // Inner Circle sub-toggle: "Groups" vs "People"
   const [innerCircleSubTab, setInnerCircleSubTab] = useState<'groups' | 'people'>('groups');
 
@@ -94,7 +97,9 @@ export default function WorkspaceHubScreen() {
   const activeItems = useMemo(() => {
     let list: Workspace[] = [];
     if (activeTab === 'dm') {
-      list = dms;
+      list = dmFilter === 'archived'
+        ? dms.filter((d) => Boolean(d.is_archived))
+        : dms.filter((d) => !d.is_archived);
     } else if (activeTab === 'community') {
       list = [...communities, ...discoverableCommunities.filter((dc) => !communities.some((c) => c.id === dc.id))];
     } else if (activeTab === 'inner_circle') {
@@ -108,7 +113,7 @@ export default function WorkspaceHubScreen() {
       const desc = (w.description || '').toLowerCase();
       return name.includes(q) || desc.includes(q);
     });
-  }, [activeTab, dms, communities, innerCircles, discoverableCommunities, searchQuery]);
+  }, [activeTab, dmFilter, dms, communities, innerCircles, discoverableCommunities, searchQuery]);
 
   const selectedWorkspace = useMemo(() => {
     if (!selectedWorkspaceId) return activeItems[0] || null;
@@ -238,6 +243,30 @@ export default function WorkspaceHubScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* DM Sub-Toggle: All vs Archived (Phase 4) */}
+      {activeTab === 'dm' && dms.some((d) => d.is_archived) && (
+        <View style={styles.subToggleContainer}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setDmFilter('all')}
+            style={[styles.subToggleBtn, dmFilter === 'all' && styles.subToggleBtnActive]}
+          >
+            <Text style={[styles.subToggleText, dmFilter === 'all' && styles.subToggleTextActive]}>
+              All Messages ({dms.filter((d) => !d.is_archived).length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setDmFilter('archived')}
+            style={[styles.subToggleBtn, dmFilter === 'archived' && styles.subToggleBtnActive]}
+          >
+            <Text style={[styles.subToggleText, dmFilter === 'archived' && styles.subToggleTextActive]}>
+              Archived ({dms.filter((d) => Boolean(d.is_archived)).length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Inner Circle Sub-Toggle: Groups vs People */}
       {activeTab === 'inner_circle' && (
