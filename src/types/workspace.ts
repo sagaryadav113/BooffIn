@@ -78,7 +78,22 @@ export type WorkspaceMessageType =
   | 'event'
   | 'role_opportunity'
   | 'saved_item'
-  | 'e2ee_cipher';
+  | 'e2ee_cipher'
+  | 'image'
+  | 'poll'
+  | 'document';
+
+export interface WorkspacePollOption {
+  id: string;
+  text: string;
+  votes: string[]; // user IDs who voted
+}
+
+export interface WorkspacePollData {
+  question: string;
+  options: WorkspacePollOption[];
+  totalVotes: number;
+}
 
 export interface WorkspaceMessage {
   id: string;
@@ -87,6 +102,8 @@ export interface WorkspaceMessage {
   content: string;
   message_type: WorkspaceMessageType;
   doi_metadata: DoiMetadata | null;
+  poll_data?: WorkspacePollData | null;
+  attachments?: any;
   e2ee_ciphertext: string | null;
   e2ee_nonce: string | null;
   media_urls: string[] | null;

@@ -48,11 +48,15 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
     ? workspace.other_user?.fullName || workspace.name || 'Researcher'
     : workspace.name;
 
-  const previewSnippet = isDM
-    ? workspace.last_message?.content || workspace.other_user?.academicTitle || 'Hey! Let\'s collaborate on this research.'
-    : isInnerCircle
-    ? workspace.last_message?.content || workspace.description || 'Private research pod (max 25 members)'
-    : workspace.description || 'Join our research community discussion';
+  const previewSnippet =
+    workspace.last_message?.content ||
+    (isDM
+      ? 'No messages yet'
+      : workspace.description || 'Welcome to this workspace');
+
+  // Determine read receipt state
+  const isLastMessageMine = workspace.last_message?.sender_id && workspace.last_message?.sender_id !== workspace.other_user?.id;
+  const isMessageRead = unreadCount === 0;
 
   return (
     <TouchableOpacity
@@ -86,16 +90,13 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
             <Text style={styles.name} numberOfLines={1}>
               {displayName}
             </Text>
-            {isDM && (workspace.other_user?.orcidVerified || true) && (
-              <CheckCircle2 size={13} color="#164E3F" style={{ marginLeft: 4 }} />
-            )}
           </View>
 
           {/* Right Timestamp */}
           <Text style={styles.timeText}>{timeText}</Text>
         </View>
 
-        {/* Message Preview Snippet */}
+        {/* Message Preview Snippet (1 single line) */}
         <View style={styles.previewRow}>
           <Text style={styles.snippetText} numberOfLines={1}>
             {previewSnippet}
@@ -110,7 +111,11 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                 </Text>
               </View>
             ) : isDM ? (
-              <CheckCheck size={14} color="#94A3B8" />
+              isMessageRead ? (
+                <CheckCheck size={16} color="#10B981" strokeWidth={2.2} />
+              ) : (
+                <CheckCheck size={16} color="#94A3B8" strokeWidth={2} />
+              )
             ) : null}
           </View>
         </View>

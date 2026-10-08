@@ -41,6 +41,7 @@ import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { Workspace, WorkspaceMessage, WorkspaceEvent, WorkspaceBlock, DoiMetadata } from '../../types/workspace';
 import { WorkspaceDoiCard } from './WorkspaceDoiCard';
+import { WorkspaceInfoModal } from './WorkspaceInfoModal';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -179,7 +180,11 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           <ArrowLeft size={20} color="#164E3F" />
         </TouchableOpacity>
 
-        <View style={styles.headerTitleContainer}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setShowInfoModal(true)}
+          style={styles.headerTitleContainer}
+        >
           <Avatar
             uri={workspace.avatar_url || undefined}
             name={workspace.name}
@@ -193,7 +198,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               {workspace.members_count || '10k'} members • 324 online
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Right Actions: Info & Settings */}
         <View style={styles.headerRightActions}>
@@ -683,6 +688,13 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           </View>
         </View>
       </Modal>
+
+      {/* Community Info Modal */}
+      <WorkspaceInfoModal
+        visible={showInfoModal}
+        onClose={() => setShowInfoModal(false)}
+        workspace={workspace}
+      />
     </View>
   );
 };

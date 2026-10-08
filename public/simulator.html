@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BooffIn Mobile Simulator</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #0d1117;
+      color: #f0f6fc;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Simulator Toolbar */
+    .toolbar {
+      height: 48px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #10B981;
+      letter-spacing: 0.3px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .select-input, .btn {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .select-input:hover, .btn:hover {
+      background: #30363d;
+      color: #ffffff;
+      border-color: #8b949e;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-emerald {
+      background: #164E3F;
+      border-color: #059669;
+      color: #ffffff;
+    }
+    .btn-emerald:hover {
+      background: #059669;
+    }
+
+    /* Main Simulator Stage */
+    .stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: auto;
+      padding: 20px;
+      background: radial-gradient(circle at 50% 50%, #161b22 0%, #0d1117 100%);
+    }
+
+    /* Phone Outer Frame */
+    .phone-wrapper {
+      position: relative;
+      transform-origin: center center;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .phone-chassis {
+      position: relative;
+      background: #1e293b;
+      border-radius: 54px;
+      padding: 12px;
+      box-shadow:
+        0 0 0 2px #334155,
+        0 0 0 5px #0f172a,
+        0 25px 50px -12px rgba(0, 0, 0, 0.85),
+        0 0 80px rgba(16, 185, 129, 0.15);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Hardware Buttons Mockup */
+    .btn-volume-up, .btn-volume-down, .btn-power {
+      position: absolute;
+      background: #334155;
+      border-radius: 4px;
+    }
+    .btn-volume-up {
+      left: -6px;
+      top: 110px;
+      width: 4px;
+      height: 48px;
+    }
+    .btn-volume-down {
+      left: -6px;
+      top: 170px;
+      width: 4px;
+      height: 48px;
+    }
+    .btn-power {
+      right: -6px;
+      top: 130px;
+      width: 4px;
+      height: 65px;
+    }
+
+    /* Phone Screen Container */
+    .phone-screen {
+      position: relative;
+      background: #ffffff;
+      border-radius: 44px;
+      overflow: hidden;
+      width: 393px;
+      height: 852px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Dynamic Island */
+    .dynamic-island {
+      position: absolute;
+      top: 11px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 124px;
+      height: 32px;
+      background: #000000;
+      border-radius: 20px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      pointer-events: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    .camera-lens {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #1e3a8a, #030712);
+      border: 1px solid #111827;
+      margin-left: auto;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 24px 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: #0F172A;
+      z-index: 999;
+      pointer-events: none;
+    }
+
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* App iFrame */
+    .app-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #ffffff;
+    }
+
+    /* Home Bar Indicator */
+    .home-indicator {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 134px;
+      height: 5px;
+      background: #0F172A;
+      border-radius: 3px;
+      opacity: 0.65;
+      pointer-events: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Toolbar -->
+  <header class="toolbar">
+    <div class="brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
+        <path d="M12 18h.01"/>
+      </svg>
+      <span>BOOFFIN SIMULATOR</span>
+    </div>
+
+    <div class="controls">
+      <!-- Device Selector -->
+      <select id="deviceSelect" class="select-input" onchange="changeDevice()">
+        <option value="iphone15pro" selected>iPhone 15 Pro (393 × 852)</option>
+        <option value="iphone15promax">iPhone 15 Pro Max (430 × 932)</option>
+        <option value="pixel8">Google Pixel 8 (412 × 915)</option>
+        <option value="compact">Compact Mobile (375 × 667)</option>
+      </select>
+
+      <!-- Scale Selector -->
+      <select id="scaleSelect" class="select-input" onchange="changeScale()">
+        <option value="0.75">75%</option>
+        <option value="0.85" selected>85% (Optimal)</option>
+        <option value="0.95">95%</option>
+        <option value="1.0">100%</option>
+      </select>
+
+      <!-- Reload App -->
+      <button class="btn btn-emerald" onclick="reloadApp()" title="Reload Live App">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+          <path d="M16 16h5v5"/>
+        </svg>
+        Reload
+      </button>
+
+      <!-- Navigate to Workspace -->
+      <button class="btn" onclick="navigateTo('/workspace')" title="Open Workspace / DMs">
+        💬 Workspace
+      </button>
+
+      <button class="btn" onclick="navigateTo('/')" title="Open Home Feed">
+        🏠 Home
+      </button>
+    </div>
+  </header>
+
+  <!-- Simulator Main Canvas -->
+  <main class="stage">
+    <div id="phoneWrapper" class="phone-wrapper" style="transform: scale(0.85);">
+      <div class="btn-volume-up"></div>
+      <div class="btn-volume-down"></div>
+      <div class="btn-power"></div>
+
+      <div class="phone-chassis">
+        <div id="phoneScreen" class="phone-screen">
+          <!-- Dynamic Island -->
+          <div class="dynamic-island">
+            <div class="camera-lens"></div>
+          </div>
+
+          <!-- Status Bar -->
+          <div class="status-bar">
+            <span id="clockText">9:41</span>
+            <div class="status-icons">
+              <!-- Signal -->
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="2" y="16" width="3" height="6" rx="1"/>
+                <rect x="7" y="12" width="3" height="10" rx="1"/>
+                <rect x="12" y="8" width="3" height="14" rx="1"/>
+                <rect x="17" y="4" width="3" height="18" rx="1"/>
+              </svg>
+              <!-- WiFi -->
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                <line x1="12" y1="20" x2="12.01" y2="20"/>
+              </svg>
+              <!-- Battery -->
+              <svg width="20" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="6" width="17" height="12" rx="3" ry="3"/>
+                <line x1="22" y1="10" x2="22" y2="14"/>
+                <rect x="4" y="8" width="11" height="8" rx="1" fill="currentColor"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Embedded Expo App -->
+          <iframe id="appIframe" class="app-frame" src="/" allow="camera; microphone; geolocation"></iframe>
+
+          <!-- Home Indicator -->
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Live Clock Update
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours();
+      let minutes = now.getMinutes();
+      minutes = minutes < 10 ? '0' + minutes : minutes;
+      const str = hours + ':' + minutes;
+      document.getElementById('clockText').textContent = str;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Change Device Dimensions
+    function changeDevice() {
+      const select = document.getElementById('deviceSelect');
+      const screen = document.getElementById('phoneScreen');
+      const val = select.value;
+
+      if (val === 'iphone15pro') {
+        screen.style.width = '393px';
+        screen.style.height = '852px';
+        screen.style.borderRadius = '44px';
+      } else if (val === 'iphone15promax') {
+        screen.style.width = '430px';
+        screen.style.height = '932px';
+        screen.style.borderRadius = '48px';
+      } else if (val === 'pixel8') {
+        screen.style.width = '412px';
+        screen.style.height = '915px';
+        screen.style.borderRadius = '38px';
+      } else if (val === 'compact') {
+        screen.style.width = '375px';
+        screen.style.height = '667px';
+        screen.style.borderRadius = '32px';
+      }
+    }
+
+    // Change Scale
+    function changeScale() {
+      const select = document.getElementById('scaleSelect');
+      const wrapper = document.getElementById('phoneWrapper');
+      wrapper.style.transform = `scale(${select.value})`;
+    }
+
+    // Reload Live App
+    function reloadApp() {
+      const iframe = document.getElementById('appIframe');
+      iframe.src = iframe.src;
+    }
+
+    // Navigation Helper
+    function navigateTo(path) {
+      const iframe = document.getElementById('appIframe');
+      iframe.src = path;
+    }
+  </script>
+</body>
+</html>

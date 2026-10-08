@@ -115,12 +115,14 @@ interface WorkspaceState {
     is_private?: boolean;
     avatar_url?: string;
     banner_url?: string;
+    member_ids?: string[];
   }) => Promise<{ workspace: Workspace | null; error: string | null }>;
   createInnerCircle: (params: {
     name: string;
     description?: string;
     e2ee_enabled?: boolean;
     avatar_url?: string;
+    member_ids?: string[];
   }) => Promise<{ workspace: Workspace | null; error: string | null }>;
   joinCommunity: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
   refreshUnreadTotal: () => Promise<void>;
@@ -457,20 +459,44 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             }
           }
 
+          let extractedMedia: string[] | null = null;
+          if (Array.isArray(newMsg.media_urls) && newMsg.media_urls.length > 0) {
+            extractedMedia = newMsg.media_urls;
+          } else if (Array.isArray(newMsg.attachments) && newMsg.attachments.length > 0) {
+            extractedMedia = newMsg.attachments
+              .map((a: any) => (typeof a === 'string' ? a : a?.url || a?.uri))
+              .filter(Boolean);
+          } else if (newMsg.attachments && typeof newMsg.attachments === 'object') {
+            if (Array.isArray(newMsg.attachments.media_urls)) {
+              extractedMedia = newMsg.attachments.media_urls;
+            } else if (newMsg.attachments.url) {
+              extractedMedia = [newMsg.attachments.url];
+            }
+          }
+
+          if ((!extractedMedia || extractedMedia.length === 0) && typeof newMsg.content === 'string') {
+            const match = newMsg.content.match(/https?:\/\/[^\s]+(?:\.jpg|\.jpeg|\.png|\.webp|\.gif|\/profile-media\/[^\s]+|\/storage\/v1\/object\/public\/[^\s]+)/i);
+            if (match) {
+              extractedMedia = [match[0]];
+            }
+          }
+
+          const isImg = (extractedMedia && extractedMedia.length > 0) || newMsg.message_type === 'image';
+
           const messageObj: WorkspaceMessage = {
             id: newMsg.id,
             workspace_id: newMsg.workspace_id,
             sender_id: newMsg.sender_id,
             content: newMsg.content,
-            message_type: newMsg.message_type,
-            doi_metadata: newMsg.doi_metadata,
-            e2ee_ciphertext: newMsg.e2ee_ciphertext,
-            e2ee_nonce: newMsg.e2ee_nonce,
-            media_urls: newMsg.media_urls,
-            is_pinned: newMsg.is_pinned,
-            reply_to_id: newMsg.reply_to_id,
+            message_type: isImg ? 'image' : (newMsg.message_type || (newMsg.doi_metadata ? 'paper_doi' : 'text')),
+            doi_metadata: newMsg.doi_metadata || (newMsg.attachments?.doi_metadata ?? null),
+            e2ee_ciphertext: newMsg.e2ee_ciphertext || null,
+            e2ee_nonce: newMsg.e2ee_nonce || null,
+            media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
+            is_pinned: newMsg.is_pinned || false,
+            reply_to_id: newMsg.reply_to_id || null,
             created_at: newMsg.created_at,
-            updated_at: newMsg.updated_at,
+            updated_at: newMsg.updated_at || newMsg.created_at,
             sender: senderProfile,
           };
 

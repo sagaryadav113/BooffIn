@@ -11,8 +11,9 @@ import {
   Modal,
   Platform,
   Linking,
-  Image,
+  Alert,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import {
   ArrowLeft,
@@ -43,7 +44,10 @@ import {
   Mic,
   Tag,
   Check,
+  Maximize2,
+  Image as ImageIcon,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { GroupCollageAvatar } from './GroupCollageAvatar';
@@ -57,9 +61,12 @@ import {
   DoiMetadata,
 } from '../../types/workspace';
 import { WorkspaceDoiCard } from './WorkspaceDoiCard';
+import { WorkspaceInfoModal } from './WorkspaceInfoModal';
+import { ImageViewerModal } from '../modals/ImageViewerModal';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
+import { uploadPostImage } from '../../api/storageService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
 
 export type InnerCircleTab = 'discussions' | 'calendar' | 'jobs' | 'bookmarked';
@@ -106,6 +113,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [attachedDoi, setAttachedDoi] = useState<DoiMetadata | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
+  // Full-screen Image Viewer Modal State
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+
   // Modals
   const [showEventModal, setShowEventModal] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
@@ -118,10 +130,49 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [jobAssignee, setJobAssignee] = useState('');
 
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const [searchUserQuery, setSearchUserQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<string | null>(null);
+
+  const handlePickImage = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        if (Platform.OS === 'web') window.alert('Please allow photo permissions.');
+        else Alert.alert('Permission Denied', 'Please grant photo library access to upload photos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.85,
+        base64: true,
+      });
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const asset = result.assets[0];
+      if (currentUser?.id) {
+        setIsUploadingMedia(true);
+        const uploadRes = await uploadPostImage(currentUser.id, asset);
+        if (uploadRes.success && uploadRes.url) {
+          await sendMessage({
+            workspace_id: workspace.id,
+            content: '📷 Shared photo',
+            message_type: 'image',
+            media_urls: [uploadRes.url],
+          });
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        } else {
+          if (Platform.OS === 'web') window.alert(uploadRes.error || 'Failed to upload photo.');
+          else Alert.alert('Upload Failed', uploadRes.error || 'Failed to upload photo.');
+        }
+      }
+    } catch (err) {
+      console.warn('Pick image error:', err);
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
 
   useEffect(() => {
     loadMessages(workspace.id);
@@ -255,12 +306,16 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           <ArrowLeft size={20} color="#164E3F" />
         </TouchableOpacity>
 
-        <View style={styles.headerCenter}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setShowInfoModal(true)}
+          style={styles.headerCenter}
+        >
           <GroupCollageAvatar size={34} name={workspace.name} />
           <Text style={styles.headerTitle} numberOfLines={1}>
             {workspace.name || "BooffIn's inner circle"}
           </Text>
-        </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.7}
@@ -420,6 +475,13 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             }
             renderItem={({ item }) => {
               const isMe = item.sender_id === currentUser?.id;
+              const msgImageUrl =
+                (item.media_urls && item.media_urls.length > 0 ? item.media_urls[0] : null) ||
+                (Array.isArray(item.attachments) && item.attachments[0]?.url ? item.attachments[0].url : null) ||
+                (typeof item.content === 'string' && (item.content.startsWith('http') || item.content.includes('/profile-media/')) ? item.content : null);
+
+              const isImage = item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo';
+
               return (
                 <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
                   {!isMe && (
@@ -435,7 +497,42 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                       <Text style={styles.senderName}>{item.sender?.fullName || 'Researcher'}</Text>
                     )}
                     {item.doi_metadata && <WorkspaceDoiCard doiMeta={item.doi_metadata} />}
-                    {item.content ? (
+
+                    {/* Image Attachment with click to open full-screen lightbox */}
+                    {isImage && (
+                      <TouchableOpacity
+                        activeOpacity={0.88}
+                        onPress={() => {
+                          if (msgImageUrl) {
+                            setViewerImages([msgImageUrl]);
+                            setViewerVisible(true);
+                          }
+                        }}
+                        style={styles.imageMsgContainer}
+                      >
+                        {msgImageUrl ? (
+                          <>
+                            <ExpoImage
+                              source={{ uri: msgImageUrl }}
+                              style={styles.imageMsg}
+                              contentFit="cover"
+                              transition={200}
+                            />
+                            <View style={styles.imageOverlayBadge}>
+                              <Maximize2 size={12} color="#FFFFFF" />
+                              <Text style={styles.imageOverlayText}>View photo</Text>
+                            </View>
+                          </>
+                        ) : (
+                          <View style={styles.imagePlaceholderBox}>
+                            <ImageIcon size={30} color="#94A3B8" />
+                            <Text style={styles.imagePlaceholderText}>Photo attachment</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {item.content && (!isImage || (item.content !== '📷 Shared photo' && item.content !== msgImageUrl)) ? (
                       <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
                         {item.content}
                       </Text>
@@ -469,10 +566,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           <View style={styles.bottomDockContainer}>
             <View style={styles.inputCapsule}>
               <TouchableOpacity
-                onPress={() => setShowDoiModal(true)}
+                onPress={handlePickImage}
                 style={styles.mediaIconBtn}
               >
-                <Camera size={19} color="#94A3B8" />
+                <Camera size={19} color="#164E3F" />
               </TouchableOpacity>
 
               <TextInput
@@ -754,6 +851,22 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           </View>
         </View>
       </Modal>
+
+      {/* Group Info Modal */}
+      <WorkspaceInfoModal
+        visible={showInfoModal}
+        onClose={() => setShowInfoModal(false)}
+        workspace={workspace}
+      />
+
+      {/* Full-Screen Image Viewer Modal */}
+      <ImageViewerModal
+        visible={viewerVisible}
+        images={viewerImages}
+        initialIndex={0}
+        onClose={() => setViewerVisible(false)}
+        authorName={workspace.name || 'Shared photo'}
+      />
     </View>
   );
 };
@@ -1252,5 +1365,48 @@ const styles = StyleSheet.create({
   attachedDoiSub: {
     fontSize: 10,
     color: '#047857',
+  },
+  imageMsgContainer: {
+    width: 230,
+    height: 175,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A12',
+    marginVertical: 4,
+    position: 'relative',
+  },
+  imageMsg: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlayBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  imageOverlayText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  imagePlaceholderBox: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    gap: 6,
+  },
+  imagePlaceholderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
 });

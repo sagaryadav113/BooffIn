@@ -11,6 +11,7 @@ import {
   StatusBar,
   ScrollView,
   Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -30,12 +31,15 @@ import {
   Phone,
   Sparkles,
   Layers,
+  Bell,
+  BellOff,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { WorkspaceCard } from '../../components/workspace/WorkspaceCard';
 import { GroupCollageAvatar } from '../../components/workspace/GroupCollageAvatar';
 import { CreateWorkspaceModal } from '../../components/workspace/CreateWorkspaceModal';
+import { CreateCommunityModal } from '../../components/workspace/CreateCommunityModal';
 import { WorkspaceDMView } from '../../components/workspace/WorkspaceDMView';
 import { WorkspaceCommunityView } from '../../components/workspace/WorkspaceCommunityView';
 import { WorkspaceInnerCircleView } from '../../components/workspace/WorkspaceInnerCircleView';
@@ -70,6 +74,7 @@ export default function WorkspaceHubScreen() {
   // Search Query
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateCommunityModal, setShowCreateCommunityModal] = useState(false);
 
   // Desktop active selected workspace for 3-pane layout
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
@@ -116,6 +121,8 @@ export default function WorkspaceHubScreen() {
   const totalCommsUnread = communities.reduce((acc, c) => acc + (c.unread_count || 0), 0);
   const totalInnersUnread = innerCircles.reduce((acc, i) => acc + (i.unread_count || 0), 0);
 
+  const [isDMsMuted, setIsDMsMuted] = useState(false);
+
   // Header Title & Actions tailored to each tab
   const renderTopAppBar = () => {
     const handleGoBack = () => {
@@ -142,15 +149,22 @@ export default function WorkspaceHubScreen() {
           </View>
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => setShowCreateModal(true)}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              setIsDMsMuted(!isDMsMuted);
+              if (Platform.OS === 'web') {
+                window.alert(!isDMsMuted ? 'Muted notifications for all chat messages.' : 'Unmuted chat notifications.');
+              }
+            }}
             style={styles.headerIconBtn}
           >
-            <View style={styles.messageAddIconBadge}>
-              <MessageSquare size={20} color="#164E3F" />
-              <View style={styles.miniPlus}>
-                <Plus size={10} color="#164E3F" strokeWidth={3} />
-              </View>
-            </View>
+            {isDMsMuted ? (
+              <BellOff size={22} color="#DC2626" strokeWidth={2.2} />
+            ) : (
+              <Bell size={22} color="#164E3F" strokeWidth={2.2} />
+            )}
           </TouchableOpacity>
         </View>
       );
@@ -170,22 +184,13 @@ export default function WorkspaceHubScreen() {
             </TouchableOpacity>
             <Text style={styles.appBarTitle}>Community</Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowCreateModal(true)}
-              style={styles.headerIconBtn}
-            >
-              <UserPlus size={20} color="#164E3F" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setActiveTab('community')}
-              style={styles.headerIconBtn}
-            >
-              <Compass size={20} color="#164E3F" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowCreateCommunityModal(true)}
+            style={styles.headerIconBtn}
+          >
+            <Plus size={22} color="#164E3F" strokeWidth={2.5} />
+          </TouchableOpacity>
         </View>
       );
     }
@@ -569,7 +574,13 @@ export default function WorkspaceHubScreen() {
                   </Text>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={() => setShowCreateModal(true)}
+                    onPress={() => {
+                      if (activeTab === 'community') {
+                        setShowCreateCommunityModal(true);
+                      } else {
+                        setShowCreateModal(true);
+                      }
+                    }}
                     style={styles.emptyActionBtn}
                   >
                     <Plus size={15} color="#FFFFFF" />
@@ -591,10 +602,16 @@ export default function WorkspaceHubScreen() {
         </View>
       )}
 
-      {/* Create Modal */}
+      {/* Inner Circle / DM Group Creator Modal */}
       <CreateWorkspaceModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
+      />
+
+      {/* Dedicated Full-Screen Community Creator Modal */}
+      <CreateCommunityModal
+        visible={showCreateCommunityModal}
+        onClose={() => setShowCreateCommunityModal(false)}
       />
     </SafeAreaView>
   );

@@ -468,6 +468,7 @@ export const workspaceService = {
     is_private?: boolean;
     avatar_url?: string;
     banner_url?: string;
+    member_ids?: string[];
   }): Promise<{ workspace: Workspace | null; error: string | null }> {
     try {
       const {
@@ -476,6 +477,7 @@ export const workspaceService = {
       if (!user) return { workspace: null, error: 'User not authenticated' };
 
       const price = TIER_PRICES[params.subscription_tier] || 0;
+      const dbTierEnum = params.subscription_tier === 'free' ? null : params.subscription_tier;
 
       // 1. Insert workspace
       let wsPayload: any = {
@@ -487,9 +489,9 @@ export const workspaceService = {
         creator_id: user.id,
         owner_id: user.id,
         is_private: params.is_private ?? false,
-        subscription_tier: params.subscription_tier,
+        subscription_tier: dbTierEnum,
         subscription_price_inr: price,
-        pricing_tier: params.subscription_tier,
+        pricing_tier: dbTierEnum,
         price_inr: price,
       };
 
@@ -507,7 +509,7 @@ export const workspaceService = {
           description: params.description?.trim() || null,
           avatar_url: params.avatar_url || null,
           creator_id: user.id,
-          pricing_tier: params.subscription_tier,
+          pricing_tier: dbTierEnum,
           price_inr: price,
         };
         const retry = await supabase.from('workspaces').insert(fallbackPayload).select().single();
@@ -520,18 +522,36 @@ export const workspaceService = {
       }
 
       // 2. Insert creator as owner
-      const { error: memErr } = await supabase.from('workspace_members').upsert(
+      const membersToInsert: Array<{ workspace_id: string; user_id: string; role: string; status: string }> = [
         {
           workspace_id: ws.id,
           user_id: user.id,
           role: 'owner',
           status: 'active',
         },
+      ];
+
+      // 3. Insert any initial invited members
+      if (Array.isArray(params.member_ids) && params.member_ids.length > 0) {
+        for (const mid of params.member_ids) {
+          if (mid && mid !== user.id) {
+            membersToInsert.push({
+              workspace_id: ws.id,
+              user_id: mid,
+              role: 'member',
+              status: 'active',
+            });
+          }
+        }
+      }
+
+      const { error: memErr } = await supabase.from('workspace_members').upsert(
+        membersToInsert,
         { onConflict: 'workspace_id,user_id' }
       );
 
       if (memErr) {
-        return { workspace: null, error: memErr.message };
+        console.warn('Workspace members upsert error (non-fatal):', memErr);
       }
 
       return { workspace: ws, error: null };
@@ -548,6 +568,7 @@ export const workspaceService = {
     description?: string;
     e2ee_enabled?: boolean;
     avatar_url?: string;
+    member_ids?: string[];
   }): Promise<{ workspace: Workspace | null; error: string | null }> {
     try {
       const {
@@ -566,8 +587,9 @@ export const workspaceService = {
         is_private: true,
         max_members: 25,
         e2ee_enabled: params.e2ee_enabled ?? true,
-        subscription_tier: 'free',
+        subscription_tier: null,
         subscription_price_inr: 0,
+        pricing_tier: null,
         price_inr: 0,
       };
 
@@ -599,18 +621,36 @@ export const workspaceService = {
       }
 
       // 2. Insert creator as owner
-      const { error: memErr } = await supabase.from('workspace_members').upsert(
+      const membersToInsert: Array<{ workspace_id: string; user_id: string; role: string; status: string }> = [
         {
           workspace_id: ws.id,
           user_id: user.id,
           role: 'owner',
           status: 'active',
         },
+      ];
+
+      // 3. Insert all initial invited members
+      if (Array.isArray(params.member_ids) && params.member_ids.length > 0) {
+        for (const mid of params.member_ids) {
+          if (mid && mid !== user.id) {
+            membersToInsert.push({
+              workspace_id: ws.id,
+              user_id: mid,
+              role: 'member',
+              status: 'active',
+            });
+          }
+        }
+      }
+
+      const { error: memErr } = await supabase.from('workspace_members').upsert(
+        membersToInsert,
         { onConflict: 'workspace_id,user_id' }
       );
 
       if (memErr) {
-        return { workspace: null, error: memErr.message };
+        console.warn('Workspace members upsert error (non-fatal):', memErr);
       }
 
       return { workspace: ws, error: null };
@@ -706,22 +746,49 @@ export const workspaceService = {
         });
       }
 
-      const messages: WorkspaceMessage[] = rawList.map((m: any) => ({
-        id: m.id,
-        workspace_id: m.workspace_id,
-        sender_id: m.sender_id,
-        content: m.content,
-        message_type: m.message_type || (m.doi_reference || m.doi_metadata ? 'paper_doi' : 'text'),
-        doi_metadata: m.doi_metadata || (m.attachments?.doi_metadata ?? null),
-        e2ee_ciphertext: m.e2ee_ciphertext || null,
-        e2ee_nonce: m.e2ee_nonce || null,
-        media_urls: m.media_urls || null,
-        is_pinned: m.is_pinned || false,
-        reply_to_id: m.reply_to_id || null,
-        created_at: m.created_at,
-        updated_at: m.updated_at || m.created_at,
-        sender: senderMap.get(m.sender_id),
-      }));
+      const messages: WorkspaceMessage[] = rawList.map((m: any) => {
+        let extractedMedia: string[] | null = null;
+        if (Array.isArray(m.media_urls) && m.media_urls.length > 0) {
+          extractedMedia = m.media_urls;
+        } else if (Array.isArray(m.attachments) && m.attachments.length > 0) {
+          extractedMedia = m.attachments
+            .map((a: any) => (typeof a === 'string' ? a : a?.url || a?.uri))
+            .filter(Boolean);
+        } else if (m.attachments && typeof m.attachments === 'object') {
+          if (Array.isArray(m.attachments.media_urls)) {
+            extractedMedia = m.attachments.media_urls;
+          } else if (m.attachments.url) {
+            extractedMedia = [m.attachments.url];
+          }
+        }
+
+        // If no media_urls yet, check if content has a direct image link or Supabase storage link
+        if ((!extractedMedia || extractedMedia.length === 0) && typeof m.content === 'string') {
+          const match = m.content.match(/https?:\/\/[^\s]+(?:\.jpg|\.jpeg|\.png|\.webp|\.gif|\/profile-media\/[^\s]+|\/storage\/v1\/object\/public\/[^\s]+)/i);
+          if (match) {
+            extractedMedia = [match[0]];
+          }
+        }
+
+        const isImgType = (extractedMedia && extractedMedia.length > 0) || m.message_type === 'image';
+
+        return {
+          id: m.id,
+          workspace_id: m.workspace_id,
+          sender_id: m.sender_id,
+          content: m.content,
+          message_type: isImgType ? 'image' : (m.message_type || (m.doi_reference || m.doi_metadata ? 'paper_doi' : 'text')),
+          doi_metadata: m.doi_metadata || (m.attachments?.doi_metadata ?? null),
+          e2ee_ciphertext: m.e2ee_ciphertext || null,
+          e2ee_nonce: m.e2ee_nonce || null,
+          media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
+          is_pinned: m.is_pinned || false,
+          reply_to_id: m.reply_to_id || null,
+          created_at: m.created_at,
+          updated_at: m.updated_at || m.created_at,
+          sender: senderMap.get(m.sender_id),
+        };
+      });
 
       // Reverse so oldest in the page is first
       return { messages: messages.reverse(), error: null };
@@ -750,7 +817,7 @@ export const workspaceService = {
       if (!user) return { message: null, error: 'User not authenticated' };
 
       let resolvedDoiMeta = params.doi_metadata || null;
-      let detectedType: WorkspaceMessageType = params.message_type || 'text';
+      let detectedType: WorkspaceMessageType = params.message_type || (params.media_urls && params.media_urls.length > 0 ? 'image' : 'text');
 
       // Auto-detect DOI if text looks like a DOI or Paper link and metadata isn't provided
       if (!resolvedDoiMeta && !params.e2ee_ciphertext) {
@@ -775,6 +842,14 @@ export const workspaceService = {
         }
       }
 
+      // Prepare attachments payload for multi-schema compatibility
+      let attachmentsPayload: any = [];
+      if (params.media_urls && params.media_urls.length > 0) {
+        attachmentsPayload = params.media_urls.map((u) => ({ type: 'image', url: u }));
+      } else if (resolvedDoiMeta) {
+        attachmentsPayload = { doi_metadata: resolvedDoiMeta };
+      }
+
       // Try rich insert
       let insertPayload: any = {
         workspace_id: params.workspace_id,
@@ -785,6 +860,7 @@ export const workspaceService = {
         e2ee_ciphertext: params.e2ee_ciphertext || null,
         e2ee_nonce: params.e2ee_nonce || null,
         media_urls: params.media_urls || null,
+        attachments: attachmentsPayload,
         reply_to_id: params.reply_to_id || null,
       };
 
@@ -802,7 +878,7 @@ export const workspaceService = {
             workspace_id: params.workspace_id,
             sender_id: user.id,
             content: params.content,
-            attachments: resolvedDoiMeta ? { doi_metadata: resolvedDoiMeta } : [],
+            attachments: attachmentsPayload,
           })
           .select()
           .single();
@@ -1347,6 +1423,28 @@ export const workspaceService = {
       return await this.removeWorkspaceMember(workspaceId, user.id);
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to leave workspace' };
+    }
+  },
+
+  /**
+   * Update workspace details (e.g. name, description, avatar_url)
+   */
+  async updateWorkspaceDetails(
+    workspaceId: string,
+    updates: { name?: string; description?: string; avatar_url?: string }
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const { error } = await supabase
+        .from('workspaces')
+        .update(updates)
+        .eq('id', workspaceId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to update workspace' };
     }
   },
 
