@@ -67,6 +67,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const [doiQuery, setDoiQuery] = useState('');
   const [isResolvingDoi, setIsResolvingDoi] = useState(false);
   const [resolvedDoi, setResolvedDoi] = useState<DoiMetadata | null>(null);
+  const [attachedDoi, setAttachedDoi] = useState<DoiMetadata | null>(null);
 
   // New Event Modal
   const [showEventModal, setShowEventModal] = useState(false);
@@ -92,40 +93,18 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     };
   }, [workspace.id]);
 
-  // If user is blocked in this community
-  if (workspace.is_blocked) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={20} color="#0F172A" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{workspace.name}</Text>
-        </View>
-
-        <View style={styles.blockedNoticeCard}>
-          <AlertTriangle size={32} color="#DC2626" />
-          <Text style={styles.blockedTitle}>Access Restricted</Text>
-          <Text style={styles.blockedSubtitle}>
-            You have been removed from this research community by a moderator.
-          </Text>
-          <View style={styles.blockedReasonBox}>
-            <Text style={styles.blockedReasonLabel}>Transparent Moderation Reason:</Text>
-            <Text style={styles.blockedReasonText}>"{workspace.block_reason || 'Community guideline violation'}"</Text>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
   const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
+    const trimmed = inputText.trim();
+    if (!trimmed && !attachedDoi) return;
     const res = await sendMessage({
       workspace_id: workspace.id,
-      content: inputText.trim(),
+      content: trimmed || (attachedDoi ? `Shared research paper: ${attachedDoi.title}` : ''),
+      message_type: attachedDoi ? 'paper_doi' : 'text',
+      doi_metadata: attachedDoi || undefined,
     });
     if (res.success) {
       setInputText('');
+      setAttachedDoi(null);
     }
   };
 
@@ -232,7 +211,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         >
           <FileText size={15} color={activeTab === 'papers' ? '#064E3B' : '#64748B'} />
           <Text style={[styles.tabText, activeTab === 'papers' && styles.tabTextActive]}>
-            Papers
+            Papers ({paperMessages.length})
           </Text>
         </TouchableOpacity>
 
@@ -262,7 +241,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         >
           <Video size={15} color={activeTab === 'live_sessions' ? '#064E3B' : '#64748B'} />
           <Text style={[styles.tabText, activeTab === 'live_sessions' && styles.tabTextActive]}>
-            Live
+            Live ({events.filter((e) => e.event_type === 'live_session').length})
           </Text>
         </TouchableOpacity>
 
@@ -372,7 +351,30 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             }}
           />
 
+          {/* Attached DOI banner */}
+          {attachedDoi && (
+            <View style={styles.attachedDoiPreview}>
+              <FileText size={14} color="#064E3B" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachedDoiTitle} numberOfLines={1}>
+                  {attachedDoi.title}
+                </Text>
+                <Text style={styles.attachedDoiSub}>DOI: {attachedDoi.doi}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setAttachedDoi(null)}>
+                <X size={16} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.inputBar}>
+            <TouchableOpacity
+              onPress={() => setShowDoiModal(true)}
+              style={styles.doiAttachIconBtn}
+            >
+              <FileText size={18} color="#064E3B" />
+            </TouchableOpacity>
+
             <TextInput
               value={inputText}
               onChangeText={setInputText}
@@ -382,8 +384,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             />
             <TouchableOpacity
               onPress={handleSendMessage}
-              disabled={!inputText.trim() || isSending}
-              style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+              disabled={(!inputText.trim() && !attachedDoi) || isSending}
+              style={[styles.sendBtn, (!inputText.trim() && !attachedDoi) && styles.sendBtnDisabled]}
             >
               {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
             </TouchableOpacity>
@@ -744,6 +746,34 @@ const styles = StyleSheet.create({
   timestamp: { fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
   myTimestamp: { color: 'rgba(255, 255, 255, 0.7)' },
   otherTimestamp: { color: '#94A3B8' },
+  attachedDoiPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#A7F3D0',
+    gap: 8,
+  },
+  attachedDoiTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#064E3B',
+  },
+  attachedDoiSub: {
+    fontSize: 10,
+    color: '#047857',
+  },
+  doiAttachIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',

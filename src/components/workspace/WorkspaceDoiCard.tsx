@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
-import { FileText, ExternalLink, Bookmark, Check } from 'lucide-react-native';
+import { FileText, ExternalLink, Bookmark, Check, Copy, Quote } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { DoiMetadata } from '../../types/workspace';
 
@@ -16,6 +17,9 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
   onSave,
   isSaved = false,
 }) => {
+  const [copiedCitation, setCopiedCitation] = useState(false);
+  const [copiedDoi, setCopiedDoi] = useState(false);
+
   const handleOpenPaper = () => {
     if (doiMeta.doi) {
       router.push(`/paper/${encodeURIComponent(doiMeta.doi)}`);
@@ -32,19 +36,41 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
 
   const hasMoreAuthors = (doiMeta.authors || []).length > 3;
 
+  const handleCopyCitation = async () => {
+    const authors = authorsText ? `${authorsText}${hasMoreAuthors ? ' et al.' : ''}` : 'Unknown Authors';
+    const year = doiMeta.publicationYear ? ` (${doiMeta.publicationYear}).` : '';
+    const journal = doiMeta.journal ? ` ${doiMeta.journal}.` : '';
+    const doi = doiMeta.doi ? ` https://doi.org/${doiMeta.doi}` : '';
+    const apa = `${authors}${year} ${doiMeta.title}.${journal}${doi}`;
+
+    await Clipboard.setStringAsync(apa);
+    setCopiedCitation(true);
+    setTimeout(() => setCopiedCitation(false), 2000);
+  };
+
+  const handleCopyDoi = async () => {
+    if (!doiMeta.doi) return;
+    await Clipboard.setStringAsync(`https://doi.org/${doiMeta.doi}`);
+    setCopiedDoi(true);
+    setTimeout(() => setCopiedDoi(false), 2000);
+  };
+
   return (
     <View style={styles.container}>
       {/* Header bar */}
       <View style={styles.header}>
         <View style={styles.badge}>
-          <FileText size={13} color="#064E3B" />
+          <FileText size={12} color="#064E3B" />
           <Text style={styles.badgeText}>DOI RESEARCH PAPER</Text>
         </View>
-        {doiMeta.citationCount !== undefined && doiMeta.citationCount > 0 && (
-          <View style={styles.citationBadge}>
-            <Text style={styles.citationText}>{doiMeta.citationCount} Citations</Text>
-          </View>
-        )}
+
+        <View style={styles.headerRightBadges}>
+          {doiMeta.citationCount !== undefined && doiMeta.citationCount > 0 && (
+            <View style={styles.citationBadge}>
+              <Text style={styles.citationText}>{doiMeta.citationCount} Citations</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Paper Title */}
@@ -67,37 +93,59 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
         </Text>
       )}
 
-      {/* DOI identifier tag */}
+      {/* Interactive DOI identifier tag with copy */}
       {doiMeta.doi && (
-        <Text style={styles.doiTag} numberOfLines={1}>
-          https://doi.org/{doiMeta.doi}
-        </Text>
+        <TouchableOpacity activeOpacity={0.7} onPress={handleCopyDoi} style={styles.doiTagRow}>
+          <Text style={styles.doiTag} numberOfLines={1}>
+            doi.org/{doiMeta.doi}
+          </Text>
+          {copiedDoi ? (
+            <Check size={11} color="#064E3B" style={{ marginLeft: 4 }} />
+          ) : (
+            <Copy size={11} color="#94A3B8" style={{ marginLeft: 4 }} />
+          )}
+        </TouchableOpacity>
       )}
 
-      {/* Actions */}
+      {/* Actions Toolbar */}
       <View style={styles.actionsRow}>
         <TouchableOpacity
-          activeOpacity={0.8}
+          activeOpacity={0.85}
           onPress={handleOpenPaper}
           style={styles.openButton}
         >
           <Text style={styles.openButtonText}>Read Paper</Text>
-          <ExternalLink size={13} color="#FFFFFF" />
+          <ExternalLink size={12} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={handleCopyCitation}
+          style={[styles.actionBtn, copiedCitation && styles.actionBtnActive]}
+        >
+          {copiedCitation ? (
+            <Check size={13} color="#064E3B" />
+          ) : (
+            <Quote size={13} color="#475569" />
+          )}
+          <Text style={[styles.actionBtnText, copiedCitation && styles.actionBtnTextActive]}>
+            {copiedCitation ? 'Citation Copied' : 'Cite (APA)'}
+          </Text>
         </TouchableOpacity>
 
         {onSave && (
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onSave}
-            style={[styles.saveButton, isSaved && styles.saveButtonActive]}
+            style={[styles.actionBtn, isSaved && styles.actionBtnActive]}
           >
             {isSaved ? (
-              <Check size={14} color="#064E3B" />
+              <Check size={13} color="#064E3B" />
             ) : (
-              <Bookmark size={14} color="#475569" />
+              <Bookmark size={13} color="#475569" />
             )}
-            <Text style={[styles.saveButtonText, isSaved && styles.saveButtonTextActive]}>
-              {isSaved ? 'Saved' : 'Save'}
+            <Text style={[styles.actionBtnText, isSaved && styles.actionBtnTextActive]}>
+              {isSaved ? 'In Vault' : 'Save'}
             </Text>
           </TouchableOpacity>
         )}
@@ -172,12 +220,28 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     flexShrink: 1,
   },
+  headerRightBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  doiTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 8,
+  },
   doiTag: {
     fontSize: 10,
-    color: '#2563EB',
+    color: '#0F172A',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    marginBottom: 8,
-    flexShrink: 1,
+    fontWeight: '500',
   },
   actionsRow: {
     flexDirection: 'row',
@@ -200,7 +264,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  saveButton: {
+  actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -211,16 +275,16 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 6,
   },
-  saveButtonActive: {
+  actionBtnActive: {
     borderColor: '#064E3B',
     backgroundColor: '#ECFDF5',
   },
-  saveButtonText: {
+  actionBtnText: {
     fontSize: 11,
     fontWeight: '500',
     color: '#475569',
   },
-  saveButtonTextActive: {
+  actionBtnTextActive: {
     color: '#064E3B',
     fontWeight: '600',
   },

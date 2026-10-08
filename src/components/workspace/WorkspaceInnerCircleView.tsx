@@ -734,7 +734,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 <View key={opp.id} style={styles.oppCard}>
                   <View style={styles.oppCardHeader}>
                     <View style={styles.oppTypeTag}>
-                      <Briefcase size={11} color="#1E3A8A" />
+                      <Briefcase size={11} color="#064E3B" />
                       <Text style={styles.oppTypeText}>{opp.role_type.replace('_', ' ').toUpperCase()}</Text>
                     </View>
                     {opp.compensation && (
@@ -1767,7 +1767,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
@@ -1775,10 +1777,12 @@ const styles = StyleSheet.create({
   oppTypeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#1E3A8A',
+    color: '#064E3B',
   },
   oppCompTag: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
@@ -1786,7 +1790,7 @@ const styles = StyleSheet.create({
   oppCompText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#92400E',
+    color: '#064E3B',
   },
   oppTitle: {
     fontSize: 14,
@@ -1915,7 +1919,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   ownerBadge: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
   memberRoleBadge: {
     backgroundColor: '#F1F5F9',
@@ -1925,7 +1931,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   ownerBadgeText: {
-    color: '#92400E',
+    color: '#064E3B',
   },
   memberRoleBadgeText: {
     color: '#64748B',

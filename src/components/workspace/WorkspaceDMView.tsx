@@ -314,6 +314,33 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <Text style={styles.emptyPrompt}>
                 You can now message each other directly and collaborate on research papers.
               </Text>
+
+              {/* Quick Starter Chips */}
+              <View style={styles.quickStartersRow}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setInputText('Hi! Loved your recent paper, would love to discuss your methodology.')}
+                  style={styles.quickStarterChip}
+                >
+                  <Text style={styles.quickStarterChipText}>🔬 Discuss Methodology</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setInputText('Hello, are you open to co-authoring or reviewing an upcoming draft?')}
+                  style={styles.quickStarterChip}
+                >
+                  <Text style={styles.quickStarterChipText}>🤝 Co-authorship Inquiry</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setShowDoiModal(true)}
+                  style={styles.quickStarterChip}
+                >
+                  <Text style={styles.quickStarterChipText}>📄 Share DOI Paper</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           }
         />
@@ -536,6 +563,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     lineHeight: 18,
+  },
+  quickStartersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  quickStarterChip: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+  quickStarterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
   },
   messageRow: {
     flexDirection: 'row',

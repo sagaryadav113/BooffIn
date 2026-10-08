@@ -22,6 +22,7 @@ import {
   Lock,
   Compass,
   ArrowLeft,
+  X,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -91,7 +92,7 @@ export default function WorkspaceHubScreen() {
 
   const renderHeader = () => (
     <View style={styles.headerContent}>
-      {/* Search Input Bar */}
+      {/* Search Input Bar with Clear Button */}
       <View style={styles.searchBar}>
         <Search size={16} color="#94A3B8" />
         <TextInput
@@ -100,10 +101,20 @@ export default function WorkspaceHubScreen() {
           placeholder="Search researchers, communities, or pods..."
           placeholderTextColor="#94A3B8"
           style={styles.searchInput}
+          returnKeyType="search"
         />
+        {searchQuery.trim().length > 0 && (
+          <TouchableOpacity
+            onPress={() => setSearchQuery('')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.clearSearchBtn}
+          >
+            <X size={14} color="#64748B" />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Architecture Tabs */}
+      {/* Architecture Tabs with Counts */}
       <View style={styles.tabsRow}>
         <TouchableOpacity
           onPress={() => setActiveTab('all')}
@@ -111,7 +122,7 @@ export default function WorkspaceHubScreen() {
         >
           <Layers size={13} color={activeTab === 'all' ? '#064E3B' : '#64748B'} />
           <Text style={[styles.tabChipText, activeTab === 'all' && styles.tabChipTextActive]}>
-            All
+            All ({dms.length + innerCircles.length + communities.length})
           </Text>
         </TouchableOpacity>
 
@@ -121,7 +132,7 @@ export default function WorkspaceHubScreen() {
         >
           <MessageSquare size={13} color={activeTab === 'dms' ? '#064E3B' : '#64748B'} />
           <Text style={[styles.tabChipText, activeTab === 'dms' && styles.tabChipTextActive]}>
-            DMs
+            DMs ({dms.length})
           </Text>
           {totalDMsUnread > 0 && (
             <View style={styles.chipBadge}>
@@ -136,7 +147,7 @@ export default function WorkspaceHubScreen() {
         >
           <Shield size={13} color={activeTab === 'inner_circles' ? '#064E3B' : '#64748B'} />
           <Text style={[styles.tabChipText, activeTab === 'inner_circles' && styles.tabChipTextActive]}>
-            Inner Circles
+            Inner Circles ({innerCircles.length})
           </Text>
           {totalInnersUnread > 0 && (
             <View style={styles.chipBadge}>
@@ -151,7 +162,7 @@ export default function WorkspaceHubScreen() {
         >
           <Users size={13} color={activeTab === 'communities' ? '#064E3B' : '#64748B'} />
           <Text style={[styles.tabChipText, activeTab === 'communities' && styles.tabChipTextActive]}>
-            Communities
+            Communities ({communities.length})
           </Text>
           {totalCommsUnread > 0 && (
             <View style={styles.chipBadge}>
@@ -176,21 +187,27 @@ export default function WorkspaceHubScreen() {
 
         {discoverableCommunities.map((ws) => (
           <View key={ws.id} style={styles.discoverCard}>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, marginRight: 8 }}>
               <Text style={styles.discoverName}>{ws.name}</Text>
               {ws.description && (
                 <Text style={styles.discoverDesc} numberOfLines={2}>
                   {ws.description}
                 </Text>
               )}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <Text style={styles.discoverPrice}>
-                  {ws.subscription_price_inr > 0 ? `₹${ws.subscription_price_inr}/mo` : 'Free Open Access'}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                <View style={[styles.discoverBadge, ws.subscription_price_inr > 0 ? styles.discoverBadgePaid : styles.discoverBadgeFree]}>
+                  <Text style={[styles.discoverBadgeText, ws.subscription_price_inr > 0 ? styles.discoverBadgeTextPaid : styles.discoverBadgeTextFree]}>
+                    {ws.subscription_price_inr > 0 ? `₹${ws.subscription_price_inr}/mo` : 'Free Open Access'}
+                  </Text>
+                </View>
+                <Text style={styles.discoverMembersCount}>
+                  {ws.members_count || 1} {ws.members_count === 1 ? 'member' : 'members'}
                 </Text>
               </View>
             </View>
 
             <TouchableOpacity
+              activeOpacity={0.8}
               onPress={() => joinCommunity(ws.id)}
               style={styles.joinBtn}
             >
@@ -401,6 +418,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  clearSearchBtn: {
+    padding: 4,
+  },
   discoverSection: {
     marginTop: 24,
     borderTopWidth: 1,
@@ -439,10 +459,32 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
-  discoverPrice: {
+  discoverBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  discoverBadgePaid: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  discoverBadgeFree: {
+    backgroundColor: '#F1F5F9',
+  },
+  discoverBadgeText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  discoverBadgeTextPaid: {
     color: '#064E3B',
+  },
+  discoverBadgeTextFree: {
+    color: '#475569',
+  },
+  discoverMembersCount: {
+    fontSize: 11,
+    color: '#94A3B8',
   },
   joinBtn: {
     backgroundColor: '#064E3B',

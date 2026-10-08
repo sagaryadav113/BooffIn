@@ -26,6 +26,28 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({ workspace, onPress
 
   const unreadCount = workspace.unread_count || 0;
 
+    const formatTime = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m`;
+      if (diffHours < 24) return `${diffHours}h`;
+      if (diffDays < 7) return `${diffDays}d`;
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch {
+      return '';
+    }
+  };
+
+  const timeText = formatTime(workspace.updated_at || workspace.created_at);
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -42,22 +64,22 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({ workspace, onPress
           />
         ) : isInnerCircle ? (
           <View style={styles.innerCircleAvatar}>
-            <Lock size={20} color="#064E3B" />
+            <Lock size={18} color="#064E3B" />
           </View>
         ) : (
           <View style={styles.communityAvatar}>
-            <Users size={20} color="#1E3A8A" />
+            <Users size={18} color="#064E3B" />
           </View>
         )}
 
         {/* Small Type Icon overlay */}
         <View style={styles.typeBadgeWrapper}>
           {isDM ? (
-            <MessageSquare size={10} color="#FFFFFF" />
+            <MessageSquare size={9} color="#FFFFFF" />
           ) : isInnerCircle ? (
-            <Shield size={10} color="#FFFFFF" />
+            <Shield size={9} color="#FFFFFF" />
           ) : (
-            <Users size={10} color="#FFFFFF" />
+            <Users size={9} color="#FFFFFF" />
           )}
         </View>
       </View>
@@ -65,24 +87,28 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({ workspace, onPress
       {/* Main Info */}
       <View style={styles.infoSection}>
         <View style={styles.titleRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {isDM
-              ? workspace.other_user?.fullName || workspace.name || 'Researcher'
-              : workspace.name}
-          </Text>
+          <View style={styles.nameContainer}>
+            <Text style={styles.name} numberOfLines={1}>
+              {isDM
+                ? workspace.other_user?.fullName || workspace.name || 'Researcher'
+                : workspace.name}
+            </Text>
 
-          {isDM && workspace.other_user?.orcidVerified && (
-            <CheckCircle2 size={13} color={colors.accentGreen} style={{ marginLeft: 4 }} />
-          )}
+            {isDM && workspace.other_user?.orcidVerified && (
+              <CheckCircle2 size={13} color={colors.accentGreen} style={{ marginLeft: 4 }} />
+            )}
+          </View>
 
-          {/* Unread badge */}
-          {unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Text>
-            </View>
-          )}
+          <View style={styles.rightMetaContainer}>
+            {timeText ? <Text style={styles.timeText}>{timeText}</Text> : null}
+            {unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Subtitle / Details */}
@@ -109,16 +135,16 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({ workspace, onPress
         <View style={styles.tagsRow}>
           {isDM ? (
             <View style={[styles.tag, styles.tagDM]}>
-              <Text style={styles.tagTextDM}>1-on-1 DM · Mutual Follow</Text>
+              <Text style={styles.tagTextDM}>1-on-1 DM</Text>
             </View>
           ) : isInnerCircle ? (
             <>
               <View style={[styles.tag, styles.tagInner]}>
-                <Text style={styles.tagTextInner}>Inner Circle · Max 25</Text>
+                <Text style={styles.tagTextInner}>Inner Circle · {workspace.members_count || 1}/25</Text>
               </View>
               {workspace.e2ee_enabled && (
                 <View style={[styles.tag, styles.tagE2EE]}>
-                  <Text style={styles.tagTextE2EE}>E2EE Encrypted</Text>
+                  <Text style={styles.tagTextE2EE}>E2EE</Text>
                 </View>
               )}
             </>
@@ -182,11 +208,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#E2E8F0',
   },
   typeBadgeWrapper: {
     position: 'absolute',
@@ -210,18 +236,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 2,
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
   name: {
     fontSize: 15,
     fontWeight: '700',
     color: '#0F172A',
-    flex: 1,
+  },
+  rightMetaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timeText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '500',
   },
   unreadBadge: {
     backgroundColor: '#064E3B',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 10,
-    marginLeft: 8,
   },
   unreadBadgeText: {
     fontSize: 10,
@@ -263,38 +303,40 @@ const styles = StyleSheet.create({
     color: '#064E3B',
   },
   tagE2EE: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   tagTextE2EE: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#92400E',
+    color: '#064E3B',
   },
   tagCommunity: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1F5F9',
   },
   tagTextCommunity: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#1D4ED8',
+    color: '#334155',
   },
   tagPaid: {
-    backgroundColor: '#FAF5FF',
+    backgroundColor: '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#E9D5FF',
+    borderColor: '#A7F3D0',
   },
   tagTextPaid: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#7E22CE',
+    color: '#064E3B',
   },
   tagFree: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#F1F5F9',
   },
   tagTextFree: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#16A34A',
+    color: '#475569',
   },
   memberCountText: {
     fontSize: 11,
