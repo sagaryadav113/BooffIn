@@ -1677,9 +1677,6 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       </View>
 
-      {/* E2EE Zero-Knowledge Encryption Status Banner */}
-      <E2EEStatusBanner onPressVerify={() => setShowSafetyNumberModal(true)} />
-
       {/* In-Chat Search & Filter Strip */}
       {showSearchBar && (
         <View style={styles.chatSearchContainer}>
@@ -3158,19 +3155,6 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         initialIndex={0}
         onClose={() => setViewerVisible(false)}
         authorName={partner?.fullName || 'Shared photo'}
-      />
-
-      {/* E2EE Safety Number Verification Modal */}
-      <E2EESafetyNumberModal
-        visible={showSafetyNumberModal}
-        onClose={() => setShowSafetyNumberModal(false)}
-        currentUserId={currentUser?.id || ''}
-        peerUser={{
-          id: partner?.id || '',
-          fullName: partner?.fullName || 'Researcher',
-          handle: partner?.handle,
-          avatarUrl: partner?.avatarUrl,
-        }}
       />
     </KeyboardAvoidingView>
   );

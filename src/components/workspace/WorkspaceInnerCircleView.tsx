@@ -1065,9 +1065,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         </View>
       )}
 
-      {/* E2EE Pod Vault Encryption Status Banner */}
-      <E2EEStatusBanner isPod={true} />
-
       {/* 2. Sub-Filter Pill Strip */}
       <View style={styles.subFilterStripContainer}>
         <ScrollView
