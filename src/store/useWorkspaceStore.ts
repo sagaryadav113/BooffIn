@@ -789,14 +789,42 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           }
 
           const isImg = (extractedMedia && extractedMedia.length > 0) || newMsg.message_type === 'image';
+          const docMeta = newMsg.document_metadata || newMsg.attachments?.document_metadata || null;
+          const inviteMeta = newMsg.workspace_invite_metadata || newMsg.attachments?.workspace_invite_metadata || null;
+          const postMeta = newMsg.post_metadata || newMsg.attachments?.post_metadata || null;
+          const profMeta = newMsg.profile_metadata || newMsg.attachments?.profile_metadata || null;
+          const callMeta = newMsg.call_metadata || newMsg.attachments?.call_metadata || null;
+          const audioMeta = newMsg.audio_metadata || newMsg.attachments?.audio_metadata || null;
+          const doiMeta = newMsg.doi_metadata || newMsg.attachments?.doi_metadata || null;
+          const pollData = newMsg.poll_data || newMsg.attachments?.poll_data || null;
+
+          let detectedType = newMsg.message_type;
+          if (isImg) detectedType = 'image';
+          else if (docMeta) detectedType = 'document';
+          else if (inviteMeta) detectedType = 'workspace_invite';
+          else if (postMeta) detectedType = 'post';
+          else if (profMeta) detectedType = 'profile';
+          else if (callMeta) detectedType = 'call_log';
+          else if (audioMeta) detectedType = 'audio';
+          else if (doiMeta) detectedType = 'paper_doi';
+          else if (pollData) detectedType = 'poll';
+          else if (!detectedType) detectedType = 'text';
 
           const messageObj: WorkspaceMessage = {
             id: newMsg.id,
             workspace_id: newMsg.workspace_id,
             sender_id: newMsg.sender_id,
             content: newMsg.content,
-            message_type: isImg ? 'image' : (newMsg.message_type || (newMsg.doi_metadata ? 'paper_doi' : 'text')),
-            doi_metadata: newMsg.doi_metadata || (newMsg.attachments?.doi_metadata ?? null),
+            message_type: detectedType,
+            doi_metadata: doiMeta,
+            document_metadata: docMeta,
+            workspace_invite_metadata: inviteMeta,
+            post_metadata: postMeta,
+            profile_metadata: profMeta,
+            call_metadata: callMeta,
+            audio_metadata: audioMeta,
+            poll_data: pollData,
+            attachments: newMsg.attachments || null,
             reactions: newMsg.reactions || null,
             is_edited: newMsg.is_edited || false,
             is_deleted: newMsg.is_deleted || false,

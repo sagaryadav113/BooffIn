@@ -1019,7 +1019,28 @@ export const workspaceService = {
           }
         }
 
-        const isImgType = (extractedMedia && extractedMedia.length > 0) || m.message_type === 'image';
+        const docMeta = m.document_metadata || m.attachments?.document_metadata || null;
+        const inviteMeta = m.workspace_invite_metadata || m.attachments?.workspace_invite_metadata || null;
+        const postMeta = m.post_metadata || m.attachments?.post_metadata || null;
+        const profMeta = m.profile_metadata || m.attachments?.profile_metadata || null;
+        const callMeta = m.call_metadata || m.attachments?.call_metadata || null;
+        const audioMeta = m.audio_metadata || m.attachments?.audio_metadata || null;
+        const doiMeta = m.doi_metadata || m.attachments?.doi_metadata || null;
+        const pollData = m.poll_data || m.attachments?.poll_data || null;
+
+        const isImgType = Boolean(extractedMedia && extractedMedia.length > 0) || m.message_type === 'image';
+
+        let detectedType = m.message_type;
+        if (isImgType) detectedType = 'image';
+        else if (docMeta) detectedType = 'document';
+        else if (inviteMeta) detectedType = 'workspace_invite';
+        else if (postMeta) detectedType = 'post';
+        else if (profMeta) detectedType = 'profile';
+        else if (callMeta) detectedType = 'call_log';
+        else if (audioMeta) detectedType = 'audio';
+        else if (doiMeta) detectedType = 'paper_doi';
+        else if (pollData) detectedType = 'poll';
+        else if (!detectedType) detectedType = 'text';
 
         // Resolve parent reply message info
         let replyInfo = null;
@@ -1039,8 +1060,16 @@ export const workspaceService = {
           workspace_id: m.workspace_id,
           sender_id: m.sender_id,
           content: m.content,
-          message_type: isImgType ? 'image' : (m.message_type || (m.doi_reference || m.doi_metadata ? 'paper_doi' : 'text')),
-          doi_metadata: m.doi_metadata || (m.attachments?.doi_metadata ?? null),
+          message_type: detectedType,
+          doi_metadata: doiMeta,
+          document_metadata: docMeta,
+          workspace_invite_metadata: inviteMeta,
+          post_metadata: postMeta,
+          profile_metadata: profMeta,
+          call_metadata: callMeta,
+          audio_metadata: audioMeta,
+          poll_data: pollData,
+          attachments: m.attachments || null,
           reactions: m.reactions || null,
           is_edited: m.is_edited || false,
           is_deleted: m.is_deleted || false,
@@ -1129,13 +1158,19 @@ export const workspaceService = {
         }
       }
 
-      // Prepare attachments payload for multi-schema compatibility
-      let attachmentsPayload: any = [];
+      // Prepare rich attachments payload
+      const attachmentsPayload: any = {};
       if (params.media_urls && params.media_urls.length > 0) {
-        attachmentsPayload = params.media_urls.map((u) => ({ type: 'image', url: u }));
-      } else if (resolvedDoiMeta) {
-        attachmentsPayload = { doi_metadata: resolvedDoiMeta };
+        attachmentsPayload.media_urls = params.media_urls;
+        attachmentsPayload.url = params.media_urls[0];
       }
+      if (resolvedDoiMeta) attachmentsPayload.doi_metadata = resolvedDoiMeta;
+      if (params.document_metadata) attachmentsPayload.document_metadata = params.document_metadata;
+      if (params.workspace_invite_metadata) attachmentsPayload.workspace_invite_metadata = params.workspace_invite_metadata;
+      if (params.post_metadata) attachmentsPayload.post_metadata = params.post_metadata;
+      if (params.profile_metadata) attachmentsPayload.profile_metadata = params.profile_metadata;
+      if (params.audio_metadata) attachmentsPayload.audio_metadata = params.audio_metadata;
+      if (params.call_metadata) attachmentsPayload.call_metadata = params.call_metadata;
 
       // Try rich insert
       let insertPayload: any = {
@@ -1194,16 +1229,34 @@ export const workspaceService = {
         }
       } catch {}
 
+      let extractedMedia: string[] | null = null;
+      if (Array.isArray(data.media_urls) && data.media_urls.length > 0) {
+        extractedMedia = data.media_urls;
+      } else if (params.media_urls && params.media_urls.length > 0) {
+        extractedMedia = params.media_urls;
+      } else if (data.attachments?.media_urls) {
+        extractedMedia = data.attachments.media_urls;
+      } else if (data.attachments?.url) {
+        extractedMedia = [data.attachments.url];
+      }
+
       const msg: WorkspaceMessage = {
         id: data.id,
         workspace_id: data.workspace_id,
         sender_id: data.sender_id,
         content: data.content,
         message_type: data.message_type || detectedType,
-        doi_metadata: data.doi_metadata || resolvedDoiMeta,
+        doi_metadata: data.doi_metadata || data.attachments?.doi_metadata || resolvedDoiMeta || null,
+        document_metadata: data.document_metadata || data.attachments?.document_metadata || params.document_metadata || null,
+        workspace_invite_metadata: data.workspace_invite_metadata || data.attachments?.workspace_invite_metadata || params.workspace_invite_metadata || null,
+        post_metadata: data.post_metadata || data.attachments?.post_metadata || params.post_metadata || null,
+        profile_metadata: data.profile_metadata || data.attachments?.profile_metadata || params.profile_metadata || null,
+        call_metadata: data.call_metadata || data.attachments?.call_metadata || params.call_metadata || null,
+        audio_metadata: data.audio_metadata || data.attachments?.audio_metadata || params.audio_metadata || null,
+        attachments: data.attachments || attachmentsPayload,
         e2ee_ciphertext: data.e2ee_ciphertext || null,
         e2ee_nonce: data.e2ee_nonce || null,
-        media_urls: data.media_urls || null,
+        media_urls: extractedMedia,
         is_pinned: data.is_pinned || false,
         reply_to_id: data.reply_to_id || null,
         created_at: data.created_at,
