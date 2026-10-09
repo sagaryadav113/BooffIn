@@ -64,6 +64,7 @@ export default function WorkspaceHubScreen() {
   const isRefreshing = useWorkspaceStore((s) => s.isRefreshing);
   const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
   const joinCommunity = useWorkspaceStore((s) => s.joinCommunity);
+  const subscribeToGlobalWorkspaceUpdates = useWorkspaceStore((s) => s.subscribeToGlobalWorkspaceUpdates);
 
   // Active Mobile / Desktop Tab: Strictly 3 Tabs
   const [activeTab, setActiveTab] = useState<WorkspaceTabType>('dm');
@@ -84,6 +85,12 @@ export default function WorkspaceHubScreen() {
 
   useEffect(() => {
     loadWorkspaces();
+    if (currentUser?.id) {
+      const unsubscribe = subscribeToGlobalWorkspaceUpdates(currentUser.id);
+      return () => {
+        unsubscribe();
+      };
+    }
   }, [currentUser?.id]);
 
   const handleRefresh = useCallback(async () => {

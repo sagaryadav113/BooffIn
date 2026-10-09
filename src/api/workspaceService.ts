@@ -223,11 +223,105 @@ export const workspaceService = {
         }
       }
 
-      // 5. Fetch user chat preferences (pinned, archived, muted, deleted)
+      // 5. Fetch latest messages & read status for all active workspaces
+      const allActiveWorkspaces = [...dms, ...communities, ...innerCircles];
+      const allWsIds = allActiveWorkspaces.map((w) => w.id);
+
+      const latestMsgMap = new Map<string, any>();
+      const wsMsgsMap = new Map<string, any[]>();
+      const otherReadMap = new Map<string, string>();
+
+      if (allWsIds.length > 0) {
+        try {
+          const { data: recentMsgRows } = await supabase
+            .from('workspace_messages')
+            .select('id, workspace_id, sender_id, content, message_type, doi_metadata, attachments, media_urls, is_deleted, created_at')
+            .in('workspace_id', allWsIds)
+            .order('created_at', { ascending: false });
+
+          (recentMsgRows || []).forEach((m: any) => {
+            if (!latestMsgMap.has(m.workspace_id)) {
+              latestMsgMap.set(m.workspace_id, m);
+            }
+            const list = wsMsgsMap.get(m.workspace_id) || [];
+            list.push(m);
+            wsMsgsMap.set(m.workspace_id, list);
+          });
+        } catch (e) {
+          console.warn('Failed to load recent workspace messages:', e);
+        }
+
+        // For DMs, also fetch the other member's last_read_at
+        const dmIds = dms.map((d) => d.id);
+        if (dmIds.length > 0) {
+          try {
+            const { data: otherMemRows } = await supabase
+              .from('workspace_members')
+              .select('workspace_id, user_id, last_read_at')
+              .in('workspace_id', dmIds)
+              .neq('user_id', userId);
+
+            (otherMemRows || []).forEach((r: any) => {
+              if (r.last_read_at) {
+                otherReadMap.set(r.workspace_id, r.last_read_at);
+              }
+            });
+          } catch (e) {
+            console.warn('Failed to load other member read timestamps:', e);
+          }
+        }
+      }
+
+      const enrichWorkspace = (ws: Workspace): Workspace => {
+        const lastMsg = latestMsgMap.get(ws.id) || null;
+        const mem = memberMap.get(ws.id);
+        const myLastReadTime = mem?.last_read_at ? new Date(mem.last_read_at).getTime() : 0;
+
+        const msgs = wsMsgsMap.get(ws.id) || [];
+        const unreadCountFromMsgs = msgs.filter(
+          (m) => m.sender_id !== userId && new Date(m.created_at).getTime() > myLastReadTime
+        ).length;
+
+        const effectiveUnread = Math.max(mem?.unread_count || 0, unreadCountFromMsgs);
+
+        let formattedLastMessage: WorkspaceMessage | null = null;
+        if (lastMsg) {
+          formattedLastMessage = {
+            id: lastMsg.id,
+            workspace_id: lastMsg.workspace_id,
+            sender_id: lastMsg.sender_id,
+            content: lastMsg.content,
+            message_type: lastMsg.message_type || (lastMsg.media_urls?.length ? 'image' : 'text'),
+            doi_metadata: lastMsg.doi_metadata || null,
+            is_deleted: lastMsg.is_deleted || false,
+            media_urls: lastMsg.media_urls || null,
+            created_at: lastMsg.created_at,
+            updated_at: lastMsg.created_at,
+            e2ee_ciphertext: null,
+            e2ee_nonce: null,
+            is_pinned: false,
+            reply_to_id: null,
+          };
+        }
+
+        return {
+          ...ws,
+          last_message: formattedLastMessage,
+          unread_count: effectiveUnread,
+          other_last_read_at: otherReadMap.get(ws.id) || null,
+          updated_at: formattedLastMessage?.created_at || ws.updated_at || ws.created_at,
+        };
+      };
+
+      const enrichedRawDms = dms.map(enrichWorkspace);
+      const enrichedCommunities = communities.map(enrichWorkspace);
+      const enrichedInnerCircles = innerCircles.map(enrichWorkspace);
+
+      // 6. Fetch user chat preferences (pinned, archived, muted, deleted)
       const prefs = await getChatPreferences(userId);
 
       // Filter deleted DMs and enrich with preference flags
-      const enrichedDms: Workspace[] = dms
+      const enrichedDms: Workspace[] = enrichedRawDms
         .filter((dm) => !prefs.deleted.includes(dm.id))
         .map((dm) => ({
           ...dm,
@@ -264,8 +358,8 @@ export const workspaceService = {
 
       return {
         dms: enrichedDms,
-        communities,
-        innerCircles,
+        communities: enrichedCommunities,
+        innerCircles: enrichedInnerCircles,
         discoverableCommunities,
         error: null,
       };
@@ -1064,6 +1158,44 @@ export const workspaceService = {
         updated_at: data.updated_at || data.created_at,
         sender: senderInfo,
       };
+
+      // 1. Update workspace updated_at timestamp
+      try {
+        await supabase
+          .from('workspaces')
+          .update({ updated_at: msg.created_at })
+          .eq('id', params.workspace_id);
+      } catch {}
+
+      // 2. Mark sender's own membership as read and reset unread_count
+      try {
+        await supabase
+          .from('workspace_members')
+          .update({
+            last_read_at: msg.created_at,
+            unread_count: 0,
+          })
+          .eq('workspace_id', params.workspace_id)
+          .eq('user_id', user.id);
+      } catch {}
+
+      // 3. Increment unread_count for all other active members in this workspace
+      try {
+        const { data: otherMembers } = await supabase
+          .from('workspace_members')
+          .select('id, user_id, unread_count')
+          .eq('workspace_id', params.workspace_id)
+          .neq('user_id', user.id);
+
+        if (otherMembers && otherMembers.length > 0) {
+          for (const om of otherMembers) {
+            await supabase
+              .from('workspace_members')
+              .update({ unread_count: (om.unread_count || 0) + 1 })
+              .eq('id', om.id);
+          }
+        }
+      } catch {}
 
       return { message: msg, error: null };
     } catch (err: any) {

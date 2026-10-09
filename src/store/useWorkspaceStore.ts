@@ -845,14 +845,35 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   subscribeToGlobalWorkspaceUpdates: (userId: string) => {
     const channel = supabase
-      .channel(`user_workspaces:${userId}`)
+      .channel(`user_global_workspaces:${userId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'workspace_members',
-          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          get().loadWorkspaces(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'workspace_messages',
+        },
+        () => {
+          get().loadWorkspaces(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'workspaces',
         },
         () => {
           get().loadWorkspaces(true);

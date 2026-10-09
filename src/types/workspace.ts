@@ -59,6 +59,7 @@ export interface Workspace {
   muted_until?: string | null;
   is_blocked?: boolean;
   block_reason?: string | null;
+  other_last_read_at?: string | null;
 }
 
 export interface WorkspaceMember {

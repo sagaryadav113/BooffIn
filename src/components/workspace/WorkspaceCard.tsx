@@ -19,6 +19,8 @@ import { Avatar } from '../core/Avatar';
 import { GroupCollageAvatar } from './GroupCollageAvatar';
 import { Workspace } from '../../types/workspace';
 
+import { useAuthStore } from '../../store/useAuthStore';
+
 interface WorkspaceCardProps {
   workspace: Workspace;
   onPress?: () => void;
@@ -30,6 +32,8 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   onPress,
   showDividers = true,
 }) => {
+  const currentUserId = useAuthStore((s) => s.user?.id);
+
   const handlePress = () => {
     if (onPress) {
       onPress();
@@ -48,30 +52,55 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   const isArchived = Boolean(workspace.is_archived);
 
   const formatTime = (dateStr?: string) => {
-    if (!dateStr) return '12:34 PM';
+    if (!dateStr) return '';
     try {
       const d = new Date(dateStr);
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch {
-      return '12:34 PM';
+      return '';
     }
   };
 
-  const timeText = formatTime(workspace.updated_at || workspace.created_at);
+  const timeText = formatTime(workspace.last_message?.created_at || workspace.updated_at || workspace.created_at);
 
   const displayName = isDM
     ? workspace.other_user?.fullName || workspace.name || 'Researcher'
     : workspace.name;
 
-  const previewSnippet =
-    workspace.last_message?.content ||
-    (isDM
-      ? 'No messages yet'
-      : workspace.description || 'Welcome to this workspace');
+  const getPreviewSnippet = () => {
+    if (!workspace.last_message) {
+      return isDM
+        ? 'No messages yet'
+        : workspace.description || 'Welcome to this workspace';
+    }
+    const lm = workspace.last_message;
+    if (lm.is_deleted) return '🚫 This message was deleted';
+    if (lm.message_type === 'image' || (lm.media_urls && lm.media_urls.length > 0)) return '📷 Photo';
+    if (lm.message_type === 'audio' || lm.message_type === 'voice_note') return '🎙️ Voice note';
+    if (lm.message_type === 'document') return `📄 ${lm.document_metadata?.name || 'Document'}`;
+    if (lm.message_type === 'paper_doi' || lm.doi_metadata) return `🔬 ${lm.doi_metadata?.title || 'Research paper'}`;
+    if (lm.message_type === 'poll') return `📊 Poll: ${lm.content}`;
+    if (lm.message_type === 'post') return '📑 Shared post';
+    if (lm.message_type === 'profile') return '👤 Shared researcher profile';
+    if (lm.message_type === 'call_log') return lm.content;
+    return lm.content || 'Message';
+  };
+
+  const previewSnippet = getPreviewSnippet();
 
   // Determine read receipt state
-  const isLastMessageMine = workspace.last_message?.sender_id && workspace.last_message?.sender_id !== workspace.other_user?.id;
-  const isMessageRead = unreadCount === 0;
+  const isLastMessageMine = Boolean(
+    workspace.last_message?.sender_id &&
+    currentUserId &&
+    workspace.last_message.sender_id === currentUserId
+  );
+
+  const isOtherUserRead = Boolean(
+    isLastMessageMine &&
+    workspace.other_last_read_at &&
+    workspace.last_message &&
+    new Date(workspace.other_last_read_at).getTime() >= new Date(workspace.last_message.created_at).getTime()
+  );
 
   return (
     <TouchableOpacity
@@ -118,13 +147,19 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
 
           {/* Right Timestamp & Icons */}
           <View style={styles.timestampCol}>
-            <Text style={styles.timeText}>{timeText}</Text>
+            {timeText ? <Text style={styles.timeText}>{timeText}</Text> : null}
           </View>
         </View>
 
         {/* Message Preview Snippet (1 single line) */}
         <View style={styles.previewRow}>
-          <Text style={styles.snippetText} numberOfLines={1}>
+          <Text
+            style={[
+              styles.snippetText,
+              unreadCount > 0 && styles.unreadSnippetText,
+            ]}
+            numberOfLines={1}
+          >
             {previewSnippet}
           </Text>
 
@@ -139,12 +174,14 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </Text>
               </View>
-            ) : isDM ? (
-              isMessageRead ? (
-                <CheckCheck size={16} color="#10B981" strokeWidth={2.2} />
-              ) : (
-                <CheckCheck size={16} color="#94A3B8" strokeWidth={2} />
-              )
+            ) : isDM && workspace.last_message ? (
+              isLastMessageMine ? (
+                isOtherUserRead ? (
+                  <CheckCheck size={16} color="#10B981" strokeWidth={2.2} />
+                ) : (
+                  <CheckCheck size={16} color="#94A3B8" strokeWidth={2} />
+                )
+              ) : null
             ) : null}
           </View>
         </View>
@@ -205,6 +242,10 @@ const styles = StyleSheet.create({
     color: '#64748B',
     flex: 1,
     marginRight: 8,
+  },
+  unreadSnippetText: {
+    fontWeight: '600',
+    color: '#0F172A',
   },
   statusIcons: {
     flexDirection: 'row',

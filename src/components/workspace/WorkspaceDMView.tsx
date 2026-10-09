@@ -272,6 +272,52 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     resolvePartner();
   }, [workspace.id, workspace.other_user, workspace.dm_participant_a, workspace.dm_participant_b, currentUser?.id]);
 
+  // Realtime read receipts tracking for 1:1 DM
+  const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(workspace.other_last_read_at || null);
+
+  useEffect(() => {
+    const otherId = localPartner?.id || workspace.other_user?.id || (workspace.dm_participant_a === currentUser?.id ? workspace.dm_participant_b : workspace.dm_participant_a);
+    if (!otherId) return;
+
+    const fetchOtherRead = async () => {
+      try {
+        const { data } = await supabase
+          .from('workspace_members')
+          .select('last_read_at')
+          .eq('workspace_id', workspace.id)
+          .eq('user_id', otherId)
+          .maybeSingle();
+        if (data?.last_read_at) {
+          setOtherLastReadAt(data.last_read_at);
+        }
+      } catch {}
+    };
+
+    fetchOtherRead();
+
+    const subChannel = supabase
+      .channel(`dm_read_receipts:${workspace.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'workspace_members',
+          filter: `workspace_id=eq.${workspace.id}`,
+        },
+        (payload: any) => {
+          if (payload.new && payload.new.user_id === otherId && payload.new.last_read_at) {
+            setOtherLastReadAt(payload.new.last_read_at);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subChannel);
+    };
+  }, [workspace.id, localPartner?.id, workspace.other_user?.id, currentUser?.id]);
+
   const partner = localPartner || workspace.other_user;
 
   // Filtered messages based on in-chat search & filter pills
@@ -1291,7 +1337,11 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
               {isMe && !isDeleted && (
-                <CheckCheck size={13} color="#34D399" style={{ marginLeft: 4 }} />
+                otherLastReadAt && new Date(otherLastReadAt).getTime() >= new Date(item.created_at).getTime() ? (
+                  <CheckCheck size={13} color="#34D399" style={{ marginLeft: 4 }} />
+                ) : (
+                  <CheckCheck size={13} color="#94A3B8" style={{ marginLeft: 4 }} />
+                )
               )}
             </View>
           </TouchableOpacity>
