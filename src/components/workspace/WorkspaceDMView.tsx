@@ -90,6 +90,7 @@ import { ChatDocumentCard } from '../chat/ChatDocumentCard';
 import { ChatCallModal } from '../chat/ChatCallModal';
 import { IncomingCallModal } from '../chat/IncomingCallModal';
 import { webrtcSignaling, IncomingCallPayload } from '../../services/webrtcSignalingService';
+import { FEATURE_FLAGS } from '../../config/featureFlags';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -358,9 +359,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     };
   }, [workspace.id, localPartner?.id, workspace.other_user?.id, currentUser?.id]);
 
-  // Step 4: Listen for incoming ephemeral P2P calls (Zero-storage broadcast)
+  // Step 4: Listen for incoming ephemeral P2P calls (Zero-storage broadcast, gated by FEATURE_FLAGS)
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!FEATURE_FLAGS.ENABLE_VOICE_VIDEO_CALLS || !currentUser?.id) return;
     const unsubscribe = webrtcSignaling.listenForIncomingCalls(
       currentUser.id,
       (call) => {
@@ -1631,25 +1632,29 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </TouchableOpacity>
 
         <View style={styles.headerRightActions}>
-          {/* Audio Call Button (Phase 3) */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => handleStartCall('audio')}
-            style={styles.headerActionBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Phone size={18} color="#164E3F" />
-          </TouchableOpacity>
+          {/* Audio Call Button (Future Feature - Gated by FEATURE_FLAGS) */}
+          {FEATURE_FLAGS.ENABLE_VOICE_VIDEO_CALLS && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => handleStartCall('audio')}
+              style={styles.headerActionBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Phone size={18} color="#164E3F" />
+            </TouchableOpacity>
+          )}
 
-          {/* Video Call Button (Phase 3) */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => handleStartCall('video')}
-            style={styles.headerActionBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Video size={19} color="#164E3F" />
-          </TouchableOpacity>
+          {/* Video Call Button (Future Feature - Gated by FEATURE_FLAGS) */}
+          {FEATURE_FLAGS.ENABLE_VOICE_VIDEO_CALLS && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => handleStartCall('video')}
+              style={styles.headerActionBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Video size={19} color="#164E3F" />
+            </TouchableOpacity>
+          )}
 
           {/* Search Trigger */}
           <TouchableOpacity
@@ -1950,48 +1955,49 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Incoming P2P Audio / Video Call Ringing Screen (Step 4) */}
+      {/* MODAL: Incoming P2P Audio / Video Call Ringing Screen & Call Modal (Future Feature - Gated) */}
       {/* ------------------------------------------------------------- */}
-      <IncomingCallModal
-        incomingCall={incomingCall}
-        onAccept={(call) => {
-          setActiveCallModal({
-            visible: true,
-            type: call.callType,
-            roomId: call.roomId,
-            isIncoming: true,
-          });
-          setIncomingCall(null);
-        }}
-        onDecline={(call) => {
-          if (currentUser?.id) {
-            webrtcSignaling.sendSignal(call.roomId, 'call_rejected', {
-              senderId: currentUser.id,
-              reason: 'declined',
-            }).catch(() => {});
-          }
-          setIncomingCall(null);
-        }}
-      />
+      {FEATURE_FLAGS.ENABLE_VOICE_VIDEO_CALLS && (
+        <>
+          <IncomingCallModal
+            incomingCall={incomingCall}
+            onAccept={(call) => {
+              setActiveCallModal({
+                visible: true,
+                type: call.callType,
+                roomId: call.roomId,
+                isIncoming: true,
+              });
+              setIncomingCall(null);
+            }}
+            onDecline={(call) => {
+              if (currentUser?.id) {
+                webrtcSignaling.sendSignal(call.roomId, 'call_rejected', {
+                  senderId: currentUser.id,
+                  reason: 'declined',
+                }).catch(() => {});
+              }
+              setIncomingCall(null);
+            }}
+          />
 
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL: 1:1 Live Audio & Video Call Modal (Step 3 & 4) */}
-      {/* ------------------------------------------------------------- */}
-      <ChatCallModal
-        visible={activeCallModal.visible}
-        callType={activeCallModal.type}
-        partner={partner}
-        currentUserId={currentUser?.id}
-        currentUserProfile={currentUser ? {
-          id: currentUser.id,
-          fullName: currentUser.fullName || (currentUser as any).name || (currentUser as any).full_name || 'Researcher',
-          avatarUrl: currentUser.avatarUrl || (currentUser as any).avatar_url,
-          academicTitle: currentUser.academicTitle || (currentUser as any).academic_title || 'Academic Collaborator',
-        } : null}
-        roomId={activeCallModal.roomId}
-        isIncoming={activeCallModal.isIncoming}
-        onEndCall={handleEndCall}
-      />
+          <ChatCallModal
+            visible={activeCallModal.visible}
+            callType={activeCallModal.type}
+            partner={partner}
+            currentUserId={currentUser?.id}
+            currentUserProfile={currentUser ? {
+              id: currentUser.id,
+              fullName: currentUser.fullName || (currentUser as any).name || (currentUser as any).full_name || 'Researcher',
+              avatarUrl: currentUser.avatarUrl || (currentUser as any).avatar_url,
+              academicTitle: currentUser.academicTitle || (currentUser as any).academic_title || 'Academic Collaborator',
+            } : null}
+            roomId={activeCallModal.roomId}
+            isIncoming={activeCallModal.isIncoming}
+            onEndCall={handleEndCall}
+          />
+        </>
+      )}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: Chat Media, Papers, Audio & Polls Gallery */}
