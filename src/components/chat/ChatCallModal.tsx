@@ -21,6 +21,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { Avatar } from '../core/Avatar';
 import { WorkspaceSenderProfile } from '../../types/workspace';
+import { mediaStreamManager } from '../../utils/mediaStreamManager';
 
 interface ChatCallModalProps {
   visible: boolean;
@@ -54,7 +55,10 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       } catch {}
 
-      // Simulate connection after 3 seconds of ringing
+      // Acquire local media streams on hardware level
+      mediaStreamManager.requestMediaStream(callType === 'video').catch(() => {});
+
+      // Simulate connection after 2.8 seconds of ringing
       ringTimerRef.current = setTimeout(() => {
         setCallState('connected');
         try {
@@ -64,17 +68,37 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
         durationTimerRef.current = setInterval(() => {
           setCallDuration((prev) => prev + 1);
         }, 1000);
-      }, 3200);
+      }, 2800);
     } else {
       if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
       if (durationTimerRef.current) clearInterval(durationTimerRef.current);
+      mediaStreamManager.stopAllLocalTracks();
     }
 
     return () => {
       if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
       if (durationTimerRef.current) clearInterval(durationTimerRef.current);
+      mediaStreamManager.stopAllLocalTracks();
     };
-  }, [visible]);
+  }, [visible, callType]);
+
+  const handleToggleMute = () => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    mediaStreamManager.setAudioMuted(nextMuted);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
+
+  const handleToggleVideo = () => {
+    const nextVideoOff = !isVideoOff;
+    setIsVideoOff(nextVideoOff);
+    mediaStreamManager.setVideoOff(nextVideoOff);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
 
   const handleHangup = () => {
     try {
@@ -83,6 +107,7 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
 
     if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
     if (durationTimerRef.current) clearInterval(durationTimerRef.current);
+    mediaStreamManager.stopAllLocalTracks();
 
     const finalDuration = callDuration;
     setCallState('ended');
@@ -157,7 +182,7 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
           {/* Mute Button */}
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => setIsMuted(!isMuted)}
+            onPress={handleToggleMute}
             style={[styles.controlBtn, isMuted && styles.controlBtnActive]}
           >
             {isMuted ? (
@@ -172,7 +197,7 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
           {callType === 'video' && (
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => setIsVideoOff(!isVideoOff)}
+              onPress={handleToggleVideo}
               style={[styles.controlBtn, isVideoOff && styles.controlBtnActive]}
             >
               {isVideoOff ? (
