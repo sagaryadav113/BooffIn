@@ -361,9 +361,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   // Step 4: Listen for incoming ephemeral P2P calls (Zero-storage broadcast)
   useEffect(() => {
     if (!currentUser?.id) return;
-    const unsubscribe = webrtcSignaling.listenForIncomingCalls(currentUser.id, (call) => {
-      setIncomingCall(call);
-    });
+    const unsubscribe = webrtcSignaling.listenForIncomingCalls(
+      currentUser.id,
+      (call) => {
+        setIncomingCall(call);
+      },
+      (cancelledRoomId) => {
+        setIncomingCall((curr) => (curr?.roomId === cancelledRoomId ? null : curr));
+      }
+    );
     return () => {
       unsubscribe();
     };
@@ -1976,6 +1982,12 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         callType={activeCallModal.type}
         partner={partner}
         currentUserId={currentUser?.id}
+        currentUserProfile={currentUser ? {
+          id: currentUser.id,
+          fullName: (currentUser as any).full_name || currentUser.name || (currentUser as any).fullName || 'Researcher',
+          avatarUrl: (currentUser as any).avatar_url || currentUser.avatarUrl,
+          academicTitle: (currentUser as any).academic_title || (currentUser as any).academicTitle || 'Academic Collaborator',
+        } : null}
         roomId={activeCallModal.roomId}
         isIncoming={activeCallModal.isIncoming}
         onEndCall={handleEndCall}

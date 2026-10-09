@@ -28,6 +28,12 @@ interface ChatCallModalProps {
   callType: 'audio' | 'video';
   partner: WorkspaceSenderProfile | null;
   currentUserId?: string;
+  currentUserProfile?: {
+    id?: string;
+    fullName?: string;
+    avatarUrl?: string | null;
+    academicTitle?: string | null;
+  } | null;
   roomId?: string;
   isIncoming?: boolean;
   onEndCall: (durationSeconds: number) => void;
@@ -38,6 +44,7 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
   callType,
   partner,
   currentUserId,
+  currentUserProfile,
   roomId = `room_${Date.now()}`,
   isIncoming = false,
   onEndCall,
@@ -93,7 +100,9 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
         webrtcSignaling.ringRecipient(partner.id, {
           roomId,
           callerId: myId,
-          callerName: 'Researcher',
+          callerName: currentUserProfile?.fullName || 'Researcher',
+          callerAvatar: currentUserProfile?.avatarUrl,
+          callerTitle: currentUserProfile?.academicTitle || 'Academic Collaborator',
           callType,
           timestamp: Date.now(),
         }).catch(() => {});
@@ -115,7 +124,7 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
         mediaStreamManager.stopAllLocalTracks();
       };
     }
-  }, [visible, callType, roomId, isIncoming, currentUserId, partner?.id]);
+  }, [visible, callType, roomId, isIncoming, currentUserId, partner?.id, currentUserProfile]);
 
   const startTimer = () => {
     if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
@@ -163,6 +172,10 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
 
     if (ringTimerRef.current) clearTimeout(ringTimerRef.current);
     if (durationTimerRef.current) clearInterval(durationTimerRef.current);
+
+    if (!isIncoming && partner?.id && callState === 'ringing') {
+      webrtcSignaling.cancelCall(partner.id, roomId).catch(() => {});
+    }
 
     if (currentUserId) {
       webrtcSignaling.leaveCallRoom(roomId, currentUserId);

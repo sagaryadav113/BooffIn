@@ -35,7 +35,8 @@ class WebRTCSignalingManager {
    */
   public listenForIncomingCalls(
     userId: string,
-    onIncoming: (call: IncomingCallPayload) => void
+    onIncoming: (call: IncomingCallPayload) => void,
+    onCancel?: (roomId: string) => void
   ): () => void {
     if (this.userGlobalChannel) {
       this.userGlobalChannel.unsubscribe();
@@ -51,6 +52,12 @@ class WebRTCSignalingManager {
       const payload: IncomingCallPayload = res.payload;
       if (payload && payload.roomId && payload.callerId !== userId) {
         onIncoming(payload);
+      }
+    });
+
+    channel.on('broadcast', { event: 'call_cancelled' }, (res: any) => {
+      if (res.payload?.roomId) {
+        onCancel?.(res.payload.roomId);
       }
     });
 
@@ -87,7 +94,31 @@ class WebRTCSignalingManager {
     // Cleanup ephemeral sender channel after firing
     setTimeout(() => {
       channel.unsubscribe();
-    }, 2000);
+    }, 2500);
+  }
+
+  /**
+   * Cancel an outgoing call while still ringing before callee answers
+   */
+  public async cancelCall(
+    recipientUserId: string,
+    roomId: string
+  ): Promise<void> {
+    const targetChannelName = `p2p_signaling_user_${recipientUserId}`;
+    const channel = supabase.channel(targetChannelName, {
+      config: { broadcast: { self: false } },
+    });
+
+    await channel.subscribe();
+    await channel.send({
+      type: 'broadcast',
+      event: 'call_cancelled',
+      payload: { roomId },
+    });
+
+    setTimeout(() => {
+      channel.unsubscribe();
+    }, 1500);
   }
 
   /**
@@ -172,21 +203,36 @@ class WebRTCSignalingManager {
   }
 
   /**
-   * Send ephemeral signal in current call room
+   * Send ephemeral signal in current call room (with ephemeral fallback if not joined yet)
    */
   public async sendSignal(
     roomId: string,
     event: 'call_accepted' | 'call_rejected' | 'sdp_offer' | 'sdp_answer' | 'ice_candidate' | 'media_toggle' | 'call_hangup',
     payload: any
   ): Promise<void> {
-    const channel = this.activeChannels.get(roomId);
-    if (channel) {
+    let channel = this.activeChannels.get(roomId);
+    if (!channel) {
+      const channelName = `p2p_call_room_${roomId}`;
+      channel = supabase.channel(channelName, {
+        config: { broadcast: { self: false } },
+      });
+      await channel.subscribe();
       await channel.send({
         type: 'broadcast',
         event,
         payload,
       });
+      setTimeout(() => {
+        channel?.unsubscribe();
+      }, 2000);
+      return;
     }
+
+    await channel.send({
+      type: 'broadcast',
+      event,
+      payload,
+    });
   }
 
   /**
