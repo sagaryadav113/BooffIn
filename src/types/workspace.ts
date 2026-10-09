@@ -108,6 +108,8 @@ export interface WorkspacePollData {
 export interface WorkspaceAudioMetadata {
   duration: number; // in seconds
   waveform?: number[];
+  url?: string;
+  uri?: string;
 }
 
 export interface WorkspacePostMetadata {

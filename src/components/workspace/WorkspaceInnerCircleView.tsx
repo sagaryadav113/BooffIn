@@ -222,7 +222,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
-  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
 
   // E2EE Pod Vault Auto-Decryption
@@ -344,30 +343,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [isSearchingProfileUsers, setIsSearchingProfileUsers] = useState(false);
 
   const [showInvitePickerModal, setShowInvitePickerModal] = useState(false);
-
-  // Step 3: Voice Note Send Handler
-  const handleSendVoiceNote = async (audioData: { duration: number; waveform: number[]; uri?: string }) => {
-    setIsRecordingVoice(false);
-    const replyId = replyingTo?.id || null;
-
-    const res = await sendMessage({
-      workspace_id: workspace.id,
-      content: '🎙️ Voice Note',
-      message_type: 'audio',
-      audio_metadata: {
-        duration: audioData.duration,
-        waveform: audioData.waveform,
-      },
-      reply_to_id: replyId,
-    });
-
-    if (res.success) {
-      setReplyingTo(null);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  };
 
   // Step 3: Poll Creation Handler
   const handleCreatePoll = async () => {
