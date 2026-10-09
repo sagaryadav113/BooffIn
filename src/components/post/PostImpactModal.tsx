@@ -328,13 +328,13 @@ export const PostImpactModal: React.FC<PostImpactModalProps> = ({
                 <View
                   style={[
                     styles.splitBarFollowers,
-                    { width: `${summary?.followerReachPercent || 36}%` },
+                    { width: `${summary?.followerReachPercent ?? 0}%` },
                   ]}
                 />
                 <View
                   style={[
                     styles.splitBarNonFollowers,
-                    { width: `${summary?.nonFollowerReachPercent || 64}%` },
+                    { width: `${summary?.nonFollowerReachPercent ?? 0}%` },
                   ]}
                 />
               </View>
@@ -343,13 +343,13 @@ export const PostImpactModal: React.FC<PostImpactModalProps> = ({
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: '#064E3B' }]} />
                   <Text style={styles.legendText}>
-                    Followers: <Text style={{ fontWeight: '700' }}>{summary?.followerReachPercent || 36}%</Text>
+                    Followers: <Text style={{ fontWeight: '700' }}>{summary?.followerReachPercent ?? 0}%</Text>
                   </Text>
                 </View>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
                   <Text style={styles.legendText}>
-                    Discovery (Non-Followers): <Text style={{ fontWeight: '700' }}>{summary?.nonFollowerReachPercent || 64}%</Text>
+                    Discovery (Non-Followers): <Text style={{ fontWeight: '700' }}>{summary?.nonFollowerReachPercent ?? 0}%</Text>
                   </Text>
                 </View>
               </View>

@@ -167,7 +167,7 @@ export async function fetchUserAnalytics(
     // Remove author self-interactions if present
     interactingUserIdSet.delete(userId);
 
-    const engagedScholars = Math.max(interactingUserIdSet.size, totalEngagement > 0 ? Math.ceil(totalEngagement * 0.75) : 0);
+    const engagedScholars = interactingUserIdSet.size;
 
     // Fetch profiles of interacting scholars to calculate real Institutions & Disciplines
     const interactingUserIds = Array.from(interactingUserIdSet);
@@ -195,15 +195,12 @@ export async function fetchUserAnalytics(
     });
 
     const totalKnownInteractors = followerInteractors + nonFollowerInteractors;
-    let followerReachPercent = 38;
-    let nonFollowerReachPercent = 62;
+    let followerReachPercent = 0;
+    let nonFollowerReachPercent = 0;
 
     if (totalKnownInteractors > 0) {
       followerReachPercent = Math.round((followerInteractors / totalKnownInteractors) * 100);
       nonFollowerReachPercent = 100 - followerReachPercent;
-    } else if (allPosts.length > 0) {
-      followerReachPercent = 32;
-      nonFollowerReachPercent = 68;
     }
 
     // Top Institutions derived from real viewer profiles
@@ -224,17 +221,8 @@ export async function fetchUserAnalytics(
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    if (topInstitutions.length === 0 && profile?.institution) {
-      topInstitutions = [
-        { name: profile.institution, count: 1, percentage: 100 },
-      ];
-    }
-
-    // Top Disciplines derived from post topics and viewer interests
+    // Top Disciplines derived only from interacting scholar profiles
     const disciplineCountMap: Record<string, number> = {};
-    postTopicsList.forEach((t) => {
-      disciplineCountMap[t] = (disciplineCountMap[t] || 0) + 3;
-    });
     interactingProfiles.forEach((p) => {
       if (Array.isArray(p.research_interests)) {
         p.research_interests.forEach((ri) => {
@@ -255,30 +243,15 @@ export async function fetchUserAnalytics(
       .sort((a, b) => b.percentage - a.percentage)
       .slice(0, 5);
 
+    // Post Clicks & Reads: derived from real interactions
+    const postClicks = totalEngagement;
 
-    // Post Clicks & Reads: user interactions, clicks to expand, paper DOI reads
-    const postClicks = Math.max(
-      Math.round(totalEngagement * 2.8 + totalPosts * 14 + (allPosts.length > 0 ? 12 : 0)),
-      totalEngagement
-    );
-
-    // Total Impressions & Reach (Instagram-Style)
-    const calculatedImpressions = allPosts.length > 0
-      ? postsInTimeframe.reduce((acc, p) => {
-          const postEngagement = (p.likes_count || 0) + (p.comments_count || 0) + (p.reposts_count || 0) + (p.saves_count || 0);
-          return acc + 120 + postEngagement * 18;
-        }, 0) + (allPosts.length * 15)
-      : Math.max(totalEngagement * 12, 0);
-
-    const totalImpressions = Math.max(calculatedImpressions, postClicks + totalEngagement, allPosts.length > 0 ? 80 : 0);
-    const totalViews = totalImpressions; // Backwards-compatible alias
+    // Total Impressions & Reach
+    const totalImpressions = totalEngagement > 0 ? totalEngagement * 2 : 0;
+    const totalViews = totalImpressions;
 
     // Unique Reach: Distinct researchers exposed to the work
-    const uniqueReach = Math.max(
-      Math.round(totalImpressions * 0.62) + Math.round(newFollowers * 1.5),
-      engagedScholars,
-      allPosts.length > 0 ? 55 : 0
-    );
+    const uniqueReach = totalImpressions > 0 ? Math.max(engagedScholars, Math.round(totalImpressions * 0.75)) : 0;
 
     const engagementRate = uniqueReach > 0
       ? Number(((totalEngagement + postClicks) / uniqueReach * 100).toFixed(1))
@@ -333,12 +306,8 @@ export async function fetchUserAnalytics(
       const dayDiscussions = dayComments + dayPosts.reduce((acc, p) => acc + (p.comments_count || 0), 0);
       const dayEng = dayLikes + dayDiscussions + dayShares;
 
-      // Realistic impressions calculation per day
-      const dayImpressions = postsCount > 0
-        ? postsCount * 140 + dayEng * 15
-        : (dayEng > 0 ? dayEng * 12 : (allPosts.length > 0 ? Math.floor((totalImpressions / days) * 0.7) : 0));
-
-      const dayReach = Math.max(Math.round(dayImpressions * 0.65), dayEng);
+      const dayImpressions = dayEng > 0 ? dayEng * 2 : 0;
+      const dayReach = dayEng > 0 ? Math.max(Math.round(dayImpressions * 0.75), dayEng) : 0;
 
       runningFollowers += dayFollows;
 
@@ -361,7 +330,7 @@ export async function fetchUserAnalytics(
     const topPosts = allPosts
       .map((p) => {
         const eng = (p.likes_count || 0) + (p.comments_count || 0) + (p.reposts_count || 0) + (p.saves_count || 0);
-        const impressions = Math.max(140 + eng * 18, 50);
+        const impressions = eng > 0 ? eng * 2 : 0;
         return {
           id: p.id,
           content: p.content || 'Research update',
@@ -421,30 +390,24 @@ function generateFallbackSummary(
   const startDateObj = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   const dailySeries: DayDataPoint[] = [];
 
-  let runningFollowers = 5;
+  let runningFollowers = 0;
   for (let i = days - 1; i >= 0; i--) {
     const dayDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
     const dayIsoDate = dayDate.toISOString().split('T')[0];
     const dayLabel = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-    const newFollowers = i % 7 === 0 ? 1 : 0;
-    runningFollowers += newFollowers;
-
-    const impressions = 35 + (i % 5) * 12;
-    const reach = Math.round(impressions * 0.65);
-
     dailySeries.push({
       date: dayIsoDate,
       label: dayLabel,
-      newFollowers,
-      cumulativeFollowers: runningFollowers,
-      views: impressions,
-      impressions,
-      reach,
-      engagement: 4 + (i % 3),
-      postsCount: i % 10 === 0 ? 1 : 0,
-      sharesCount: i % 8 === 0 ? 1 : 0,
-      discussionsCount: i % 4 === 0 ? 1 : 0,
+      newFollowers: 0,
+      cumulativeFollowers: 0,
+      views: 0,
+      impressions: 0,
+      reach: 0,
+      engagement: 0,
+      postsCount: 0,
+      sharesCount: 0,
+      discussionsCount: 0,
     });
   }
 
@@ -453,32 +416,24 @@ function generateFallbackSummary(
     timeframeDays: days,
     startDate: startDateObj.toISOString(),
     endDate: now.toISOString(),
-    totalImpressions: 480,
-    totalViews: 480,
-    uniqueReach: 312,
-    engagedScholars: 28,
-    followerReachPercent: 35,
-    nonFollowerReachPercent: 65,
-    totalPosts: 3,
-    totalShares: 2,
-    totalDiscussions: 6,
-    totalLikes: 14,
-    totalSaves: 6,
-    totalFollowers: runningFollowers,
-    newFollowers: 3,
-    totalEngagement: 28,
-    postClicks: 42,
-    engagementRate: 8.7,
-    topDisciplines: [
-      { name: 'AI in Science', percentage: 45, count: 14 },
-      { name: 'Neuroscience', percentage: 30, count: 9 },
-      { name: 'Structural Biology', percentage: 25, count: 8 },
-    ],
-    topInstitutions: [
-      { name: 'Stanford University', count: 8, percentage: 32 },
-      { name: 'MIT', count: 6, percentage: 24 },
-      { name: 'Oxford Genomics', count: 4, percentage: 16 },
-    ],
+    totalImpressions: 0,
+    totalViews: 0,
+    uniqueReach: 0,
+    engagedScholars: 0,
+    followerReachPercent: 0,
+    nonFollowerReachPercent: 0,
+    totalPosts: 0,
+    totalShares: 0,
+    totalDiscussions: 0,
+    totalLikes: 0,
+    totalSaves: 0,
+    totalFollowers: 0,
+    newFollowers: 0,
+    totalEngagement: 0,
+    postClicks: 0,
+    engagementRate: 0,
+    topDisciplines: [],
+    topInstitutions: [],
     dailySeries,
     topPosts: [],
   };
@@ -501,30 +456,22 @@ export async function fetchSinglePostImpact(
           createdAt: new Date().toISOString(),
           content: 'Research post',
           postType: 'discussion',
-          totalImpressions: 180,
-          uniqueReach: 120,
-          engagedScholars: 15,
-          followerReachPercent: 40,
-          nonFollowerReachPercent: 60,
-          likesCount: 5,
-          discussionsCount: 3,
-          sharesCount: 2,
-          savesCount: 4,
-          totalEngagement: 14,
-          postClicks: 22,
-          engagementRate: 11.6,
-          topDisciplines: [
-            { name: 'AI in Science', percentage: 48, count: 8 },
-            { name: 'Structural Biology', percentage: 32, count: 5 },
-            { name: 'Genomics', percentage: 20, count: 3 },
-          ],
-          topInstitutions: [
-            { name: 'Stanford University', count: 4, percentage: 40 },
-            { name: 'MIT', count: 3, percentage: 30 },
-            { name: 'Oxford Genomics', count: 2, percentage: 20 },
-          ],
-          profileVisits: 8,
-          followsGained: 2,
+          totalImpressions: 0,
+          uniqueReach: 0,
+          engagedScholars: 0,
+          followerReachPercent: 0,
+          nonFollowerReachPercent: 0,
+          likesCount: 0,
+          discussionsCount: 0,
+          sharesCount: 0,
+          savesCount: 0,
+          totalEngagement: 0,
+          postClicks: 0,
+          engagementRate: 0,
+          topDisciplines: [],
+          topInstitutions: [],
+          profileVisits: 0,
+          followsGained: 0,
         },
         error: null,
       };
@@ -550,12 +497,11 @@ export async function fetchSinglePostImpact(
     }
 
     // 2. Fetch all direct interactions & relations on this post
-    const [likesRes, commentsRes, repostsRes, bookmarksRes, topicsRes, followsRes] = await Promise.all([
+    const [likesRes, commentsRes, repostsRes, bookmarksRes, followsRes] = await Promise.all([
       supabase.from('likes').select('user_id, created_at').eq('post_id', postId),
       supabase.from('comments').select('id, author_id, created_at').eq('post_id', postId),
       supabase.from('reposts').select('user_id, created_at').eq('post_id', postId),
       supabase.from('bookmarks').select('user_id, created_at').eq('post_id', postId),
-      supabase.from('post_topics').select('topic:topics(name)').eq('post_id', postId),
       supabase.from('follows').select('follower_id').eq('following_id', requestingUserId),
     ]);
 
@@ -563,7 +509,6 @@ export async function fetchSinglePostImpact(
     const comments = commentsRes.data || [];
     const reposts = repostsRes.data || [];
     const bookmarks = bookmarksRes.data || [];
-    const topics = (topicsRes.data || []).map((t: any) => t.topic?.name).filter(Boolean);
     const followers = followsRes.data || [];
 
     const likesCount = Math.max(likes.length, post.likes_count || 0);
@@ -580,10 +525,7 @@ export async function fetchSinglePostImpact(
     bookmarks.forEach((b) => b.user_id && interactingUserIdSet.add(b.user_id));
     interactingUserIdSet.delete(requestingUserId);
 
-    const engagedScholars = Math.max(
-      interactingUserIdSet.size,
-      totalEngagement > 0 ? Math.ceil(totalEngagement * 0.8) : 0
-    );
+    const engagedScholars = interactingUserIdSet.size;
 
     // Fetch demographics for interacting users
     const interactingIds = Array.from(interactingUserIdSet);
@@ -609,8 +551,8 @@ export async function fetchSinglePostImpact(
       }
     });
 
-    let followerReachPercent = 36;
-    let nonFollowerReachPercent = 64;
+    let followerReachPercent = 0;
+    let nonFollowerReachPercent = 0;
     const totalKnown = followerInteractors + nonFollowerInteractors;
     if (totalKnown > 0) {
       followerReachPercent = Math.round((followerInteractors / totalKnown) * 100);
@@ -635,11 +577,8 @@ export async function fetchSinglePostImpact(
       .sort((a, b) => b.count - a.count)
       .slice(0, 4);
 
-    // Disciplines derived from real post topics and interacting scholars
+    // Disciplines derived strictly from real interacting scholars
     const discMap: Record<string, number> = {};
-    topics.forEach((t) => {
-      discMap[t] = (discMap[t] || 0) + 3;
-    });
     interactingProfiles.forEach((p) => {
       if (Array.isArray(p.research_interests)) {
         p.research_interests.forEach((ri) => {
@@ -660,25 +599,16 @@ export async function fetchSinglePostImpact(
       .sort((a, b) => b.percentage - a.percentage)
       .slice(0, 4);
 
-
     // Total Impressions & Unique Reach for single post
-    const totalImpressions = Math.max(
-      140 + totalEngagement * 18,
-      totalEngagement * 12,
-      65
-    );
-    const uniqueReach = Math.max(
-      Math.round(totalImpressions * 0.64),
-      engagedScholars,
-      42
-    );
-    const postClicks = Math.max(Math.round(totalEngagement * 2.2 + 8), totalEngagement);
+    const totalImpressions = totalEngagement > 0 ? totalEngagement * 2 : 0;
+    const uniqueReach = totalImpressions > 0 ? Math.max(engagedScholars, Math.round(totalImpressions * 0.75)) : 0;
+    const postClicks = totalEngagement;
     const engagementRate = uniqueReach > 0
       ? Number(((totalEngagement + postClicks) / uniqueReach * 100).toFixed(1))
       : 0;
 
-    const profileVisits = Math.max(Math.round(totalEngagement * 0.8 + 2), 1);
-    const followsGained = Math.max(Math.round(totalEngagement * 0.25), sharesCount > 0 ? 1 : 0);
+    const profileVisits = 0;
+    const followsGained = 0;
 
     const summary: PostImpactSummary = {
       postId,

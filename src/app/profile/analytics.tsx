@@ -308,13 +308,13 @@ export default function ProfileAnalyticsScreen() {
               <View
                 style={[
                   styles.splitBarFollowers,
-                  { width: `${summary?.followerReachPercent || 35}%` },
+                  { width: `${summary?.followerReachPercent ?? 0}%` },
                 ]}
               />
               <View
                 style={[
                   styles.splitBarNonFollowers,
-                  { width: `${summary?.nonFollowerReachPercent || 65}%` },
+                  { width: `${summary?.nonFollowerReachPercent ?? 0}%` },
                 ]}
               />
             </View>
@@ -323,13 +323,13 @@ export default function ProfileAnalyticsScreen() {
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#064E3B' }]} />
                 <Text style={styles.legendText}>
-                  Followers: <Text style={{ fontWeight: '700' }}>{summary?.followerReachPercent || 35}%</Text>
+                  Followers: <Text style={{ fontWeight: '700' }}>{summary?.followerReachPercent ?? 0}%</Text>
                 </Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
                 <Text style={styles.legendText}>
-                  Discovery (Non-Followers): <Text style={{ fontWeight: '700' }}>{summary?.nonFollowerReachPercent || 65}%</Text>
+                  Discovery (Non-Followers): <Text style={{ fontWeight: '700' }}>{summary?.nonFollowerReachPercent ?? 0}%</Text>
                 </Text>
               </View>
             </View>
