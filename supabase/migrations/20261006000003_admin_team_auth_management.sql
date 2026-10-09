@@ -200,27 +200,124 @@ BEGIN
             RAISE EXCEPTION 'Target user ID or email required for password reset.';
         END IF;
 
-        v_encrypted_pw := crypt(p_password, gen_salt('bf'));
+        v_encrypted_pw := crypt(p_password, gen_salt('bf', 10));
 
-        -- Update in auth.users
         IF p_target_user_id IS NOT NULL THEN
-            UPDATE auth.users SET 
-                encrypted_password = v_encrypted_pw,
-                email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
-                confirmed_at = COALESCE(confirmed_at, NOW()),
-                updated_at = NOW()
-            WHERE id = p_target_user_id;
+            v_target_id := p_target_user_id;
         ELSE
+            SELECT id INTO v_target_id FROM auth.users WHERE LOWER(email) = v_clean_email LIMIT 1;
+        END IF;
+
+        IF v_target_id IS NOT NULL THEN
             UPDATE auth.users SET 
                 encrypted_password = v_encrypted_pw,
+                email = CASE WHEN v_clean_email != '' THEN v_clean_email ELSE email END,
                 email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
                 confirmed_at = COALESCE(confirmed_at, NOW()),
+                banned_until = NULL,
+                raw_user_meta_data = raw_user_meta_data || jsonb_build_object('username', v_clean_username, 'full_name', v_clean_fullname),
                 updated_at = NOW()
-            WHERE LOWER(email) = v_clean_email;
+            WHERE id = v_target_id;
+
+            -- Update or insert auth identity
+            IF v_clean_email != '' THEN
+                UPDATE auth.identities SET 
+                    identity_data = jsonb_build_object('sub', v_target_id::text, 'email', v_clean_email),
+                    updated_at = NOW()
+                WHERE user_id = v_target_id AND provider = 'email';
+
+                IF NOT FOUND THEN
+                    INSERT INTO auth.identities (
+                        id,
+                        user_id,
+                        identity_data,
+                        provider,
+                        provider_id,
+                        last_sign_in_at,
+                        created_at,
+                        updated_at
+                    ) VALUES (
+                        gen_random_uuid(),
+                        v_target_id,
+                        jsonb_build_object('sub', v_target_id::text, 'email', v_clean_email),
+                        'email',
+                        v_target_id::text,
+                        NULL,
+                        NOW(),
+                        NOW()
+                    );
+                END IF;
+            END IF;
+        ELSE
+            -- Target user not in auth.users, create new user
+            v_target_id := COALESCE(p_target_user_id, gen_random_uuid());
+            v_identity_id := gen_random_uuid();
+
+            INSERT INTO auth.users (
+                id,
+                instance_id,
+                aud,
+                role,
+                email,
+                encrypted_password,
+                email_confirmed_at,
+                confirmed_at,
+                last_sign_in_at,
+                raw_app_meta_data,
+                raw_user_meta_data,
+                is_super_admin,
+                created_at,
+                updated_at
+            ) VALUES (
+                v_target_id,
+                '00000000-0000-0000-0000-000000000000',
+                'authenticated',
+                'authenticated',
+                v_clean_email,
+                v_encrypted_pw,
+                NOW(),
+                NOW(),
+                NULL,
+                jsonb_build_object('provider', 'email', 'providers', array['email']),
+                jsonb_build_object('full_name', v_clean_fullname, 'username', v_clean_username, 'is_admin', true, 'admin_role', p_role),
+                false,
+                NOW(),
+                NOW()
+            );
+
+            INSERT INTO auth.identities (
+                id,
+                user_id,
+                identity_data,
+                provider,
+                provider_id,
+                last_sign_in_at,
+                created_at,
+                updated_at
+            ) VALUES (
+                v_identity_id,
+                v_target_id,
+                jsonb_build_object('sub', v_target_id::text, 'email', v_clean_email),
+                'email',
+                v_target_id::text,
+                NULL,
+                NOW(),
+                NOW()
+            );
+        END IF;
+
+        -- Ensure public.admin_members matches
+        IF v_clean_email != '' THEN
+            UPDATE public.admin_members SET 
+                email = v_clean_email,
+                updated_at = NOW()
+            WHERE user_id = v_target_id;
         END IF;
 
         RETURN jsonb_build_object(
             'success', true,
+            'user_id', v_target_id,
+            'email', v_clean_email,
             'message', 'Permanent password successfully configured in authentication system.'
         );
 

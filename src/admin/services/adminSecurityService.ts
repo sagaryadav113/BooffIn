@@ -298,10 +298,38 @@ export const adminSecurityService = {
         p_target_user_id: params.targetUserId,
         p_email: targetEmail,
         p_password: finalPassword,
+        p_full_name: targetFullName,
+        p_username: targetUsername,
       });
 
       if (rpcError) {
-        console.warn('RPC password reset warning, attempting client recovery:', rpcError.message);
+        console.error('RPC password reset error:', rpcError.message);
+        // If resetting self, try standard supabase client password update
+        const { data: currentUser } = await supabase.auth.getUser();
+        if (currentUser?.user?.id === params.targetUserId) {
+          const { error: selfUpdateError } = await supabase.auth.updateUser({ password: finalPassword });
+          if (selfUpdateError) {
+            return {
+              newPassword: null,
+              email: null,
+              username: null,
+              error: new Error(`Password reset failed: ${rpcError.message || selfUpdateError.message}`),
+            };
+          }
+        } else {
+          return {
+            newPassword: null,
+            email: null,
+            username: null,
+            error: new Error(`Database error: ${rpcError.message}`),
+          };
+        }
+      } else {
+        // If resetting self and RPC succeeded, also sync current client session if active
+        const { data: currentUser } = await supabase.auth.getUser();
+        if (currentUser?.user?.id === params.targetUserId) {
+          await supabase.auth.updateUser({ password: finalPassword }).catch(() => {});
+        }
       }
 
       // 3. Keep admin_members and profiles in sync
