@@ -223,7 +223,10 @@ export const workspaceService = {
         }
       }
 
-      // 5. Fetch latest messages & read status for all active workspaces
+      // 5. Fetch user chat preferences (pinned, archived, muted, deleted, cleared history)
+      const prefs = await getChatPreferences(userId);
+
+      // 6. Fetch latest messages & read status for all active workspaces
       const allActiveWorkspaces = [...dms, ...communities, ...innerCircles];
       const allWsIds = allActiveWorkspaces.map((w) => w.id);
 
@@ -233,20 +236,24 @@ export const workspaceService = {
 
       if (allWsIds.length > 0) {
         try {
-          const { data: recentMsgRows } = await supabase
+          const { data: recentMsgRows, error: msgErr } = await supabase
             .from('workspace_messages')
-            .select('id, workspace_id, sender_id, content, message_type, doi_metadata, attachments, media_urls, is_deleted, created_at')
+            .select('*')
             .in('workspace_id', allWsIds)
             .order('created_at', { ascending: false });
 
-          (recentMsgRows || []).forEach((m: any) => {
-            if (!latestMsgMap.has(m.workspace_id)) {
-              latestMsgMap.set(m.workspace_id, m);
-            }
-            const list = wsMsgsMap.get(m.workspace_id) || [];
-            list.push(m);
-            wsMsgsMap.set(m.workspace_id, list);
-          });
+          if (!msgErr && Array.isArray(recentMsgRows)) {
+            recentMsgRows.forEach((m: any) => {
+              if (!latestMsgMap.has(m.workspace_id)) {
+                latestMsgMap.set(m.workspace_id, m);
+              }
+              const list = wsMsgsMap.get(m.workspace_id) || [];
+              list.push(m);
+              wsMsgsMap.set(m.workspace_id, list);
+            });
+          } else if (msgErr) {
+            console.warn('Error fetching recent workspace messages:', msgErr.message);
+          }
         } catch (e) {
           console.warn('Failed to load recent workspace messages:', e);
         }
@@ -273,30 +280,78 @@ export const workspaceService = {
       }
 
       const enrichWorkspace = (ws: Workspace): Workspace => {
-        const lastMsg = latestMsgMap.get(ws.id) || null;
+        let lastMsg = latestMsgMap.get(ws.id) || null;
         const mem = memberMap.get(ws.id);
         const myLastReadTime = mem?.last_read_at ? new Date(mem.last_read_at).getTime() : 0;
 
+        // Check if history was cleared locally
+        const clearedIso = prefs.clearedAt?.[ws.id];
+        if (clearedIso && lastMsg) {
+          if (new Date(lastMsg.created_at).getTime() <= new Date(clearedIso).getTime()) {
+            lastMsg = null;
+          }
+        }
+
         const msgs = wsMsgsMap.get(ws.id) || [];
-        const unreadCountFromMsgs = msgs.filter(
-          (m) => m.sender_id !== userId && new Date(m.created_at).getTime() > myLastReadTime
-        ).length;
+        const unreadCountFromMsgs = msgs.filter((m) => {
+          if (clearedIso && new Date(m.created_at).getTime() <= new Date(clearedIso).getTime()) {
+            return false;
+          }
+          return m.sender_id !== userId && new Date(m.created_at).getTime() > myLastReadTime;
+        }).length;
 
         const effectiveUnread = Math.max(mem?.unread_count || 0, unreadCountFromMsgs);
 
         let formattedLastMessage: WorkspaceMessage | null = null;
         if (lastMsg) {
+          let extractedMedia: string[] | null = null;
+          if (Array.isArray(lastMsg.media_urls) && lastMsg.media_urls.length > 0) {
+            extractedMedia = lastMsg.media_urls;
+          } else if (Array.isArray(lastMsg.attachments) && lastMsg.attachments.length > 0) {
+            extractedMedia = lastMsg.attachments
+              .map((a: any) => (typeof a === 'string' ? a : a?.url || a?.uri))
+              .filter(Boolean);
+          } else if (lastMsg.attachments && typeof lastMsg.attachments === 'object') {
+            if (Array.isArray(lastMsg.attachments.media_urls)) {
+              extractedMedia = lastMsg.attachments.media_urls;
+            } else if (lastMsg.attachments.url) {
+              extractedMedia = [lastMsg.attachments.url];
+            }
+          }
+
+          if ((!extractedMedia || extractedMedia.length === 0) && typeof lastMsg.content === 'string') {
+            const match = lastMsg.content.match(/https?:\/\/[^\s]+(?:\.jpg|\.jpeg|\.png|\.webp|\.gif|\/profile-media\/[^\s]+|\/storage\/v1\/object\/public\/[^\s]+)/i);
+            if (match) {
+              extractedMedia = [match[0]];
+            }
+          }
+
+          const isImg = (extractedMedia && extractedMedia.length > 0) || lastMsg.message_type === 'image';
+          const docMeta = lastMsg.document_metadata || lastMsg.attachments?.document_metadata || null;
+          const doiMeta = lastMsg.doi_metadata || lastMsg.attachments?.doi_metadata || null;
+          const postMeta = lastMsg.post_metadata || lastMsg.attachments?.post_metadata || null;
+          const profMeta = lastMsg.profile_metadata || lastMsg.attachments?.profile_metadata || null;
+          const callMeta = lastMsg.call_metadata || lastMsg.attachments?.call_metadata || null;
+          const audioMeta = lastMsg.audio_metadata || lastMsg.attachments?.audio_metadata || null;
+          const inviteMeta = lastMsg.workspace_invite_metadata || lastMsg.attachments?.workspace_invite_metadata || null;
+
           formattedLastMessage = {
             id: lastMsg.id,
             workspace_id: lastMsg.workspace_id,
             sender_id: lastMsg.sender_id,
             content: lastMsg.content,
-            message_type: lastMsg.message_type || (lastMsg.media_urls?.length ? 'image' : 'text'),
-            doi_metadata: lastMsg.doi_metadata || null,
+            message_type: isImg ? 'image' : (lastMsg.message_type || (doiMeta ? 'paper_doi' : 'text')),
+            doi_metadata: doiMeta,
+            document_metadata: docMeta,
+            post_metadata: postMeta,
+            profile_metadata: profMeta,
+            call_metadata: callMeta,
+            audio_metadata: audioMeta,
+            workspace_invite_metadata: inviteMeta,
             is_deleted: lastMsg.is_deleted || false,
-            media_urls: lastMsg.media_urls || null,
+            media_urls: extractedMedia,
             created_at: lastMsg.created_at,
-            updated_at: lastMsg.created_at,
+            updated_at: lastMsg.updated_at || lastMsg.created_at,
             e2ee_ciphertext: null,
             e2ee_nonce: null,
             is_pinned: false,
@@ -316,9 +371,6 @@ export const workspaceService = {
       const enrichedRawDms = dms.map(enrichWorkspace);
       const enrichedCommunities = communities.map(enrichWorkspace);
       const enrichedInnerCircles = innerCircles.map(enrichWorkspace);
-
-      // 6. Fetch user chat preferences (pinned, archived, muted, deleted)
-      const prefs = await getChatPreferences(userId);
 
       // Filter deleted DMs and enrich with preference flags
       const enrichedDms: Workspace[] = enrichedRawDms

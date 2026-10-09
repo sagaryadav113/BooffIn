@@ -61,7 +61,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
     }
   };
 
-  const timeText = formatTime(workspace.last_message?.created_at || workspace.updated_at || workspace.created_at);
+  const timeText = workspace.last_message ? formatTime(workspace.last_message.created_at) : '';
 
   const displayName = isDM
     ? workspace.other_user?.fullName || workspace.name || 'Researcher'
