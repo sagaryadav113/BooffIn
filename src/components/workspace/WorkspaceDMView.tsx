@@ -88,6 +88,8 @@ import { ChatProfileCard } from '../chat/ChatProfileCard';
 import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
 import { ChatDocumentCard } from '../chat/ChatDocumentCard';
 import { ChatCallModal } from '../chat/ChatCallModal';
+import { IncomingCallModal } from '../chat/IncomingCallModal';
+import { webrtcSignaling, IncomingCallPayload } from '../../services/webrtcSignalingService';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -143,11 +145,17 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   // Voice Note Recording State
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
 
-  // 1:1 Live Calling State (Phase 3)
-  const [activeCallModal, setActiveCallModal] = useState<{ visible: boolean; type: 'audio' | 'video' }>({
+  // 1:1 Live Calling State (Phase 3 & 4: Zero-Storage P2P WebRTC)
+  const [activeCallModal, setActiveCallModal] = useState<{
+    visible: boolean;
+    type: 'audio' | 'video';
+    roomId?: string;
+    isIncoming?: boolean;
+  }>({
     visible: false,
     type: 'audio',
   });
+  const [incomingCall, setIncomingCall] = useState<IncomingCallPayload | null>(null);
 
   // Chat Media Gallery Modal State
   const [showGalleryModal, setShowGalleryModal] = useState(false);
@@ -349,6 +357,17 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       supabase.removeChannel(subChannel);
     };
   }, [workspace.id, localPartner?.id, workspace.other_user?.id, currentUser?.id]);
+
+  // Step 4: Listen for incoming ephemeral P2P calls (Zero-storage broadcast)
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const unsubscribe = webrtcSignaling.listenForIncomingCalls(currentUser.id, (call) => {
+      setIncomingCall(call);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [currentUser?.id]);
 
   const partner = localPartner || workspace.other_user;
 
@@ -586,15 +605,21 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     }
   };
 
-  // Live 1:1 Call Handlers (Phase 3)
+  // Live 1:1 Call Handlers (Phase 3 & 4)
   const handleStartCall = (type: 'audio' | 'video') => {
-    setActiveCallModal({ visible: true, type });
+    const roomId = `room_${workspace.id}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    setActiveCallModal({
+      visible: true,
+      type,
+      roomId,
+      isIncoming: false,
+    });
   };
 
   const handleEndCall = async (durationSeconds: number) => {
+    const callType = activeCallModal.type;
     setActiveCallModal({ visible: false, type: 'audio' });
 
-    const callType = activeCallModal.type;
     const callMetadata: WorkspaceCallMetadata = {
       call_id: `call_${Date.now()}`,
       call_type: callType,
@@ -1922,12 +1947,40 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: 1:1 Live Audio & Video Call Modal (Phase 3) */}
+      {/* MODAL: Incoming P2P Audio / Video Call Ringing Screen (Step 4) */}
+      {/* ------------------------------------------------------------- */}
+      <IncomingCallModal
+        incomingCall={incomingCall}
+        onAccept={(call) => {
+          setActiveCallModal({
+            visible: true,
+            type: call.callType,
+            roomId: call.roomId,
+            isIncoming: true,
+          });
+          setIncomingCall(null);
+        }}
+        onDecline={(call) => {
+          if (currentUser?.id) {
+            webrtcSignaling.sendSignal(call.roomId, 'call_rejected', {
+              senderId: currentUser.id,
+              reason: 'declined',
+            }).catch(() => {});
+          }
+          setIncomingCall(null);
+        }}
+      />
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: 1:1 Live Audio & Video Call Modal (Step 3 & 4) */}
       {/* ------------------------------------------------------------- */}
       <ChatCallModal
         visible={activeCallModal.visible}
         callType={activeCallModal.type}
         partner={partner}
+        currentUserId={currentUser?.id}
+        roomId={activeCallModal.roomId}
+        isIncoming={activeCallModal.isIncoming}
         onEndCall={handleEndCall}
       />
 
