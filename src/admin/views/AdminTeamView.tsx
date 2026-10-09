@@ -712,6 +712,21 @@ export const AdminTeamView: React.FC = () => {
                 )}
 
                 <View style={styles.credRow}>
+                  <Text style={styles.credLabel}>Staff Member:</Text>
+                  <Text style={styles.credValue}>{recoveryMember.fullName || 'Admin'}</Text>
+                </View>
+
+                {(recoveryMember as any).username && (
+                  <View style={[styles.credRow, { marginTop: 6 }]}>
+                    <Text style={styles.credLabel}>Username (Handle):</Text>
+                    <Text style={styles.credValue}>@{(recoveryMember as any).username}</Text>
+                    <TouchableOpacity style={styles.copyBtn} onPress={() => copyTextToClipboard(`@${(recoveryMember as any).username}`, 'email')}>
+                      <Text style={styles.copyBtnText}>{copiedEmail ? 'Copied' : 'Copy'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <View style={[styles.credRow, { marginTop: 6 }]}>
                   <Text style={styles.credLabel}>Login Email:</Text>
                   <Text style={styles.credValue}>{recoveryMember.email || `${recoveryMember.user_id}@letsbooffin.com`}</Text>
                   <TouchableOpacity style={styles.copyBtn} onPress={() => copyTextToClipboard(recoveryMember.email || '', 'recEmail')}>
@@ -721,8 +736,10 @@ export const AdminTeamView: React.FC = () => {
 
                 {activeNewPassword ? (
                   <View style={[styles.successBannerBlock, { marginTop: 12 }]}>
-                    <Text style={styles.successBannerTitle}>Password Updated Successfully</Text>
-                    <Text style={styles.successBannerSub}>This password is now active and permanent in authentication:</Text>
+                    <Text style={styles.successBannerTitle}>Permanent Password Configured</Text>
+                    <Text style={styles.successBannerSub}>
+                      This credential is active immediately. The admin can log in using either their username (@{(recoveryMember as any).username || 'username'}) or email and this password:
+                    </Text>
                     <View style={[styles.credRow, { marginTop: 6 }]}>
                       <Text style={styles.credLabel}>Active Password:</Text>
                       <Text style={styles.credValue}>{activeNewPassword}</Text>

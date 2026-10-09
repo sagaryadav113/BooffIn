@@ -8,14 +8,65 @@ import { getPermissionsForRole } from '../lib/permissions';
 
 export const adminAuthService = {
   /**
-   * Signs in an administrator using Supabase Auth.
+   * Signs in an administrator using Supabase Auth with email or username support.
    */
-  async signInWithPassword(email: string, password: string):Promise<{ error: Error | null }> {
+  async signInWithPassword(identifier: string, password: string): Promise<{ error: Error | null }> {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      let cleanIdentifier = identifier.trim().toLowerCase();
+      let emailToAuth = cleanIdentifier;
+
+      // If user typed username instead of email, resolve it
+      if (!cleanIdentifier.includes('@')) {
+        const cleanHandle = cleanIdentifier.replace(/^@/, '');
+        
+        // 1. Check admin_members by email pattern or profile
+        const { data: adminMember } = await supabase
+          .from('admin_members')
+          .select('email, user_id')
+          .or(`email.ilike.${cleanHandle}@%,full_name.ilike.%${cleanHandle}%`)
+          .maybeSingle();
+
+        // 2. Check profiles
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .eq('username', cleanHandle)
+          .maybeSingle();
+
+        if (adminMember?.email) {
+          emailToAuth = adminMember.email;
+        } else if (profile?.id) {
+          const { data: adminById } = await supabase
+            .from('admin_members')
+            .select('email')
+            .eq('user_id', profile.id)
+            .maybeSingle();
+          if (adminById?.email) {
+            emailToAuth = adminById.email;
+          } else {
+            emailToAuth = `${cleanHandle}@letsbooffin.com`;
+          }
+        } else {
+          emailToAuth = `${cleanHandle}@letsbooffin.com`;
+        }
+      }
+
+      let { error } = await supabase.auth.signInWithPassword({ email: emailToAuth, password });
+
+      // Fallback try with default domain if first attempt fails and was handle
+      if (error && !cleanIdentifier.includes('@') && emailToAuth !== `${cleanIdentifier.replace(/^@/, '')}@letsbooffin.com`) {
+        const retry = await supabase.auth.signInWithPassword({
+          email: `${cleanIdentifier.replace(/^@/, '')}@letsbooffin.com`,
+          password,
+        });
+        if (!retry.error) {
+          error = null;
+        }
+      }
+
       return { error };
     } catch (err: any) {
-      return { error: err };
+      return { error: err instanceof Error ? err : new Error(String(err)) };
     }
   },
 

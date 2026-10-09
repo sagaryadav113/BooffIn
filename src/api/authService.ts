@@ -244,23 +244,66 @@ export async function getInitialAuthSession(): Promise<UserProfile | null> {
 export const getCurrentUser = getInitialAuthSession;
 
 /**
- * Sign In with Email & Password
+ * Sign In with Email or Username & Password
  */
 export async function signInWithEmail(
-  email: string,
+  identifier: string,
   password: string
 ): Promise<AuthResponse> {
   try {
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanIdentifier = identifier.trim().toLowerCase();
 
-    if (!cleanEmail || !password) {
-      return { user: null, error: 'Email and password are required.' };
+    if (!cleanIdentifier || !password) {
+      return { user: null, error: 'Email or username and password are required.' };
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
+    let emailToAuth = cleanIdentifier;
+
+    // If user provided a username/handle (no '@'), resolve to their registered email
+    if (!cleanIdentifier.includes('@')) {
+      const cleanHandle = cleanIdentifier.replace(/^@/, '');
+      
+      // 1. Look up profile by username
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .eq('username', cleanHandle)
+        .maybeSingle();
+
+      if (profileData?.id) {
+        // Look up email in admin_members if present
+        const { data: adminData } = await supabase
+          .from('admin_members')
+          .select('email')
+          .eq('user_id', profileData.id)
+          .maybeSingle();
+
+        if (adminData?.email) {
+          emailToAuth = adminData.email.toLowerCase();
+        } else {
+          emailToAuth = `${cleanHandle}@letsbooffin.com`;
+        }
+      } else {
+        emailToAuth = `${cleanHandle}@letsbooffin.com`;
+      }
+    }
+
+    let { data, error } = await supabase.auth.signInWithPassword({
+      email: emailToAuth,
       password,
     });
+
+    // Fallback try with domain pattern if initial attempt failed and identifier was a username
+    if (error && !cleanIdentifier.includes('@') && emailToAuth !== `${cleanIdentifier.replace(/^@/, '')}@letsbooffin.com`) {
+      const retry = await supabase.auth.signInWithPassword({
+        email: `${cleanIdentifier.replace(/^@/, '')}@letsbooffin.com`,
+        password,
+      });
+      if (!retry.error && retry.data) {
+        data = retry.data;
+        error = null;
+      }
+    }
 
     if (error) {
       return { user: null, error: error.message };
@@ -271,7 +314,7 @@ export async function signInWithEmail(
       if (!profile) {
         profile = {
           id: data.user.id,
-          handle: cleanEmail.split('@')[0],
+          handle: cleanIdentifier.includes('@') ? cleanIdentifier.split('@')[0] : cleanIdentifier.replace(/^@/, ''),
           fullName: data.user.user_metadata?.full_name || 'Researcher',
           academicTitle: 'Researcher',
           institution: 'Independent',

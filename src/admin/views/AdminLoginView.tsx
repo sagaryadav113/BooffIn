@@ -18,8 +18,8 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({ onSuccess }) => 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      setErrorMessage('Please enter your administrator email and password.');
+    if (!email.trim() || !password) {
+      setErrorMessage('Please enter your administrator email or username and password.');
       return;
     }
 
@@ -57,15 +57,14 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({ onSuccess }) => 
         ) : null}
 
         <View style={styles.form}>
-          <Text style={styles.inputLabel}>Admin Email</Text>
+          <Text style={styles.inputLabel}>Admin Email or Username</Text>
           <TextInput
             style={styles.input}
-            placeholder="admin@booffin.com"
+            placeholder="admin@letsbooffin.com or @username"
             placeholderTextColor={ADMIN_COLORS.textMuted}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
-            keyboardType="email-address"
           />
 
           <Text style={styles.inputLabel}>Password</Text>

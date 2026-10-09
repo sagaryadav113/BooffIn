@@ -54,7 +54,7 @@ export const adminSecurityService = {
   /**
    * Lists all admin members from public.admin_members with email/profile joins.
    */
-  async listAdminMembers(): Promise<{ members: (AdminMember & { email?: string; fullName?: string })[]; error: Error | null }> {
+  async listAdminMembers(): Promise<{ members: (AdminMember & { email?: string; fullName?: string; username?: string })[]; error: Error | null }> {
     try {
       const { data, error } = await supabase
         .from('admin_members')
@@ -90,11 +90,13 @@ export const adminSecurityService = {
             (auditMeta?.provisioned_name) ||
             'Administrator';
 
+          const username = prof?.username || auditMeta?.provisioned_username || (d.email ? d.email.split('@')[0] : 'admin');
+
           const email = 
             d.email || 
             auditMeta?.provisioned_email || 
             (prof?.username ? `${prof.username}@letsbooffin.com` : undefined) || 
-            `${d.user_id.slice(0, 8)}@letsbooffin.com`;
+            `${username}@letsbooffin.com`;
 
           return {
             id: d.id,
@@ -105,6 +107,7 @@ export const adminSecurityService = {
             created_at: d.created_at,
             updated_at: d.updated_at,
             fullName,
+            username,
             email,
           };
         });
@@ -121,7 +124,8 @@ export const adminSecurityService = {
             user_id: user.id,
             role: 'SUPER_ADMIN',
             status: 'ACTIVE',
-            fullName: user.user_metadata?.full_name || 'Primary Super Admin',
+            fullName: user.user_metadata?.full_name || 'Super Admin',
+            username: user.user_metadata?.username || user.email?.split('@')[0] || 'admin',
             email: user.email || 'admin@letsbooffin.com',
             created_at: user.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -137,7 +141,7 @@ export const adminSecurityService = {
   },
 
   /**
-   * Provisions a new team member / Co-Admin with pre-confirmed auth credentials.
+   * Provisions a new team member / Co-Admin with pre-confirmed auth credentials and equal authority.
    */
   async provisionTeamMember(params: {
     fullName: string;
@@ -174,6 +178,7 @@ export const adminSecurityService = {
           reason: `Super Admin provisioned team member ${params.fullName} (${email}) with role ${params.role}`,
           metadata: {
             provisioned_email: email,
+            provisioned_username: cleanHandle,
             provisioned_name: params.fullName.trim(),
             assigned_role: params.role,
           },
@@ -249,24 +254,49 @@ export const adminSecurityService = {
   },
 
   /**
-   * Resets / changes an administrator's password permanently in Supabase Auth.
+   * Resets / changes any administrator's or researcher's password permanently in Supabase Auth.
    */
   async resetMemberPassword(params: {
     targetUserId: string;
-    targetEmail: string;
-    targetFullName: string;
+    targetEmail?: string;
+    targetFullName?: string;
+    targetUsername?: string;
     newPassword?: string;
-  }): Promise<{ newPassword: string | null; error: Error | null }> {
+  }): Promise<{ newPassword: string | null; email: string | null; username: string | null; error: Error | null }> {
     try {
       const finalPassword = params.newPassword && params.newPassword.trim().length >= 6
         ? params.newPassword.trim()
         : generateSecurePassword();
 
-      // 1. Authoritative Backend RPC Call to permanently update password in auth.users
+      let targetEmail = params.targetEmail?.trim().toLowerCase();
+      let targetUsername = params.targetUsername?.trim().toLowerCase();
+      let targetFullName = params.targetFullName?.trim() || 'User';
+
+      // 1. Resolve target profile and admin records if missing email or username
+      if (!targetEmail || !targetUsername) {
+        if (params.targetUserId) {
+          const [profRes, adminRes] = await Promise.all([
+            supabase.from('profiles').select('username, full_name').eq('id', params.targetUserId).maybeSingle(),
+            supabase.from('admin_members').select('email, full_name').eq('user_id', params.targetUserId).maybeSingle(),
+          ]);
+
+          if (adminRes.data?.email) targetEmail = adminRes.data.email.toLowerCase();
+          if (profRes.data?.username) targetUsername = profRes.data.username.toLowerCase();
+          if (profRes.data?.full_name) targetFullName = profRes.data.full_name;
+        }
+      }
+
+      if (!targetEmail && targetUsername) {
+        targetEmail = `${targetUsername}@letsbooffin.com`;
+      } else if (!targetEmail && params.targetUserId) {
+        targetEmail = `${params.targetUserId.slice(0, 8)}@letsbooffin.com`;
+      }
+
+      // 2. Authoritative Backend RPC Call to permanently update password in auth.users
       const { data: rpcData, error: rpcError } = await supabase.rpc('admin_manage_team_credentials', {
         p_action: 'RESET_PASSWORD',
         p_target_user_id: params.targetUserId,
-        p_email: params.targetEmail,
+        p_email: targetEmail,
         p_password: finalPassword,
       });
 
@@ -274,16 +304,27 @@ export const adminSecurityService = {
         console.warn('RPC password reset warning, attempting client recovery:', rpcError.message);
       }
 
-      // 2. Safe audit logging
+      // 3. Keep admin_members and profiles in sync
+      if (params.targetUserId) {
+        if (targetEmail) {
+          await supabase
+            .from('admin_members')
+            .update({ email: targetEmail, updated_at: new Date().toISOString() })
+            .eq('user_id', params.targetUserId);
+        }
+      }
+
+      // 4. Safe audit logging
       try {
         const { data } = await supabase.auth.getUser();
         await adminAuditService.recordAuditLog({
           action: 'ADMIN_PASSWORD_RESET',
-          targetType: 'ADMIN',
+          targetType: 'USER',
           targetId: params.targetUserId,
-          reason: `Super Admin updated permanent password for ${params.targetFullName} (${params.targetEmail})`,
+          reason: `Super Admin configured permanent password for ${targetFullName} (${targetEmail || targetUsername})`,
           metadata: {
-            target_email: params.targetEmail,
+            target_email: targetEmail,
+            target_username: targetUsername,
             requested_by: data?.user?.id,
           },
         });
@@ -291,9 +332,19 @@ export const adminSecurityService = {
         console.warn('Audit log recording non-fatal warning during password reset:', auditErr);
       }
 
-      return { newPassword: finalPassword, error: null };
+      return {
+        newPassword: finalPassword,
+        email: targetEmail || null,
+        username: targetUsername || null,
+        error: null,
+      };
     } catch (err: any) {
-      return { newPassword: null, error: err instanceof Error ? err : new Error(String(err)) };
+      return {
+        newPassword: null,
+        email: null,
+        username: null,
+        error: err instanceof Error ? err : new Error(String(err)),
+      };
     }
   },
 

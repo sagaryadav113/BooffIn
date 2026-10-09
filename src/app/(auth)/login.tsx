@@ -29,14 +29,9 @@ export default function LoginScreen() {
     setValidationError(null);
     clearError();
 
-    const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      setValidationError('Please enter your email address.');
-      return;
-    }
-
-    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      setValidationError('Please enter a valid email address.');
+    const cleanInput = email.trim();
+    if (!cleanInput) {
+      setValidationError('Please enter your email address or username.');
       return;
     }
 
@@ -45,7 +40,7 @@ export default function LoginScreen() {
       return;
     }
 
-    const success = await signIn(cleanEmail, password);
+    const success = await signIn(cleanInput, password);
     if (success) {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -124,7 +119,7 @@ export default function LoginScreen() {
         <View style={styles.dividerRow}>
           <View style={styles.dividerLine} />
           <Typography variant="micro" color={colors.textMuted} style={styles.dividerText}>
-            OR SIGN IN WITH EMAIL
+            OR SIGN IN WITH CREDENTIALS
           </Typography>
           <View style={styles.dividerLine} />
         </View>
@@ -141,15 +136,14 @@ export default function LoginScreen() {
         {/* Form Inputs */}
         <View style={styles.form}>
           <Input
-            label="Email Address"
-            placeholder="scientist@university.edu"
+            label="Email Address or Username"
+            placeholder="scientist@university.edu or @handle"
             value={email}
             onChangeText={(text) => {
               setEmail(text);
               if (validationError) setValidationError(null);
             }}
             autoCapitalize="none"
-            keyboardType="email-address"
             leftIcon="Inbox"
           />
 

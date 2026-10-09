@@ -18,6 +18,7 @@ import { ADMIN_COLORS, ADMIN_RADII } from '../lib/constants';
 import { AdminDataTable, ColumnDef } from '../components/AdminDataTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { adminUserService } from '../services/adminUserService';
+import { adminSecurityService, generateSecurePassword } from '../services/adminSecurityService';
 import { AdminUserProfile } from '../types/data';
 import { 
   Search, 
@@ -32,7 +33,9 @@ import {
   Globe,
   Building2,
   Calendar,
-  X
+  X,
+  Copy,
+  Check
 } from 'lucide-react-native';
 
 type UserFilterType = 'ALL' | 'VERIFIED' | 'FACULTY' | 'PRIVATE';
@@ -52,6 +55,36 @@ export const AdminUsersView: React.FC = () => {
 
   // Deep Profile Inspector Modal
   const [selectedUser, setSelectedUser] = useState<AdminUserProfile | null>(null);
+
+  // Password Reset / Generation Modal State
+  const [recoveryUser, setRecoveryUser] = useState<AdminUserProfile | null>(null);
+  const [userNewPassword, setUserNewPassword] = useState('');
+  const [userActiveNewPassword, setUserActiveNewPassword] = useState<string | null>(null);
+  const [isResettingUserPassword, setIsResettingUserPassword] = useState(false);
+  const [userRecoveryError, setUserRecoveryError] = useState<string | null>(null);
+  const [copiedUserEmail, setCopiedUserEmail] = useState(false);
+  const [copiedUserUsername, setCopiedUserUsername] = useState(false);
+  const [copiedUserPassword, setCopiedUserPassword] = useState(false);
+
+  // Copy helper
+  const copyText = async (text: string, type: 'email' | 'username' | 'password') => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      }
+    } catch {}
+
+    if (type === 'email') {
+      setCopiedUserEmail(true);
+      setTimeout(() => setCopiedUserEmail(false), 2000);
+    } else if (type === 'username') {
+      setCopiedUserUsername(true);
+      setTimeout(() => setCopiedUserUsername(false), 2000);
+    } else if (type === 'password') {
+      setCopiedUserPassword(true);
+      setTimeout(() => setCopiedUserPassword(false), 2000);
+    }
+  };
 
   const loadUsers = useCallback(async (query?: string) => {
     setLoading(true);
@@ -98,8 +131,42 @@ export const AdminUsersView: React.FC = () => {
     }
   };
 
-  const handleSendPasswordReset = (email: string) => {
-    setActionSuccessMessage(`Password recovery instructions dispatched to researcher.`);
+  const handleOpenUserPasswordReset = (user: AdminUserProfile) => {
+    setRecoveryUser(user);
+    setUserNewPassword(generateSecurePassword());
+    setUserActiveNewPassword(null);
+    setUserRecoveryError(null);
+    setCopiedUserEmail(false);
+    setCopiedUserUsername(false);
+    setCopiedUserPassword(false);
+    setIsResettingUserPassword(false);
+  };
+
+  const handleSaveUserPermanentPassword = async () => {
+    if (!recoveryUser) return;
+    if (!userNewPassword.trim() || userNewPassword.trim().length < 6) {
+      setUserRecoveryError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setIsResettingUserPassword(true);
+    setUserRecoveryError(null);
+
+    const res = await adminSecurityService.resetMemberPassword({
+      targetUserId: recoveryUser.id,
+      targetFullName: recoveryUser.full_name || recoveryUser.username || 'Researcher',
+      targetUsername: recoveryUser.username,
+      newPassword: userNewPassword.trim(),
+    });
+
+    setIsResettingUserPassword(false);
+
+    if (res.error) {
+      setUserRecoveryError(res.error.message);
+    } else if (res.newPassword) {
+      setUserActiveNewPassword(res.newPassword);
+      setActionSuccessMessage(`Permanent password configured for @${recoveryUser.username}. They can log in immediately.`);
+    }
   };
 
   const columns: ColumnDef<AdminUserProfile>[] = [
@@ -446,11 +513,114 @@ export const AdminUsersView: React.FC = () => {
 
                 <TouchableOpacity
                   style={styles.resetPassBtn}
-                  onPress={() => handleSendPasswordReset(selectedUser.username)}
+                  onPress={() => handleOpenUserPasswordReset(selectedUser)}
                 >
                   <Key size={13} color={ADMIN_COLORS.textSecondary} />
-                  <Text style={styles.resetPassBtnText}>Reset Password</Text>
+                  <Text style={styles.resetPassBtnText}>Set Permanent Password</Text>
                 </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Password Reset / Permanent Credentials Modal */}
+      {recoveryUser && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setRecoveryUser(null)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Key size={16} color={ADMIN_COLORS.emeraldPrimary} />
+                  <Text style={styles.modalTitle}>Set Permanent Password — @{recoveryUser.username}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setRecoveryUser(null)} style={styles.closeBtn}>
+                  <X size={16} color={ADMIN_COLORS.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                {userRecoveryError && (
+                  <View style={styles.errorBox}>
+                    <Text style={styles.errorText}>{userRecoveryError}</Text>
+                  </View>
+                )}
+
+                <View style={styles.credRow}>
+                  <Text style={styles.credLabel}>Username (Handle):</Text>
+                  <Text style={styles.credValue}>@{recoveryUser.username}</Text>
+                  <TouchableOpacity style={styles.copyBtn} onPress={() => copyText(`@${recoveryUser.username}`, 'username')}>
+                    <Text style={styles.copyBtnText}>{copiedUserUsername ? 'Copied' : 'Copy'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={[styles.credRow, { marginTop: 6 }]}>
+                  <Text style={styles.credLabel}>Login Email:</Text>
+                  <Text style={styles.credValue}>{(recoveryUser as any).email || `${recoveryUser.username}@letsbooffin.com`}</Text>
+                  <TouchableOpacity style={styles.copyBtn} onPress={() => copyText((recoveryUser as any).email || `${recoveryUser.username}@letsbooffin.com`, 'email')}>
+                    <Text style={styles.copyBtnText}>{copiedUserEmail ? 'Copied' : 'Copy'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {userActiveNewPassword ? (
+                  <View style={[styles.successBannerBlock, { marginTop: 12 }]}>
+                    <Text style={styles.successBannerTitle}>Permanent Password Configured</Text>
+                    <Text style={styles.successBannerSub}>
+                      This credential is active immediately. The researcher can log in using either their username (@{recoveryUser.username}) or email.
+                    </Text>
+                    <View style={[styles.credRow, { marginTop: 8 }]}>
+                      <Text style={styles.credLabel}>New Password:</Text>
+                      <Text style={styles.credValue}>{userActiveNewPassword}</Text>
+                      <TouchableOpacity style={styles.copyBtn} onPress={() => copyText(userActiveNewPassword, 'password')}>
+                        <Text style={styles.copyBtnText}>{copiedUserPassword ? 'Copied' : 'Copy'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={styles.inputLabel}>New Permanent Password</Text>
+                      <TouchableOpacity onPress={() => setUserNewPassword(generateSecurePassword())}>
+                        <Text style={styles.linkActionText}>Generate Random</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={styles.inputField}
+                      value={userNewPassword}
+                      onChangeText={setUserNewPassword}
+                      placeholder="Type or generate new permanent password"
+                      placeholderTextColor={ADMIN_COLORS.textMuted}
+                    />
+                  </View>
+                )}
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={styles.actionOutlineBtn}
+                  onPress={() => setRecoveryUser(null)}
+                >
+                  <Text style={styles.actionOutlineBtnText}>{userActiveNewPassword ? 'Done' : 'Cancel'}</Text>
+                </TouchableOpacity>
+
+                {!userActiveNewPassword && (
+                  <TouchableOpacity
+                    style={styles.primaryActionBtn}
+                    onPress={handleSaveUserPermanentPassword}
+                    disabled={isResettingUserPassword}
+                  >
+                    {isResettingUserPassword ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.primaryActionBtnText}>Apply Permanent Password</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
