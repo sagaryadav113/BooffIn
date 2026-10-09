@@ -96,7 +96,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
 import { supabase } from '../../api/client';
 import { fetchUserProfile } from '../../api/authService';
-import { uploadPostImage } from '../../api/storageService';
+import { uploadPostImage, uploadVoiceNoteAudio } from '../../api/storageService';
 import { blockUser, reportContent } from '../../api/moderationService';
 import { unfollowUser } from '../../api/socialService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
@@ -589,17 +589,39 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   };
 
   // Voice Note Send Handler
-  const handleSendVoiceNote = async (audioData: { duration: number; waveform: number[]; uri?: string }) => {
+  const handleSendVoiceNote = async (audioData: {
+    duration: number;
+    waveform: number[];
+    uri?: string;
+    blob?: Blob;
+    mimeType?: string;
+  }) => {
     setIsRecordingVoice(false);
     const replyId = replyingTo?.id || null;
+
+    let finalAudioUrl = audioData.uri || null;
+
+    // Upload audio blob to storage if authenticated so receiver can play it anywhere
+    if (currentUser?.id && audioData.blob) {
+      const uploadRes = await uploadVoiceNoteAudio(
+        currentUser.id,
+        audioData.blob,
+        audioData.mimeType || 'audio/webm'
+      );
+      if (uploadRes.success && uploadRes.url) {
+        finalAudioUrl = uploadRes.url;
+      }
+    }
 
     const res = await sendMessage({
       workspace_id: workspace.id,
       content: '🎙️ Voice Note',
       message_type: 'audio',
+      media_urls: finalAudioUrl ? [finalAudioUrl] : [],
       audio_metadata: {
         duration: audioData.duration,
         waveform: audioData.waveform,
+        url: finalAudioUrl || undefined,
       },
       reply_to_id: replyId,
     });
@@ -1331,7 +1353,13 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 {/* Voice Note / Audio Player */}
                 {isAudio && (
                   <VoiceNotePlayer
-                    audioUrl={item.media_urls?.[0]}
+                    audioUrl={
+                      item.media_urls?.[0] ||
+                      resolvedAudioMeta?.url ||
+                      (item.attachments as any)?.audio_url ||
+                      (item.attachments as any)?.url ||
+                      resolvedAudioMeta?.uri
+                    }
                     duration={resolvedAudioMeta?.duration || 18}
                     waveform={resolvedAudioMeta?.waveform}
                     isMe={isMe}

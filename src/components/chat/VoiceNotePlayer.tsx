@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import { Play, Pause, Mic } from 'lucide-react-native';
+import { Play, Pause } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 interface VoiceNotePlayerProps {
@@ -36,11 +36,12 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
 
   const totalDuration = duration > 0 ? duration : 18;
 
-  // Initialize Web Audio if available
+  // Initialize Web Audio playback if available
   useEffect(() => {
-    if (Platform.OS === 'web' && audioUrl && audioUrl.startsWith('http')) {
+    if (Platform.OS === 'web' && audioUrl && typeof Audio !== 'undefined') {
       try {
         const audio = new Audio(audioUrl);
+        audio.preload = 'metadata';
         audioRef.current = audio;
 
         audio.onended = () => {
@@ -52,8 +53,12 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
         audio.ontimeupdate = () => {
           setCurrentTime(audio.currentTime);
         };
-      } catch {
-        // Fallback to simulated timer
+
+        audio.onerror = (e) => {
+          console.warn('Audio playback load warning:', e);
+        };
+      } catch (err) {
+        console.warn('Audio element initialization error:', err);
       }
     }
 
@@ -79,10 +84,10 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
       setIsPlaying(false);
     } else {
       setIsPlaying(true);
-      if (audioRef.current) {
+      if (audioRef.current && audioUrl) {
         audioRef.current.playbackRate = playbackSpeed;
-        audioRef.current.play().catch(() => {
-          // If browser policy blocks auto-play or bad url, fallback to simulated play
+        audioRef.current.play().catch((err) => {
+          console.warn('Browser audio play failed, running simulated fallback:', err);
           startSimulatedPlay();
         });
       } else {
@@ -107,6 +112,18 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     }, intervalMs);
   };
 
+  const handleScrub = (idx: number) => {
+    const barsCount = bars.length;
+    const targetTime = (idx / barsCount) * totalDuration;
+    setCurrentTime(targetTime);
+    if (audioRef.current) {
+      audioRef.current.currentTime = targetTime;
+    }
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
+
   const toggleSpeed = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -125,7 +142,7 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
   };
 
   const progressPercent = totalDuration > 0 ? (currentTime / totalDuration) : 0;
-  const bars = waveform.length > 0 ? waveform : DEFAULT_WAVEFORM;
+  const bars = waveform && waveform.length > 0 ? waveform : DEFAULT_WAVEFORM;
 
   return (
     <View style={styles.container}>
@@ -154,20 +171,26 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
             const barPx = Math.max(6, Math.min(28, (barHeight / 100) * 28));
 
             return (
-              <View
+              <TouchableOpacity
                 key={idx}
-                style={[
-                  styles.waveformBar,
-                  { height: barPx },
-                  isMe
-                    ? isPlayed
-                      ? styles.barMyPlayed
-                      : styles.barMyUnplayed
-                    : isPlayed
-                    ? styles.barOtherPlayed
-                    : styles.barOtherUnplayed,
-                ]}
-              />
+                activeOpacity={0.7}
+                onPress={() => handleScrub(idx)}
+                style={styles.barTouchWrapper}
+              >
+                <View
+                  style={[
+                    styles.waveformBar,
+                    { height: barPx },
+                    isMe
+                      ? isPlayed
+                        ? styles.barMyPlayed
+                        : styles.barMyUnplayed
+                      : isPlayed
+                      ? styles.barOtherPlayed
+                      : styles.barOtherUnplayed,
+                  ]}
+                />
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -231,6 +254,12 @@ const styles = StyleSheet.create({
     height: 30,
     gap: 2,
   },
+  barTouchWrapper: {
+    flex: 1,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   waveformBar: {
     width: 3,
     borderRadius: 2,
@@ -249,13 +278,14 @@ const styles = StyleSheet.create({
   },
   timeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: 4,
   },
   timeText: {
     fontSize: 11,
     fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
   timeTextMy: {
     color: '#D1FAE5',
@@ -269,7 +299,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   speedBadgeMy: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
   speedBadgeOther: {
     backgroundColor: '#E2E8F0',
@@ -282,6 +312,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   speedTextOther: {
-    color: '#164E3F',
+    color: '#0F172A',
   },
 });

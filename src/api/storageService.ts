@@ -692,3 +692,64 @@ export async function uploadMultiplePostImages(
   return { urls, errors };
 }
 
+/**
+ * Uploads a recorded voice note audio blob or base64 string to Supabase Storage
+ * and returns the public CDN audio URL.
+ */
+export async function uploadVoiceNoteAudio(
+  userId: string,
+  audioBlobOrBase64: Blob | string,
+  mimeType: string = 'audio/webm'
+): Promise<UploadMediaResult> {
+  try {
+    if (!userId) {
+      return { success: false, url: null, error: 'User must be authenticated.' };
+    }
+
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const ext = mimeType.includes('mp4') || mimeType.includes('m4a')
+      ? 'm4a'
+      : mimeType.includes('ogg')
+      ? 'ogg'
+      : mimeType.includes('mp3')
+      ? 'mp3'
+      : 'webm';
+    const fileName = `voice_${Date.now()}_${randomSuffix}.${ext}`;
+    const filePath = `${userId}/audio/${fileName}`;
+
+    let bodyData: any = audioBlobOrBase64;
+    if (typeof audioBlobOrBase64 === 'string') {
+      if (audioBlobOrBase64.startsWith('data:')) {
+        const base64Data = audioBlobOrBase64.split(',')[1];
+        bodyData = decodeBase64ToUint8Array(base64Data);
+      }
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from(PROFILE_MEDIA_BUCKET)
+      .upload(filePath, bodyData, {
+        contentType: mimeType,
+        cacheControl: '31536000',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.warn('Voice note upload error:', uploadError);
+      return { success: false, url: null, error: uploadError.message };
+    }
+
+    const { data: publicData } = supabase.storage
+      .from(PROFILE_MEDIA_BUCKET)
+      .getPublicUrl(filePath);
+
+    return {
+      success: true,
+      url: publicData.publicUrl,
+      error: null,
+    };
+  } catch (err: any) {
+    console.error('uploadVoiceNoteAudio error:', err);
+    return { success: false, url: null, error: err.message || 'Failed to upload voice note.' };
+  }
+}
+

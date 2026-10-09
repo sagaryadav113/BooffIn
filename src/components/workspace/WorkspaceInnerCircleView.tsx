@@ -99,7 +99,7 @@ import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
-import { uploadPostImage } from '../../api/storageService';
+import { uploadPostImage, uploadVoiceNoteAudio } from '../../api/storageService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
 import { E2EEStatusBanner } from '../chat/E2EEStatusBanner';
 import { derivePodSessionKey, encryptTextMessage, decryptTextMessage } from '../../utils/e2eeCrypto';
@@ -222,6 +222,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
 
   // E2EE Pod Vault Auto-Decryption
@@ -592,6 +593,51 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       console.warn('Pick image error:', err);
     } finally {
       setIsUploadingMedia(false);
+    }
+  };
+
+  // Voice Note Send Handler
+  const handleSendVoiceNote = async (audioData: {
+    duration: number;
+    waveform: number[];
+    uri?: string;
+    blob?: Blob;
+    mimeType?: string;
+  }) => {
+    setIsRecordingVoice(false);
+    const replyId = replyingTo?.id || null;
+
+    let finalAudioUrl = audioData.uri || null;
+
+    if (currentUser?.id && audioData.blob) {
+      const uploadRes = await uploadVoiceNoteAudio(
+        currentUser.id,
+        audioData.blob,
+        audioData.mimeType || 'audio/webm'
+      );
+      if (uploadRes.success && uploadRes.url) {
+        finalAudioUrl = uploadRes.url;
+      }
+    }
+
+    const res = await sendMessage({
+      workspace_id: workspace.id,
+      content: '🎙️ Voice Note',
+      message_type: 'audio',
+      media_urls: finalAudioUrl ? [finalAudioUrl] : [],
+      audio_metadata: {
+        duration: audioData.duration,
+        waveform: audioData.waveform,
+        url: finalAudioUrl || undefined,
+      },
+      reply_to_id: replyId,
+    });
+
+    if (res.success) {
+      setReplyingTo(null);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
   };
 
@@ -1348,7 +1394,13 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     {/* Voice Note / Audio Player */}
                     {isAudio && (
                       <VoiceNotePlayer
-                        audioUrl={item.media_urls?.[0]}
+                        audioUrl={
+                          item.media_urls?.[0] ||
+                          resolvedAudioMeta?.url ||
+                          (item.attachments as any)?.audio_url ||
+                          (item.attachments as any)?.url ||
+                          resolvedAudioMeta?.uri
+                        }
                         duration={resolvedAudioMeta?.duration || 18}
                         waveform={resolvedAudioMeta?.waveform}
                         isMe={isMe}
