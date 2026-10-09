@@ -1984,9 +1984,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         currentUserId={currentUser?.id}
         currentUserProfile={currentUser ? {
           id: currentUser.id,
-          fullName: (currentUser as any).full_name || currentUser.name || (currentUser as any).fullName || 'Researcher',
-          avatarUrl: (currentUser as any).avatar_url || currentUser.avatarUrl,
-          academicTitle: (currentUser as any).academic_title || (currentUser as any).academicTitle || 'Academic Collaborator',
+          fullName: currentUser.fullName || (currentUser as any).name || (currentUser as any).full_name || 'Researcher',
+          avatarUrl: currentUser.avatarUrl || (currentUser as any).avatar_url,
+          academicTitle: currentUser.academicTitle || (currentUser as any).academic_title || 'Academic Collaborator',
         } : null}
         roomId={activeCallModal.roomId}
         isIncoming={activeCallModal.isIncoming}
