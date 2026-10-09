@@ -79,7 +79,6 @@ BEGIN
                 email,
                 encrypted_password,
                 email_confirmed_at,
-                confirmed_at,
                 last_sign_in_at,
                 raw_app_meta_data,
                 raw_user_meta_data,
@@ -93,7 +92,6 @@ BEGIN
                 'authenticated',
                 v_clean_email,
                 v_encrypted_pw,
-                NOW(),
                 NOW(),
                 NULL,
                 jsonb_build_object('provider', 'email', 'providers', array['email']),
@@ -128,7 +126,6 @@ BEGIN
             UPDATE auth.users SET 
                 encrypted_password = v_encrypted_pw,
                 email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
-                confirmed_at = COALESCE(confirmed_at, NOW()),
                 raw_user_meta_data = raw_user_meta_data || jsonb_build_object('full_name', v_clean_fullname, 'username', v_clean_username, 'is_admin', true, 'admin_role', p_role),
                 updated_at = NOW()
             WHERE id = v_target_id;
@@ -213,7 +210,6 @@ BEGIN
                 encrypted_password = v_encrypted_pw,
                 email = CASE WHEN v_clean_email != '' THEN v_clean_email ELSE email END,
                 email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
-                confirmed_at = COALESCE(confirmed_at, NOW()),
                 banned_until = NULL,
                 raw_user_meta_data = raw_user_meta_data || jsonb_build_object('username', v_clean_username, 'full_name', v_clean_fullname),
                 updated_at = NOW()
@@ -261,7 +257,6 @@ BEGIN
                 email,
                 encrypted_password,
                 email_confirmed_at,
-                confirmed_at,
                 last_sign_in_at,
                 raw_app_meta_data,
                 raw_user_meta_data,
@@ -275,7 +270,6 @@ BEGIN
                 'authenticated',
                 v_clean_email,
                 v_encrypted_pw,
-                NOW(),
                 NOW(),
                 NULL,
                 jsonb_build_object('provider', 'email', 'providers', array['email']),
