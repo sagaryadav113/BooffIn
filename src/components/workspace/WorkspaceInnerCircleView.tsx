@@ -101,6 +101,8 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
 import { uploadPostImage } from '../../api/storageService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
+import { E2EEStatusBanner } from '../chat/E2EEStatusBanner';
+import { derivePodSessionKey, encryptTextMessage, decryptTextMessage } from '../../utils/e2eeCrypto';
 
 const SAMPLE_POD_MANUSCRIPTS = [
   {
@@ -221,6 +223,31 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [viewerVisible, setViewerVisible] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+
+  // E2EE Pod Vault Auto-Decryption
+  const [decryptedTextMap, setDecryptedTextMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    async function decryptPodMessages() {
+      if (!workspace.id) return;
+      try {
+        const podKey = await derivePodSessionKey(workspace.id);
+        const updates: Record<string, string> = {};
+        for (const m of messages) {
+          if (m.e2ee_ciphertext && m.e2ee_nonce && !decryptedTextMap[m.id]) {
+            try {
+              const dec = await decryptTextMessage(m.e2ee_ciphertext, m.e2ee_nonce, podKey);
+              if (dec) updates[m.id] = dec;
+            } catch {}
+          }
+        }
+        if (Object.keys(updates).length > 0) {
+          setDecryptedTextMap((prev) => ({ ...prev, ...updates }));
+        }
+      } catch {}
+    }
+    decryptPodMessages();
+  }, [messages, workspace.id]);
 
   // Filtered & Searched Messages (with Step 4 Ephemeral Filtering)
   const displayedMessages = useMemo(() => {
@@ -640,11 +667,27 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
     const replyId = replyingTo?.id || null;
 
+    let e2eeCipher: string | null = null;
+    let e2eeNonce: string | null = null;
+
+    if (workspace.id && trimmed && !attachedDoi) {
+      try {
+        const podKey = await derivePodSessionKey(workspace.id);
+        const enc = await encryptTextMessage(trimmed, podKey);
+        e2eeCipher = enc.ciphertext;
+        e2eeNonce = enc.nonce;
+      } catch (err) {
+        console.warn('Pod encryption warning:', err);
+      }
+    }
+
     const res = await sendMessage({
       workspace_id: workspace.id,
       content: trimmed || (attachedDoi ? `Shared paper: ${attachedDoi.title}` : ''),
-      message_type: attachedDoi ? 'paper_doi' : 'text',
+      message_type: attachedDoi ? 'paper_doi' : (e2eeCipher ? 'e2ee_cipher' : 'text'),
       doi_metadata: attachedDoi,
+      e2ee_ciphertext: e2eeCipher,
+      e2ee_nonce: e2eeNonce,
       reply_to_id: replyId,
     });
 
@@ -1021,6 +1064,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           </ScrollView>
         </View>
       )}
+
+      {/* E2EE Pod Vault Encryption Status Banner */}
+      <E2EEStatusBanner isPod={true} />
 
       {/* 2. Sub-Filter Pill Strip */}
       <View style={styles.subFilterStripContainer}>
@@ -1408,21 +1454,34 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                           🚫 This message was deleted
                         </Text>
                       </View>
-                    ) : item.content &&
-                      !isImage &&
-                      !isAudio &&
-                      !isDocument &&
-                      !isPost &&
-                      !isProfile &&
-                      !isWorkspaceInvite &&
-                      !isPoll &&
-                      item.content !== '📷 Shared photo' &&
-                      item.content !== msgImageUrl ? (
-                      renderMessageContent(item.content, isMe)
-                    ) : null}
+                    ) : (() => {
+                      const isEncrypted = Boolean(item.e2ee_ciphertext);
+                      const displayContent = isEncrypted
+                        ? (decryptedTextMap[item.id] || item.content || '🔒 Encrypted message')
+                        : item.content;
+
+                      if (
+                        displayContent &&
+                        !isImage &&
+                        !isAudio &&
+                        !isDocument &&
+                        !isPost &&
+                        !isProfile &&
+                        !isWorkspaceInvite &&
+                        !isPoll &&
+                        item.content !== '📷 Shared photo' &&
+                        item.content !== msgImageUrl
+                      ) {
+                        return renderMessageContent(displayContent, isMe);
+                      }
+                      return null;
+                    })()}
 
                     {/* Metadata: Edited, Time, Status */}
                     <View style={styles.messageFooterRow}>
+                      {Boolean(item.e2ee_ciphertext) && !item.is_deleted && (
+                        <Lock size={10} color={isMe ? '#A7F3D0' : '#166534'} style={{ marginRight: 4 }} />
+                      )}
                       {item.is_edited && !item.is_deleted && (
                         <Text style={[styles.editedIndicator, isMe ? styles.myEditedIndicator : styles.otherEditedIndicator]}>
                           (edited)

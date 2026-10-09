@@ -59,6 +59,7 @@ import {
   BellOff,
   Trash,
   AlertTriangle,
+  Lock,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -96,6 +97,9 @@ import { uploadPostImage } from '../../api/storageService';
 import { blockUser, reportContent } from '../../api/moderationService';
 import { unfollowUser } from '../../api/socialService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
+import { E2EESafetyNumberModal } from '../chat/E2EESafetyNumberModal';
+import { E2EEStatusBanner } from '../chat/E2EEStatusBanner';
+import { deriveSharedSessionKey, encryptTextMessage, decryptTextMessage } from '../../utils/e2eeCrypto';
 
 const QUICK_EMOJIS = ['❤️', '👍', '🔬', '🔥', '👏', '💡', '🎉'];
 type ChatFilterType = 'all' | 'media' | 'papers' | 'audio' | 'polls' | 'docs';
@@ -220,6 +224,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   // Local poll voting state for optimistic interactions
   const [localPollVotes, setLocalPollVotes] = useState<Record<string, string>>({});
 
+  // E2EE Zero-Knowledge Encryption State
+  const [showSafetyNumberModal, setShowSafetyNumberModal] = useState<boolean>(false);
+  const [decryptedTextMap, setDecryptedTextMap] = useState<Record<string, string>>({});
+
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
 
@@ -230,6 +238,30 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       unsubscribe();
     };
   }, [workspace.id]);
+
+  // E2EE Auto-Decryption Effect for incoming encrypted ciphertexts
+  useEffect(() => {
+    async function decryptEncryptedMessages() {
+      const peerId = localPartner?.id || workspace.other_user?.id;
+      if (!currentUser?.id || !peerId) return;
+      try {
+        const sessionKey = await deriveSharedSessionKey(currentUser.id, peerId, workspace.id);
+        const updates: Record<string, string> = {};
+        for (const m of messages) {
+          if (m.e2ee_ciphertext && m.e2ee_nonce && !decryptedTextMap[m.id]) {
+            try {
+              const dec = await decryptTextMessage(m.e2ee_ciphertext, m.e2ee_nonce, sessionKey);
+              if (dec) updates[m.id] = dec;
+            } catch {}
+          }
+        }
+        if (Object.keys(updates).length > 0) {
+          setDecryptedTextMap((prev) => ({ ...prev, ...updates }));
+        }
+      } catch {}
+    }
+    decryptEncryptedMessages();
+  }, [messages, currentUser?.id, localPartner?.id, workspace.other_user?.id, workspace.id]);
 
   useEffect(() => {
     if (workspace.other_user) {
@@ -917,11 +949,28 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
     const replyId = replyingTo?.id || null;
 
+    let e2eeCipher: string | null = null;
+    let e2eeNonce: string | null = null;
+
+    // Encrypt message with zero-knowledge shared session key
+    if (currentUser?.id && partner?.id && trimmed && !attachedDoi) {
+      try {
+        const sessionKey = await deriveSharedSessionKey(currentUser.id, partner.id, workspace.id);
+        const enc = await encryptTextMessage(trimmed, sessionKey);
+        e2eeCipher = enc.ciphertext;
+        e2eeNonce = enc.nonce;
+      } catch (err) {
+        console.warn('E2EE encryption warning:', err);
+      }
+    }
+
     const res = await sendMessage({
       workspace_id: workspace.id,
       content: trimmed || (attachedDoi ? `Shared paper: ${attachedDoi.title}` : ''),
-      message_type: attachedDoi ? 'paper_doi' : 'text',
+      message_type: attachedDoi ? 'paper_doi' : (e2eeCipher ? 'e2ee_cipher' : 'text'),
       doi_metadata: attachedDoi,
+      e2ee_ciphertext: e2eeCipher,
+      e2ee_nonce: e2eeNonce,
       reply_to_id: replyId,
     });
 
@@ -1364,21 +1413,45 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 )}
 
                 {/* Text Content */}
-                {item.content && !hasDoi && !isPoll && !isAudio && !isPost && !isProfile && !isWorkspaceInvite && !isDocument && !isCallLog && (!isImage || (item.content !== '📷 Shared photo' && item.content !== msgImageUrl)) ? (
-                  <Text
-                    style={[
-                      styles.messageText,
-                      isMe ? styles.myMessageText : styles.otherMessageText,
-                    ]}
-                  >
-                    {item.content}
-                  </Text>
-                ) : null}
+                {(() => {
+                  const isEncrypted = Boolean(item.e2ee_ciphertext);
+                  const displayMessageText = isEncrypted
+                    ? (decryptedTextMap[item.id] || item.content || '🔒 Encrypted message')
+                    : item.content;
+
+                  if (
+                    displayMessageText &&
+                    !hasDoi &&
+                    !isPoll &&
+                    !isAudio &&
+                    !isPost &&
+                    !isProfile &&
+                    !isWorkspaceInvite &&
+                    !isDocument &&
+                    !isCallLog &&
+                    (!isImage || (item.content !== '📷 Shared photo' && item.content !== msgImageUrl))
+                  ) {
+                    return (
+                      <Text
+                        style={[
+                          styles.messageText,
+                          isMe ? styles.myMessageText : styles.otherMessageText,
+                        ]}
+                      >
+                        {displayMessageText}
+                      </Text>
+                    );
+                  }
+                  return null;
+                })()}
               </>
             )}
 
             {/* Timestamp & status footer */}
             <View style={styles.msgFooter}>
+              {Boolean(item.e2ee_ciphertext) && !isDeleted && (
+                <Lock size={10} color={isMe ? '#A7F3D0' : '#166534'} style={{ marginRight: 4 }} />
+              )}
               {item.is_edited && !isDeleted && (
                 <Text
                   style={[
@@ -1578,6 +1651,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* E2EE Zero-Knowledge Encryption Status Banner */}
+      <E2EEStatusBanner onPressVerify={() => setShowSafetyNumberModal(true)} />
 
       {/* In-Chat Search & Filter Strip */}
       {showSearchBar && (
@@ -3029,6 +3105,19 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         initialIndex={0}
         onClose={() => setViewerVisible(false)}
         authorName={partner?.fullName || 'Shared photo'}
+      />
+
+      {/* E2EE Safety Number Verification Modal */}
+      <E2EESafetyNumberModal
+        visible={showSafetyNumberModal}
+        onClose={() => setShowSafetyNumberModal(false)}
+        currentUserId={currentUser?.id || ''}
+        peerUser={{
+          id: partner?.id || '',
+          fullName: partner?.fullName || 'Researcher',
+          handle: partner?.handle,
+          avatarUrl: partner?.avatarUrl,
+        }}
       />
     </KeyboardAvoidingView>
   );
