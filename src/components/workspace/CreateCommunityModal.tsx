@@ -23,7 +23,7 @@ import {
   Sparkles,
   Globe,
   Lock,
-  AlertTriangle,
+  Info,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
@@ -334,19 +334,19 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             <View>
-              {/* Strict Capacity Limit Indicator / Warning Banner */}
+              {/* Capacity Limit Notice Card */}
               {hasReachedLimit ? (
-                <View style={styles.limitWarningCard}>
-                  <View style={styles.limitWarningHeader}>
-                    <AlertTriangle size={18} color="#DC2626" strokeWidth={2.5} />
-                    <Text style={styles.limitWarningTitle}>Creation Limit Reached (3/3 Active)</Text>
+                <View style={styles.limitInfoCard}>
+                  <View style={styles.limitInfoHeader}>
+                    <Info size={17} color="#0F172A" strokeWidth={2.2} />
+                    <Text style={styles.limitInfoTitle}>Community Limit (3/3 Active)</Text>
                   </View>
-                  <Text style={styles.limitWarningSub}>
-                    To create a 4th community, you must disable one of your 3 active communities.
+                  <Text style={styles.limitInfoSub}>
+                    You have reached the limit of 3 active communities. To create a new one, disable an existing community to free up a slot.
                   </Text>
-                  <View style={styles.limitWarningNoteBox}>
-                    <Text style={styles.limitWarningNoteText}>
-                      <Text style={{ fontWeight: '700', color: '#991B1B' }}>Important Rule:</Text> Disabling is permanent with no recovery. All past chats, papers, materials, and profiles remain viewable for show purpose, but communication will be blocked.
+                  <View style={styles.limitInfoNoteBox}>
+                    <Text style={styles.limitInfoNoteText}>
+                      Disabled communities remain viewable for show purpose (past chats, papers, media), but new messages cannot be sent.
                     </Text>
                   </View>
 
@@ -364,7 +364,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                             {comm.name}
                           </Text>
                           <Text style={styles.disableCommunityMeta}>
-                            {comm.members_count || 1} members • {comm.subscription_tier || 'Free'}
+                            {comm.members_count || 1} {comm.members_count === 1 ? 'member' : 'members'} • {comm.subscription_tier || 'Free'}
                           </Text>
                         </View>
                         <TouchableOpacity
@@ -636,7 +636,6 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
             style={[
               styles.createBtn,
               (hasReachedLimit || !name.trim()) && styles.createBtnDisabled,
-              hasReachedLimit && styles.createBtnLimitReached,
               isSubmitting && { opacity: 0.7 },
             ]}
           >
@@ -669,37 +668,32 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
           <View style={styles.modalBackdrop}>
             <View style={styles.confirmDialogCard}>
               <View style={styles.confirmDialogIconWrap}>
-                <AlertTriangle size={30} color="#DC2626" strokeWidth={2.5} />
+                <Info size={24} color="#0F172A" strokeWidth={2} />
               </View>
 
-              <Text style={styles.confirmDialogTitle}>Permanently Disable Community?</Text>
+              <Text style={styles.confirmDialogTitle}>Disable "{communityToDisable?.name}"?</Text>
 
-              <View style={styles.confirmDialogWarningBox}>
-                <Text style={styles.confirmDialogWarningHeadline}>
-                  ⚠️ WARNING: THERE IS NO RECOVERY
-                </Text>
-                <Text style={styles.confirmDialogWarningBody}>
-                  You are about to permanently disable <Text style={{ fontWeight: '700' }}>"{communityToDisable?.name}"</Text>.
-                </Text>
-              </View>
+              <Text style={styles.confirmDialogSubtitle}>
+                Disabling frees up 1 community slot so you can create a new community.
+              </Text>
 
               <View style={styles.confirmBulletList}>
                 <View style={styles.confirmBulletItem}>
                   <Text style={styles.confirmBulletDot}>•</Text>
                   <Text style={styles.confirmBulletText}>
-                    <Text style={{ fontWeight: '700' }}>Read-only Show Purpose:</Text> All past chats, research papers, materials, media, and profiles will remain permanently viewable.
+                    <Text style={{ fontWeight: '600', color: '#0F172A' }}>View Only:</Text> Past chats, papers, media, and profiles remain viewable for portfolio and reference.
                   </Text>
                 </View>
                 <View style={styles.confirmBulletItem}>
                   <Text style={styles.confirmBulletDot}>•</Text>
                   <Text style={styles.confirmBulletText}>
-                    <Text style={{ fontWeight: '700' }}>No Communication:</Text> Sending messages, podcasts, and live discussions will be permanently disabled.
+                    <Text style={{ fontWeight: '600', color: '#0F172A' }}>Communication Closed:</Text> Sending new messages, podcasts, and calls will be disabled.
                   </Text>
                 </View>
                 <View style={styles.confirmBulletItem}>
                   <Text style={styles.confirmBulletDot}>•</Text>
                   <Text style={styles.confirmBulletText}>
-                    <Text style={{ fontWeight: '700' }}>Slot Released:</Text> Frees up 1 slot so you can create your new community.
+                    <Text style={{ fontWeight: '600', color: '#0F172A' }}>Permanent:</Text> This action cannot be undone.
                   </Text>
                 </View>
               </View>
@@ -726,7 +720,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                   {isDisabling ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.confirmDangerBtnText}>Disable Permanently</Text>
+                    <Text style={styles.confirmDangerBtnText}>Disable</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -763,153 +757,142 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     letterSpacing: -0.3,
   },
-  limitWarningCard: {
+  limitInfoCard: {
     marginHorizontal: 16,
     marginTop: 12,
     marginBottom: 4,
-    padding: 12,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 12,
+    padding: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#E2E8F0',
   },
-  limitWarningHeader: {
+  limitInfoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     marginBottom: 4,
   },
-  limitWarningTitle: {
+  limitInfoTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#DC2626',
+    color: '#0F172A',
   },
-  limitWarningSub: {
-    fontSize: 12,
-    color: '#991B1B',
-    lineHeight: 16,
+  limitInfoSub: {
+    fontSize: 12.5,
+    color: '#475569',
+    lineHeight: 17,
   },
-  limitWarningNoteBox: {
+  limitInfoNoteBox: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    padding: 8,
-    marginTop: 8,
+    padding: 10,
+    marginTop: 10,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#E2E8F0',
   },
-  limitWarningNoteText: {
+  limitInfoNoteText: {
     fontSize: 11.5,
-    color: '#7F1D1D',
+    color: '#64748B',
     lineHeight: 16,
   },
   disableListHeader: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#991B1B',
-    marginTop: 10,
-    marginBottom: 6,
+    color: '#475569',
+    marginTop: 12,
+    marginBottom: 8,
   },
   disableCommunitiesList: {
-    gap: 6,
+    gap: 8,
   },
   disableCommunityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    padding: 8,
+    padding: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#FEE2E2',
-    gap: 8,
+    borderColor: '#E2E8F0',
+    gap: 10,
   },
   disableCommunityInfo: {
     flex: 1,
   },
   disableCommunityName: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '700',
     color: '#0F172A',
   },
   disableCommunityMeta: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: '#64748B',
     marginTop: 1,
   },
   disableActionBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: '#FECACA',
   },
   disableActionBtnText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
     color: '#DC2626',
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   confirmDialogCard: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 380,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 20,
     alignItems: 'center',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
   },
   confirmDialogIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FEE2E2',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   confirmDialogTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#0F172A',
     textAlign: 'center',
-    letterSpacing: -0.3,
-    marginBottom: 8,
+    letterSpacing: -0.2,
+    marginBottom: 4,
   },
-  confirmDialogWarningBox: {
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 10,
-    padding: 10,
-    width: '100%',
-    marginBottom: 12,
-  },
-  confirmDialogWarningHeadline: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#DC2626',
-    letterSpacing: 0.3,
-    marginBottom: 3,
-    textAlign: 'center',
-  },
-  confirmDialogWarningBody: {
+  confirmDialogSubtitle: {
     fontSize: 12.5,
-    color: '#991B1B',
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 17,
+    marginBottom: 14,
   },
   confirmBulletList: {
     width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
     gap: 8,
     marginBottom: 18,
   },
@@ -937,32 +920,27 @@ const styles = StyleSheet.create({
   },
   confirmCancelBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
+    height: 42,
+    borderRadius: 10,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   confirmCancelBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13.5,
+    fontWeight: '600',
     color: '#475569',
   },
   confirmDangerBtn: {
-    flex: 1.3,
-    height: 44,
-    borderRadius: 12,
+    flex: 1,
+    height: 42,
+    borderRadius: 10,
     backgroundColor: '#DC2626',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
   },
   confirmDangerBtnText: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -1264,10 +1242,6 @@ const styles = StyleSheet.create({
   createBtnDisabled: {
     backgroundColor: '#94A3B8',
     opacity: 0.6,
-  },
-  createBtnLimitReached: {
-    backgroundColor: '#DC2626',
-    opacity: 0.85,
   },
   createBtnText: {
     fontSize: 15,
