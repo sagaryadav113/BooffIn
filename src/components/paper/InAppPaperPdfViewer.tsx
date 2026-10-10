@@ -319,6 +319,26 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
     );
   }, [paper.canonicalUrl, paper.doi, paper.openAccessUrl, effectiveStreamUrl]);
 
+  // Web viewer URL for embedded reading without CORS or X-Frame-Options blocking
+  const webViewerUrl = useMemo(() => {
+    if (!effectiveStreamUrl) return publisherWebUrl || '';
+    const lower = effectiveStreamUrl.toLowerCase();
+    const isPdf =
+      lower.endsWith('.pdf') ||
+      lower.includes('.pdf') ||
+      lower.includes('arxiv.org') ||
+      lower.includes('biorxiv.org') ||
+      lower.includes('medrxiv.org') ||
+      lower.includes('nature.com/articles');
+
+    if (isPdf) {
+      return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(effectiveStreamUrl)}${
+        reloadTrigger > 0 ? `&_r=${reloadTrigger}` : ''
+      }`;
+    }
+    return effectiveStreamUrl;
+  }, [effectiveStreamUrl, publisherWebUrl, reloadTrigger]);
+
   // Load and cache PDF on mount or reload
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -514,7 +534,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
       {Platform.OS === 'web' ? (
         <View style={styles.webPdfWrapper}>
           <iframe
-            src={effectiveStreamUrl}
+            src={webViewerUrl}
             style={{
               width: '100%',
               height: 850,
