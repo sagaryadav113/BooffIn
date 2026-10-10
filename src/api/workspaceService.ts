@@ -686,17 +686,25 @@ export const workspaceService = {
       } = await supabase.auth.getUser();
       if (!user) return { workspace: null, error: 'User not authenticated' };
 
-      // Strict Community Limit: Maximum 3 communities created per user
-      const { count: existingCount, error: countErr } = await supabase
+      // Strict Community Limit: Maximum 3 active communities created per user
+      const { data: userCommunities, error: countErr } = await supabase
         .from('workspaces')
-        .select('id', { count: 'exact', head: true })
+        .select('id, is_disabled, status, settings')
         .eq('type', 'community')
         .or(`owner_id.eq.${user.id},creator_id.eq.${user.id}`);
 
-      if (existingCount !== null && !countErr && existingCount >= 3) {
+      const activeCount = (userCommunities || []).filter(
+        (c: any) =>
+          c.is_disabled !== true &&
+          c.status !== 'disabled' &&
+          c.settings?.is_disabled !== true
+      ).length;
+
+      if (!countErr && activeCount >= 3) {
         return {
           workspace: null,
-          error: 'Community Limit Reached: You cannot create more than 3 communities. You currently own 3/3 communities.',
+          error:
+            'Community Limit Reached: You cannot have more than 3 active communities. Please disable one of your existing communities to create a new one.',
         };
       }
 
@@ -910,6 +918,71 @@ export const workspaceService = {
       return { success: true, error: null };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to join community' };
+    }
+  },
+
+  /**
+   * Permanently disable a community workspace (Permanent read-only archive).
+   * Note: Cannot be recovered once disabled. Members can still view chats and materials
+   * for show/archive purpose, but cannot send messages or communicate.
+   */
+  async disableCommunity(workspaceId: string): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { success: false, error: 'User not authenticated' };
+
+      const { data: ws, error: fetchErr } = await supabase
+        .from('workspaces')
+        .select('*')
+        .eq('id', workspaceId)
+        .single();
+
+      if (fetchErr || !ws) {
+        return { success: false, error: 'Community workspace not found' };
+      }
+
+      if (ws.owner_id !== user.id && ws.creator_id !== user.id) {
+        return { success: false, error: 'Only the community owner can disable this community' };
+      }
+
+      const updatedSettings = {
+        ...(ws.settings || {}),
+        is_disabled: true,
+        disabled_at: new Date().toISOString(),
+        disabled_by: user.id,
+      };
+
+      let { error: updateErr } = await supabase
+        .from('workspaces')
+        .update({
+          is_disabled: true,
+          status: 'disabled',
+          settings: updatedSettings,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', workspaceId);
+
+      // Fallback if is_disabled / status column is missing
+      if (updateErr && (updateErr.message.includes('column') || updateErr.message.includes('schema cache'))) {
+        const { error: fallbackErr } = await supabase
+          .from('workspaces')
+          .update({
+            settings: updatedSettings,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', workspaceId);
+        updateErr = fallbackErr;
+      }
+
+      if (updateErr) {
+        return { success: false, error: updateErr.message || 'Failed to disable community' };
+      }
+
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to disable community' };
     }
   },
 
@@ -1145,6 +1218,26 @@ export const workspaceService = {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return { message: null, error: 'User not authenticated' };
+
+      // Block sending messages to a disabled/archived workspace
+      const { data: targetWs } = await supabase
+        .from('workspaces')
+        .select('id, is_disabled, status, settings')
+        .eq('id', params.workspace_id)
+        .single();
+
+      if (
+        targetWs &&
+        (targetWs.is_disabled === true ||
+          targetWs.status === 'disabled' ||
+          targetWs.settings?.is_disabled === true)
+      ) {
+        return {
+          message: null,
+          error:
+            'This community has been permanently disabled and is preserved in read-only mode. New messages cannot be sent.',
+        };
+      }
 
       let resolvedDoiMeta = params.doi_metadata || null;
       let detectedType: WorkspaceMessageType = params.message_type || (params.media_urls && params.media_urls.length > 0 ? 'image' : 'text');

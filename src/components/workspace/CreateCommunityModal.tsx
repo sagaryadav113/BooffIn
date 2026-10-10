@@ -31,6 +31,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { fetchFollowing } from '../../api/socialService';
 import { supabase } from '../../api/client';
 import { UserProfile, WorkspaceSubscriptionTier } from '../../types';
+import { Workspace } from '../../types/workspace';
 import { Avatar } from '../core/Avatar';
 
 interface CreateCommunityModalProps {
@@ -88,16 +89,27 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
 }) => {
   const currentUser = useAuthStore((s) => s.user);
   const createCommunity = useWorkspaceStore((s) => s.createCommunity);
+  const disableCommunity = useWorkspaceStore((s) => s.disableCommunity);
   const communities = useWorkspaceStore((s) => s.communities);
 
-  const ownedCommunitiesCount = useMemo(() => {
-    if (!currentUser?.id) return 0;
+  const activeOwnedCommunities = useMemo(() => {
+    if (!currentUser?.id) return [];
     return (communities || []).filter(
-      (c) => (c.owner_id === currentUser.id || c.creator_id === currentUser.id) && c.type === 'community'
-    ).length;
+      (c) =>
+        (c.owner_id === currentUser.id || c.creator_id === currentUser.id) &&
+        c.type === 'community' &&
+        !c.is_disabled &&
+        c.status !== 'disabled' &&
+        !c.settings?.is_disabled
+    );
   }, [communities, currentUser?.id]);
 
+  const ownedCommunitiesCount = activeOwnedCommunities.length;
   const hasReachedLimit = ownedCommunitiesCount >= 3;
+
+  const [communityToDisable, setCommunityToDisable] = useState<Workspace | null>(null);
+  const [showDisableConfirmModal, setShowDisableConfirmModal] = useState(false);
+  const [isDisabling, setIsDisabling] = useState(false);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -227,10 +239,33 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
     setSelectedUsers((prev) => prev.filter((u) => u.id !== userId));
   }, []);
 
+  // Handle Permanent Community Disabling
+  const handleConfirmDisable = async () => {
+    if (!communityToDisable) return;
+    setIsDisabling(true);
+    try {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      const res = await disableCommunity(communityToDisable.id);
+      if (res.error) {
+        setErrorText(res.error);
+      } else {
+        setShowDisableConfirmModal(false);
+        setCommunityToDisable(null);
+        setErrorText(null);
+      }
+    } catch (err: any) {
+      setErrorText(err?.message || 'Failed to disable community');
+    } finally {
+      setIsDisabling(false);
+    }
+  };
+
   // Create Community
   const handleCreateCommunity = async () => {
     if (hasReachedLimit) {
-      setErrorText('Community Limit Reached: You cannot create more than 3 communities. You currently own 3/3 communities.');
+      setErrorText('Community Limit Reached: You must disable one of your 3 active communities to create a new one.');
       return;
     }
 
@@ -303,18 +338,54 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
               {hasReachedLimit ? (
                 <View style={styles.limitWarningCard}>
                   <View style={styles.limitWarningHeader}>
-                    <AlertTriangle size={17} color="#DC2626" strokeWidth={2.5} />
-                    <Text style={styles.limitWarningTitle}>Creation Limit Reached (3/3)</Text>
+                    <AlertTriangle size={18} color="#DC2626" strokeWidth={2.5} />
+                    <Text style={styles.limitWarningTitle}>Creation Limit Reached (3/3 Active)</Text>
                   </View>
                   <Text style={styles.limitWarningSub}>
-                    In BooffIn Workspace, each researcher can create and manage up to 3 communities. You currently own 3/3 active communities.
+                    To create a 4th community, you must disable one of your 3 active communities.
                   </Text>
+                  <View style={styles.limitWarningNoteBox}>
+                    <Text style={styles.limitWarningNoteText}>
+                      <Text style={{ fontWeight: '700', color: '#991B1B' }}>Important Rule:</Text> Disabling is permanent with no recovery. All past chats, papers, materials, and profiles remain viewable for show purpose, but communication will be blocked.
+                    </Text>
+                  </View>
+
+                  <Text style={styles.disableListHeader}>Select a community to disable:</Text>
+                  <View style={styles.disableCommunitiesList}>
+                    {activeOwnedCommunities.map((comm) => (
+                      <View key={comm.id} style={styles.disableCommunityRow}>
+                        <Avatar
+                          url={comm.avatar_url || undefined}
+                          name={comm.name}
+                          size="sm"
+                        />
+                        <View style={styles.disableCommunityInfo}>
+                          <Text numberOfLines={1} style={styles.disableCommunityName}>
+                            {comm.name}
+                          </Text>
+                          <Text style={styles.disableCommunityMeta}>
+                            {comm.members_count || 1} members • {comm.subscription_tier || 'Free'}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            setCommunityToDisable(comm);
+                            setShowDisableConfirmModal(true);
+                          }}
+                          style={styles.disableActionBtn}
+                        >
+                          <Text style={styles.disableActionBtnText}>Disable</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               ) : (
                 <View style={styles.capacityBadgeContainer}>
                   <View style={styles.capacityPill}>
                     <Text style={styles.capacityPillText}>
-                      Community Capacity: {ownedCommunitiesCount}/3 Created
+                      Community Capacity: {ownedCommunitiesCount}/3 Active
                     </Text>
                   </View>
                 </View>
@@ -582,6 +653,86 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Permanent Disable Confirmation Modal */}
+        <Modal
+          visible={showDisableConfirmModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (!isDisabling) {
+              setShowDisableConfirmModal(false);
+              setCommunityToDisable(null);
+            }
+          }}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.confirmDialogCard}>
+              <View style={styles.confirmDialogIconWrap}>
+                <AlertTriangle size={30} color="#DC2626" strokeWidth={2.5} />
+              </View>
+
+              <Text style={styles.confirmDialogTitle}>Permanently Disable Community?</Text>
+
+              <View style={styles.confirmDialogWarningBox}>
+                <Text style={styles.confirmDialogWarningHeadline}>
+                  ⚠️ WARNING: THERE IS NO RECOVERY
+                </Text>
+                <Text style={styles.confirmDialogWarningBody}>
+                  You are about to permanently disable <Text style={{ fontWeight: '700' }}>"{communityToDisable?.name}"</Text>.
+                </Text>
+              </View>
+
+              <View style={styles.confirmBulletList}>
+                <View style={styles.confirmBulletItem}>
+                  <Text style={styles.confirmBulletDot}>•</Text>
+                  <Text style={styles.confirmBulletText}>
+                    <Text style={{ fontWeight: '700' }}>Read-only Show Purpose:</Text> All past chats, research papers, materials, media, and profiles will remain permanently viewable.
+                  </Text>
+                </View>
+                <View style={styles.confirmBulletItem}>
+                  <Text style={styles.confirmBulletDot}>•</Text>
+                  <Text style={styles.confirmBulletText}>
+                    <Text style={{ fontWeight: '700' }}>No Communication:</Text> Sending messages, podcasts, and live discussions will be permanently disabled.
+                  </Text>
+                </View>
+                <View style={styles.confirmBulletItem}>
+                  <Text style={styles.confirmBulletDot}>•</Text>
+                  <Text style={styles.confirmBulletText}>
+                    <Text style={{ fontWeight: '700' }}>Slot Released:</Text> Frees up 1 slot so you can create your new community.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.confirmDialogActions}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  disabled={isDisabling}
+                  onPress={() => {
+                    setShowDisableConfirmModal(false);
+                    setCommunityToDisable(null);
+                  }}
+                  style={styles.confirmCancelBtn}
+                >
+                  <Text style={styles.confirmCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  disabled={isDisabling}
+                  onPress={handleConfirmDisable}
+                  style={styles.confirmDangerBtn}
+                >
+                  {isDisabling ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.confirmDangerBtnText}>Disable Permanently</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </Modal>
   );
@@ -637,6 +788,183 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#991B1B',
     lineHeight: 16,
+  },
+  limitWarningNoteBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  limitWarningNoteText: {
+    fontSize: 11.5,
+    color: '#7F1D1D',
+    lineHeight: 16,
+  },
+  disableListHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#991B1B',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  disableCommunitiesList: {
+    gap: 6,
+  },
+  disableCommunityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    gap: 8,
+  },
+  disableCommunityInfo: {
+    flex: 1,
+  },
+  disableCommunityName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  disableCommunityMeta: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  disableActionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  disableActionBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmDialogCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  confirmDialogIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmDialogTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+    letterSpacing: -0.3,
+    marginBottom: 8,
+  },
+  confirmDialogWarningBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    padding: 10,
+    width: '100%',
+    marginBottom: 12,
+  },
+  confirmDialogWarningHeadline: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#DC2626',
+    letterSpacing: 0.3,
+    marginBottom: 3,
+    textAlign: 'center',
+  },
+  confirmDialogWarningBody: {
+    fontSize: 12.5,
+    color: '#991B1B',
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  confirmBulletList: {
+    width: '100%',
+    gap: 8,
+    marginBottom: 18,
+  },
+  confirmBulletItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  confirmBulletDot: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: -1,
+  },
+  confirmBulletText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 16,
+  },
+  confirmDialogActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  confirmDangerBtn: {
+    flex: 1.3,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  confirmDangerBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   capacityBadgeContainer: {
     alignItems: 'flex-start',

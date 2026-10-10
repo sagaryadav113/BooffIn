@@ -166,6 +166,7 @@ interface WorkspaceState {
     member_ids?: string[];
   }) => Promise<{ workspace: Workspace | null; error: string | null }>;
   joinCommunity: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
+  disableCommunity: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
   updateWorkspaceDetails: (
     workspaceId: string,
     updates: {
@@ -719,6 +720,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   joinCommunity: async (workspaceId: string) => {
     const res = await workspaceService.joinCommunity(workspaceId);
+    if (res.success) {
+      await get().loadWorkspaces(true);
+    }
+    return res;
+  },
+
+  disableCommunity: async (workspaceId: string) => {
+    const res = await workspaceService.disableCommunity(workspaceId);
     if (res.success) {
       await get().loadWorkspaces(true);
     }

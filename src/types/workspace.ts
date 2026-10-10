@@ -43,6 +43,10 @@ export interface Workspace {
   dm_participant_b?: string | null;
   e2ee_enabled: boolean;
   e2ee_public_keys: Record<string, string> | null;
+  status?: 'active' | 'disabled' | 'archived';
+  is_disabled?: boolean;
+  disabled_at?: string | null;
+  disabled_by?: string | null;
   settings: Record<string, any>;
   created_at: string;
   updated_at: string;

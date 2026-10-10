@@ -90,6 +90,13 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const clearChatHistory = useWorkspaceStore((s) => s.clearChatHistory);
   const setMuteWorkspace = useWorkspaceStore((s) => s.setMuteWorkspace);
   const updateWorkspaceDetails = useWorkspaceStore((s) => s.updateWorkspaceDetails);
+  const disableCommunity = useWorkspaceStore((s) => s.disableCommunity);
+
+  const isCommunityDisabled = Boolean(
+    workspace.is_disabled ||
+    workspace.status === 'disabled' ||
+    workspace.settings?.is_disabled
+  );
 
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
@@ -103,6 +110,10 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const [showMembersList, setShowMembersList] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Disable Community Confirmation State
+  const [showDisableCommunityModal, setShowDisableCommunityModal] = useState(false);
+  const [isDisablingCommunity, setIsDisablingCommunity] = useState(false);
 
   // Selected Member for Role / Kick / Ban Action Sheet
   const [selectedMember, setSelectedMember] = useState<WorkspaceMember | null>(null);
@@ -720,6 +731,29 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
     }
   };
 
+  // Handle Permanent Community Disabling
+  const handleConfirmDisableCommunity = async () => {
+    setIsDisablingCommunity(true);
+    try {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      const res = await disableCommunity(workspace.id);
+      if (res.success) {
+        setShowDisableCommunityModal(false);
+        onClose();
+        router.replace('/workspace' as any);
+      } else {
+        if (Platform.OS === 'web') window.alert(res.error || 'Failed to disable community');
+        else Alert.alert('Error', res.error || 'Failed to disable community');
+      }
+    } catch (err: any) {
+      console.warn('Disable community error:', err);
+    } finally {
+      setIsDisablingCommunity(false);
+    }
+  };
+
   // Summary of member names / handles for the People subtitle
   const membersSubtitle = useMemo(() => {
     if (members.length === 0) return 'No other members yet';
@@ -1316,6 +1350,43 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               </View>
             </TouchableOpacity>
 
+            {/* Disable Community Button (For Community Owners) */}
+            {workspace.type === 'community' && isOwner && (
+              isCommunityDisabled ? (
+                <View style={[styles.menuRow, { marginTop: 4, opacity: 0.85 }]}>
+                  <View style={styles.menuIconWrap}>
+                    <AlertTriangle size={22} color="#DC2626" strokeWidth={2} />
+                  </View>
+                  <View style={styles.menuTextCol}>
+                    <Text style={[styles.menuTitle, { color: '#DC2626' }]}>
+                      Community Disabled (Read-Only)
+                    </Text>
+                    <Text style={styles.menuSubtitle}>
+                      This community is archived in permanent read-only mode for show purpose.
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setShowDisableCommunityModal(true)}
+                  style={[styles.menuRow, { marginTop: 4 }]}
+                >
+                  <View style={styles.menuIconWrap}>
+                    <AlertTriangle size={22} color="#DC2626" strokeWidth={2} />
+                  </View>
+                  <View style={styles.menuTextCol}>
+                    <Text style={[styles.menuTitle, { color: '#DC2626' }]}>
+                      Disable Community (Permanent Archive)
+                    </Text>
+                    <Text style={styles.menuSubtitle}>
+                      Release 1 community slot. Past chats & materials remain viewable, but communication is blocked.
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )
+            )}
+
             {/* Leave or Delete Pod Button */}
             {!isDM && (
               <TouchableOpacity
@@ -1764,6 +1835,82 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
+        </Modal>
+
+        {/* Permanent Disable Community Confirmation Modal */}
+        <Modal
+          visible={showDisableCommunityModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (!isDisablingCommunity) {
+              setShowDisableCommunityModal(false);
+            }
+          }}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.confirmDialogCard}>
+              <View style={styles.confirmDialogIconWrap}>
+                <AlertTriangle size={30} color="#DC2626" strokeWidth={2.5} />
+              </View>
+
+              <Text style={styles.confirmDialogTitle}>Permanently Disable Community?</Text>
+
+              <View style={styles.confirmDialogWarningBox}>
+                <Text style={styles.confirmDialogWarningHeadline}>
+                  ⚠️ WARNING: THERE IS NO RECOVERY
+                </Text>
+                <Text style={styles.confirmDialogWarningBody}>
+                  You are about to permanently disable <Text style={{ fontWeight: '700' }}>"{workspace.name}"</Text>.
+                </Text>
+              </View>
+
+              <View style={styles.confirmBulletList}>
+                <View style={styles.confirmBulletItem}>
+                  <Text style={styles.confirmBulletDot}>•</Text>
+                  <Text style={styles.confirmBulletText}>
+                    <Text style={{ fontWeight: '700' }}>Read-only Show Purpose:</Text> All past chats, research papers, materials, media, and member profiles will remain permanently viewable.
+                  </Text>
+                </View>
+                <View style={styles.confirmBulletItem}>
+                  <Text style={styles.confirmBulletDot}>•</Text>
+                  <Text style={styles.confirmBulletText}>
+                    <Text style={{ fontWeight: '700' }}>No Communication:</Text> Sending messages, calls, podcasts, and live discussions will be permanently blocked.
+                  </Text>
+                </View>
+                <View style={styles.confirmBulletItem}>
+                  <Text style={styles.confirmBulletDot}>•</Text>
+                  <Text style={styles.confirmBulletText}>
+                    <Text style={{ fontWeight: '700' }}>Slot Released:</Text> Frees up 1 community slot so you can create another community.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.confirmDialogActions}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  disabled={isDisablingCommunity}
+                  onPress={() => setShowDisableCommunityModal(false)}
+                  style={styles.confirmCancelBtn}
+                >
+                  <Text style={styles.confirmCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  disabled={isDisablingCommunity}
+                  onPress={handleConfirmDisableCommunity}
+                  style={styles.confirmDangerBtn}
+                >
+                  {isDisablingCommunity ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.confirmDangerBtnText}>Disable Permanently</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </Modal>
 
         {/* Step 4: Export Academic Lab Record Modal */}
@@ -2352,5 +2499,123 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94A3B8',
     marginTop: 2,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmDialogCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  confirmDialogIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmDialogTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+    letterSpacing: -0.3,
+    marginBottom: 8,
+  },
+  confirmDialogWarningBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    padding: 10,
+    width: '100%',
+    marginBottom: 12,
+  },
+  confirmDialogWarningHeadline: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#DC2626',
+    letterSpacing: 0.3,
+    marginBottom: 3,
+    textAlign: 'center',
+  },
+  confirmDialogWarningBody: {
+    fontSize: 12.5,
+    color: '#991B1B',
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  confirmBulletList: {
+    width: '100%',
+    gap: 8,
+    marginBottom: 18,
+  },
+  confirmBulletItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  confirmBulletDot: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: -1,
+  },
+  confirmBulletText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 16,
+  },
+  confirmDialogActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  confirmDangerBtn: {
+    flex: 1.3,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  confirmDangerBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

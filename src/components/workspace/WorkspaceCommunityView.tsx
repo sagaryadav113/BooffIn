@@ -37,6 +37,7 @@ import {
   Radio,
   Clock,
   Bookmark,
+  Lock,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
@@ -123,6 +124,12 @@ interface WorkspaceCommunityViewProps {
 export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ workspace }) => {
   const currentUser = useAuthStore((s) => s.user);
   const [activeTab, setActiveTab] = useState<CommunityTab>('discussion');
+
+  const isCommunityDisabled = Boolean(
+    workspace.is_disabled ||
+    workspace.status === 'disabled' ||
+    workspace.settings?.is_disabled
+  );
 
   const messages = useWorkspaceStore((s) => s.messages);
   const events = useWorkspaceStore((s) => s.events);
@@ -330,6 +337,21 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Disabled / Read-only Archive Notice Banner */}
+      {isCommunityDisabled && (
+        <View style={styles.disabledCommunityBanner}>
+          <AlertTriangle size={15} color="#DC2626" strokeWidth={2.5} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.disabledCommunityBannerTitle}>
+              Community Archived (Read-Only)
+            </Text>
+            <Text style={styles.disabledCommunityBannerSub}>
+              This community is disabled. All past chats, materials, papers, and profiles remain viewable for show purpose, but messaging is permanently disabled.
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* Horizontally Scrolling Segment Pill Strip */}
       <View style={styles.segmentStripContainer}>
@@ -644,42 +666,51 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             />
           )}
 
-          {/* Bottom Capsule Input Dock */}
-          <View style={styles.bottomDockContainer}>
-            <View style={styles.inputCapsule}>
-              <TouchableOpacity
-                onPress={() => setShowDoiModal(true)}
-                style={styles.mediaIconBtn}
-              >
-                <Camera size={19} color="#94A3B8" />
-              </TouchableOpacity>
+          {/* Bottom Capsule Input Dock or Disabled Read-Only Dock */}
+          {isCommunityDisabled ? (
+            <View style={styles.disabledBottomDock}>
+              <Lock size={16} color="#64748B" strokeWidth={2.2} />
+              <Text style={styles.disabledBottomDockText}>
+                This community is disabled and in read-only mode.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.bottomDockContainer}>
+              <View style={styles.inputCapsule}>
+                <TouchableOpacity
+                  onPress={() => setShowDoiModal(true)}
+                  style={styles.mediaIconBtn}
+                >
+                  <Camera size={19} color="#94A3B8" />
+                </TouchableOpacity>
 
-              <TextInput
-                value={inputText}
-                onChangeText={handleTextChange}
-                placeholder={`Message ${workspace.name}...`}
-                placeholderTextColor="#94A3B8"
-                style={styles.textInput}
-              />
+                <TextInput
+                  value={inputText}
+                  onChangeText={handleTextChange}
+                  placeholder={`Message ${workspace.name}...`}
+                  placeholderTextColor="#94A3B8"
+                  style={styles.textInput}
+                />
+
+                <TouchableOpacity
+                  onPress={() => {
+                    if (Platform.OS === 'web') window.alert('Voice memo ready.');
+                  }}
+                  style={styles.mediaIconBtn}
+                >
+                  <Mic size={19} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
-                onPress={() => {
-                  if (Platform.OS === 'web') window.alert('Voice memo ready.');
-                }}
-                style={styles.mediaIconBtn}
+                onPress={handleSendMessage}
+                disabled={(!inputText.trim() && !attachedDoi) || isSending}
+                style={[styles.detachedSendBtn, (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled]}
               >
-                <Mic size={19} color="#94A3B8" />
+                {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              onPress={handleSendMessage}
-              disabled={(!inputText.trim() && !attachedDoi) || isSending}
-              style={[styles.detachedSendBtn, (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled]}
-            >
-              {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
       )}
 
@@ -1433,5 +1464,42 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#64748B',
     textTransform: 'capitalize',
+  },
+  disabledCommunityBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF2F2',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FECACA',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  disabledCommunityBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginBottom: 2,
+  },
+  disabledCommunityBannerSub: {
+    fontSize: 11.5,
+    color: '#991B1B',
+    lineHeight: 15,
+  },
+  disabledBottomDock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 8,
+  },
+  disabledBottomDockText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
   },
 });
