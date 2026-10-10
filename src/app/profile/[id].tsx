@@ -719,9 +719,9 @@ export default function OtherResearcherProfileScreen() {
             </View>
           </View>
 
-          {/* Join Researcher Community Banner */}
+          {/* Join Researcher Community Button */}
           <TouchableOpacity
-            style={styles.joinCommunityBanner}
+            style={styles.joinCommunityBox}
             onPress={() => {
               try {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -730,15 +730,10 @@ export default function OtherResearcherProfileScreen() {
             }}
             activeOpacity={0.8}
           >
-            <View style={styles.joinCommunityLeft}>
-              <View style={styles.joinCommunityIconWrap}>
-                <Users size={16} color="#064E3B" />
-              </View>
-              <Text style={styles.joinCommunityText} numberOfLines={1}>
-                Join {researcher.fullName ? `${researcher.fullName.split(' ')[0]}'s` : 'Author'} Community
-              </Text>
-            </View>
-            <Sparkles size={16} color="#064E3B" />
+            <Users size={13} color="#FFFFFF" />
+            <Text style={styles.joinCommunityText}>
+              Join {researcher.fullName ? `${researcher.fullName.split(' ')[0]}'s` : 'Author'} Community
+            </Text>
           </TouchableOpacity>
 
           {/* Following / Followers Stats */}
@@ -1014,38 +1009,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  joinCommunityBanner: {
+  joinCommunityBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: 10,
-    marginBottom: 12,
-  },
-  joinCommunityLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  joinCommunityIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#DCFCE7',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#064E3B',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 6,
+    marginTop: -4,
+    marginBottom: spacing.md,
   },
   joinCommunityText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#064E3B',
-    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   scrollContent: {
     paddingBottom: spacing.xxxl * 2,
