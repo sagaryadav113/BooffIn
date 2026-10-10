@@ -268,6 +268,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   // In-chat search
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeChatFilter, setActiveChatFilter] = useState<'all' | 'media' | 'papers' | 'audio' | 'polls' | 'docs'>('all');
 
   // Chat input
   const [inputText, setInputText] = useState('');
@@ -933,17 +934,56 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     return null;
   };
 
-  // Filter messages by search
+  // Filter messages by search and filter pills
   const filteredMessages = useMemo(() => {
-    if (!searchQuery.trim()) return messages;
-    const q = searchQuery.toLowerCase();
-    return messages.filter(
-      (m) =>
-        (m.content || '').toLowerCase().includes(q) ||
-        (m.sender?.fullName || '').toLowerCase().includes(q) ||
-        (m.doi_metadata?.title || '').toLowerCase().includes(q)
-    );
-  }, [messages, searchQuery]);
+    return messages.filter((m) => {
+      // 1. Text Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const contentMatch = (m.content || '').toLowerCase().includes(q);
+        const senderMatch = (m.sender?.fullName || m.sender?.handle || '').toLowerCase().includes(q);
+        const doiMatch = (m.doi_metadata?.title || '').toLowerCase().includes(q);
+        const docMatch = (m.document_metadata?.name || '').toLowerCase().includes(q);
+        if (!contentMatch && !senderMatch && !doiMatch && !docMatch) return false;
+      }
+
+      // 2. Active Pill Filter
+      if (activeChatFilter === 'media') {
+        const hasImg =
+          m.message_type === 'image' ||
+          Boolean(extractImageUrl(m)) ||
+          m.content === '📷 Shared photo' ||
+          m.content === '📷 Captured photo';
+        return hasImg && !m.is_deleted;
+      }
+      if (activeChatFilter === 'papers') {
+        return (Boolean(m.doi_metadata) || m.message_type === 'paper_doi') && !m.is_deleted;
+      }
+      if (activeChatFilter === 'audio') {
+        return (
+          (m.message_type === 'audio' ||
+            m.message_type === 'voice_note' ||
+            Boolean(m.audio_metadata) ||
+            m.content?.startsWith('🎙️')) &&
+          !m.is_deleted
+        );
+      }
+      if (activeChatFilter === 'polls') {
+        return (
+          (m.message_type === 'poll' || m.content?.startsWith('📊 Poll:')) &&
+          !m.is_deleted
+        );
+      }
+      if (activeChatFilter === 'docs') {
+        return (
+          (m.message_type === 'document' || Boolean(m.document_metadata)) &&
+          !m.is_deleted
+        );
+      }
+
+      return true;
+    });
+  }, [messages, searchQuery, activeChatFilter]);
 
   // Target workspaces for forward modal
   const forwardTargets = useMemo(() => {
@@ -1045,22 +1085,66 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         </View>
       </View>
 
-      {/* In-Chat Search Bar Toggle */}
+      {/* In-Chat Search & Filter Strip */}
       {showSearchBar && (
-        <View style={styles.searchBarRow}>
-          <Search size={16} color="#94A3B8" />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search discussion..."
-            placeholderTextColor="#94A3B8"
-            style={styles.searchBarInput}
-            autoFocus
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <X size={16} color="#94A3B8" />
-            </TouchableOpacity>
+        <View style={styles.chatSearchContainer}>
+          <View style={styles.chatSearchInputRow}>
+            <Search size={15} color="#64748B" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search conversation..."
+              placeholderTextColor="#94A3B8"
+              style={styles.chatSearchInput}
+              autoFocus
+            />
+            {searchQuery.trim() ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <X size={15} color="#64748B" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {/* Filter Pills Strip */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterPillsRow}
+          >
+            {(['all', 'media', 'papers', 'audio', 'polls', 'docs'] as const).map((filter) => {
+              const isActive = activeChatFilter === filter;
+              const label =
+                filter === 'all'
+                  ? 'All'
+                  : filter === 'media'
+                  ? '📷 Photos'
+                  : filter === 'papers'
+                  ? '📄 Papers'
+                  : filter === 'audio'
+                  ? '🎙️ Voice'
+                  : filter === 'polls'
+                  ? '📊 Polls'
+                  : '📑 Docs';
+
+              return (
+                <TouchableOpacity
+                  key={filter}
+                  activeOpacity={0.7}
+                  onPress={() => setActiveChatFilter(filter)}
+                  style={[styles.chatFilterPill, isActive && styles.chatFilterPillActive]}
+                >
+                  <Text style={[styles.chatFilterPillText, isActive && styles.chatFilterPillTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {(searchQuery.trim() || activeChatFilter !== 'all') && (
+            <Text style={styles.searchMatchCountText}>
+              {filteredMessages.length} message{filteredMessages.length === 1 ? '' : 's'} found
+            </Text>
           )}
         </View>
       )}
@@ -2812,21 +2896,60 @@ const styles = StyleSheet.create({
   headerIconBtnActive: {
     backgroundColor: '#F0FDF4',
   },
-  searchBarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  chatSearchContainer: {
     backgroundColor: '#F8FAFC',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    gap: 8,
   },
-  searchBarInput: {
+  chatSearchInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 36,
+  },
+  chatSearchInput: {
     flex: 1,
-    fontSize: 13.5,
+    fontSize: 13,
     color: '#0F172A',
-    padding: 0,
+  },
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+    paddingBottom: 2,
+  },
+  chatFilterPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  chatFilterPillActive: {
+    backgroundColor: '#164E3F',
+    borderColor: '#164E3F',
+  },
+  chatFilterPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  chatFilterPillTextActive: {
+    color: '#FFFFFF',
+  },
+  searchMatchCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#164E3F',
+    marginTop: 6,
   },
   segmentStripContainer: {
     backgroundColor: '#FFFFFF',

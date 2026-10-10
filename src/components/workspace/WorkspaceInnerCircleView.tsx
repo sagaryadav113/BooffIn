@@ -374,7 +374,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   // Search & Filter State
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
-  const [activeChatFilter, setActiveChatFilter] = useState<'all' | 'papers' | 'photos' | 'polls'>('all');
+  const [activeChatFilter, setActiveChatFilter] = useState<'all' | 'media' | 'papers' | 'audio' | 'polls' | 'docs'>('all');
 
   // Pinned Announcement / Message in Pod State
   const [localPinnedMessageId, setLocalPinnedMessageId] = useState<string | null>(null);
@@ -414,6 +414,81 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     decryptPodMessages();
   }, [messages, workspace.id]);
 
+  // Helper to extract image URL from message
+  const extractImageUrl = (m: WorkspaceMessage) => {
+    if (
+      m.message_type === 'audio' ||
+      m.message_type === 'voice_note' ||
+      m.message_type === 'poll' ||
+      m.message_type === 'document' ||
+      m.message_type === 'call_log' ||
+      m.content?.startsWith('🎙️') ||
+      Boolean(m.audio_metadata) ||
+      Boolean((m.attachments as any)?.audio_metadata)
+    ) {
+      return null;
+    }
+    if (m.media_urls && m.media_urls.length > 0 && typeof m.media_urls[0] === 'string' && m.media_urls[0].startsWith('http')) {
+      const url = m.media_urls[0].toLowerCase();
+      if (
+        url.endsWith('.webm') ||
+        url.endsWith('.mp3') ||
+        url.endsWith('.m4a') ||
+        url.endsWith('.ogg') ||
+        url.endsWith('.wav') ||
+        url.endsWith('.pdf') ||
+        url.includes('/audio/')
+      ) {
+        return null;
+      }
+      return m.media_urls[0];
+    }
+    if (Array.isArray(m.attachments)) {
+      for (const a of m.attachments) {
+        if (typeof a === 'string' && a.startsWith('http')) {
+          const url = a.toLowerCase();
+          if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
+            return a;
+          }
+        }
+        if (a?.url && typeof a.url === 'string' && a.url.startsWith('http')) {
+          const url = a.url.toLowerCase();
+          if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
+            return a.url;
+          }
+        }
+        if (a?.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.startsWith('http')) return a.imageUrl;
+        if (a?.image_url && typeof a.image_url === 'string' && a.image_url.startsWith('http')) return a.image_url;
+      }
+    } else if (m.attachments && typeof m.attachments === 'object') {
+      if (Array.isArray(m.attachments.media_urls) && m.attachments.media_urls.length > 0) {
+        const first = m.attachments.media_urls[0];
+        if (typeof first === 'string' && first.startsWith('http')) {
+          const url = first.toLowerCase();
+          if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
+            return first;
+          }
+        }
+      }
+      if (m.attachments.imageUrl && typeof m.attachments.imageUrl === 'string' && m.attachments.imageUrl.startsWith('http')) {
+        return m.attachments.imageUrl;
+      }
+      if (m.attachments.image_url && typeof m.attachments.image_url === 'string' && m.attachments.image_url.startsWith('http')) {
+        return m.attachments.image_url;
+      }
+    }
+    if (typeof m.content === 'string' && (m.message_type === 'image' || m.content === '📷 Shared photo' || m.content === '📷 Captured photo')) {
+      if (m.content.startsWith('http://') || m.content.startsWith('https://')) {
+        return m.content.trim();
+      }
+      const match = m.content.match(/https?:\/\/[^\s]+(?:\.jpg|\.jpeg|\.png|\.webp|\.gif|\/profile-media\/[^\s]+|\/storage\/v1\/object\/public\/[^\s]+|\/workspace-media\/[^\s]+)/i);
+      if (match) {
+        return match[0];
+      }
+    }
+    return null;
+  };
+
   // Filtered & Searched Messages (with Step 4 Ephemeral Filtering)
   const displayedMessages = useMemo(() => {
     let list = messages;
@@ -433,17 +508,30 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     }
 
     // Filter by type if active
-    if (activeChatFilter === 'papers') {
-      list = list.filter((m) => Boolean(m.doi_metadata) || m.message_type === 'paper_doi');
-    } else if (activeChatFilter === 'photos') {
+    if (activeChatFilter === 'media') {
       list = list.filter(
         (m) =>
-          m.message_type === 'image' ||
-          Boolean(m.media_urls && m.media_urls.length > 0) ||
-          m.content === '📷 Shared photo'
+          !m.is_deleted &&
+          (m.message_type === 'image' ||
+            Boolean(extractImageUrl(m)) ||
+            m.content === '📷 Shared photo' ||
+            m.content === '📷 Captured photo')
+      );
+    } else if (activeChatFilter === 'papers') {
+      list = list.filter((m) => !m.is_deleted && (Boolean(m.doi_metadata) || m.message_type === 'paper_doi'));
+    } else if (activeChatFilter === 'audio') {
+      list = list.filter(
+        (m) =>
+          !m.is_deleted &&
+          (m.message_type === 'audio' ||
+            m.message_type === 'voice_note' ||
+            Boolean(m.audio_metadata) ||
+            m.content?.startsWith('🎙️'))
       );
     } else if (activeChatFilter === 'polls') {
-      list = list.filter((m) => m.message_type === 'poll' || m.content.startsWith('📊 Poll:'));
+      list = list.filter((m) => !m.is_deleted && (m.message_type === 'poll' || m.content.startsWith('📊 Poll:')));
+    } else if (activeChatFilter === 'docs') {
+      list = list.filter((m) => !m.is_deleted && (m.message_type === 'document' || Boolean(m.document_metadata)));
     }
 
     // Search query
@@ -453,7 +541,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         const contentMatch = (m.content || '').toLowerCase().includes(q);
         const senderMatch = (m.sender?.fullName || '').toLowerCase().includes(q);
         const doiMatch = (m.doi_metadata?.title || '').toLowerCase().includes(q);
-        return contentMatch || senderMatch || doiMatch;
+        const docMatch = (m.document_metadata?.name || '').toLowerCase().includes(q);
+        return contentMatch || senderMatch || doiMatch || docMatch;
       });
     }
 
@@ -1274,59 +1363,67 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         </TouchableOpacity>
       )}
 
-      {/* 1b. In-Pod Search & Filter Strip */}
+      {/* In-Chat Search & Filter Strip */}
       {showSearchBar && (
-        <View style={styles.inPodSearchBarContainer}>
-          <View style={styles.searchBarInputWrap}>
-            <Search size={15} color="#94A3B8" />
+        <View style={styles.chatSearchContainer}>
+          <View style={styles.chatSearchInputRow}>
+            <Search size={15} color="#64748B" />
             <TextInput
               value={chatSearchQuery}
               onChangeText={setChatSearchQuery}
-              placeholder="Search pod messages, papers, members..."
+              placeholder="Search conversation..."
               placeholderTextColor="#94A3B8"
-              style={styles.searchBarInput}
+              style={styles.chatSearchInput}
               autoFocus
             />
-            {chatSearchQuery.length > 0 && (
+            {chatSearchQuery.trim() ? (
               <TouchableOpacity onPress={() => setChatSearchQuery('')}>
                 <X size={15} color="#64748B" />
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
 
-          {/* Quick Filter Chips */}
+          {/* Filter Pills Strip */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.searchFilterChipsRow}
+            contentContainerStyle={styles.filterPillsRow}
           >
-            {(
-              [
-                { id: 'all', label: 'All' },
-                { id: 'papers', label: '📄 Papers & DOIs' },
-                { id: 'photos', label: '📷 Media' },
-                { id: 'polls', label: '📊 Polls' },
-              ] as const
-            ).map((chip) => (
-              <TouchableOpacity
-                key={chip.id}
-                onPress={() => setActiveChatFilter(chip.id)}
-                style={[
-                  styles.searchFilterChip,
-                  activeChatFilter === chip.id && styles.searchFilterChipActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.searchFilterChipText,
-                    activeChatFilter === chip.id && styles.searchFilterChipTextActive,
-                  ]}
+            {(['all', 'media', 'papers', 'audio', 'polls', 'docs'] as const).map((filter) => {
+              const isActive = activeChatFilter === filter;
+              const label =
+                filter === 'all'
+                  ? 'All'
+                  : filter === 'media'
+                  ? '📷 Photos'
+                  : filter === 'papers'
+                  ? '📄 Papers'
+                  : filter === 'audio'
+                  ? '🎙️ Voice'
+                  : filter === 'polls'
+                  ? '📊 Polls'
+                  : '📑 Docs';
+
+              return (
+                <TouchableOpacity
+                  key={filter}
+                  activeOpacity={0.7}
+                  onPress={() => setActiveChatFilter(filter)}
+                  style={[styles.chatFilterPill, isActive && styles.chatFilterPillActive]}
                 >
-                  {chip.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text style={[styles.chatFilterPillText, isActive && styles.chatFilterPillTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
+
+          {(chatSearchQuery.trim() || activeChatFilter !== 'all') && (
+            <Text style={styles.searchMatchCountText}>
+              {displayedMessages.length} message{displayedMessages.length === 1 ? '' : 's'} found
+            </Text>
+          )}
         </View>
       )}
 
@@ -1463,80 +1560,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               const isFirstOfDateGroup =
                 index === 0 ||
                 getDateLabel(item.created_at) !== getDateLabel(displayedMessages[index - 1]?.created_at);
-
-              const extractImageUrl = (m: WorkspaceMessage) => {
-                if (
-                  m.message_type === 'audio' ||
-                  m.message_type === 'voice_note' ||
-                  m.message_type === 'poll' ||
-                  m.message_type === 'document' ||
-                  m.message_type === 'call_log' ||
-                  m.content?.startsWith('🎙️') ||
-                  Boolean(m.audio_metadata) ||
-                  Boolean((m.attachments as any)?.audio_metadata)
-                ) {
-                  return null;
-                }
-                if (m.media_urls && m.media_urls.length > 0 && typeof m.media_urls[0] === 'string' && m.media_urls[0].startsWith('http')) {
-                  const url = m.media_urls[0].toLowerCase();
-                  if (
-                    url.endsWith('.webm') ||
-                    url.endsWith('.mp3') ||
-                    url.endsWith('.m4a') ||
-                    url.endsWith('.ogg') ||
-                    url.endsWith('.wav') ||
-                    url.endsWith('.pdf') ||
-                    url.includes('/audio/')
-                  ) {
-                    return null;
-                  }
-                  return m.media_urls[0];
-                }
-                if (Array.isArray(m.attachments)) {
-                  for (const a of m.attachments) {
-                    if (typeof a === 'string' && a.startsWith('http')) {
-                      const url = a.toLowerCase();
-                      if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
-                        return a;
-                      }
-                    }
-                    if (a?.url && typeof a.url === 'string' && a.url.startsWith('http')) {
-                      const url = a.url.toLowerCase();
-                      if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
-                        return a.url;
-                      }
-                    }
-                    if (a?.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.startsWith('http')) return a.imageUrl;
-                    if (a?.image_url && typeof a.image_url === 'string' && a.image_url.startsWith('http')) return a.image_url;
-                  }
-                } else if (m.attachments && typeof m.attachments === 'object') {
-                  if (Array.isArray(m.attachments.media_urls) && m.attachments.media_urls.length > 0) {
-                    const first = m.attachments.media_urls[0];
-                    if (typeof first === 'string' && first.startsWith('http')) {
-                      const url = first.toLowerCase();
-                      if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
-                        return first;
-                      }
-                    }
-                  }
-                  if (m.attachments.imageUrl && typeof m.attachments.imageUrl === 'string' && m.attachments.imageUrl.startsWith('http')) {
-                    return m.attachments.imageUrl;
-                  }
-                  if (m.attachments.image_url && typeof m.attachments.image_url === 'string' && m.attachments.image_url.startsWith('http')) {
-                    return m.attachments.image_url;
-                  }
-                }
-                if (typeof m.content === 'string' && (m.message_type === 'image' || m.content === '📷 Shared photo')) {
-                  if (m.content.startsWith('http://') || m.content.startsWith('https://')) {
-                    return m.content.trim();
-                  }
-                  const match = m.content.match(/https?:\/\/[^\s]+(?:\.jpg|\.jpeg|\.png|\.webp|\.gif|\/profile-media\/[^\s]+|\/storage\/v1\/object\/public\/[^\s]+|\/workspace-media\/[^\s]+)/i);
-                  if (match) {
-                    return match[0];
-                  }
-                }
-                return null;
-              };
 
               const msgImageUrl = extractImageUrl(item);
               const resolvedDocMeta = item.document_metadata || (item.attachments as any)?.document_metadata || (
@@ -3081,6 +3104,61 @@ const styles = StyleSheet.create({
   },
   headerIconBtn: {
     padding: 6,
+  },
+  chatSearchContainer: {
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  chatSearchInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 36,
+  },
+  chatSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+    paddingBottom: 2,
+  },
+  chatFilterPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  chatFilterPillActive: {
+    backgroundColor: '#164E3F',
+    borderColor: '#164E3F',
+  },
+  chatFilterPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  chatFilterPillTextActive: {
+    color: '#FFFFFF',
+  },
+  searchMatchCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#164E3F',
+    marginTop: 6,
   },
   subFilterStripContainer: {
     backgroundColor: '#FFFFFF',
