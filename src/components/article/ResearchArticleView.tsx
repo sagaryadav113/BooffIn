@@ -418,17 +418,6 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
             </View>
           </View>
 
-          {/* Discussion Type Filter Pills */}
-          {filterCounts && onSelectFilter && (
-            <View style={styles.filterPillsWrapper}>
-              <DiscussionTypePills
-                activeType={activeFilter || 'all'}
-                counts={filterCounts}
-                onSelectType={onSelectFilter}
-              />
-            </View>
-          )}
-
           {/* Discussion Composer Card */}
           {currentUser && onSubmitDiscussion && (
             <View style={styles.composerWrapper}>

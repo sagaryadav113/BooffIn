@@ -376,13 +376,6 @@ export default function PostDetailScreen() {
             </View>
           </View>
 
-          {/* Discussion Type Filter Pills */}
-          <DiscussionTypePills
-            activeType={activeFilter}
-            counts={filterCounts}
-            onSelectType={setActiveFilter}
-          />
-
           {/* Discussion Composer Card */}
           <View style={styles.composerWrapper}>
             <DiscussionComposer

@@ -1342,13 +1342,6 @@ export default function PaperDetailScreen() {
               </Text>
             </View>
 
-            {/* Discussion Type Filter Pills */}
-            <DiscussionTypePills
-              activeType={activeFilter}
-              counts={filterCounts}
-              onSelectType={setActiveFilter}
-            />
-
             {/* Discussion Composer Card */}
             <View style={styles.composerWrapper}>
               <DiscussionComposer

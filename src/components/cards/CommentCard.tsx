@@ -207,14 +207,9 @@ export const CommentCard: React.FC<CommentCardProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* Structured Discussion Type Badge on root or like button on sub-reply */}
+        {/* Timestamp on root comment or like button on sub-reply */}
         {isRoot ? (
-          <View style={[styles.typeBadge, { backgroundColor: badgeInfo.bg }]}>
-            <IconComp size={12} color={badgeInfo.color} />
-            <Text style={[styles.typeBadgeLabel, { color: badgeInfo.color }]}>
-              {badgeInfo.label}
-            </Text>
-          </View>
+          <Text style={styles.timestampText}>{comment.createdAt}</Text>
         ) : (
           <TouchableOpacity
             onPress={handleLike}
@@ -448,10 +443,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     gap: 4,
   },
-  typeBadgeLabel: {
-    ...typography.micro,
-    fontWeight: '700',
-    fontSize: 11,
+  timestampText: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontSize: 12,
   },
   contentContainer: {
     marginVertical: spacing.xs + 2,

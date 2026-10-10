@@ -17,60 +17,8 @@ export interface DiscussionTypePillsProps {
   onSelectType: (type: 'all' | DiscussionType) => void;
 }
 
-export const DiscussionTypePills: React.FC<DiscussionTypePillsProps> = ({
-  activeType,
-  counts,
-  onSelectType,
-}) => {
-  const tabs: Array<{
-    type: 'all' | DiscussionType;
-    label: string;
-    icon: React.ComponentType<{ size?: number; color?: string }>;
-    count: number;
-  }> = [
-    { type: 'all', label: 'All', icon: Layers, count: counts.all },
-    { type: 'discussion', label: 'Discussions', icon: DiscussionIcon, count: counts.discussion },
-    { type: 'question', label: 'Questions', icon: HelpCircle, count: counts.question },
-    { type: 'insight', label: 'Insights', icon: Lightbulb, count: counts.insight },
-    { type: 'methodology', label: 'Methodology', icon: FlaskConical, count: counts.methodology },
-  ];
-
-  return (
-    <View style={styles.container}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContainer}
-      >
-        {tabs.map((tab) => {
-          const isActive = activeType === tab.type;
-          const IconComponent = tab.icon;
-          const iconColor = isActive ? colors.white : colors.textSecondary;
-
-          return (
-            <TouchableOpacity
-              key={tab.type}
-              onPress={() => onSelectType(tab.type)}
-              activeOpacity={0.8}
-              style={[styles.pill, isActive && styles.pillActive]}
-            >
-              <IconComponent size={14} color={iconColor} />
-              <Text style={[styles.pillLabel, isActive && styles.pillLabelActive]}>
-                {tab.label}
-              </Text>
-              {tab.count > 0 && (
-                <View style={[styles.badge, isActive && styles.badgeActive]}>
-                  <Text style={[styles.badgeText, isActive && styles.badgeTextActive]}>
-                    {tab.count}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
+export const DiscussionTypePills: React.FC<DiscussionTypePillsProps> = () => {
+  return null;
 };
 
 const styles = StyleSheet.create({

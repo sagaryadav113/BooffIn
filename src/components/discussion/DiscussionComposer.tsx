@@ -39,24 +39,9 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
   isSubmitting = false,
   availableMentions = [],
 }) => {
-  const [type, setType] = useState<DiscussionType>('discussion');
-  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMentionBar, setShowMentionBar] = useState(false);
-
-  const getPlaceholder = (t: DiscussionType) => {
-    switch (t) {
-      case 'question':
-        return 'Ask a constructive question about methodology, controls, or findings...';
-      case 'insight':
-        return 'Share a scientific insight, synthesis across literature, or future hypothesis...';
-      case 'methodology':
-        return 'Discuss experimental protocols, sample preparation, or replication details...';
-      default:
-        return 'Start a constructive scientific discussion on this paper reference...';
-    }
-  };
 
   const handleMentionInsert = (handle: string) => {
     try {
@@ -73,33 +58,19 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
     } catch {}
 
     onSubmit({
-      type,
-      title: title.trim() || undefined,
+      type: 'discussion',
       content: content.trim(),
     });
 
-    setTitle('');
     setContent('');
     setIsExpanded(false);
     setShowMentionBar(false);
     Keyboard.dismiss();
   };
 
-  const types: Array<{
-    value: DiscussionType;
-    label: string;
-    icon: React.ComponentType<{ size?: number; color?: string }>;
-    accentColor: string;
-  }> = [
-    { value: 'discussion', label: 'Discussion', icon: DiscussionIcon, accentColor: colors.textPrimary },
-    { value: 'question', label: 'Question', icon: HelpCircle, accentColor: colors.accentBlue },
-    { value: 'insight', label: 'Insight', icon: Lightbulb, accentColor: colors.journalScience },
-    { value: 'methodology', label: 'Methodology', icon: FlaskConical, accentColor: colors.accentGreen },
-  ];
-
   return (
     <View style={styles.container}>
-      {/* Header with user avatar and type selector */}
+      {/* Header with user avatar and name */}
       <View style={styles.headerRow}>
         <Avatar
           url={currentUser.avatarUrl}
@@ -115,61 +86,9 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
         </View>
       </View>
 
-      {/* Discussion Type Selector */}
-      <View style={styles.typeSelectorRow}>
-        {types.map((item) => {
-          const isSelected = type === item.value;
-          const IconComp = item.icon;
-          return (
-            <TouchableOpacity
-              key={item.value}
-              onPress={() => {
-                try {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                } catch {}
-                setType(item.value);
-              }}
-              activeOpacity={0.8}
-              style={[
-                styles.typeButton,
-                isSelected && {
-                  backgroundColor: colors.black,
-                  borderColor: colors.black,
-                },
-              ]}
-            >
-              <IconComp
-                size={13}
-                color={isSelected ? colors.white : colors.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.typeButtonText,
-                  isSelected && styles.typeButtonTextSelected,
-                ]}
-              >
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Optional Title Input (shown for questions & insights or when expanded) */}
-      {(isExpanded || type === 'question' || type === 'insight') && (
-        <TextInput
-          placeholder={type === 'question' ? 'Question summary / title (optional)' : 'Key takeaway / topic title (optional)'}
-          placeholderTextColor={colors.textMuted}
-          value={title}
-          onChangeText={setTitle}
-          style={styles.titleInput}
-          maxLength={120}
-        />
-      )}
-
       {/* Main Content Input */}
       <TextInput
-        placeholder={getPlaceholder(type)}
+        placeholder="Start a constructive scientific discussion on this paper reference..."
         placeholderTextColor={colors.textMuted}
         value={content}
         onChangeText={(text) => {
@@ -243,9 +162,7 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
           activeOpacity={0.85}
         >
           <Send size={14} color={colors.white} />
-          <Text style={styles.submitButtonText}>
-            {type === 'question' ? 'Ask Question' : type === 'insight' ? 'Share Insight' : 'Post'}
-          </Text>
+          <Text style={styles.submitButtonText}>Post</Text>
         </TouchableOpacity>
       </View>
     </View>
