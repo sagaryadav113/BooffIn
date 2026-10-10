@@ -33,6 +33,7 @@ export interface Workspace {
   avatar_url: string | null;
   banner_url: string | null;
   owner_id: string;
+  creator_id?: string | null;
   is_private: boolean;
   max_members: number | null;
   subscription_tier: WorkspaceSubscriptionTier;
