@@ -204,7 +204,7 @@ export default function WorkspaceHubScreen() {
                 activeOpacity={0.7}
                 onPress={() => setIsMiddleColCollapsed(true)}
                 style={styles.headerIconBtn}
-                title="Collapse Messages"
+                accessibilityLabel="Collapse Messages"
               >
                 <PanelLeftClose size={20} color="#64748B" />
               </TouchableOpacity>
@@ -241,7 +241,7 @@ export default function WorkspaceHubScreen() {
                 activeOpacity={0.7}
                 onPress={() => setIsMiddleColCollapsed(true)}
                 style={styles.headerIconBtn}
-                title="Collapse Communities"
+                accessibilityLabel="Collapse Communities"
               >
                 <PanelLeftClose size={20} color="#64748B" />
               </TouchableOpacity>
@@ -270,7 +270,7 @@ export default function WorkspaceHubScreen() {
               activeOpacity={0.7}
               onPress={() => setIsMiddleColCollapsed(true)}
               style={styles.headerIconBtn}
-              title="Collapse"
+              accessibilityLabel="Collapse"
             >
               <PanelLeftClose size={20} color="#64748B" />
             </TouchableOpacity>
@@ -305,7 +305,7 @@ export default function WorkspaceHubScreen() {
               activeOpacity={0.7}
               onPress={() => setIsMiddleColCollapsed(true)}
               style={styles.headerIconBtn}
-              title="Collapse Inner Circles"
+              accessibilityLabel="Collapse Inner Circles"
             >
               <PanelLeftClose size={20} color="#64748B" />
             </TouchableOpacity>
@@ -627,7 +627,7 @@ export default function WorkspaceHubScreen() {
               <TouchableOpacity
                 onPress={() => setIsLeftRailCollapsed(!isLeftRailCollapsed)}
                 style={styles.railToggleBtn}
-                title={isLeftRailCollapsed ? 'Expand Navigation' : 'Collapse Navigation'}
+                accessibilityLabel={isLeftRailCollapsed ? 'Expand Navigation' : 'Collapse Navigation'}
                 activeOpacity={0.7}
               >
                 {isLeftRailCollapsed ? (
@@ -645,7 +645,7 @@ export default function WorkspaceHubScreen() {
                 isLeftRailCollapsed && styles.desktopRailTabCollapsed,
                 activeTab === 'dm' && styles.desktopRailTabActive,
               ]}
-              title="Direct Messages"
+              accessibilityLabel="Direct Messages"
             >
               <View style={styles.railIconWrap}>
                 <MessageSquare size={18} color={activeTab === 'dm' ? '#164E3F' : '#64748B'} />
@@ -667,7 +667,7 @@ export default function WorkspaceHubScreen() {
                 isLeftRailCollapsed && styles.desktopRailTabCollapsed,
                 activeTab === 'community' && styles.desktopRailTabActive,
               ]}
-              title="Communities"
+              accessibilityLabel="Communities"
             >
               <View style={styles.railIconWrap}>
                 <Users size={18} color={activeTab === 'community' ? '#164E3F' : '#64748B'} />
@@ -689,7 +689,7 @@ export default function WorkspaceHubScreen() {
                 isLeftRailCollapsed && styles.desktopRailTabCollapsed,
                 activeTab === 'inner_circle' && styles.desktopRailTabActive,
               ]}
-              title="Inner Circles"
+              accessibilityLabel="Inner Circles"
             >
               <View style={styles.railIconWrap}>
                 <Shield size={18} color={activeTab === 'inner_circle' ? '#164E3F' : '#64748B'} />
@@ -711,7 +711,7 @@ export default function WorkspaceHubScreen() {
                 isLeftRailCollapsed && styles.desktopRailTabCollapsed,
                 activeTab === 'settings' && styles.desktopRailTabActive,
               ]}
-              title="Settings"
+              accessibilityLabel="Settings"
             >
               <View style={styles.railIconWrap}>
                 <Settings size={18} color={activeTab === 'settings' ? '#164E3F' : '#64748B'} />
@@ -730,7 +730,7 @@ export default function WorkspaceHubScreen() {
                 styles.desktopNewBtn,
                 isLeftRailCollapsed && styles.desktopNewBtnCollapsed,
               ]}
-              title="New Workspace"
+              accessibilityLabel="New Workspace"
             >
               <Plus size={16} color="#FFFFFF" />
               {!isLeftRailCollapsed && (
