@@ -322,6 +322,14 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   // Web viewer URL for embedded reading without CORS or X-Frame-Options blocking
   const webViewerUrl = useMemo(() => {
     if (!effectiveStreamUrl) return publisherWebUrl || '';
+
+    // In Desktop Electron app: Chromium has native PDF viewer and Electron unblocks headers,
+    // so we load the direct PDF stream with native performance and ZERO redirects!
+    const isDesktopApp = typeof window !== 'undefined' && Boolean((window as any).booffinDesktop);
+    if (isDesktopApp) {
+      return effectiveStreamUrl;
+    }
+
     const lower = effectiveStreamUrl.toLowerCase();
     const isPdf =
       lower.endsWith('.pdf') ||
@@ -535,6 +543,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
         <View style={styles.webPdfWrapper}>
           <iframe
             src={webViewerUrl}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
             style={{
               width: '100%',
               height: 850,

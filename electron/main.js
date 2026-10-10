@@ -82,6 +82,14 @@ function createWindow() {
     mainWindow.show();
   });
 
+  // Prevent any iframe or external script from navigating the main app window away from BooffIn
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    if (!navigationUrl.startsWith('app://localhost')) {
+      event.preventDefault();
+      shell.openExternal(navigationUrl);
+    }
+  });
+
   // Handle external links
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://accounts.google.com') || url.startsWith('https://github.com/login')) {
