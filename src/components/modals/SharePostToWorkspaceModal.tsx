@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import {
   X,
@@ -454,47 +455,53 @@ export const SharePostToWorkspaceModal: React.FC<SharePostToWorkspaceModalProps>
             />
           </View>
 
-          {/* Tabs Filter Bar */}
-          <View style={styles.tabsRow}>
-            <TouchableOpacity
-              onPress={() => setActiveTab('all')}
-              style={[styles.tabPill, activeTab === 'all' && styles.tabPillActive]}
+          {/* Tabs Filter Bar (Clean single horizontal line) */}
+          <View style={styles.tabsContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabsScrollContent}
             >
-              <Layers size={13} color={activeTab === 'all' ? '#FFFFFF' : '#64748B'} />
-              <Text style={[styles.tabPillText, activeTab === 'all' && styles.tabPillTextActive]}>
-                All
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveTab('all')}
+                style={[styles.tabPill, activeTab === 'all' && styles.tabPillActive]}
+              >
+                <Layers size={13} color={activeTab === 'all' ? '#FFFFFF' : '#64748B'} />
+                <Text style={[styles.tabPillText, activeTab === 'all' && styles.tabPillTextActive]}>
+                  All
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setActiveTab('dms')}
-              style={[styles.tabPill, activeTab === 'dms' && styles.tabPillActive]}
-            >
-              <MessageSquare size={13} color={activeTab === 'dms' ? '#FFFFFF' : '#64748B'} />
-              <Text style={[styles.tabPillText, activeTab === 'dms' && styles.tabPillTextActive]}>
-                DMs {dms.length > 0 ? `(${dms.length})` : ''}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveTab('dms')}
+                style={[styles.tabPill, activeTab === 'dms' && styles.tabPillActive]}
+              >
+                <MessageSquare size={13} color={activeTab === 'dms' ? '#FFFFFF' : '#64748B'} />
+                <Text style={[styles.tabPillText, activeTab === 'dms' && styles.tabPillTextActive]}>
+                  DMs {dms.length > 0 ? `(${dms.length})` : ''}
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setActiveTab('communities')}
-              style={[styles.tabPill, activeTab === 'communities' && styles.tabPillActive]}
-            >
-              <Users size={13} color={activeTab === 'communities' ? '#FFFFFF' : '#64748B'} />
-              <Text style={[styles.tabPillText, activeTab === 'communities' && styles.tabPillTextActive]}>
-                Community {communities.length > 0 ? `(${communities.length})` : ''}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveTab('communities')}
+                style={[styles.tabPill, activeTab === 'communities' && styles.tabPillActive]}
+              >
+                <Users size={13} color={activeTab === 'communities' ? '#FFFFFF' : '#64748B'} />
+                <Text style={[styles.tabPillText, activeTab === 'communities' && styles.tabPillTextActive]}>
+                  Community {communities.length > 0 ? `(${communities.length})` : ''}
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setActiveTab('inner_circles')}
-              style={[styles.tabPill, activeTab === 'inner_circles' && styles.tabPillActive]}
-            >
-              <Shield size={13} color={activeTab === 'inner_circles' ? '#FFFFFF' : '#64748B'} />
-              <Text style={[styles.tabPillText, activeTab === 'inner_circles' && styles.tabPillTextActive]}>
-                Inner Circle {innerCircles.length > 0 ? `(${innerCircles.length})` : ''}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveTab('inner_circles')}
+                style={[styles.tabPill, activeTab === 'inner_circles' && styles.tabPillActive]}
+              >
+                <Shield size={13} color={activeTab === 'inner_circles' ? '#FFFFFF' : '#64748B'} />
+                <Text style={[styles.tabPillText, activeTab === 'inner_circles' && styles.tabPillTextActive]}>
+                  Inner Circle {innerCircles.length > 0 ? `(${innerCircles.length})` : ''}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
 
           {/* Search Input Bar */}
@@ -589,7 +596,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: 20,
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
   },
@@ -628,7 +635,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   errorBanner: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: 20,
     marginBottom: spacing.xs,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
@@ -643,7 +650,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   previewCard: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: 20,
     marginTop: spacing.xs,
     marginBottom: spacing.xs,
     padding: spacing.sm + 2,
@@ -675,7 +682,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   noteInputContainer: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: 20,
     marginTop: spacing.xs,
     marginBottom: spacing.xs,
   },
@@ -689,21 +696,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0F172A',
   },
-  tabsRow: {
+  tabsContainer: {
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  tabsScrollContent: {
+    paddingHorizontal: 20,
+    gap: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-    gap: 6,
-    flexWrap: 'wrap',
   },
   tabPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6.5,
     borderRadius: radii.full,
     backgroundColor: '#F1F5F9',
   },
@@ -722,7 +730,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: spacing.lg,
+    marginHorizontal: 20,
     marginTop: spacing.xs,
     marginBottom: spacing.xs,
     backgroundColor: '#F8FAFC',
@@ -742,21 +750,22 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: spacing.xl,
   },
   targetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#F1F5F9',
   },
   targetInfo: {
     flex: 1,
-    marginLeft: 10,
-    marginRight: 10,
+    marginLeft: 12,
+    marginRight: 12,
   },
   targetNameRow: {
     flexDirection: 'row',
@@ -789,10 +798,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: '#064E3B',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 7.5,
     borderRadius: radii.full,
-    minWidth: 70,
+    minWidth: 72,
     justifyContent: 'center',
   },
   sendBtnDisabled: {
