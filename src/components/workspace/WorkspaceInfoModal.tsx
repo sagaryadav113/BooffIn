@@ -979,134 +979,138 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               </TouchableOpacity>
             )}
 
-            {/* 2. People / Members (Expanded List & Roles) */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowMembersList(!showMembersList)}
-              style={styles.menuRow}
-            >
-              <View style={styles.menuIconWrap}>
-                <Users size={22} color="#0F172A" strokeWidth={2} />
-              </View>
-              <View style={styles.menuTextCol}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={styles.menuTitle}>People</Text>
-                  <View style={styles.capacityBadgeContainer}>
-                    <Text style={styles.memberCountBadge}>
-                      {members.length}
-                      {workspace.type === 'inner_circle' ? '/25' : ''}
+            {/* 2. People / Members (Expanded List & Roles - Groups & Inner Circles only) */}
+            {!isDM && (
+              <>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setShowMembersList(!showMembersList)}
+                  style={styles.menuRow}
+                >
+                  <View style={styles.menuIconWrap}>
+                    <Users size={22} color="#0F172A" strokeWidth={2} />
+                  </View>
+                  <View style={styles.menuTextCol}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={styles.menuTitle}>People</Text>
+                      <View style={styles.capacityBadgeContainer}>
+                        <Text style={styles.memberCountBadge}>
+                          {members.length}
+                          {workspace.type === 'inner_circle' ? '/25' : ''}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.menuSubtitle} numberOfLines={1}>
+                      {isLoadingMembers ? 'Loading members...' : membersSubtitle}
                     </Text>
                   </View>
-                </View>
-                <Text style={styles.menuSubtitle} numberOfLines={1}>
-                  {isLoadingMembers ? 'Loading members...' : membersSubtitle}
-                </Text>
-              </View>
-            </TouchableOpacity>
+                </TouchableOpacity>
 
-            {/* Expanded Member List with In-Modal Search & Role Controls */}
-            {showMembersList && (
-              <View style={styles.expandedMembersList}>
-                {/* Member Search Bar */}
-                {members.length > 3 && (
-                  <View style={styles.memberSearchInputWrap}>
-                    <Search size={14} color="#94A3B8" />
-                    <TextInput
-                      value={memberSearchQuery}
-                      onChangeText={setMemberSearchQuery}
-                      placeholder="Search pod members or roles..."
-                      placeholderTextColor="#94A3B8"
-                      style={styles.memberSearchInput}
-                    />
-                    {memberSearchQuery.length > 0 && (
-                      <TouchableOpacity onPress={() => setMemberSearchQuery('')}>
-                        <X size={14} color="#64748B" />
-                      </TouchableOpacity>
+                {/* Expanded Member List with In-Modal Search & Role Controls */}
+                {showMembersList && (
+                  <View style={styles.expandedMembersList}>
+                    {/* Member Search Bar */}
+                    {members.length > 3 && (
+                      <View style={styles.memberSearchInputWrap}>
+                        <Search size={14} color="#94A3B8" />
+                        <TextInput
+                          value={memberSearchQuery}
+                          onChangeText={setMemberSearchQuery}
+                          placeholder="Search pod members or roles..."
+                          placeholderTextColor="#94A3B8"
+                          style={styles.memberSearchInput}
+                        />
+                        {memberSearchQuery.length > 0 && (
+                          <TouchableOpacity onPress={() => setMemberSearchQuery('')}>
+                            <X size={14} color="#64748B" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     )}
+
+                    {displayedMembers.map((m) => {
+                      const isUserOwner = m.role === 'owner' || m.user_id === workspace.owner_id;
+                      const isUserAdmin = m.role === 'admin';
+                      const isUserMod = m.role === 'moderator';
+
+                      return (
+                        <TouchableOpacity
+                          key={m.id || m.user_id}
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            if (canManageRoles && !isUserOwner && m.user_id !== currentUser?.id) {
+                              setSelectedMember(m);
+                              setShowMemberActionModal(true);
+                            } else if (m.user_id) {
+                              onClose();
+                              router.push(`/profile/${m.user_id}`);
+                            }
+                          }}
+                          style={styles.memberRow}
+                        >
+                          <Avatar
+                            uri={m.profile?.avatarUrl || undefined}
+                            name={m.profile?.fullName || 'Researcher'}
+                            size="sm"
+                          />
+                          <View style={styles.memberInfoCol}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <Text style={styles.memberName}>{m.profile?.fullName || 'Collaborator'}</Text>
+                              {m.profile?.orcidVerified && (
+                                <CheckCircle2 size={13} color="#164E3F" strokeWidth={2.5} />
+                              )}
+                            </View>
+                            <Text style={styles.memberAcademicSub} numberOfLines={1}>
+                              {m.profile?.academicTitle || m.profile?.institution || `@${m.profile?.handle || 'user'}`}
+                            </Text>
+                          </View>
+
+                          {/* Role Pill Badge */}
+                          <View
+                            style={[
+                              styles.rolePill,
+                              isUserOwner
+                                ? styles.rolePillOwner
+                                : isUserAdmin
+                                ? styles.rolePillAdmin
+                                : isUserMod
+                                ? styles.rolePillMod
+                                : styles.rolePillMember,
+                            ]}
+                          >
+                            {isUserOwner ? (
+                              <Crown size={10} color="#164E3F" />
+                            ) : isUserAdmin ? (
+                              <ShieldCheck size={10} color="#2563EB" />
+                            ) : isUserMod ? (
+                              <Shield size={10} color="#7C3AED" />
+                            ) : null}
+                            <Text
+                              style={[
+                                styles.rolePillText,
+                                isUserOwner
+                                  ? styles.rolePillTextOwner
+                                  : isUserAdmin
+                                  ? styles.rolePillTextAdmin
+                                  : isUserMod
+                                  ? styles.rolePillTextMod
+                                  : styles.rolePillTextMember,
+                              ]}
+                            >
+                              {isUserOwner ? 'Owner • PI' : isUserAdmin ? 'Admin' : isUserMod ? 'Moderator' : 'Member'}
+                            </Text>
+                          </View>
+
+                          {/* Action trigger chevron for admins */}
+                          {canManageRoles && !isUserOwner && m.user_id !== currentUser?.id && (
+                            <MoreHorizontal size={16} color="#94A3B8" style={{ marginLeft: 4 }} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 )}
-
-                {displayedMembers.map((m) => {
-                  const isUserOwner = m.role === 'owner' || m.user_id === workspace.owner_id;
-                  const isUserAdmin = m.role === 'admin';
-                  const isUserMod = m.role === 'moderator';
-
-                  return (
-                    <TouchableOpacity
-                      key={m.id || m.user_id}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        if (canManageRoles && !isUserOwner && m.user_id !== currentUser?.id) {
-                          setSelectedMember(m);
-                          setShowMemberActionModal(true);
-                        } else if (m.user_id) {
-                          onClose();
-                          router.push(`/profile/${m.user_id}`);
-                        }
-                      }}
-                      style={styles.memberRow}
-                    >
-                      <Avatar
-                        uri={m.profile?.avatarUrl || undefined}
-                        name={m.profile?.fullName || 'Researcher'}
-                        size="sm"
-                      />
-                      <View style={styles.memberInfoCol}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Text style={styles.memberName}>{m.profile?.fullName || 'Collaborator'}</Text>
-                          {m.profile?.orcidVerified && (
-                            <CheckCircle2 size={13} color="#164E3F" strokeWidth={2.5} />
-                          )}
-                        </View>
-                        <Text style={styles.memberAcademicSub} numberOfLines={1}>
-                          {m.profile?.academicTitle || m.profile?.institution || `@${m.profile?.handle || 'user'}`}
-                        </Text>
-                      </View>
-
-                      {/* Role Pill Badge */}
-                      <View
-                        style={[
-                          styles.rolePill,
-                          isUserOwner
-                            ? styles.rolePillOwner
-                            : isUserAdmin
-                            ? styles.rolePillAdmin
-                            : isUserMod
-                            ? styles.rolePillMod
-                            : styles.rolePillMember,
-                        ]}
-                      >
-                        {isUserOwner ? (
-                          <Crown size={10} color="#164E3F" />
-                        ) : isUserAdmin ? (
-                          <ShieldCheck size={10} color="#2563EB" />
-                        ) : isUserMod ? (
-                          <Shield size={10} color="#7C3AED" />
-                        ) : null}
-                        <Text
-                          style={[
-                            styles.rolePillText,
-                            isUserOwner
-                              ? styles.rolePillTextOwner
-                              : isUserAdmin
-                              ? styles.rolePillTextAdmin
-                              : isUserMod
-                              ? styles.rolePillTextMod
-                              : styles.rolePillTextMember,
-                          ]}
-                        >
-                          {isUserOwner ? 'Owner • PI' : isUserAdmin ? 'Admin' : isUserMod ? 'Moderator' : 'Member'}
-                        </Text>
-                      </View>
-
-                      {/* Action trigger chevron for admins */}
-                      {canManageRoles && !isUserOwner && m.user_id !== currentUser?.id && (
-                        <MoreHorizontal size={16} color="#94A3B8" style={{ marginLeft: 4 }} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              </>
             )}
 
             {/* 3. Pod Collaboration & Permissions Controls (Groups & Inner Circles) */}
