@@ -523,17 +523,31 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           }
           updatedReactions = current;
 
-          let pd = m.poll_data ? { ...m.poll_data } : null;
+          let pd = m.poll_data || (m.attachments as any)?.poll_data || null;
+          if (!pd && typeof m.content === 'string' && m.content.startsWith('📊 Poll:')) {
+            const lines = m.content.split('\n');
+            const q = lines[0].replace('📊 Poll:', '').trim();
+            const optLines = lines.slice(1).filter((l) => l.startsWith('• '));
+            const opts = optLines.map((l, idx) => ({
+              id: `opt_${idx}`,
+              text: l.replace('• ', '').trim(),
+              votes: [] as string[],
+            }));
+            if (opts.length > 0) {
+              pd = { question: q, options: opts, totalVotes: 0 };
+            }
+          }
+
           if (pd && Array.isArray(pd.options)) {
-            const updatedOpts = pd.options.map((opt) => {
-              let votes: string[] = Array.isArray(opt.votes) ? opt.votes.filter((uid) => uid !== currentUser.id) : [];
+            const updatedOpts = pd.options.map((opt: any) => {
+              let votes: string[] = Array.isArray(opt.votes) ? opt.votes.filter((uid: string) => uid !== currentUser.id) : [];
               if (opt.id === optionId) {
                 votes.push(currentUser.id);
               }
               return { ...opt, votes };
             });
             let total = 0;
-            updatedOpts.forEach((o) => { total += o.votes.length; });
+            updatedOpts.forEach((o: any) => { total += o.votes.length; });
             pd = { ...pd, options: updatedOpts, totalVotes: total };
             updatedPollData = pd;
           }
@@ -1202,6 +1216,70 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             set((state) => ({
               messages: state.messages.map((m) => (m.id === messageObj.id ? { ...m, ...messageObj } : m)),
             }));
+            return;
+          }
+
+          // Check if this is a poll vote action transaction
+          const isVoteAction =
+            newMsg.attachments?.is_poll_vote_action === true ||
+            (typeof newMsg.content === 'string' && (newMsg.content.includes('Vote:') || newMsg.content.includes('[POLL_VOTE]')));
+
+          if (isVoteAction) {
+            let pollId = newMsg.attachments?.poll_id;
+            let optionId = newMsg.attachments?.option_id;
+            const voterId = newMsg.attachments?.voter_id || newMsg.sender_id;
+
+            if (!pollId && typeof newMsg.content === 'string') {
+              const matchPoll = newMsg.content.match(/\[([a-f0-9\-]+)\]/i);
+              if (matchPoll) pollId = matchPoll[1];
+            }
+            if (optionId === undefined && typeof newMsg.content === 'string') {
+              const matchOpt = newMsg.content.match(/Vote:\s*([^\s\[]+)/i);
+              if (matchOpt && matchOpt[1] !== 'retracted') {
+                optionId = matchOpt[1];
+              } else {
+                optionId = '';
+              }
+            }
+
+            if (pollId && voterId) {
+              set((state) => ({
+                messages: state.messages.map((m) => {
+                  if (m.id === pollId) {
+                    const currentReactions = { ...(m.reactions || {}) };
+                    Object.keys(currentReactions).forEach((k) => {
+                      if (k.startsWith('vote:') && Array.isArray(currentReactions[k])) {
+                        currentReactions[k] = currentReactions[k].filter((uid) => uid !== voterId);
+                        if (currentReactions[k].length === 0) delete currentReactions[k];
+                      }
+                    });
+                    if (optionId) {
+                      const voteKey = `vote:${optionId}`;
+                      const users = Array.isArray(currentReactions[voteKey]) ? [...currentReactions[voteKey]] : [];
+                      if (!users.includes(voterId)) users.push(voterId);
+                      currentReactions[voteKey] = users;
+                    }
+
+                    let pd = m.poll_data ? { ...m.poll_data } : null;
+                    if (pd && Array.isArray(pd.options)) {
+                      const updatedOpts = pd.options.map((opt) => {
+                        let votes: string[] = Array.isArray(opt.votes) ? opt.votes.filter((uid) => uid !== voterId) : [];
+                        if (opt.id === optionId) {
+                          votes.push(voterId);
+                        }
+                        return { ...opt, votes };
+                      });
+                      let total = 0;
+                      updatedOpts.forEach((o) => { total += o.votes.length; });
+                      pd = { ...pd, options: updatedOpts, totalVotes: total };
+                    }
+
+                    return { ...m, reactions: currentReactions, poll_data: pd };
+                  }
+                  return m;
+                }),
+              }));
+            }
             return;
           }
 

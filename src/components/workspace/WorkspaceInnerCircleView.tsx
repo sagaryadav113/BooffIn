@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -588,7 +589,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
   const [localPollVotes, setLocalPollVotes] = useState<Record<string, string>>({});
 
-  // Auto-hydrate user's existing poll selections from loaded messages so votes persist across restarts
+  // Auto-hydrate user's existing poll selections from loaded messages and AsyncStorage so votes persist across restarts
   useEffect(() => {
     if (!currentUser?.id || !messages || messages.length === 0) return;
     const detected: Record<string, string> = {};
@@ -611,9 +612,24 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       }
     });
 
-    if (Object.keys(detected).length > 0) {
-      setLocalPollVotes((prev) => ({ ...detected, ...prev }));
-    }
+    // Also check AsyncStorage for any votes cast by this user on these messages
+    (async () => {
+      for (const m of messages) {
+        if (m.message_type === 'poll' || (typeof m.content === 'string' && m.content.startsWith('📊 Poll:'))) {
+          if (!detected[m.id]) {
+            try {
+              const savedVote = await AsyncStorage.getItem(`@booffin_poll_vote_${m.id}_${currentUser.id}`);
+              if (savedVote) {
+                detected[m.id] = savedVote;
+              }
+            } catch {}
+          }
+        }
+      }
+      if (Object.keys(detected).length > 0) {
+        setLocalPollVotes((prev) => ({ ...detected, ...prev }));
+      }
+    })();
   }, [messages, currentUser?.id]);
 
   const [showPostPickerModal, setShowPostPickerModal] = useState(false);
@@ -776,7 +792,27 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
 
-    const prevVote = localPollVotes[messageId];
+    const targetMsg = messages.find((m) => m.id === messageId);
+    let prevVote = localPollVotes[messageId];
+    if (prevVote === undefined && currentUser?.id && targetMsg) {
+      const reactions = (targetMsg.reactions as Record<string, string[]>) || (targetMsg.attachments as any)?.reactions || {};
+      Object.entries(reactions).forEach(([k, uids]) => {
+        if (k.startsWith('vote:') && Array.isArray(uids) && uids.includes(currentUser.id)) {
+          prevVote = k.replace('vote:', '');
+        }
+      });
+      if (!prevVote) {
+        const pd = targetMsg.poll_data || (targetMsg.attachments as any)?.poll_data;
+        if (pd && Array.isArray(pd.options)) {
+          pd.options.forEach((opt: any) => {
+            if (Array.isArray(opt.votes) && opt.votes.includes(currentUser.id)) {
+              prevVote = opt.id;
+            }
+          });
+        }
+      }
+    }
+
     const newVote = prevVote === optionId ? '' : optionId;
 
     setLocalPollVotes((prev) => ({
@@ -1820,8 +1856,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                       });
 
                       // 1. Reactions (keys starting with vote:)
-                      if (item.reactions && typeof item.reactions === 'object') {
-                        Object.entries(item.reactions).forEach(([key, userIds]) => {
+                      const reactionsMapRaw = (item.reactions as Record<string, string[]>) || (item.attachments as any)?.reactions || {};
+                      if (reactionsMapRaw && typeof reactionsMapRaw === 'object') {
+                        Object.entries(reactionsMapRaw).forEach(([key, userIds]) => {
                           if (key.startsWith('vote:') && Array.isArray(userIds)) {
                             const optId = key.replace('vote:', '');
                             if (optionVotersMap[optId]) {

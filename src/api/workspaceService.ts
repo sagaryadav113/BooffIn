@@ -1083,23 +1083,55 @@ export const workspaceService = {
       const rawMap = new Map<string, any>();
       rawList.forEach((m: any) => rawMap.set(m.id, m));
 
-      // 1. Reconcile lightweight poll vote action transactions across the workspace
+      // 1. Fetch and reconcile all poll vote action transactions across the workspace
+      let voteActions: any[] = [];
+      try {
+        const { data: vData } = await supabase
+          .from('workspace_messages')
+          .select('id, sender_id, content, attachments, created_at')
+          .eq('workspace_id', workspaceId)
+          .or('content.ilike.%Vote:%,content.ilike.%[POLL_VOTE]%')
+          .order('created_at', { ascending: true });
+        if (Array.isArray(vData)) {
+          voteActions = vData;
+        }
+      } catch {}
+
+      const allVoteRecords = [
+        ...rawList.filter(
+          (m: any) =>
+            m.attachments?.is_poll_vote_action === true ||
+            (typeof m.content === 'string' && (m.content.includes('Vote:') || m.content.includes('[POLL_VOTE]')))
+        ),
+        ...voteActions,
+      ];
+
       // Map: pollMessageId -> Map<voterUserId, optionId>
       const pollVoteLedger = new Map<string, Map<string, string>>();
-      rawList.forEach((m: any) => {
-        const isVoteAction =
-          m.attachments?.is_poll_vote_action === true ||
-          (typeof m.content === 'string' && m.content.startsWith('🗳️ Vote:'));
-        if (isVoteAction) {
-          const pollId = m.attachments?.poll_id || m.reply_to_id;
-          const optionId = m.attachments?.option_id ?? '';
-          const voterId = m.attachments?.voter_id || m.sender_id;
-          if (pollId && voterId) {
-            if (!pollVoteLedger.has(pollId)) {
-              pollVoteLedger.set(pollId, new Map());
-            }
-            pollVoteLedger.get(pollId)!.set(voterId, optionId);
+      allVoteRecords.forEach((m: any) => {
+        let pollId = m.attachments?.poll_id;
+        let optionId = m.attachments?.option_id;
+        let voterId = m.attachments?.voter_id || m.sender_id;
+
+        // Fallback: Parse pollId and optionId from content string format "🗳️ Vote: opt_X [uuid]"
+        if (!pollId && typeof m.content === 'string') {
+          const matchPoll = m.content.match(/\[([a-f0-9\-]+)\]/i);
+          if (matchPoll) pollId = matchPoll[1];
+        }
+        if (optionId === undefined && typeof m.content === 'string') {
+          const matchOpt = m.content.match(/Vote:\s*([^\s\[]+)/i);
+          if (matchOpt && matchOpt[1] !== 'retracted') {
+            optionId = matchOpt[1];
+          } else {
+            optionId = '';
           }
+        }
+
+        if (pollId && voterId) {
+          if (!pollVoteLedger.has(pollId)) {
+            pollVoteLedger.set(pollId, new Map());
+          }
+          pollVoteLedger.get(pollId)!.set(voterId, optionId || '');
         }
       });
 
@@ -1107,7 +1139,7 @@ export const workspaceService = {
       const visibleRawList = rawList.filter((m: any) => {
         const isVoteAction =
           m.attachments?.is_poll_vote_action === true ||
-          (typeof m.content === 'string' && m.content.startsWith('🗳️ Vote:'));
+          (typeof m.content === 'string' && (m.content.includes('Vote:') || m.content.includes('[POLL_VOTE]')));
         return !isVoteAction;
       });
 
@@ -1144,7 +1176,26 @@ export const workspaceService = {
         const doiMeta = m.doi_metadata || m.attachments?.doi_metadata || null;
         let pollData: any = m.poll_data || m.attachments?.poll_data || null;
 
-        // Extract reactions from top-level column OR attachments.reactions
+        // Fallback: reconstruct pollData from content if it was wiped or missing from attachments
+        if (!pollData && typeof m.content === 'string' && m.content.startsWith('📊 Poll:')) {
+          const lines = m.content.split('\n');
+          const questionText = lines[0].replace('📊 Poll:', '').trim();
+          const optLines = lines.slice(1).filter((l: string) => l.startsWith('• '));
+          const parsedOptions = optLines.map((l: string, idx: number) => ({
+            id: `opt_${idx}`,
+            text: l.replace('• ', '').trim(),
+            votes: [] as string[],
+          }));
+          if (parsedOptions.length > 0) {
+            pollData = {
+              question: questionText,
+              options: parsedOptions,
+              totalVotes: 0,
+            };
+          }
+        }
+
+        // Extract reactions from attachments.reactions
         let reactions: Record<string, string[]> = {};
         if (m.reactions && typeof m.reactions === 'object' && !Array.isArray(m.reactions)) {
           reactions = { ...m.reactions };
@@ -1530,7 +1581,7 @@ export const workspaceService = {
     try {
       const { data: msg } = await supabase
         .from('workspace_messages')
-        .select('id, attachments, reactions')
+        .select('id, attachments')
         .eq('id', messageId)
         .single();
 
@@ -1540,9 +1591,7 @@ export const workspaceService = {
       }
 
       let currentReactions: Record<string, string[]> = {};
-      if (msg?.reactions && typeof msg.reactions === 'object' && !Array.isArray(msg.reactions)) {
-        currentReactions = { ...msg.reactions };
-      } else if (currentAttachments.reactions && typeof currentAttachments.reactions === 'object' && !Array.isArray(currentAttachments.reactions)) {
+      if (currentAttachments.reactions && typeof currentAttachments.reactions === 'object' && !Array.isArray(currentAttachments.reactions)) {
         currentReactions = { ...currentAttachments.reactions };
       }
 
@@ -1564,23 +1613,13 @@ export const workspaceService = {
 
       currentAttachments.reactions = updated;
 
-      // Persist to attachments (and try reactions column if available)
+      // Persist to attachments
       try {
         await supabase
           .from('workspace_messages')
-          .update({
-            attachments: currentAttachments,
-            reactions: updated,
-          })
+          .update({ attachments: currentAttachments })
           .eq('id', messageId);
-      } catch {
-        try {
-          await supabase
-            .from('workspace_messages')
-            .update({ attachments: currentAttachments })
-            .eq('id', messageId);
-        } catch {}
-      }
+      } catch {}
 
       return { reactions: updated, error: null };
     } catch (err: any) {
@@ -1606,8 +1645,8 @@ export const workspaceService = {
   }> {
     try {
       // 1. Persist locally to AsyncStorage for instant restoration on this device
+      const storageKey = `@booffin_poll_vote_${messageId}_${userId}`;
       try {
-        const storageKey = `@booffin_poll_vote_${messageId}_${userId}`;
         if (optionId) {
           await AsyncStorage.setItem(storageKey, optionId);
         } else {
@@ -1615,10 +1654,10 @@ export const workspaceService = {
         }
       } catch {}
 
-      // 2. Fetch target poll message
+      // 2. Fetch target poll message (ONLY query valid columns: id, attachments, content)
       const { data: msg } = await supabase
         .from('workspace_messages')
-        .select('id, attachments, reactions')
+        .select('id, attachments, content')
         .eq('id', messageId)
         .single();
 
@@ -1628,13 +1667,30 @@ export const workspaceService = {
       }
 
       let currentReactions: Record<string, string[]> = {};
-      if (msg?.reactions && typeof msg.reactions === 'object' && !Array.isArray(msg.reactions)) {
-        currentReactions = { ...msg.reactions };
-      } else if (currentAttachments.reactions && typeof currentAttachments.reactions === 'object' && !Array.isArray(currentAttachments.reactions)) {
+      if (currentAttachments.reactions && typeof currentAttachments.reactions === 'object' && !Array.isArray(currentAttachments.reactions)) {
         currentReactions = { ...currentAttachments.reactions };
       }
 
-      let currentPollData: WorkspacePollData | null = currentAttachments.poll_data || (msg as any)?.poll_data || null;
+      let currentPollData: WorkspacePollData | null = currentAttachments.poll_data || null;
+
+      // Robust fallback: if attachments.poll_data is missing, reconstruct it from message content
+      if (!currentPollData && typeof msg?.content === 'string' && msg.content.startsWith('📊 Poll:')) {
+        const lines = msg.content.split('\n');
+        const q = lines[0].replace('📊 Poll:', '').trim();
+        const optLines = lines.slice(1).filter((l: string) => l.startsWith('• '));
+        const options = optLines.map((l: string, idx: number) => ({
+          id: `opt_${idx}`,
+          text: l.replace('• ', '').trim(),
+          votes: [] as string[],
+        }));
+        if (options.length > 0) {
+          currentPollData = {
+            question: q,
+            options,
+            totalVotes: 0,
+          };
+        }
+      }
 
       // 3. Reconcile user vote in reactions map
       const updatedReactions: Record<string, string[]> = { ...currentReactions };
@@ -1694,27 +1750,35 @@ export const workspaceService = {
           .eq('id', messageId);
       } catch {}
 
-      // 6. Guaranteed insert transaction (all workspace members have INSERT rights)
+      // 6. Guaranteed insert transaction (only valid columns: workspace_id, sender_id, content, attachments)
       try {
-        await supabase
+        const { error: insErr } = await supabase
           .from('workspace_messages')
           .insert({
             workspace_id: workspaceId,
             sender_id: userId,
-            message_type: 'poll',
             content: `🗳️ Vote: ${optionId || 'retracted'} [${messageId}]`,
-            reply_to_id: messageId,
             attachments: {
               is_poll_vote_action: true,
               poll_id: messageId,
-              option_id: optionId,
+              option_id: optionId || '',
               voter_id: userId,
               timestamp: new Date().toISOString(),
             },
           });
+        if (insErr) {
+          console.error('[workspaceService] vote record insert error:', insErr);
+        }
       } catch (err) {
-        console.warn('[workspaceService] vote record insert warning:', err);
+        console.warn('[workspaceService] vote record insert exception:', err);
       }
+
+      // 7. Persist updated poll data into AsyncStorage cache as backup
+      try {
+        if (updatedPollData) {
+          await AsyncStorage.setItem(`@booffin_poll_data_${messageId}`, JSON.stringify(updatedPollData));
+        }
+      } catch {}
 
       return {
         success: true,
