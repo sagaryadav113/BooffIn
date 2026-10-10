@@ -159,10 +159,25 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const removeMember = useWorkspaceStore((s) => s.removeMember);
   const leaveWorkspace = useWorkspaceStore((s) => s.leaveWorkspace);
   const subscribeToWorkspaceMessages = useWorkspaceStore((s) => s.subscribeToWorkspaceMessages);
+  const sendTypingIndicator = useWorkspaceStore((s) => s.sendTypingIndicator);
+  const typingInThisRoom = useWorkspaceStore((s) => s.typingUsers[workspace.id]);
   const toggleReaction = useWorkspaceStore((s) => s.toggleReaction);
   const editMessage = useWorkspaceStore((s) => s.editMessage);
   const deleteMessage = useWorkspaceStore((s) => s.deleteMessage);
   const forwardMessage = useWorkspaceStore((s) => s.forwardMessage);
+
+  // Initial Room Loader & Realtime Subscription
+  useEffect(() => {
+    loadMessages(workspace.id);
+    loadMembers(workspace.id);
+    loadEvents(workspace.id);
+    loadOpportunities(workspace.id);
+    loadSavedItems(workspace.id);
+    const unsubscribe = subscribeToWorkspaceMessages(workspace.id);
+    return () => {
+      unsubscribe();
+    };
+  }, [workspace.id]);
 
   // Workspaces for Forwarding
   const dms = useWorkspaceStore((s) => s.dms);
@@ -182,6 +197,32 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
   // Discussions State
   const [inputText, setInputText] = useState('');
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isSomeoneTyping = Boolean(typingInThisRoom && Object.keys(typingInThisRoom).length > 0);
+  const typingUserNames = isSomeoneTyping
+    ? Object.values(typingInThisRoom).map((u) => u.username).join(', ')
+    : null;
+
+  const handleUserTyping = (text: string) => {
+    if (text.length > 0) {
+      sendTypingIndicator(workspace.id, true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        sendTypingIndicator(workspace.id, false);
+      }, 2500);
+    } else {
+      sendTypingIndicator(workspace.id, false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      sendTypingIndicator(workspace.id, false);
+    };
+  }, [workspace.id]);
   const [showDoiModal, setShowDoiModal] = useState(false);
   const [doiQuery, setDoiQuery] = useState('');
   const [isResolvingDoi, setIsResolvingDoi] = useState(false);
@@ -635,6 +676,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   // Input change & Mention detection
   const handleInputChange = (text: string) => {
     setInputText(text);
+    handleUserTyping(text);
     const lastWord = text.split(/\s+/).pop() || '';
     if (lastWord.startsWith('@')) {
       setMentionQuery(lastWord.slice(1).toLowerCase());
@@ -713,6 +755,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     });
 
     if (res.success) {
+      sendTypingIndicator(workspace.id, false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       setInputText('');
       setAttachedDoi(null);
       setReplyingTo(null);
@@ -1598,6 +1642,20 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               <TouchableOpacity onPress={() => setAttachedDoi(null)}>
                 <X size={16} color="#64748B" />
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Realtime Pod Members Typing Bubble Indicator */}
+          {isSomeoneTyping && (
+            <View style={styles.typingIndicatorBanner}>
+              <View style={styles.typingDotsWrap}>
+                <View style={[styles.typingDot, styles.typingDot1]} />
+                <View style={[styles.typingDot, styles.typingDot2]} />
+                <View style={[styles.typingDot, styles.typingDot3]} />
+              </View>
+              <Text style={styles.typingIndicatorText} numberOfLines={1}>
+                <Text style={{ fontWeight: '700' }}>{typingUserNames}</Text> {Object.keys(typingInThisRoom || {}).length > 1 ? 'are typing...' : 'is typing...'}
+              </Text>
             </View>
           )}
 
@@ -3700,6 +3758,41 @@ const styles = StyleSheet.create({
   ephemeralBannerSub: {
     fontSize: 11,
     color: '#059669',
+  },
+  typingIndicatorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(241, 245, 249, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 8,
+  },
+  typingDotsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#164E3F',
+  },
+  typingDot1: {
+    opacity: 0.4,
+  },
+  typingDot2: {
+    opacity: 0.7,
+  },
+  typingDot3: {
+    opacity: 1,
+  },
+  typingIndicatorText: {
+    fontSize: 12,
+    color: '#475569',
+    fontStyle: 'italic',
   },
 });
 

@@ -43,6 +43,8 @@ interface WorkspaceState {
   // Global State
   unreadTotal: number;
   activeHubTab: WorkspaceHubTab;
+  typingUsers: Record<string, Record<string, { username: string; timestamp: number }>>;
+  otherLastReadMap: Record<string, string>;
   isLoading: boolean;
   isRefreshing: boolean;
   isMessagesLoading: boolean;
@@ -52,6 +54,7 @@ interface WorkspaceState {
 
   // Actions
   setActiveHubTab: (tab: WorkspaceHubTab) => void;
+  sendTypingIndicator: (workspaceId: string, isTyping: boolean) => void;
   loadWorkspaces: (refresh?: boolean) => Promise<void>;
   loadWorkspaceDetails: (workspaceId: string) => Promise<Workspace | null>;
   loadMembers: (workspaceId: string) => Promise<void>;
@@ -187,6 +190,8 @@ interface WorkspaceState {
   subscribeToGlobalWorkspaceUpdates: (userId: string) => () => void;
 }
 
+const activeWorkspaceChannels = new Map<string, any>();
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   dms: [],
   communities: [],
@@ -201,6 +206,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   members: [],
   unreadTotal: 0,
   activeHubTab: 'all',
+  typingUsers: {},
+  otherLastReadMap: {},
   isLoading: false,
   isRefreshing: false,
   isMessagesLoading: false,
@@ -209,6 +216,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   error: null,
 
   setActiveHubTab: (tab: WorkspaceHubTab) => set({ activeHubTab: tab }),
+
+  sendTypingIndicator: (workspaceId: string, isTyping: boolean) => {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser || !workspaceId) return;
+    const channel = activeWorkspaceChannels.get(workspaceId);
+    if (channel) {
+      channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          workspaceId,
+          userId: currentUser.id,
+          username: currentUser.fullName || currentUser.handle || 'Researcher',
+          isTyping,
+          timestamp: Date.now(),
+        },
+      });
+    }
+  },
 
   loadWorkspaces: async (refresh = false) => {
     const currentUser = useAuthStore.getState().user;
@@ -368,6 +394,29 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         };
       });
 
+      // Instant 0ms broadcast to all other room participants
+      const channel = activeWorkspaceChannels.get(params.workspace_id);
+      if (channel) {
+        channel.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: {
+            message: res.message,
+          },
+        });
+        // Clear typing status
+        const currentUser = useAuthStore.getState().user;
+        channel.send({
+          type: 'broadcast',
+          event: 'typing',
+          payload: {
+            workspaceId: params.workspace_id,
+            userId: currentUser?.id,
+            isTyping: false,
+          },
+        });
+      }
+
       return { success: true, error: null };
     } catch (err: any) {
       set({ isSending: false });
@@ -381,9 +430,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     // Optimistic local update
     let updatedReactions: Record<string, string[]> = {};
+    let targetWorkspaceId: string | null = null;
     set((state) => {
       const msgs = state.messages.map((m) => {
         if (m.id === messageId) {
+          targetWorkspaceId = m.workspace_id;
           const current = { ...(m.reactions || {}) };
           const users = Array.isArray(current[emoji]) ? [...current[emoji]] : [];
           const idx = users.indexOf(currentUser.id);
@@ -405,6 +456,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return { messages: msgs };
     });
 
+    if (targetWorkspaceId) {
+      const channel = activeWorkspaceChannels.get(targetWorkspaceId);
+      if (channel) {
+        channel.send({
+          type: 'broadcast',
+          event: 'message_updated',
+          payload: {
+            workspaceId: targetWorkspaceId,
+            action: 'reaction',
+            messageId,
+            reactions: updatedReactions,
+          },
+        });
+      }
+    }
+
     try {
       const res = await workspaceService.toggleReaction(messageId, emoji, currentUser.id);
       if (res.error) {
@@ -417,14 +484,33 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   editMessage: async (messageId, newContent) => {
+    let targetWorkspaceId: string | null = null;
     // Optimistic update
     set((state) => ({
-      messages: state.messages.map((m) =>
-        m.id === messageId
-          ? { ...m, content: newContent.trim(), is_edited: true, updated_at: new Date().toISOString() }
-          : m
-      ),
+      messages: state.messages.map((m) => {
+        if (m.id === messageId) {
+          targetWorkspaceId = m.workspace_id;
+          return { ...m, content: newContent.trim(), is_edited: true, updated_at: new Date().toISOString() };
+        }
+        return m;
+      }),
     }));
+
+    if (targetWorkspaceId) {
+      const channel = activeWorkspaceChannels.get(targetWorkspaceId);
+      if (channel) {
+        channel.send({
+          type: 'broadcast',
+          event: 'message_updated',
+          payload: {
+            workspaceId: targetWorkspaceId,
+            action: 'edit',
+            messageId,
+            newContent: newContent.trim(),
+          },
+        });
+      }
+    }
 
     try {
       const res = await workspaceService.editMessage(messageId, newContent);
@@ -435,22 +521,44 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   deleteMessage: async (messageId, deleteForEveryone = true) => {
+    let targetWorkspaceId: string | null = null;
     // Optimistic update
     set((state) => ({
       messages: deleteForEveryone
-        ? state.messages.map((m) =>
-            m.id === messageId
-              ? {
-                  ...m,
-                  content: '🚫 This message was deleted',
-                  is_deleted: true,
-                  media_urls: null,
-                  doi_metadata: null,
-                }
-              : m
-          )
-        : state.messages.filter((m) => m.id !== messageId),
+        ? state.messages.map((m) => {
+            if (m.id === messageId) {
+              targetWorkspaceId = m.workspace_id;
+              return {
+                ...m,
+                content: '🚫 This message was deleted',
+                is_deleted: true,
+                media_urls: null,
+                doi_metadata: null,
+              };
+            }
+            return m;
+          })
+        : state.messages.filter((m) => {
+            if (m.id === messageId) targetWorkspaceId = m.workspace_id;
+            return m.id !== messageId;
+          }),
     }));
+
+    if (targetWorkspaceId && deleteForEveryone) {
+      const channel = activeWorkspaceChannels.get(targetWorkspaceId);
+      if (channel) {
+        channel.send({
+          type: 'broadcast',
+          event: 'message_updated',
+          payload: {
+            workspaceId: targetWorkspaceId,
+            action: 'delete',
+            messageId,
+            deleteForEveryone: true,
+          },
+        });
+      }
+    }
 
     try {
       const res = await workspaceService.deleteMessage(messageId, deleteForEveryone);
@@ -472,7 +580,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   markAsRead: async (workspaceId: string) => {
     const currentUser = useAuthStore.getState().user;
     if (!currentUser) return;
+    const now = new Date().toISOString();
     await workspaceService.markWorkspaceAsRead(workspaceId, currentUser.id);
+
+    // Broadcast instant read receipt so sender's ticks immediately turn green
+    const channel = activeWorkspaceChannels.get(workspaceId);
+    if (channel) {
+      channel.send({
+        type: 'broadcast',
+        event: 'read_receipt',
+        payload: {
+          workspaceId,
+          userId: currentUser.id,
+          lastReadAt: now,
+        },
+      });
+    }
 
     // Update local state unread badge
     set((state) => {
@@ -725,8 +848,111 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   subscribeToWorkspaceMessages: (workspaceId: string) => {
-    const channel = supabase
-      .channel(`workspace_messages:${workspaceId}`)
+    // 1. Establish dedicated real-time room channel with broadcast support
+    const channel = supabase.channel(`workspace_room:${workspaceId}`, {
+      config: { broadcast: { self: false } },
+    });
+
+    activeWorkspaceChannels.set(workspaceId, channel);
+
+    channel
+      // A. Realtime Instant Broadcast: New Message (0ms latency)
+      .on('broadcast', { event: 'new_message' }, async ({ payload }: any) => {
+        if (!payload?.message || payload.message.workspace_id !== workspaceId) return;
+        const msg = payload.message as WorkspaceMessage;
+
+        set((state) => {
+          if (state.messages.some((m) => m.id === msg.id)) {
+            return {
+              messages: state.messages.map((m) => (m.id === msg.id ? { ...m, ...msg } : m)),
+            };
+          }
+          return {
+            messages: [...state.messages, msg],
+          };
+        });
+
+        // Mark as read if user is viewing chat and message is from other user
+        const currentUserId = useAuthStore.getState().user?.id;
+        if (currentUserId && msg.sender_id !== currentUserId) {
+          get().markAsRead(workspaceId);
+        }
+      })
+      // B. Realtime Instant Broadcast: Typing Indicator
+      .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
+        if (!payload || payload.workspaceId !== workspaceId) return;
+        const currentUserId = useAuthStore.getState().user?.id;
+        if (payload.userId === currentUserId) return;
+
+        set((state) => {
+          const roomTyping = { ...(state.typingUsers[workspaceId] || {}) };
+          if (payload.isTyping) {
+            roomTyping[payload.userId] = {
+              username: payload.username || 'Researcher',
+              timestamp: payload.timestamp || Date.now(),
+            };
+          } else {
+            delete roomTyping[payload.userId];
+          }
+          return {
+            typingUsers: {
+              ...state.typingUsers,
+              [workspaceId]: roomTyping,
+            },
+          };
+        });
+      })
+      // C. Realtime Instant Broadcast: Read Receipts (Green Ticks)
+      .on('broadcast', { event: 'read_receipt' }, ({ payload }: any) => {
+        if (!payload || payload.workspaceId !== workspaceId) return;
+        const currentUserId = useAuthStore.getState().user?.id;
+        if (payload.userId === currentUserId) return;
+
+        set((state) => ({
+          otherLastReadMap: {
+            ...state.otherLastReadMap,
+            [workspaceId]: payload.lastReadAt,
+          },
+        }));
+      })
+      // D. Realtime Instant Broadcast: Message Updates (Reactions, Edits, Deletions)
+      .on('broadcast', { event: 'message_updated' }, ({ payload }: any) => {
+        if (!payload || payload.workspaceId !== workspaceId) return;
+        if (payload.action === 'delete') {
+          set((state) => ({
+            messages: payload.deleteForEveryone
+              ? state.messages.map((m) =>
+                  m.id === payload.messageId
+                    ? {
+                        ...m,
+                        content: '🚫 This message was deleted',
+                        is_deleted: true,
+                        media_urls: null,
+                        doi_metadata: null,
+                      }
+                    : m
+                )
+              : state.messages.filter((m) => m.id !== payload.messageId),
+          }));
+        } else if (payload.action === 'edit') {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              m.id === payload.messageId
+                ? { ...m, content: payload.newContent, is_edited: true, updated_at: new Date().toISOString() }
+                : m
+            ),
+          }));
+        } else if (payload.action === 'reaction') {
+          set((state) => ({
+            messages: state.messages.map((m) =>
+              m.id === payload.messageId
+                ? { ...m, reactions: payload.reactions }
+                : m
+            ),
+          }));
+        }
+      })
+      // E. Postgres Changes for Workspace Messages (Resilience & Background Sync)
       .on(
         'postgres_changes',
         {
@@ -864,9 +1090,31 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           }
         }
       )
+      // F. Postgres Changes for Workspace Members (Read Receipts)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'workspace_members',
+          filter: `workspace_id=eq.${workspaceId}`,
+        },
+        (payload: any) => {
+          const currentUserId = useAuthStore.getState().user?.id;
+          if (payload.new && payload.new.user_id !== currentUserId && payload.new.last_read_at) {
+            set((state) => ({
+              otherLastReadMap: {
+                ...state.otherLastReadMap,
+                [workspaceId]: payload.new.last_read_at,
+              },
+            }));
+          }
+        }
+      )
       .subscribe();
 
     return () => {
+      activeWorkspaceChannels.delete(workspaceId);
       supabase.removeChannel(channel);
     };
   },

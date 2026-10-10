@@ -140,8 +140,40 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const isMuted = Boolean(currentDm.is_muted);
   const isArchived = Boolean(currentDm.is_archived);
 
+  // Real-time typing & presence selectors
+  const sendTypingIndicator = useWorkspaceStore((s) => s.sendTypingIndicator);
+  const typingInThisRoom = useWorkspaceStore((s) => s.typingUsers[workspace.id]);
+  const storeOtherLastRead = useWorkspaceStore((s) => s.otherLastReadMap[workspace.id]);
+
   const [localPartner, setLocalPartner] = useState<any>(workspace.other_user || null);
   const [inputText, setInputText] = useState('');
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const partner = localPartner || workspace.other_user;
+  const isPartnerTyping = Boolean(typingInThisRoom && Object.keys(typingInThisRoom).length > 0);
+  const typingPartnerName = isPartnerTyping
+    ? Object.values(typingInThisRoom)[0]?.username || partner?.fullName || 'Researcher'
+    : null;
+
+  const handleUserTyping = (text: string) => {
+    if (text.length > 0) {
+      sendTypingIndicator(workspace.id, true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        sendTypingIndicator(workspace.id, false);
+      }, 2500);
+    } else {
+      sendTypingIndicator(workspace.id, false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      sendTypingIndicator(workspace.id, false);
+    };
+  }, [workspace.id]);
 
   // Voice Note Recording State
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
@@ -376,7 +408,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     };
   }, [currentUser?.id]);
 
-  const partner = localPartner || workspace.other_user;
+  const effectiveOtherLastReadAt = storeOtherLastRead || otherLastReadAt || workspace.other_last_read_at;
 
   // Filtered messages based on in-chat search & filter pills
   const displayedMessages = useMemo(() => {
@@ -1029,6 +1061,8 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     });
 
     if (res.success) {
+      sendTypingIndicator(workspace.id, false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       setInputText('');
       setAttachedDoi(null);
       setReplyingTo(null);
@@ -1537,7 +1571,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
               {isMe && !isDeleted && (
-                otherLastReadAt && new Date(otherLastReadAt).getTime() >= new Date(item.created_at).getTime() ? (
+                effectiveOtherLastReadAt && new Date(effectiveOtherLastReadAt).getTime() >= new Date(item.created_at).getTime() ? (
                   <CheckCheck size={13} color="#34D399" style={{ marginLeft: 4 }} />
                 ) : (
                   <CheckCheck size={13} color="#94A3B8" style={{ marginLeft: 4 }} />
@@ -1867,6 +1901,20 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       )}
 
+      {/* Realtime Partner Typing Bubble Indicator */}
+      {isPartnerTyping && (
+        <View style={styles.typingIndicatorBanner}>
+          <View style={styles.typingDotsWrap}>
+            <View style={[styles.typingDot, styles.typingDot1]} />
+            <View style={[styles.typingDot, styles.typingDot2]} />
+            <View style={[styles.typingDot, styles.typingDot3]} />
+          </View>
+          <Text style={styles.typingIndicatorText} numberOfLines={1}>
+            <Text style={{ fontWeight: '700' }}>{typingPartnerName}</Text> is typing...
+          </Text>
+        </View>
+      )}
+
       {/* Docked Quoted Reply Bar */}
       {replyingTo && (
         <View style={styles.replyingToDock}>
@@ -1938,7 +1986,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <TextInput
               ref={textInputRef}
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={(text) => {
+                setInputText(text);
+                handleUserTyping(text);
+              }}
               placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
               placeholderTextColor="#94A3B8"
               style={styles.textInput}
@@ -4432,5 +4483,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  typingIndicatorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(241, 245, 249, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 8,
+  },
+  typingDotsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#164E3F',
+  },
+  typingDot1: {
+    opacity: 0.4,
+  },
+  typingDot2: {
+    opacity: 0.7,
+  },
+  typingDot3: {
+    opacity: 1,
+  },
+  typingIndicatorText: {
+    fontSize: 12,
+    color: '#475569',
+    fontStyle: 'italic',
   },
 });
