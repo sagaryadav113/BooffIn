@@ -228,6 +228,18 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
     setIsLoadingMembers(false);
   };
 
+  const handleOptimisticMembersAdded = (newMembers?: WorkspaceMember[]) => {
+    if (newMembers && newMembers.length > 0) {
+      setMembers((prev) => {
+        const existingIds = new Set(prev.map((m) => m.user_id));
+        const toAdd = newMembers.filter((nm) => !existingIds.has(nm.user_id));
+        return [...prev, ...toAdd];
+      });
+      setShowMembersList(true);
+    }
+    refreshMembers();
+  };
+
   // Handle Copy Invite Link
   const handleCopyInviteLink = async () => {
     try {
@@ -1934,7 +1946,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
           onClose={() => setShowAddMembersModal(false)}
           workspace={workspace}
           existingMembers={members}
-          onMemberAdded={refreshMembers}
+          onMemberAdded={handleOptimisticMembersAdded}
         />
       </SafeAreaView>
     </Modal>

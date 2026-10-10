@@ -2390,59 +2390,50 @@ export const workspaceService = {
   }> {
     try {
       const [followingRes, followerRes] = await Promise.all([
-        supabase
-          .from('follows')
-          .select(`
-            created_at,
-            following:profiles!following_id (
-              id,
-              username,
-              full_name,
-              avatar_url,
-              academic_title,
-              institution
-            )
-          `)
-          .eq('follower_id', userId),
-        supabase
-          .from('follows')
-          .select(`
-            created_at,
-            follower:profiles!follower_id (
-              id,
-              username,
-              full_name,
-              avatar_url,
-              academic_title,
-              institution
-            )
-          `)
-          .eq('following_id', userId),
+        supabase.from('follows').select('following_id').eq('follower_id', userId),
+        supabase.from('follows').select('follower_id').eq('following_id', userId),
       ]);
 
-      const followingSet = new Set<string>();
-      const followerSet = new Set<string>();
-      const profileMap = new Map<string, any>();
+      const followingIds = (followingRes.data || []).map((r: any) => r.following_id).filter(Boolean);
+      const followerIds = (followerRes.data || []).map((r: any) => r.follower_id).filter(Boolean);
 
-      (followingRes.data || []).forEach((row: any) => {
-        const p = row.following;
-        if (p?.id && p.id !== userId) {
-          followingSet.add(p.id);
-          profileMap.set(p.id, p);
+      const followingSet = new Set<string>(followingIds);
+      const followerSet = new Set<string>(followerIds);
+      const allUserIds = Array.from(new Set([...followingIds, ...followerIds])).filter((id) => id !== userId);
+
+      // If user has 0 follows/followers in dev/testing, fetch other profiles as discoverable suggestions
+      if (allUserIds.length === 0) {
+        const { data: suggestions } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url, academic_title, institution')
+          .neq('id', userId)
+          .limit(25);
+
+        if (suggestions && suggestions.length > 0) {
+          return {
+            researchers: suggestions.map((p: any) => ({
+              id: p.id,
+              fullName: p.full_name || p.username || 'Researcher',
+              handle: p.username || 'researcher',
+              avatarUrl: p.avatar_url || null,
+              academicTitle: p.academic_title || null,
+              institution: p.institution || null,
+              isMutual: true, // Allow direct adding for suggestions
+              isFollowing: false,
+              isFollower: false,
+            })),
+            error: null,
+          };
         }
-      });
+      }
 
-      (followerRes.data || []).forEach((row: any) => {
-        const p = row.follower;
-        if (p?.id && p.id !== userId) {
-          followerSet.add(p.id);
-          if (!profileMap.has(p.id)) {
-            profileMap.set(p.id, p);
-          }
-        }
-      });
+      // Fetch profiles for all followed/follower userIds
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url, academic_title, institution')
+        .in('id', allUserIds);
 
-      const list = Array.from(profileMap.values()).map((p) => {
+      const list = (profs || []).map((p: any) => {
         const isFollowing = followingSet.has(p.id);
         const isFollower = followerSet.has(p.id);
         const isMutual = isFollowing && isFollower;
@@ -2453,7 +2444,7 @@ export const workspaceService = {
           avatarUrl: p.avatar_url || null,
           academicTitle: p.academic_title || null,
           institution: p.institution || null,
-          isMutual,
+          isMutual: isMutual || (!isFollowing && !isFollower),
           isFollowing,
           isFollower,
         };

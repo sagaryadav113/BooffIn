@@ -38,7 +38,7 @@ export interface WorkspaceAddMembersModalProps {
   onClose: () => void;
   workspace: Workspace;
   existingMembers?: WorkspaceMember[];
-  onMemberAdded?: () => void;
+  onMemberAdded?: (newMembers?: WorkspaceMember[]) => void;
 }
 
 interface ResearcherConnection {
@@ -162,7 +162,7 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
     return { mutualCount, inviteCount, total: selectedIds.size };
   }, [selectedIds, connections]);
 
-  // Handle Add Action
+  // Handle Add Action - Instant optimistic updates & real-time DB persistence
   const handleConfirmAdd = async () => {
     if (selectedIds.size === 0 || !currentUser?.id) return;
 
@@ -171,10 +171,10 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
       const currentActiveCount = (existingMembers || []).filter(
         (m) => m.status === 'active'
       ).length;
-      if (currentActiveCount + selectedCounts.mutualCount > 25) {
+      if (currentActiveCount + selectedIds.size > 25) {
         Alert.alert(
           'Capacity Exceeded',
-          `Inner circle pod is limited to 25 members. Current active: ${currentActiveCount}. Cannot add ${selectedCounts.mutualCount} more.`
+          `Inner circle pod is limited to 25 members. Current active: ${currentActiveCount}. Cannot add ${selectedIds.size} more.`
         );
         return;
       }
@@ -187,34 +187,68 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
-    let directAdded = 0;
-    let inviteSent = 0;
-    const errors: string[] = [];
+    // 1. Build instant optimistic WorkspaceMember records
+    const optimisticAddedMembers: WorkspaceMember[] = [];
+    const targetIdList = Array.from(selectedIds);
 
-    for (const targetId of Array.from(selectedIds)) {
+    for (const targetId of targetIdList) {
       const person = connections.find((c) => c.id === targetId);
       if (!person) continue;
 
-      if (person.isMutual) {
-        // Mutual follower -> Add directly to workspace
-        const res = await workspaceService.addDirectMember(workspace.id, targetId, 'member');
-        if (res.success) {
-          directAdded++;
-        } else {
-          errors.push(res.error || `Could not add ${person.fullName}`);
-        }
-      } else {
-        // Non-mutual follower -> Send invitation link on their chat
-        const res = await workspaceService.sendWorkspaceInvitation(
+      optimisticAddedMembers.push({
+        id: `opt-${Date.now()}-${targetId}`,
+        workspace_id: workspace.id,
+        user_id: targetId,
+        role: 'member',
+        status: 'active',
+        is_muted: false,
+        last_read_at: new Date().toISOString(),
+        unread_count: 0,
+        joined_at: new Date().toISOString(),
+        profile: {
+          id: person.id,
+          fullName: person.fullName,
+          handle: person.handle,
+          avatarUrl: person.avatarUrl,
+          academicTitle: person.academicTitle,
+          institution: person.institution,
+        },
+      });
+    }
+
+    // 2. Dispatch instant optimistic update to parent and global store
+    if (optimisticAddedMembers.length > 0) {
+      onMemberAdded?.(optimisticAddedMembers);
+      const currStoreMembers = useWorkspaceStore.getState().members || [];
+      const existingUserIds = new Set(currStoreMembers.map((m) => m.user_id));
+      const fresh = optimisticAddedMembers.filter((m) => !existingUserIds.has(m.user_id));
+      useWorkspaceStore.setState({
+        members: [...currStoreMembers, ...fresh],
+      });
+    }
+
+    // 3. Persist additions in database
+    let directAdded = 0;
+    let inviteSent = 0;
+
+    for (const targetId of targetIdList) {
+      const person = connections.find((c) => c.id === targetId);
+      if (!person) continue;
+
+      // Directly add active membership record
+      const res = await workspaceService.addDirectMember(workspace.id, targetId, 'member');
+      if (res.success) {
+        directAdded++;
+      }
+
+      // If non-mutual, also send invitation link on chat
+      if (!person.isMutual) {
+        await workspaceService.sendWorkspaceInvitation(
           workspace,
           targetId,
           currentUser.id
         );
-        if (res.success) {
-          inviteSent++;
-        } else {
-          errors.push(res.error || `Could not send invite to ${person.fullName}`);
-        }
+        inviteSent++;
       }
     }
 
@@ -224,22 +258,14 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
 
-    // Formulate feedback summary
-    const parts = [];
-    if (directAdded > 0) parts.push(`Added ${directAdded} mutual follower${directAdded > 1 ? 's' : ''} directly`);
-    if (inviteSent > 0) parts.push(`Sent chat invite to ${inviteSent} researcher${inviteSent > 1 ? 's' : ''}`);
+    // 4. Background refresh to sync DB state
+    loadMembers(workspace.id);
+    loadWorkspaceDetails(workspace.id);
 
-    const msg = parts.join('. ') + '.';
-    setStatusMessage(msg);
-
-    // Refresh workspace details and members in store
-    await loadMembers(workspace.id);
-    await loadWorkspaceDetails(workspace.id);
-    onMemberAdded?.();
-
+    // 5. Close modal quickly so user immediately sees their group info screen with the added members
     setTimeout(() => {
       onClose();
-    }, 1200);
+    }, 250);
   };
 
   const renderConnectionItem = useCallback(
