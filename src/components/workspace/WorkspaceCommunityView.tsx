@@ -12,6 +12,7 @@ import {
   Platform,
   Linking,
   Image,
+  Animated,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -46,6 +47,73 @@ import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
 
+const getDateLabel = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (msgDate.getTime() === today.getTime()) {
+    return 'Today';
+  }
+  if (msgDate.getTime() === yesterday.getTime()) {
+    return 'Yesterday';
+  }
+  const isSameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: isSameYear ? undefined : 'numeric',
+  });
+};
+
+const AnimatedTypingIndicator: React.FC<{ name: string; count: number }> = ({ name, count }) => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const createAnim = (val: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: -4, duration: 250, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.delay(Math.max(0, 500 - delay)),
+        ])
+      );
+
+    const a1 = createAnim(dot1, 0);
+    const a2 = createAnim(dot2, 150);
+    const a3 = createAnim(dot3, 300);
+
+    a1.start();
+    a2.start();
+    a3.start();
+
+    return () => {
+      a1.stop();
+      a2.stop();
+      a3.stop();
+    };
+  }, [dot1, dot2, dot3]);
+
+  return (
+    <View style={styles.typingIndicatorBanner}>
+      <View style={styles.typingDotsWrap}>
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot1 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot2 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot3 }] }]} />
+      </View>
+      <Text style={styles.typingIndicatorText} numberOfLines={1}>
+        <Text style={{ fontWeight: '700' }}>{name}</Text> {count > 1 ? 'are typing...' : 'is typing...'}
+      </Text>
+    </View>
+  );
+};
+
 export type CommunityTab = 'papers' | 'discussion' | 'podcasts' | 'live_sessions';
 
 interface WorkspaceCommunityViewProps {
@@ -69,6 +137,16 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const loadBlocks = useWorkspaceStore((s) => s.loadBlocks);
   const blockMember = useWorkspaceStore((s) => s.blockMember);
   const subscribeToWorkspaceMessages = useWorkspaceStore((s) => s.subscribeToWorkspaceMessages);
+  const typingUsers = useWorkspaceStore((s) => s.typingUsers);
+  const sendTypingIndicator = useWorkspaceStore((s) => s.sendTypingIndicator);
+
+  // Realtime Typing Calculation for this Community Room
+  const typingInThisRoom = typingUsers[workspace.id] || {};
+  const isSomeoneTyping = Object.keys(typingInThisRoom).length > 0;
+  const typingUserNames = Object.values(typingInThisRoom)
+    .map((t) => t.username)
+    .join(', ');
+  const typingTimeoutRef = useRef<any>(null);
 
   // Chat input
   const [inputText, setInputText] = useState('');
@@ -86,8 +164,11 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
 
   const flatListRef = useRef<FlatList>(null);
+  const isAtBottomRef = useRef(true);
+  const hasInitialScrolledRef = useRef(false);
 
   useEffect(() => {
+    hasInitialScrolledRef.current = false;
     loadMessages(workspace.id);
     loadEvents(workspace.id);
     loadBlocks(workspace.id);
@@ -98,9 +179,42 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     };
   }, [workspace.id]);
 
+  // Initial scroll to latest message when messages load
+  useEffect(() => {
+    if (messages.length > 0 && !hasInitialScrolledRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+        hasInitialScrolledRef.current = true;
+      }, 50);
+    }
+  }, [messages.length, isMessagesLoading]);
+
+  // Auto-scroll when new messages arrive if user is near bottom
+  useEffect(() => {
+    if (messages.length > 0 && hasInitialScrolledRef.current && isAtBottomRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    }
+  }, [messages.length]);
+
+  const handleTextChange = (text: string) => {
+    setInputText(text);
+    if (workspace.id) {
+      sendTypingIndicator(workspace.id, text.trim().length > 0);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        sendTypingIndicator(workspace.id, false);
+      }, 2500);
+    }
+  };
+
   const handleSendMessage = async () => {
     const trimmed = inputText.trim();
     if (!trimmed && !attachedDoi) return;
+    if (workspace.id) {
+      sendTypingIndicator(workspace.id, false);
+    }
     const res = await sendMessage({
       workspace_id: workspace.id,
       content: trimmed || (attachedDoi ? `Shared research paper: ${attachedDoi.title}` : ''),
@@ -331,6 +445,24 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             data={messages}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messagesList}
+            showsVerticalScrollIndicator={false}
+            onScroll={(e) => {
+              const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+              const paddingToBottom = 150;
+              const isClose = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+              isAtBottomRef.current = isClose;
+            }}
+            onContentSizeChange={() => {
+              if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
+                flatListRef.current?.scrollToEnd({ animated: hasInitialScrolledRef.current });
+                hasInitialScrolledRef.current = true;
+              }
+            }}
+            onLayout={() => {
+              if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
             ListHeaderComponent={
               /* Reference Embedded Demo Academic & Podcast Cards for Instant Rich Aesthetic */
               <View style={{ marginBottom: 12 }}>
@@ -442,31 +574,46 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                 </View>
               </View>
             }
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
               const isMe = item.sender_id === currentUser?.id;
+              const isFirstOfDateGroup =
+                index === 0 ||
+                getDateLabel(item.created_at) !== getDateLabel(messages[index - 1]?.created_at);
+
               return (
-                <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
-                  {!isMe && (
-                    <Avatar
-                      uri={item.sender?.avatarUrl || undefined}
-                      name={item.sender?.fullName || 'Researcher'}
-                      size="sm"
-                      style={{ marginRight: 8, alignSelf: 'flex-end', marginBottom: 4 }}
-                    />
+                <View key={item.id} style={{ width: '100%' }}>
+                  {isFirstOfDateGroup && (
+                    <View style={styles.dateSeparatorRow}>
+                      <View style={styles.dateSeparatorLine} />
+                      <View style={styles.dateSeparatorPill}>
+                        <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
+                      </View>
+                      <View style={styles.dateSeparatorLine} />
+                    </View>
                   )}
-                  <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.otherBubble]}>
+                  <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
                     {!isMe && (
-                      <Text style={styles.senderName}>{item.sender?.fullName || 'Researcher'}</Text>
+                      <Avatar
+                        uri={item.sender?.avatarUrl || undefined}
+                        name={item.sender?.fullName || 'Researcher'}
+                        size="sm"
+                        style={{ marginRight: 8, alignSelf: 'flex-end', marginBottom: 4 }}
+                      />
                     )}
-                    {item.doi_metadata && <WorkspaceDoiCard doiMeta={item.doi_metadata} />}
-                    {item.content ? (
-                      <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
-                        {item.content}
+                    <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.otherBubble]}>
+                      {!isMe && (
+                        <Text style={styles.senderName}>{item.sender?.fullName || 'Researcher'}</Text>
+                      )}
+                      {item.doi_metadata && <WorkspaceDoiCard doiMeta={item.doi_metadata} />}
+                      {item.content ? (
+                        <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
+                          {item.content}
+                        </Text>
+                      ) : null}
+                      <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
+                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </Text>
-                    ) : null}
-                    <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
-                      {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
+                    </View>
                   </View>
                 </View>
               );
@@ -489,6 +636,14 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             </View>
           )}
 
+          {/* Realtime Community Typing Indicator */}
+          {isSomeoneTyping && (
+            <AnimatedTypingIndicator
+              name={typingUserNames || 'Someone'}
+              count={Object.keys(typingInThisRoom || {}).length}
+            />
+          )}
+
           {/* Bottom Capsule Input Dock */}
           <View style={styles.bottomDockContainer}>
             <View style={styles.inputCapsule}>
@@ -501,7 +656,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
               <TextInput
                 value={inputText}
-                onChangeText={setInputText}
+                onChangeText={handleTextChange}
                 placeholder={`Message ${workspace.name}...`}
                 placeholderTextColor="#94A3B8"
                 style={styles.textInput}
@@ -1219,5 +1374,64 @@ const styles = StyleSheet.create({
   attachedDoiSub: {
     fontSize: 10,
     color: '#047857',
+  },
+  typingIndicatorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(241, 245, 249, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 8,
+  },
+  typingDotsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#164E3F',
+  },
+  typingIndicatorText: {
+    fontSize: 12,
+    color: '#475569',
+    fontStyle: 'italic',
+  },
+  dateSeparatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 14,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dateSeparatorPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  dateSeparatorText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'capitalize',
   },
 });
