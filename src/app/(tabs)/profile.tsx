@@ -86,6 +86,7 @@ import { ScholarPublication } from '../../types/scholar';
 import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab';
 import { FollowListModal } from '../../components/modals/FollowListModal';
 import { ImageCropperModal, CroppedImageResult } from '../../components/modals/ImageCropperModal';
+import { AuthorCommunitiesModal } from '../../components/profile/AuthorCommunitiesModal';
 
 export const DEFAULT_PROFILE_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
@@ -123,6 +124,7 @@ export default function CurrentUserProfileScreen() {
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
+  const [communitiesModalVisible, setCommunitiesModalVisible] = useState(false);
 
   // Automatically sync sub-tab or open research analytics modal if navigated via URL params (e.g. ?tab=Saved or ?tab=Articles)
   useEffect(() => {
@@ -931,6 +933,28 @@ export default function CurrentUserProfileScreen() {
             </View>
           </View>
 
+          {/* Join User Community Banner */}
+          <TouchableOpacity
+            style={styles.joinCommunityBanner}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              setCommunitiesModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.joinCommunityLeft}>
+              <View style={styles.joinCommunityIconWrap}>
+                <Users size={16} color="#064E3B" />
+              </View>
+              <Text style={styles.joinCommunityText} numberOfLines={1}>
+                Join {user.fullName ? `${user.fullName.split(' ')[0]}'s` : 'My'} Community
+              </Text>
+            </View>
+            <Sparkles size={16} color="#064E3B" />
+          </TouchableOpacity>
+
           {/* Following / Followers Stats */}
           <View style={styles.statsRow}>
             <TouchableOpacity
@@ -1709,6 +1733,18 @@ export default function CurrentUserProfileScreen() {
           onClose={() => setAnalyticsModalOpen(false)}
         />
       )}
+
+      {/* Author Communities Modal */}
+      {user && (
+        <AuthorCommunitiesModal
+          visible={communitiesModalVisible}
+          onClose={() => setCommunitiesModalVisible(false)}
+          authorId={user.id}
+          authorName={user.fullName || 'Researcher'}
+          authorAvatarUrl={user.avatarUrl}
+          isOwnProfile={true}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -1717,6 +1753,39 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  joinCommunityBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  joinCommunityLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  joinCommunityIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinCommunityText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#064E3B',
+    flexShrink: 1,
   },
   scrollContent: {
     paddingBottom: spacing.xxxl * 2,

@@ -60,6 +60,7 @@ import { AppHeader } from '../../components/layout/AppHeader';
 import { FollowListModal } from '../../components/modals/FollowListModal';
 import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab';
 import { OpenAlexAuthorProfileView } from '../../components/profile/OpenAlexAuthorProfileView';
+import { AuthorCommunitiesModal } from '../../components/profile/AuthorCommunitiesModal';
 
 function isOpenAlexOrOrcidIdentifier(
   id?: string,
@@ -98,6 +99,7 @@ export default function OtherResearcherProfileScreen() {
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [communitiesModalVisible, setCommunitiesModalVisible] = useState(false);
   const [postsRenderLimit, setPostsRenderLimit] = useState(12);
 
   const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
@@ -717,6 +719,28 @@ export default function OtherResearcherProfileScreen() {
             </View>
           </View>
 
+          {/* Join Researcher Community Banner */}
+          <TouchableOpacity
+            style={styles.joinCommunityBanner}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              setCommunitiesModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.joinCommunityLeft}>
+              <View style={styles.joinCommunityIconWrap}>
+                <Users size={16} color="#064E3B" />
+              </View>
+              <Text style={styles.joinCommunityText} numberOfLines={1}>
+                Join {researcher.fullName ? `${researcher.fullName.split(' ')[0]}'s` : 'Author'} Community
+              </Text>
+            </View>
+            <Sparkles size={16} color="#064E3B" />
+          </TouchableOpacity>
+
           {/* Following / Followers Stats */}
           <View style={styles.statsRow}>
             <TouchableOpacity
@@ -969,6 +993,18 @@ export default function OtherResearcherProfileScreen() {
           onReportSuccess={() => setReportModalVisible(false)}
         />
       )}
+
+      {/* Author Communities Modal */}
+      {researcher && (
+        <AuthorCommunitiesModal
+          visible={communitiesModalVisible}
+          onClose={() => setCommunitiesModalVisible(false)}
+          authorId={researcher.id}
+          authorName={researcher.fullName || 'Researcher'}
+          authorAvatarUrl={researcher.avatarUrl}
+          isOwnProfile={isOwnProfile}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -977,6 +1013,39 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  joinCommunityBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  joinCommunityLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  joinCommunityIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinCommunityText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#064E3B',
+    flexShrink: 1,
   },
   scrollContent: {
     paddingBottom: spacing.xxxl * 2,

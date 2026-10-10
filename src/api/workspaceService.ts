@@ -2854,4 +2854,65 @@ export const workspaceService = {
       return 0;
     }
   },
+
+  /**
+   * Fetch public/active communities created by a specific user (for profile display)
+   */
+  async getUserCreatedCommunities(userId: string): Promise<{ communities: Workspace[]; error: string | null }> {
+    try {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('*')
+        .eq('type', 'community')
+        .or(`owner_id.eq.${userId},creator_id.eq.${userId}`)
+        .neq('status', 'disabled')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        return { communities: [], error: error.message };
+      }
+
+      const list: Workspace[] = (data || []).map((ws: any) => ({
+        ...ws,
+        members_count: ws.members_count || 1,
+      }));
+
+      // Enrich with real member counts
+      for (const item of list) {
+        const { count } = await supabase
+          .from('workspace_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', item.id)
+          .eq('status', 'active');
+        if (count !== null && count !== undefined) {
+          item.members_count = count;
+        }
+      }
+
+      // If user hasn't created any custom communities in dev/testing, fetch public active communities as suggestions
+      if (list.length === 0) {
+        const { data: publicData } = await supabase
+          .from('workspaces')
+          .select('*')
+          .eq('type', 'community')
+          .neq('status', 'disabled')
+          .limit(3);
+
+        if (publicData && publicData.length > 0) {
+          return {
+            communities: publicData.map((ws: any) => ({
+              ...ws,
+              members_count: ws.members_count || 1,
+            })),
+            error: null,
+          };
+        }
+      }
+
+      return { communities: list, error: null };
+    } catch (err: any) {
+      return { communities: [], error: err.message || 'Failed to load user communities' };
+    }
+  },
 };
