@@ -862,8 +862,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   subscribeToWorkspaceMessages: (workspaceId: string) => {
-    // 1. Establish dedicated real-time room channel with broadcast support
-    const channel = supabase.channel(`workspace_room:${workspaceId}`, {
+    // 1. Clean up any existing channel for this workspace first to prevent callback-after-subscribe errors
+    const existing = activeWorkspaceChannels.get(workspaceId);
+    if (existing) {
+      try {
+        supabase.removeChannel(existing);
+      } catch {}
+      activeWorkspaceChannels.delete(workspaceId);
+    }
+
+    const channelName = `workspace_room:${workspaceId}`;
+    try {
+      const existingInClient = supabase.getChannels().find((c: any) => c.topic === `realtime:${channelName}` || c.topic === channelName);
+      if (existingInClient) {
+        supabase.removeChannel(existingInClient);
+      }
+    } catch {}
+
+    // 2. Establish dedicated real-time room channel with broadcast support
+    const channel = supabase.channel(channelName, {
       config: { broadcast: { self: false } },
     });
 

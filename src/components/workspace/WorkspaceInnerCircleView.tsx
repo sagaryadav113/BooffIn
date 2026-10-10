@@ -271,6 +271,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     loadEvents(workspace.id);
     loadOpportunities(workspace.id);
     loadSavedItems(workspace.id);
+    markAsRead(workspace.id);
     const unsubscribe = subscribeToWorkspaceMessages(workspace.id);
     return () => {
       unsubscribe();
@@ -872,19 +873,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     }
   };
 
-  useEffect(() => {
-    loadMessages(workspace.id);
-    loadEvents(workspace.id);
-    loadOpportunities(workspace.id);
-    loadSavedItems(workspace.id);
-    loadMembers(workspace.id);
-    markAsRead(workspace.id);
-
-    const unsubscribe = subscribeToWorkspaceMessages(workspace.id);
-    return () => {
-      unsubscribe();
-    };
-  }, [workspace.id]);
 
   // Input change & Mention detection
   const handleInputChange = (text: string) => {
