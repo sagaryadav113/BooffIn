@@ -1,11 +1,25 @@
 // BooffIn Electron Main Process
-const { app, BrowserWindow, session, shell, Menu } = require('electron');
+const { app, BrowserWindow, protocol, net, session, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let mainWindow = null;
 
-// Allow self-signed certificates or academic endpoints if needed
+// Register custom privileged scheme for SPA asset loading
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
+
+// Allow unblocked academic endpoints
 app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
 
 function createWindow() {
@@ -22,7 +36,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true, // Keep web security, but strip blocking headers below
+      webSecurity: false, // Allows cross-origin paper embedding inside desktop
       allowRunningInsecureContent: false,
     },
     backgroundColor: '#0F172A',
@@ -34,11 +48,10 @@ function createWindow() {
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 BooffInDesktop/1.0.0';
   mainWindow.webContents.setUserAgent(userAgent);
 
-  // Unblock academic paper iframes by stripping restrictive headers
+  // Unblock academic paper iframes by stripping anti-embedding headers
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = { ...details.responseHeaders };
 
-    // Remove anti-embedding headers so bioRxiv, arXiv, PMC, and other journals can render inside BooffIn
     const headersToRemove = [
       'x-frame-options',
       'X-Frame-Options',
@@ -52,38 +65,29 @@ function createWindow() {
       delete responseHeaders[h];
     }
 
-    // Ensure permissive CORS for document requests
     responseHeaders['access-control-allow-origin'] = ['*'];
 
     callback({ cancel: false, responseHeaders });
   });
 
-  // Load the exported production Expo web bundle or local dev server
-  const distIndexPath = path.join(__dirname, '../dist/index.html');
-  const isDev = process.env.NODE_ENV === 'development';
-
-  if (isDev && process.env.ELECTRON_START_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_START_URL);
-  } else if (fs.existsSync(distIndexPath)) {
+  // Load the app via privileged scheme
+  mainWindow.loadURL('app://localhost/index.html').catch(() => {
+    // Fallback: direct load file
+    const distIndexPath = path.join(__dirname, '../dist/index.html');
     mainWindow.loadFile(distIndexPath);
-  } else {
-    // Fallback to local dev server if dist not yet built
-    mainWindow.loadURL('http://localhost:8081');
-  }
+  });
 
-  // Gracefully show window when ready
+  // Show window once ready
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
 
-  // Handle external links (open in system default browser)
+  // Handle external links
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // If it's an external authentication or general web link, open in user's default browser
     if (url.startsWith('https://accounts.google.com') || url.startsWith('https://github.com/login')) {
       shell.openExternal(url);
       return { action: 'deny' };
     }
-    // Allow internal window creation for PDF previews
     return { action: 'allow' };
   });
 
@@ -94,6 +98,28 @@ function createWindow() {
 
 // App lifecycle
 app.whenReady().then(() => {
+  // Resolve dist path
+  const distPath = path.join(__dirname, '../dist');
+
+  // Handle app:// protocol for SPA assets
+  protocol.handle('app', (request) => {
+    const reqUrl = new URL(request.url);
+    let pathname = decodeURIComponent(reqUrl.pathname);
+
+    if (pathname === '/' || pathname === '') {
+      pathname = '/index.html';
+    }
+
+    let filePath = path.join(distPath, pathname);
+
+    // If file doesn't exist, serve index.html (SPA client-side routing)
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+      filePath = path.join(distPath, 'index.html');
+    }
+
+    return net.fetch(`file:///${filePath.replace(/\\/g, '/')}`);
+  });
+
   createWindow();
 
   app.on('activate', () => {
