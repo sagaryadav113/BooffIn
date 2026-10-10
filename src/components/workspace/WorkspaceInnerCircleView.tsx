@@ -1631,11 +1631,12 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     />
                   )}
 
-                  <TouchableOpacity
-                    activeOpacity={0.92}
-                    onLongPress={() => handleLongPressMessage(item)}
-                    style={[styles.messageBubble, isMe ? styles.myBubble : styles.otherBubble]}
-                  >
+                  <View style={styles.bubbleWrapper}>
+                    <TouchableOpacity
+                      activeOpacity={0.92}
+                      onLongPress={() => handleLongPressMessage(item)}
+                      style={[styles.messageBubble, isMe ? styles.myBubble : styles.otherBubble]}
+                    >
                     {/* Pinned Tag */}
                     {isPinnedThis && (
                       <View style={styles.bubblePinTag}>
@@ -1848,7 +1849,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         })}
                       </View>
                     )}
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             );
@@ -3239,25 +3241,36 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: 'row',
-    marginBottom: 10,
-    maxWidth: '85%',
+    marginBottom: 12,
+    maxWidth: Platform.OS === 'web' ? '72%' : '84%',
+    alignItems: 'flex-end',
   },
   myMessageRow: {
     alignSelf: 'flex-end',
+    justifyContent: 'flex-end',
   },
   otherMessageRow: {
     alignSelf: 'flex-start',
+    justifyContent: 'flex-start',
+  },
+  bubbleWrapper: {
+    maxWidth: '100%',
+    flexShrink: 1,
   },
   messageBubble: {
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 16,
+    borderRadius: 18,
+    maxWidth: '100%',
+    flexShrink: 1,
   },
   myBubble: {
     backgroundColor: '#164E3F',
+    borderBottomRightRadius: 3,
   },
   otherBubble: {
     backgroundColor: '#F3F4F6',
+    borderBottomLeftRadius: 3,
   },
   senderName: {
     fontSize: 11,
@@ -3268,6 +3281,8 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 14,
     lineHeight: 20,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   myMessageText: {
     color: '#FFFFFF',

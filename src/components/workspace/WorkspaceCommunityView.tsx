@@ -1289,15 +1289,16 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                       />
                     )}
 
-                    <TouchableOpacity
-                      activeOpacity={0.9}
-                      onLongPress={() => handleLongPressMessage(item)}
-                      style={[
-                        styles.messageBubble,
-                        isMe ? styles.myBubble : styles.otherBubble,
-                        isDeleted && styles.deletedBubble,
-                      ]}
-                    >
+                    <View style={styles.bubbleWrapper}>
+                      <TouchableOpacity
+                        activeOpacity={0.9}
+                        onLongPress={() => handleLongPressMessage(item)}
+                        style={[
+                          styles.messageBubble,
+                          isMe ? styles.myBubble : styles.otherBubble,
+                          isDeleted && styles.deletedBubble,
+                        ]}
+                      >
                       {/* Sender Name in Group Chat */}
                       {!isMe && !isDeleted && (
                         <Text style={styles.senderName}>
@@ -1440,7 +1441,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                           </View>
                         </>
                       )}
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   {/* Emoji Reactions Pills under message bubble */}
@@ -2950,8 +2952,9 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: 'row',
-    marginVertical: 4,
-    maxWidth: '84%',
+    marginBottom: 10,
+    maxWidth: Platform.OS === 'web' ? '72%' : '84%',
+    alignItems: 'flex-end',
   },
   myMessageRow: {
     alignSelf: 'flex-end',
@@ -2961,11 +2964,16 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     justifyContent: 'flex-start',
   },
-  messageBubble: {
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  bubbleWrapper: {
     maxWidth: '100%',
+    flexShrink: 1,
+  },
+  messageBubble: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    maxWidth: '100%',
+    flexShrink: 1,
   },
   myBubble: {
     backgroundColor: '#164E3F',
