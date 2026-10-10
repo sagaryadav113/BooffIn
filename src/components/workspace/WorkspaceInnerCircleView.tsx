@@ -247,6 +247,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const sendTypingIndicator = useWorkspaceStore((s) => s.sendTypingIndicator);
   const typingInThisRoom = useWorkspaceStore((s) => s.typingUsers[workspace.id]);
   const toggleReaction = useWorkspaceStore((s) => s.toggleReaction);
+  const votePoll = useWorkspaceStore((s) => s.votePoll);
   const editMessage = useWorkspaceStore((s) => s.editMessage);
   const deleteMessage = useWorkspaceStore((s) => s.deleteMessage);
   const forwardMessage = useWorkspaceStore((s) => s.forwardMessage);
@@ -587,6 +588,34 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
   const [localPollVotes, setLocalPollVotes] = useState<Record<string, string>>({});
 
+  // Auto-hydrate user's existing poll selections from loaded messages so votes persist across restarts
+  useEffect(() => {
+    if (!currentUser?.id || !messages || messages.length === 0) return;
+    const detected: Record<string, string> = {};
+    messages.forEach((m) => {
+      const reactions = (m.reactions as Record<string, string[]>) || (m.attachments as any)?.reactions || {};
+      const pollData = m.poll_data || (m.attachments as any)?.poll_data;
+
+      Object.entries(reactions).forEach(([k, uids]) => {
+        if (k.startsWith('vote:') && Array.isArray(uids) && uids.includes(currentUser.id)) {
+          detected[m.id] = k.replace('vote:', '');
+        }
+      });
+
+      if (!detected[m.id] && pollData && Array.isArray(pollData.options)) {
+        pollData.options.forEach((opt: any) => {
+          if (Array.isArray(opt.votes) && opt.votes.includes(currentUser.id)) {
+            detected[m.id] = opt.id;
+          }
+        });
+      }
+    });
+
+    if (Object.keys(detected).length > 0) {
+      setLocalPollVotes((prev) => ({ ...detected, ...prev }));
+    }
+  }, [messages, currentUser?.id]);
+
   const [showPostPickerModal, setShowPostPickerModal] = useState(false);
   const [postTitleInput, setPostTitleInput] = useState('');
   const [postSnippetInput, setPostSnippetInput] = useState('');
@@ -755,16 +784,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       [messageId]: newVote,
     }));
 
-    if (currentUser?.id) {
-      if (prevVote && prevVote !== optionId) {
-        await toggleReaction(messageId, `vote:${prevVote}`);
-      }
-      if (newVote) {
-        await toggleReaction(messageId, `vote:${newVote}`);
-      } else if (prevVote === optionId) {
-        await toggleReaction(messageId, `vote:${optionId}`);
-      }
-    }
+    await votePoll(workspace.id, messageId, newVote);
   };
 
   // Step 3: Share Document / PDF Manuscript Handler

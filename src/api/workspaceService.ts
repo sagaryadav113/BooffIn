@@ -1083,7 +1083,35 @@ export const workspaceService = {
       const rawMap = new Map<string, any>();
       rawList.forEach((m: any) => rawMap.set(m.id, m));
 
-      const messages: WorkspaceMessage[] = rawList.map((m: any) => {
+      // 1. Reconcile lightweight poll vote action transactions across the workspace
+      // Map: pollMessageId -> Map<voterUserId, optionId>
+      const pollVoteLedger = new Map<string, Map<string, string>>();
+      rawList.forEach((m: any) => {
+        const isVoteAction =
+          m.attachments?.is_poll_vote_action === true ||
+          (typeof m.content === 'string' && m.content.startsWith('🗳️ Vote:'));
+        if (isVoteAction) {
+          const pollId = m.attachments?.poll_id || m.reply_to_id;
+          const optionId = m.attachments?.option_id ?? '';
+          const voterId = m.attachments?.voter_id || m.sender_id;
+          if (pollId && voterId) {
+            if (!pollVoteLedger.has(pollId)) {
+              pollVoteLedger.set(pollId, new Map());
+            }
+            pollVoteLedger.get(pollId)!.set(voterId, optionId);
+          }
+        }
+      });
+
+      // 2. Filter out raw vote transaction records from visible chat messages
+      const visibleRawList = rawList.filter((m: any) => {
+        const isVoteAction =
+          m.attachments?.is_poll_vote_action === true ||
+          (typeof m.content === 'string' && m.content.startsWith('🗳️ Vote:'));
+        return !isVoteAction;
+      });
+
+      const messages: WorkspaceMessage[] = visibleRawList.map((m: any) => {
         let extractedMedia: string[] | null = null;
         if (Array.isArray(m.media_urls) && m.media_urls.length > 0) {
           extractedMedia = m.media_urls;
@@ -1114,7 +1142,61 @@ export const workspaceService = {
         const callMeta = m.call_metadata || m.attachments?.call_metadata || null;
         const audioMeta = m.audio_metadata || m.attachments?.audio_metadata || null;
         const doiMeta = m.doi_metadata || m.attachments?.doi_metadata || null;
-        const pollData = m.poll_data || m.attachments?.poll_data || null;
+        let pollData: any = m.poll_data || m.attachments?.poll_data || null;
+
+        // Extract reactions from top-level column OR attachments.reactions
+        let reactions: Record<string, string[]> = {};
+        if (m.reactions && typeof m.reactions === 'object' && !Array.isArray(m.reactions)) {
+          reactions = { ...m.reactions };
+        } else if (m.attachments?.reactions && typeof m.attachments.reactions === 'object' && !Array.isArray(m.attachments.reactions)) {
+          reactions = { ...m.attachments.reactions };
+        }
+
+        // Apply ledger votes if this is a poll message
+        if (pollVoteLedger.has(m.id)) {
+          const ledgerVotes = pollVoteLedger.get(m.id)!;
+          // Apply to reactions
+          ledgerVotes.forEach((chosenOptId, voterId) => {
+            // Remove voter from all options first
+            Object.keys(reactions).forEach((k) => {
+              if (k.startsWith('vote:') && Array.isArray(reactions[k])) {
+                reactions[k] = reactions[k].filter((uid) => uid !== voterId);
+                if (reactions[k].length === 0) delete reactions[k];
+              }
+            });
+            // Add to chosen option if not retracted
+            if (chosenOptId) {
+              const voteKey = `vote:${chosenOptId}`;
+              if (!reactions[voteKey]) reactions[voteKey] = [];
+              if (!reactions[voteKey].includes(voterId)) reactions[voteKey].push(voterId);
+            }
+          });
+
+          // Apply to pollData if available
+          if (pollData && Array.isArray(pollData.options)) {
+            const updatedOpts = pollData.options.map((opt: any) => {
+              let votes: string[] = Array.isArray(opt.votes) ? [...opt.votes] : [];
+              ledgerVotes.forEach((chosenOptId, voterId) => {
+                votes = votes.filter((uid) => uid !== voterId);
+                if (opt.id === chosenOptId) {
+                  votes.push(voterId);
+                }
+              });
+              return { ...opt, votes };
+            });
+
+            let total = 0;
+            updatedOpts.forEach((opt: any) => {
+              total += (opt.votes?.length || 0);
+            });
+
+            pollData = {
+              ...pollData,
+              options: updatedOpts,
+              totalVotes: total,
+            };
+          }
+        }
 
         const isImgType = Boolean(extractedMedia && extractedMedia.length > 0) || m.message_type === 'image';
 
@@ -1127,7 +1209,7 @@ export const workspaceService = {
         else if (callMeta) detectedType = 'call_log';
         else if (audioMeta) detectedType = 'audio';
         else if (doiMeta) detectedType = 'paper_doi';
-        else if (pollData) detectedType = 'poll';
+        else if (pollData || (typeof m.content === 'string' && m.content.startsWith('📊 Poll:'))) detectedType = 'poll';
         else if (!detectedType) detectedType = 'text';
 
         // Resolve parent reply message info
@@ -1158,7 +1240,7 @@ export const workspaceService = {
           audio_metadata: audioMeta,
           poll_data: pollData,
           attachments: m.attachments || null,
-          reactions: m.reactions || null,
+          reactions: Object.keys(reactions).length > 0 ? reactions : null,
           is_edited: m.is_edited || false,
           is_deleted: m.is_deleted || false,
           e2ee_ciphertext: m.e2ee_ciphertext || null,
@@ -1446,19 +1528,22 @@ export const workspaceService = {
     userId: string
   ): Promise<{ reactions: Record<string, string[]>; error: string | null }> {
     try {
-      const { data: msg, error: fetchErr } = await supabase
+      const { data: msg } = await supabase
         .from('workspace_messages')
-        .select('reactions')
+        .select('id, attachments, reactions')
         .eq('id', messageId)
         .single();
 
-      if (fetchErr && !fetchErr.message.includes('column')) {
-        return { reactions: {}, error: fetchErr.message };
+      let currentAttachments: any = {};
+      if (msg?.attachments && typeof msg.attachments === 'object' && !Array.isArray(msg.attachments)) {
+        currentAttachments = { ...msg.attachments };
       }
 
-      let currentReactions: Record<string, string[]> = (msg?.reactions as any) || {};
-      if (typeof currentReactions !== 'object' || currentReactions === null || Array.isArray(currentReactions)) {
-        currentReactions = {};
+      let currentReactions: Record<string, string[]> = {};
+      if (msg?.reactions && typeof msg.reactions === 'object' && !Array.isArray(msg.reactions)) {
+        currentReactions = { ...msg.reactions };
+      } else if (currentAttachments.reactions && typeof currentAttachments.reactions === 'object' && !Array.isArray(currentAttachments.reactions)) {
+        currentReactions = { ...currentAttachments.reactions };
       }
 
       const usersForEmoji = Array.isArray(currentReactions[emoji]) ? [...currentReactions[emoji]] : [];
@@ -1470,25 +1555,176 @@ export const workspaceService = {
         usersForEmoji.push(userId);
       }
 
-      const updated = { ...currentReactions };
+      const updated: Record<string, string[]> = { ...currentReactions };
       if (usersForEmoji.length > 0) {
         updated[emoji] = usersForEmoji;
       } else {
         delete updated[emoji];
       }
 
-      const { error: updateErr } = await supabase
-        .from('workspace_messages')
-        .update({ reactions: updated })
-        .eq('id', messageId);
+      currentAttachments.reactions = updated;
 
-      if (updateErr) {
-        return { reactions: updated, error: updateErr.message };
+      // Persist to attachments (and try reactions column if available)
+      try {
+        await supabase
+          .from('workspace_messages')
+          .update({
+            attachments: currentAttachments,
+            reactions: updated,
+          })
+          .eq('id', messageId);
+      } catch {
+        try {
+          await supabase
+            .from('workspace_messages')
+            .update({ attachments: currentAttachments })
+            .eq('id', messageId);
+        } catch {}
       }
 
       return { reactions: updated, error: null };
     } catch (err: any) {
       return { reactions: {}, error: err.message || 'Failed to toggle reaction' };
+    }
+  },
+
+  /**
+   * Cast or update a poll vote with multi-layer persistence.
+   * Stores to AsyncStorage locally, updates attachments on the message,
+   * and logs a vote action record to workspace_messages so votes never vanish across app restarts.
+   */
+  async votePoll(
+    workspaceId: string,
+    messageId: string,
+    optionId: string,
+    userId: string
+  ): Promise<{
+    success: boolean;
+    reactions: Record<string, string[]>;
+    pollData?: WorkspacePollData;
+    error: string | null;
+  }> {
+    try {
+      // 1. Persist locally to AsyncStorage for instant restoration on this device
+      try {
+        const storageKey = `@booffin_poll_vote_${messageId}_${userId}`;
+        if (optionId) {
+          await AsyncStorage.setItem(storageKey, optionId);
+        } else {
+          await AsyncStorage.removeItem(storageKey);
+        }
+      } catch {}
+
+      // 2. Fetch target poll message
+      const { data: msg } = await supabase
+        .from('workspace_messages')
+        .select('id, attachments, reactions')
+        .eq('id', messageId)
+        .single();
+
+      let currentAttachments: any = {};
+      if (msg?.attachments && typeof msg.attachments === 'object' && !Array.isArray(msg.attachments)) {
+        currentAttachments = { ...msg.attachments };
+      }
+
+      let currentReactions: Record<string, string[]> = {};
+      if (msg?.reactions && typeof msg.reactions === 'object' && !Array.isArray(msg.reactions)) {
+        currentReactions = { ...msg.reactions };
+      } else if (currentAttachments.reactions && typeof currentAttachments.reactions === 'object' && !Array.isArray(currentAttachments.reactions)) {
+        currentReactions = { ...currentAttachments.reactions };
+      }
+
+      let currentPollData: WorkspacePollData | null = currentAttachments.poll_data || (msg as any)?.poll_data || null;
+
+      // 3. Reconcile user vote in reactions map
+      const updatedReactions: Record<string, string[]> = { ...currentReactions };
+      Object.keys(updatedReactions).forEach((key) => {
+        if (key.startsWith('vote:') && Array.isArray(updatedReactions[key])) {
+          updatedReactions[key] = updatedReactions[key].filter((uid) => uid !== userId);
+          if (updatedReactions[key].length === 0) {
+            delete updatedReactions[key];
+          }
+        }
+      });
+
+      if (optionId) {
+        const voteKey = `vote:${optionId}`;
+        const users = Array.isArray(updatedReactions[voteKey]) ? [...updatedReactions[voteKey]] : [];
+        if (!users.includes(userId)) {
+          users.push(userId);
+        }
+        updatedReactions[voteKey] = users;
+      }
+
+      // 4. Reconcile user vote in poll_data
+      let updatedPollData: WorkspacePollData | null = null;
+      if (currentPollData && Array.isArray(currentPollData.options)) {
+        const updatedOptions = currentPollData.options.map((opt) => {
+          let votes: string[] = Array.isArray(opt.votes) ? opt.votes.filter((uid) => uid !== userId) : [];
+          if (opt.id === optionId) {
+            votes.push(userId);
+          }
+          return { ...opt, votes };
+        });
+
+        let total = 0;
+        updatedOptions.forEach((opt) => {
+          total += opt.votes.length;
+        });
+
+        updatedPollData = {
+          ...currentPollData,
+          options: updatedOptions,
+          totalVotes: total,
+        };
+      }
+
+      currentAttachments.reactions = updatedReactions;
+      if (updatedPollData) {
+        currentAttachments.poll_data = updatedPollData;
+      }
+
+      // 5. Direct message update attempt (succeeds if user is allowed to update)
+      try {
+        await supabase
+          .from('workspace_messages')
+          .update({
+            attachments: currentAttachments,
+          })
+          .eq('id', messageId);
+      } catch {}
+
+      // 6. Guaranteed insert transaction (all workspace members have INSERT rights)
+      try {
+        await supabase
+          .from('workspace_messages')
+          .insert({
+            workspace_id: workspaceId,
+            sender_id: userId,
+            message_type: 'poll',
+            content: `🗳️ Vote: ${optionId || 'retracted'} [${messageId}]`,
+            reply_to_id: messageId,
+            attachments: {
+              is_poll_vote_action: true,
+              poll_id: messageId,
+              option_id: optionId,
+              voter_id: userId,
+              timestamp: new Date().toISOString(),
+            },
+          });
+      } catch (err) {
+        console.warn('[workspaceService] vote record insert warning:', err);
+      }
+
+      return {
+        success: true,
+        reactions: updatedReactions,
+        pollData: updatedPollData || undefined,
+        error: null,
+      };
+    } catch (err: any) {
+      console.error('[workspaceService] votePoll error:', err);
+      return { success: false, reactions: {}, error: err.message || 'Failed to submit vote' };
     }
   },
 

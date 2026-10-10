@@ -101,6 +101,11 @@ interface WorkspaceState {
     messageId: string,
     emoji: string
   ) => Promise<{ success: boolean; reactions: Record<string, string[]>; error: string | null }>;
+  votePoll: (
+    workspaceId: string,
+    messageId: string,
+    optionId: string
+  ) => Promise<{ success: boolean; reactions: Record<string, string[]>; pollData?: WorkspacePollData; error: string | null }>;
   editMessage: (
     messageId: string,
     newContent: string
@@ -486,6 +491,78 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         return { success: false, reactions: updatedReactions, error: res.error };
       }
       return { success: true, reactions: res.reactions, error: null };
+    } catch (err: any) {
+      return { success: false, reactions: updatedReactions, error: err.message };
+    }
+  },
+
+  votePoll: async (workspaceId, messageId, optionId) => {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser) return { success: false, reactions: {}, error: 'Not authenticated' };
+
+    let updatedReactions: Record<string, string[]> = {};
+    let updatedPollData: WorkspacePollData | undefined = undefined;
+
+    set((state) => {
+      const msgs = state.messages.map((m) => {
+        if (m.id === messageId) {
+          const current = { ...(m.reactions || {}) };
+          // Remove voter from all options
+          Object.keys(current).forEach((k) => {
+            if (k.startsWith('vote:') && Array.isArray(current[k])) {
+              current[k] = current[k].filter((uid) => uid !== currentUser.id);
+              if (current[k].length === 0) delete current[k];
+            }
+          });
+          // Add new vote if optionId is provided
+          if (optionId) {
+            const voteKey = `vote:${optionId}`;
+            const users = Array.isArray(current[voteKey]) ? [...current[voteKey]] : [];
+            if (!users.includes(currentUser.id)) users.push(currentUser.id);
+            current[voteKey] = users;
+          }
+          updatedReactions = current;
+
+          let pd = m.poll_data ? { ...m.poll_data } : null;
+          if (pd && Array.isArray(pd.options)) {
+            const updatedOpts = pd.options.map((opt) => {
+              let votes: string[] = Array.isArray(opt.votes) ? opt.votes.filter((uid) => uid !== currentUser.id) : [];
+              if (opt.id === optionId) {
+                votes.push(currentUser.id);
+              }
+              return { ...opt, votes };
+            });
+            let total = 0;
+            updatedOpts.forEach((o) => { total += o.votes.length; });
+            pd = { ...pd, options: updatedOpts, totalVotes: total };
+            updatedPollData = pd;
+          }
+
+          return { ...m, reactions: current, poll_data: pd };
+        }
+        return m;
+      });
+      return { messages: msgs };
+    });
+
+    const channel = activeWorkspaceChannels.get(workspaceId);
+    if (channel) {
+      channel.send({
+        type: 'broadcast',
+        event: 'message_updated',
+        payload: {
+          workspaceId,
+          action: 'poll_vote',
+          messageId,
+          reactions: updatedReactions,
+          poll_data: updatedPollData,
+        },
+      });
+    }
+
+    try {
+      const res = await workspaceService.votePoll(workspaceId, messageId, optionId, currentUser.id);
+      return res;
     } catch (err: any) {
       return { success: false, reactions: updatedReactions, error: err.message };
     }
@@ -995,11 +1072,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                 : m
             ),
           }));
-        } else if (payload.action === 'reaction') {
+        } else if (payload.action === 'reaction' || payload.action === 'poll_vote') {
           set((state) => ({
             messages: state.messages.map((m) =>
               m.id === payload.messageId
-                ? { ...m, reactions: payload.reactions }
+                ? {
+                    ...m,
+                    reactions: payload.reactions ?? m.reactions,
+                    poll_data: payload.poll_data ?? m.poll_data,
+                  }
                 : m
             ),
           }));
