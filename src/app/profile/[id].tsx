@@ -90,6 +90,7 @@ export default function OtherResearcherProfileScreen() {
   const allPosts = usePostStore((s) => s.posts);
 
   const [researcher, setResearcher] = useState<UserProfile | null>(null);
+  const isOwnProfile = researcher?.id === currentUser?.id;
   const [isLoading, setIsLoading] = useState(true);
   const [researcherPosts, setResearcherPosts] = useState<Post[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
@@ -214,8 +215,6 @@ export default function OtherResearcherProfileScreen() {
 
     loadProfile();
   }, [id, currentUser?.id, currentUser?.handle, loadResearcherPosts]);
-
-  const isOwnProfile = researcher?.id === currentUser?.id;
 
   const handleRefresh = async () => {
     if (!researcher?.id) return;

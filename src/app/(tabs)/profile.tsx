@@ -93,6 +93,7 @@ export const DEFAULT_PROFILE_BANNER = 'https://images.unsplash.com/photo-1506744
 
 export default function CurrentUserProfileScreen() {
   const storeUser = useAuthStore((s) => s.user);
+  const user = storeUser;
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const refreshCurrentUserProfile = useAuthStore((s) => s.refreshCurrentUserProfile);
   const allPosts = usePostStore((s) => s.posts);
@@ -241,8 +242,6 @@ export default function CurrentUserProfileScreen() {
     imageUri: null,
     cropType: 'avatar',
   });
-
-  const user = storeUser;
 
   const handlePickAndUploadAvatar = async () => {
     setAvatarModalOpen(false);
