@@ -331,7 +331,7 @@ export default function WorkspaceHubScreen() {
             {item.description || 'Join our research group discussion and paper reviews.'}
           </Text>
           <Text style={styles.communityMeta}>
-            {item.members_count || '10k'} members • 324 online
+            {item.members_count || 1} {item.members_count === 1 ? 'member' : 'members'}
           </Text>
         </View>
 

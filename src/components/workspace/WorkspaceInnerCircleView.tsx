@@ -99,6 +99,7 @@ import { ChatProfileCard } from '../chat/ChatProfileCard';
 import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { usePresenceStore } from '../../store/usePresenceStore';
 import { resolvePaper } from '../../api/paperResolver';
 import { uploadPostImage, uploadVoiceNoteAudio } from '../../api/storageService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
@@ -282,6 +283,12 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const dms = useWorkspaceStore((s) => s.dms);
   const communities = useWorkspaceStore((s) => s.communities);
   const innerCircles = useWorkspaceStore((s) => s.innerCircles);
+
+  const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
+  const memberCount = members.length > 0 ? members.length : (workspace.members_count || 1);
+  const onlineCount = useMemo(() => {
+    return (members || []).filter((m) => m.user_id && onlineUserIds[m.user_id]).length;
+  }, [members, onlineUserIds]);
 
   // User Role & Permissions (Step 2: Roles & Permissions)
   const isOwner = workspace.owner_id === currentUser?.id;
@@ -1117,9 +1124,13 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               </Text>
               <Shield size={13} color="#164E3F" />
             </View>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {memberCount} {memberCount === 1 ? 'member' : 'members'} • Confidential Pod
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              {onlineCount > 0 && <View style={styles.onlineDot} />}
+              <Text style={styles.headerSubtitle} numberOfLines={1}>
+                {memberCount} {memberCount === 1 ? 'member' : 'members'}
+                {onlineCount > 0 ? ` • ${onlineCount} online` : ''} • Confidential Pod
+              </Text>
+            </View>
           </View>
         </TouchableOpacity>
 
@@ -3944,6 +3955,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#64748B',
     textTransform: 'capitalize',
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16A34A',
   },
 });
 
