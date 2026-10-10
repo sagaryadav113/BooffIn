@@ -322,7 +322,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const isModOrAbove = isAdminOrOwner || myRole === 'moderator';
 
   const canPost = (!workspace.settings?.only_admins_post || isAdminOrOwner) && isMember;
-  const canInvite = (!workspace.settings?.only_admins_invite || isAdminOrOwner) && isMember;
+  const canInvite = isAdminOrOwner && isMember;
   const canPin = (!workspace.settings?.only_admins_pin || isAdminOrOwner) && isMember;
 
   const [isJoining, setIsJoining] = useState(false);

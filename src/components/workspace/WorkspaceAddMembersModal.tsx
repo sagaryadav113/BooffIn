@@ -166,6 +166,21 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
   const handleConfirmAdd = async () => {
     if (selectedIds.size === 0 || !currentUser?.id) return;
 
+    // Check creator or admin authority
+    const isCreatorOrAdmin =
+      workspace.owner_id === currentUser.id ||
+      workspace.creator_id === currentUser.id ||
+      workspace.my_role === 'owner' ||
+      workspace.my_role === 'admin' ||
+      (existingMembers || []).some(
+        (m) => m.user_id === currentUser.id && (m.role === 'owner' || m.role === 'admin')
+      );
+
+    if (!isCreatorOrAdmin) {
+      Alert.alert('Permission Denied', 'Only the group creator and designated admins can add new members.');
+      return;
+    }
+
     // Check inner circle capacity
     if (workspace.type === 'inner_circle') {
       const currentActiveCount = (existingMembers || []).filter(

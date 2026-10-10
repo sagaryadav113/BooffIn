@@ -164,12 +164,11 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
     ? 'owner'
     : (myMembership?.role || workspace.my_role || 'member');
 
-  const canManageRoles = isOwner || myRole === 'owner' || myRole === 'admin';
+  const isCreatorOrAdmin = isOwner || workspace.creator_id === currentUser?.id || myRole === 'owner' || myRole === 'admin';
+  const canManageRoles = isCreatorOrAdmin;
+  const canAddMembers = !isDM && isCreatorOrAdmin;
   const canEditAvatar = !isDM && (
-    isOwner ||
-    workspace.creator_id === currentUser?.id ||
-    myRole === 'owner' ||
-    myRole === 'admin' ||
+    isCreatorOrAdmin ||
     workspace.type === 'inner_circle'
   );
 
@@ -950,8 +949,8 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
 
           {/* Quick Action Bar: For DMs: Mute & Options (Add & Search removed per Snapshot 1). For Groups: All 4 */}
           <View style={[styles.actionBar, isDM && styles.dmActionBar]}>
-            {/* 1. Add (Groups / Communities only) */}
-            {!isDM && (
+            {/* 1. Add (Groups / Communities only - strictly creator & admin) */}
+            {canAddMembers && (
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
@@ -1018,8 +1017,8 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
 
           {/* Settings & Info Items */}
           <View style={styles.menuSection}>
-            {/* 1. Invite Link */}
-            {!isDM && (
+            {/* 1. Invite Link (Creator & Admin only) */}
+            {canAddMembers && (
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handleCopyInviteLink}
