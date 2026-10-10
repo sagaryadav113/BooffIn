@@ -61,6 +61,7 @@ import { FollowListModal } from '../../components/modals/FollowListModal';
 import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab';
 import { OpenAlexAuthorProfileView } from '../../components/profile/OpenAlexAuthorProfileView';
 import { AuthorCommunitiesModal } from '../../components/profile/AuthorCommunitiesModal';
+import { fetchUserAnalytics } from '../../api/analyticsService';
 
 function isOpenAlexOrOrcidIdentifier(
   id?: string,
@@ -101,10 +102,25 @@ export default function OtherResearcherProfileScreen() {
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [communitiesModalVisible, setCommunitiesModalVisible] = useState(false);
   const [postsRenderLimit, setPostsRenderLimit] = useState(12);
+  const [impressions28d, setImpressions28d] = useState<number | null>(null);
 
   const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
   const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
   const [isMessageLoading, setIsMessageLoading] = useState(false);
+
+  // Fetch real 28-day research impressions when viewing own profile via [id].tsx
+  useEffect(() => {
+    if (!isOwnProfile || !researcher?.id) return;
+    let isMounted = true;
+    fetchUserAnalytics(researcher.id, '28d').then((res) => {
+      if (isMounted && res.summary) {
+        setImpressions28d(res.summary.totalImpressions ?? res.summary.totalViews ?? 0);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [isOwnProfile, researcher?.id]);
 
   const handleStartDM = async () => {
     if (!researcher?.id) return;
@@ -670,12 +686,7 @@ export default function OtherResearcherProfileScreen() {
           {/* RESEARCH IMPACT & ANALYTICS BAR (Private to Account Owner Only) */}
           {isOwnProfile && (
             <ProfileAnalyticsBar
-              totalViews={Math.max(
-                posts.length * 95 +
-                  posts.reduce((acc: number, p: Post) => acc + (p.likesCount || 0), 0) * 4 +
-                  posts.reduce((acc: number, p: Post) => acc + (p.commentsCount || 0), 0) * 6,
-                posts.length > 0 ? 90 : 0
-              )}
+              totalViews={impressions28d !== null ? impressions28d : 0}
               onPress={() => setAnalyticsModalOpen(true)}
             />
           )}
@@ -971,7 +982,16 @@ export default function OtherResearcherProfileScreen() {
           visible={analyticsModalOpen}
           userId={researcher.id}
           userFullName={researcher.fullName}
-          onClose={() => setAnalyticsModalOpen(false)}
+          onClose={() => {
+            setAnalyticsModalOpen(false);
+            if (researcher?.id) {
+              fetchUserAnalytics(researcher.id, '28d').then((res) => {
+                if (res.summary) {
+                  setImpressions28d(res.summary.totalImpressions ?? res.summary.totalViews ?? 0);
+                }
+              });
+            }
+          }}
         />
       )}
 

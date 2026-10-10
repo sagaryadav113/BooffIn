@@ -87,6 +87,7 @@ import { BooffInScholarsTab } from '../../components/profile/BooffInScholarsTab'
 import { FollowListModal } from '../../components/modals/FollowListModal';
 import { ImageCropperModal, CroppedImageResult } from '../../components/modals/ImageCropperModal';
 import { AuthorCommunitiesModal } from '../../components/profile/AuthorCommunitiesModal';
+import { fetchUserAnalytics } from '../../api/analyticsService';
 
 export const DEFAULT_PROFILE_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
@@ -125,6 +126,7 @@ export default function CurrentUserProfileScreen() {
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
   const [communitiesModalVisible, setCommunitiesModalVisible] = useState(false);
+  const [impressions28d, setImpressions28d] = useState<number | null>(null);
 
   // Automatically sync sub-tab or open research analytics modal if navigated via URL params (e.g. ?tab=Saved or ?tab=Articles)
   useEffect(() => {
@@ -178,6 +180,20 @@ export default function CurrentUserProfileScreen() {
       setAnalyticsModalOpen(true);
     }
   }, [params.openAnalytics, params.tab, params.subFilter]);
+
+  // Fetch real 28-day research impressions to keep profile banner in exact sync with analytics
+  useEffect(() => {
+    if (!user?.id) return;
+    let isMounted = true;
+    fetchUserAnalytics(user.id, '28d').then((res) => {
+      if (isMounted && res.summary) {
+        setImpressions28d(res.summary.totalImpressions ?? res.summary.totalViews ?? 0);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
 
   // Support immediate in-page tab switching from desktop sidebars (Web only)
   useEffect(() => {
@@ -885,12 +901,7 @@ export default function CurrentUserProfileScreen() {
 
           {/* RESEARCH IMPACT & ANALYTICS BAR (Compact Single Row, Private to Owner) */}
           <ProfileAnalyticsBar
-            totalViews={Math.max(
-              posts.length * 115 +
-                posts.reduce((acc: number, p) => acc + (p.likesCount || 0), 0) * 5 +
-                posts.reduce((acc: number, p) => acc + (p.commentsCount || 0), 0) * 8,
-              posts.length > 0 ? 120 : 0
-            )}
+            totalViews={impressions28d !== null ? impressions28d : 0}
             onPress={() => setAnalyticsModalOpen(true)}
           />
 
@@ -1725,7 +1736,16 @@ export default function CurrentUserProfileScreen() {
           visible={analyticsModalOpen}
           userId={user.id}
           userFullName={user.fullName}
-          onClose={() => setAnalyticsModalOpen(false)}
+          onClose={() => {
+            setAnalyticsModalOpen(false);
+            if (user?.id) {
+              fetchUserAnalytics(user.id, '28d').then((res) => {
+                if (res.summary) {
+                  setImpressions28d(res.summary.totalImpressions ?? res.summary.totalViews ?? 0);
+                }
+              });
+            }
+          }}
         />
       )}
 
