@@ -1477,27 +1477,59 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 getDateLabel(item.created_at) !== getDateLabel(displayedMessages[index - 1]?.created_at);
 
               const extractImageUrl = (m: WorkspaceMessage) => {
+                if (
+                  m.message_type === 'audio' ||
+                  m.message_type === 'voice_note' ||
+                  m.message_type === 'poll' ||
+                  m.message_type === 'document' ||
+                  m.message_type === 'call_log' ||
+                  m.content?.startsWith('🎙️') ||
+                  Boolean(m.audio_metadata) ||
+                  Boolean((m.attachments as any)?.audio_metadata)
+                ) {
+                  return null;
+                }
                 if (m.media_urls && m.media_urls.length > 0 && typeof m.media_urls[0] === 'string' && m.media_urls[0].startsWith('http')) {
+                  const url = m.media_urls[0].toLowerCase();
+                  if (
+                    url.endsWith('.webm') ||
+                    url.endsWith('.mp3') ||
+                    url.endsWith('.m4a') ||
+                    url.endsWith('.ogg') ||
+                    url.endsWith('.wav') ||
+                    url.endsWith('.pdf') ||
+                    url.includes('/audio/')
+                  ) {
+                    return null;
+                  }
                   return m.media_urls[0];
                 }
                 if (Array.isArray(m.attachments)) {
                   for (const a of m.attachments) {
-                    if (typeof a === 'string' && a.startsWith('http')) return a;
-                    if (a?.url && typeof a.url === 'string' && a.url.startsWith('http')) return a.url;
-                    if (a?.uri && typeof a.uri === 'string' && a.uri.startsWith('http')) return a.uri;
+                    if (typeof a === 'string' && a.startsWith('http')) {
+                      const url = a.toLowerCase();
+                      if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
+                        return a;
+                      }
+                    }
+                    if (a?.url && typeof a.url === 'string' && a.url.startsWith('http')) {
+                      const url = a.url.toLowerCase();
+                      if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
+                        return a.url;
+                      }
+                    }
                     if (a?.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.startsWith('http')) return a.imageUrl;
                     if (a?.image_url && typeof a.image_url === 'string' && a.image_url.startsWith('http')) return a.image_url;
                   }
                 } else if (m.attachments && typeof m.attachments === 'object') {
                   if (Array.isArray(m.attachments.media_urls) && m.attachments.media_urls.length > 0) {
                     const first = m.attachments.media_urls[0];
-                    if (typeof first === 'string' && first.startsWith('http')) return first;
-                  }
-                  if (m.attachments.url && typeof m.attachments.url === 'string' && m.attachments.url.startsWith('http')) {
-                    return m.attachments.url;
-                  }
-                  if (m.attachments.uri && typeof m.attachments.uri === 'string' && m.attachments.uri.startsWith('http')) {
-                    return m.attachments.uri;
+                    if (typeof first === 'string' && first.startsWith('http')) {
+                      const url = first.toLowerCase();
+                      if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
+                        return first;
+                      }
+                    }
                   }
                   if (m.attachments.imageUrl && typeof m.attachments.imageUrl === 'string' && m.attachments.imageUrl.startsWith('http')) {
                     return m.attachments.imageUrl;
@@ -1506,7 +1538,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     return m.attachments.image_url;
                   }
                 }
-                if (typeof m.content === 'string') {
+                if (typeof m.content === 'string' && (m.message_type === 'image' || m.content === '📷 Shared photo')) {
                   if (m.content.startsWith('http://') || m.content.startsWith('https://')) {
                     return m.content.trim();
                   }
@@ -1552,14 +1584,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               const isPost = !isDeleted && Boolean(resolvedPostMeta);
               const isProfile = !isDeleted && Boolean(resolvedProfileMeta);
               const isCallLog = !isDeleted && (Boolean(resolvedCallMeta) || item.message_type === 'call_log');
-              const isImage = !isDeleted && (item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo');
-              const isPoll = !isDeleted && (item.message_type === 'poll' || item.content.startsWith('📊 Poll:') || Boolean(resolvedPollData));
               const isAudio =
                 !isDeleted &&
                 (item.message_type === 'audio' ||
                   item.message_type === 'voice_note' ||
                   Boolean(resolvedAudioMeta) ||
-                  item.content.startsWith('🎙️ Voice Note'));
+                  item.content?.startsWith('🎙️'));
+              const isImage = !isDeleted && !isAudio && (item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo');
+              const isPoll = !isDeleted && (item.message_type === 'poll' || item.content.startsWith('📊 Poll:') || Boolean(resolvedPollData));
 
               // Parse poll options if poll message
               let pollQuestionText = '';

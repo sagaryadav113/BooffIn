@@ -182,18 +182,50 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
       recorder.onstop = () => {
         const mime = recorder.mimeType || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mime });
-        const objectUrl = typeof URL !== 'undefined' ? URL.createObjectURL(audioBlob) : undefined;
 
-        cleanupHardware();
-
-        onSendVoiceNote({
-          duration: totalSeconds,
-          waveform: finalWaveform,
-          blob: audioBlob,
-          uri: objectUrl,
-          mimeType: mime,
-        });
+        if (typeof FileReader !== 'undefined') {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const dataUrl = (reader.result as string) || (typeof URL !== 'undefined' ? URL.createObjectURL(audioBlob) : undefined);
+            cleanupHardware();
+            onSendVoiceNote({
+              duration: totalSeconds,
+              waveform: finalWaveform,
+              blob: audioBlob,
+              uri: dataUrl,
+              mimeType: mime,
+            });
+          };
+          reader.onerror = () => {
+            const objectUrl = typeof URL !== 'undefined' ? URL.createObjectURL(audioBlob) : undefined;
+            cleanupHardware();
+            onSendVoiceNote({
+              duration: totalSeconds,
+              waveform: finalWaveform,
+              blob: audioBlob,
+              uri: objectUrl,
+              mimeType: mime,
+            });
+          };
+          reader.readAsDataURL(audioBlob);
+        } else {
+          const objectUrl = typeof URL !== 'undefined' ? URL.createObjectURL(audioBlob) : undefined;
+          cleanupHardware();
+          onSendVoiceNote({
+            duration: totalSeconds,
+            waveform: finalWaveform,
+            blob: audioBlob,
+            uri: objectUrl,
+            mimeType: mime,
+          });
+        }
       };
+
+      try {
+        if (typeof recorder.requestData === 'function') {
+          recorder.requestData();
+        }
+      } catch {}
 
       recorder.stop();
     } else {

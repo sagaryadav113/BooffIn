@@ -41,7 +41,7 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     if (Platform.OS === 'web' && audioUrl && typeof Audio !== 'undefined') {
       try {
         const audio = new Audio(audioUrl);
-        audio.preload = 'metadata';
+        audio.preload = 'auto';
         audioRef.current = audio;
 
         audio.onended = () => {
@@ -51,11 +51,13 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
         };
 
         audio.ontimeupdate = () => {
-          setCurrentTime(audio.currentTime);
+          if (audio.currentTime !== undefined && !isNaN(audio.currentTime)) {
+            setCurrentTime(audio.currentTime);
+          }
         };
 
         audio.onerror = (e) => {
-          console.warn('Audio playback load warning:', e);
+          console.warn('Audio playback load note:', e);
         };
       } catch (err) {
         console.warn('Audio element initialization error:', err);
@@ -64,33 +66,66 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
 
     return () => {
       if (audioRef.current) {
-        audioRef.current.pause();
+        try {
+          audioRef.current.pause();
+        } catch {}
         audioRef.current = null;
       }
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [audioUrl]);
 
-  const togglePlayPause = () => {
+  const togglePlayPause = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
 
     if (isPlaying) {
       if (audioRef.current) {
-        audioRef.current.pause();
+        try {
+          audioRef.current.pause();
+        } catch {}
       }
       if (timerRef.current) clearInterval(timerRef.current);
       setIsPlaying(false);
     } else {
-      setIsPlaying(true);
-      if (audioRef.current && audioUrl) {
-        audioRef.current.playbackRate = playbackSpeed;
-        audioRef.current.play().catch((err) => {
-          console.warn('Browser audio play failed, running simulated fallback:', err);
+      if (!audioUrl) {
+        setIsPlaying(true);
+        startSimulatedPlay();
+        return;
+      }
+
+      // Re-initialize audio if needed
+      if (!audioRef.current && Platform.OS === 'web' && typeof Audio !== 'undefined') {
+        try {
+          const audio = new Audio(audioUrl);
+          audio.preload = 'auto';
+          audio.onended = () => {
+            setIsPlaying(false);
+            setCurrentTime(0);
+            if (timerRef.current) clearInterval(timerRef.current);
+          };
+          audio.ontimeupdate = () => {
+            if (audio.currentTime !== undefined && !isNaN(audio.currentTime)) {
+              setCurrentTime(audio.currentTime);
+            }
+          };
+          audioRef.current = audio;
+        } catch {}
+      }
+
+      if (audioRef.current) {
+        try {
+          audioRef.current.playbackRate = playbackSpeed;
+          await audioRef.current.play();
+          setIsPlaying(true);
+        } catch (err) {
+          console.warn('Browser audio play failed, falling back to animated player:', err);
+          setIsPlaying(true);
           startSimulatedPlay();
-        });
+        }
       } else {
+        setIsPlaying(true);
         startSimulatedPlay();
       }
     }
@@ -117,7 +152,9 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     const targetTime = (idx / barsCount) * totalDuration;
     setCurrentTime(targetTime);
     if (audioRef.current) {
-      audioRef.current.currentTime = targetTime;
+      try {
+        audioRef.current.currentTime = targetTime;
+      } catch {}
     }
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -131,7 +168,9 @@ export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
     const nextSpeed: 1 | 1.5 | 2 = playbackSpeed === 1 ? 1.5 : playbackSpeed === 1.5 ? 2 : 1;
     setPlaybackSpeed(nextSpeed);
     if (audioRef.current) {
-      audioRef.current.playbackRate = nextSpeed;
+      try {
+        audioRef.current.playbackRate = nextSpeed;
+      } catch {}
     }
   };
 

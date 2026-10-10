@@ -524,13 +524,17 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     let finalAudioUrl = audioData.uri || null;
 
     if (currentUser?.id && audioData.blob) {
-      const uploadRes = await uploadVoiceNoteAudio(
-        currentUser.id,
-        audioData.blob,
-        audioData.mimeType || 'audio/webm'
-      );
-      if (uploadRes.success && uploadRes.url) {
-        finalAudioUrl = uploadRes.url;
+      try {
+        const uploadRes = await uploadVoiceNoteAudio(
+          currentUser.id,
+          audioData.blob,
+          audioData.mimeType || 'audio/webm'
+        );
+        if (uploadRes.success && uploadRes.url) {
+          finalAudioUrl = uploadRes.url;
+        }
+      } catch (uploadErr) {
+        console.warn('Voice note storage upload note:', uploadErr);
       }
     }
 
@@ -538,8 +542,13 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       await sendMessage({
         workspace_id: workspace.id,
         content: '🎙️ Voice Note',
-        message_type: 'voice_note',
+        message_type: 'audio',
         media_urls: finalAudioUrl ? [finalAudioUrl] : [],
+        audio_metadata: {
+          duration: audioData.duration,
+          waveform: audioData.waveform,
+          url: finalAudioUrl || undefined,
+        },
         reply_to_id: replyId,
       });
       setReplyingTo(null);
@@ -877,14 +886,46 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
   // Helper to extract image url from message
   const extractImageUrl = (m: WorkspaceMessage) => {
+    if (
+      m.message_type === 'audio' ||
+      m.message_type === 'voice_note' ||
+      m.message_type === 'poll' ||
+      m.message_type === 'document' ||
+      m.content?.startsWith('🎙️') ||
+      Boolean(m.audio_metadata) ||
+      Boolean((m.attachments as any)?.audio_metadata)
+    ) {
+      return null;
+    }
     if (m.media_urls && m.media_urls.length > 0 && typeof m.media_urls[0] === 'string' && m.media_urls[0].startsWith('http')) {
+      const url = m.media_urls[0].toLowerCase();
+      if (
+        url.endsWith('.webm') ||
+        url.endsWith('.mp3') ||
+        url.endsWith('.m4a') ||
+        url.endsWith('.ogg') ||
+        url.endsWith('.wav') ||
+        url.endsWith('.pdf') ||
+        url.includes('/audio/')
+      ) {
+        return null;
+      }
       return m.media_urls[0];
     }
     if (Array.isArray(m.attachments)) {
       for (const a of m.attachments) {
-        if (typeof a === 'string' && a.startsWith('http')) return a;
-        if (a?.url && typeof a.url === 'string' && a.url.startsWith('http')) return a.url;
-        if (a?.uri && typeof a.uri === 'string' && a.uri.startsWith('http')) return a.uri;
+        if (typeof a === 'string' && a.startsWith('http')) {
+          const url = a.toLowerCase();
+          if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
+            return a;
+          }
+        }
+        if (a?.url && typeof a.url === 'string' && a.url.startsWith('http')) {
+          const url = a.url.toLowerCase();
+          if (!url.endsWith('.webm') && !url.endsWith('.mp3') && !url.endsWith('.m4a') && !url.endsWith('.ogg') && !url.endsWith('.wav') && !url.endsWith('.pdf') && !url.includes('/audio/')) {
+            return a.url;
+          }
+        }
         if (a?.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.startsWith('http')) return a.imageUrl;
         if (a?.image_url && typeof a.image_url === 'string' && a.image_url.startsWith('http')) return a.image_url;
       }
@@ -1185,7 +1226,13 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                 getDateLabel(item.created_at) !== getDateLabel(filteredMessages[index - 1]?.created_at);
 
               const msgImageUrl = extractImageUrl(item);
-              const isVoiceNote = item.message_type === 'voice_note' || item.message_type === 'audio';
+              const isVoiceNote =
+                !isDeleted &&
+                (item.message_type === 'voice_note' ||
+                  item.message_type === 'audio' ||
+                  Boolean(item.audio_metadata) ||
+                  item.content?.startsWith('🎙️'));
+              const isImage = !isDeleted && !isVoiceNote && (item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo');
 
               // Reply preview data
               const replyTarget = item.reply_to || (item.reply_to_id ? messages.find((m) => m.id === item.reply_to_id) : null);
@@ -1276,7 +1323,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                       ) : (
                         <>
                           {/* Image Attachment */}
-                          {msgImageUrl && (
+                          {isImage && msgImageUrl && (
                             <TouchableOpacity
                               activeOpacity={0.9}
                               onPress={() => setViewerImageUrl(msgImageUrl)}
@@ -1295,7 +1342,15 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                           {isVoiceNote && (
                             <View style={{ marginVertical: 4 }}>
                               <VoiceNotePlayer
-                                audioUrl={item.media_urls?.[0] || (item.attachments as any)?.[0]?.url || item.content}
+                                audioUrl={
+                                  item.media_urls?.[0] ||
+                                  item.audio_metadata?.url ||
+                                  (item.attachments as any)?.[0]?.url ||
+                                  (item.attachments as any)?.url ||
+                                  item.audio_metadata?.uri
+                                }
+                                duration={item.audio_metadata?.duration || 18}
+                                waveform={item.audio_metadata?.waveform}
                                 isMe={isMe}
                               />
                             </View>
