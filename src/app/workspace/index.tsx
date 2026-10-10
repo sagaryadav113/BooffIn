@@ -37,7 +37,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { WorkspaceCard } from '../../components/workspace/WorkspaceCard';
-import { GroupCollageAvatar } from '../../components/workspace/GroupCollageAvatar';
+import { Avatar } from '../../components/core/Avatar';
 import { CreateWorkspaceModal } from '../../components/workspace/CreateWorkspaceModal';
 import { CreateCommunityModal } from '../../components/workspace/CreateCommunityModal';
 import { WorkspaceDMView } from '../../components/workspace/WorkspaceDMView';
@@ -47,7 +47,6 @@ import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 import { Workspace } from '../../types/workspace';
-import { Avatar } from '../../components/core/Avatar';
 
 export type WorkspaceTabType = 'dm' | 'community' | 'inner_circle';
 
@@ -368,7 +367,7 @@ export default function WorkspaceHubScreen() {
         }}
         style={styles.innerCircleRow}
       >
-        <GroupCollageAvatar size={48} name={item.name} />
+        <Avatar uri={item.avatar_url || undefined} name={item.name} size="md" />
 
         <View style={styles.innerCircleBody}>
           <View style={styles.innerCircleTitleRow}>

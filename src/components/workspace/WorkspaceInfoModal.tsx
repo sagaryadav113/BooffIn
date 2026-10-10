@@ -163,6 +163,13 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
     : (myMembership?.role || workspace.my_role || 'member');
 
   const canManageRoles = isOwner || myRole === 'owner' || myRole === 'admin';
+  const canEditAvatar = !isDM && (
+    isOwner ||
+    workspace.creator_id === currentUser?.id ||
+    myRole === 'owner' ||
+    myRole === 'admin' ||
+    workspace.type === 'inner_circle'
+  );
 
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -288,9 +295,9 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
 
   // Step 4: Pick Avatar Image
   const handlePickAvatar = async () => {
-    if (!canManageRoles) {
-      if (Platform.OS === 'web') window.alert('Only Admins and PI can change the pod icon.');
-      else Alert.alert('Permission Denied', 'Only Admins and PI can change the pod icon.');
+    if (!canEditAvatar) {
+      if (Platform.OS === 'web') window.alert('Only group admins and members can change the group picture.');
+      else Alert.alert('Permission Denied', 'Only group admins and members can change the group picture.');
       return;
     }
     try {
@@ -787,7 +794,12 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Hero Profile Avatar & Title */}
           <View style={styles.heroSection}>
-            <View style={styles.avatarWrapper}>
+            <TouchableOpacity
+              activeOpacity={canEditAvatar ? 0.8 : 1}
+              onPress={canEditAvatar ? handlePickAvatar : undefined}
+              disabled={isUploadingAvatar}
+              style={styles.avatarWrapper}
+            >
               {isDM ? (
                 <View style={{ position: 'relative' }}>
                   <Avatar
@@ -797,14 +809,6 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                   />
                   {isPartnerOnline && <View style={styles.presenceDotHero} />}
                 </View>
-              ) : workspace.avatar_url ? (
-                <Avatar
-                  uri={workspace.avatar_url}
-                  name={displayName}
-                  size="xl"
-                />
-              ) : workspace.type === 'inner_circle' ? (
-                <GroupCollageAvatar size={84} name={displayName} />
               ) : (
                 <Avatar
                   uri={workspace.avatar_url || undefined}
@@ -814,7 +818,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               )}
 
               {/* Camera Icon Overlay to Pick Custom Pod Avatar */}
-              {!isDM && canManageRoles && (
+              {!isDM && canEditAvatar && (
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={handlePickAvatar}
@@ -828,7 +832,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                   )}
                 </TouchableOpacity>
               )}
-            </View>
+            </TouchableOpacity>
 
             {/* Editable Title & Description / Topic */}
             {isEditingName ? (

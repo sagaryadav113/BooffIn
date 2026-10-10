@@ -20,11 +20,14 @@ import {
   Users,
   Check,
   CheckCircle2,
+  Camera,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { fetchFollowing } from '../../api/socialService';
+import { uploadPostImage } from '../../api/storageService';
 import { supabase } from '../../api/client';
 import { UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
@@ -42,6 +45,8 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
   const createInnerCircle = useWorkspaceStore((s) => s.createInnerCircle);
 
   const [groupName, setGroupName] = useState('');
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<UserProfile[]>([]);
   const [followingList, setFollowingList] = useState<UserProfile[]>([]);
@@ -54,6 +59,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
     if (!visible) {
       // Reset state on close
       setGroupName('');
+      setAvatarUri(null);
       setSearchQuery('');
       setSelectedUsers([]);
       setErrorText(null);
@@ -155,6 +161,32 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
     });
   }, []);
 
+  // Pick custom group avatar
+  const handlePickAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setIsUploadingAvatar(true);
+        const uploadRes = await uploadPostImage(
+          currentUser?.id || 'inner_circle_avatar',
+          result.assets[0]
+        );
+        const finalUrl = uploadRes.url || result.assets[0].uri;
+        setAvatarUri(finalUrl);
+        setIsUploadingAvatar(false);
+      }
+    } catch (err: any) {
+      setIsUploadingAvatar(false);
+      console.warn('Pick avatar error:', err);
+    }
+  };
+
   // Remove a selected user from chips
   const handleRemoveUser = useCallback((userId: string) => {
     try {
@@ -194,6 +226,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
         name: finalName,
         description: `Private research group with ${selectedUsers.length} collaborator${selectedUsers.length > 1 ? 's' : ''}`,
         e2ee_enabled: true,
+        avatar_url: avatarUri || undefined,
         member_ids: memberIds,
       });
 
@@ -230,26 +263,49 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
           <View style={{ width: 32 }} />
         </View>
 
-        {/* Group Name (Optional) Input Box */}
+        {/* Group Avatar & Name Input Row */}
         <View style={styles.groupNameContainer}>
-          <View style={styles.groupNameInputWrap}>
-            <TextInput
-              value={groupName}
-              onChangeText={setGroupName}
-              placeholder="Group name (optional)"
-              placeholderTextColor="#94A3B8"
-              style={styles.groupNameInput}
-              autoCapitalize="words"
-            />
-            {groupName.length > 0 && (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setGroupName('')}
-                style={styles.clearInputBtn}
-              >
-                <X size={14} color="#64748B" />
-              </TouchableOpacity>
-            )}
+          <View style={styles.groupHeaderRow}>
+            {/* Custom Avatar Picker */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handlePickAvatar}
+              disabled={isUploadingAvatar}
+              style={styles.avatarPickerBtn}
+            >
+              {isUploadingAvatar ? (
+                <ActivityIndicator size="small" color="#164E3F" />
+              ) : avatarUri ? (
+                <Avatar uri={avatarUri} name={groupName || 'Pod'} size={46} />
+              ) : (
+                <View style={styles.avatarPickerPlaceholder}>
+                  <Camera size={20} color="#164E3F" strokeWidth={2} />
+                </View>
+              )}
+              <View style={styles.avatarCameraBadge}>
+                <Camera size={9} color="#FFFFFF" strokeWidth={2.4} />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.groupNameInputWrap}>
+              <TextInput
+                value={groupName}
+                onChangeText={setGroupName}
+                placeholder="Group name (optional)"
+                placeholderTextColor="#94A3B8"
+                style={styles.groupNameInput}
+                autoCapitalize="words"
+              />
+              {groupName.length > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setGroupName('')}
+                  style={styles.clearInputBtn}
+                >
+                  <X size={14} color="#64748B" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
 
@@ -457,7 +513,45 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
+  groupHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarPickerBtn: {
+    position: 'relative',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPickerPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarCameraBadge: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 17,
+    height: 17,
+    borderRadius: 8.5,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
   groupNameInputWrap: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',

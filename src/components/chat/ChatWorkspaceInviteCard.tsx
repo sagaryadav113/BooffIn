@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Users, Shield, ArrowUpRight } from 'lucide-react-native';
 import { WorkspaceInviteMetadata } from '../../types/workspace';
-import { GroupCollageAvatar } from '../workspace/GroupCollageAvatar';
+import { Avatar } from '../core/Avatar';
 
 interface ChatWorkspaceInviteCardProps {
   inviteMeta: WorkspaceInviteMetadata;
@@ -56,7 +56,7 @@ export const ChatWorkspaceInviteCard: React.FC<ChatWorkspaceInviteCardProps> = (
       </View>
 
       <View style={styles.workspaceRow}>
-        <GroupCollageAvatar size={38} name={inviteMeta.name} />
+        <Avatar uri={inviteMeta.avatarUrl || undefined} name={inviteMeta.name} size="sm" />
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={styles.workspaceTitle} numberOfLines={1}>
             {inviteMeta.name || 'Workspace Pod'}

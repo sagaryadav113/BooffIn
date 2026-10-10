@@ -1,45 +1,46 @@
 import React from 'react';
-import { View, StyleSheet, Image, Text } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
+import { Avatar } from '../core/Avatar';
 
 interface GroupCollageAvatarProps {
   size?: number;
   avatars?: string[];
   name?: string;
+  avatarUrl?: string | null;
 }
-
-const DEFAULT_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-];
 
 export const GroupCollageAvatar: React.FC<GroupCollageAvatarProps> = ({
   size = 48,
   avatars = [],
   name = 'Group',
+  avatarUrl,
 }) => {
-  const displayAvatars = avatars.length >= 2 ? avatars.slice(0, 4) : DEFAULT_AVATARS;
-  const halfSize = size / 2;
+  if (avatarUrl) {
+    return <Avatar uri={avatarUrl} name={name} size={size} />;
+  }
 
-  return (
-    <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }]}>
-      <View style={styles.grid}>
-        <View style={[styles.quadrant, { width: halfSize, height: halfSize }]}>
-          <Image source={{ uri: displayAvatars[0] }} style={styles.image} />
-        </View>
-        <View style={[styles.quadrant, { width: halfSize, height: halfSize }]}>
-          <Image source={{ uri: displayAvatars[1] }} style={styles.image} />
-        </View>
-        <View style={[styles.quadrant, { width: halfSize, height: halfSize }]}>
-          <Image source={{ uri: displayAvatars[2] }} style={styles.image} />
-        </View>
-        <View style={[styles.quadrant, { width: halfSize, height: halfSize }]}>
-          <Image source={{ uri: displayAvatars[3] }} style={styles.image} />
+  const validAvatars = (avatars || []).filter(
+    (a) => typeof a === 'string' && a.trim().length > 0
+  );
+
+  if (validAvatars.length >= 2) {
+    const displayAvatars = validAvatars.slice(0, 4);
+    const halfSize = size / 2;
+
+    return (
+      <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }]}>
+        <View style={styles.grid}>
+          {displayAvatars.map((uri, idx) => (
+            <View key={idx} style={[styles.quadrant, { width: halfSize, height: halfSize }]}>
+              <Image source={{ uri }} style={styles.image} />
+            </View>
+          ))}
         </View>
       </View>
-    </View>
-  );
+    );
+  }
+
+  return <Avatar uri={undefined} name={name} size={size} />;
 };
 
 const styles = StyleSheet.create({

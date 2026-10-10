@@ -129,8 +129,6 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
             />
             {isOtherUserOnline && <View style={styles.presenceDot} />}
           </View>
-        ) : isInnerCircle ? (
-          <GroupCollageAvatar size={48} name={workspace.name} />
         ) : (
           <Avatar
             uri={workspace.avatar_url || undefined}

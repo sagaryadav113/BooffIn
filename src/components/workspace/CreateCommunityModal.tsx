@@ -23,11 +23,14 @@ import {
   Globe,
   Lock,
   Info,
+  Camera,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { fetchFollowing } from '../../api/socialService';
+import { uploadPostImage } from '../../api/storageService';
 import { supabase } from '../../api/client';
 import { UserProfile, WorkspaceSubscriptionTier } from '../../types';
 import { Workspace } from '../../types/workspace';
@@ -67,6 +70,8 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
   const [isDisabling, setIsDisabling] = useState(false);
 
   const [name, setName] = useState('');
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,6 +86,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
     if (!visible) {
       // Reset state on close
       setName('');
+      setAvatarUri(null);
       setDescription('');
       setIsPrivate(false);
       setSearchQuery('');
@@ -184,6 +190,32 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
     });
   }, []);
 
+  // Pick custom community avatar
+  const handlePickAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setIsUploadingAvatar(true);
+        const uploadRes = await uploadPostImage(
+          currentUser?.id || 'community_avatar',
+          result.assets[0]
+        );
+        const finalUrl = uploadRes.url || result.assets[0].uri;
+        setAvatarUri(finalUrl);
+        setIsUploadingAvatar(false);
+      }
+    } catch (err: any) {
+      setIsUploadingAvatar(false);
+      console.warn('Pick avatar error:', err);
+    }
+  };
+
   // Remove a selected user from chips
   const handleRemoveUser = useCallback((userId: string) => {
     try {
@@ -243,6 +275,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
         description: description.trim() || undefined,
         subscription_tier: 'free',
         is_private: isPrivate,
+        avatar_url: avatarUri || undefined,
         member_ids: memberIds,
       });
 
@@ -344,26 +377,49 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                 </View>
               )}
 
-              {/* Community Name Input Box */}
+              {/* Community Avatar & Name Input Row */}
               <View style={styles.inputContainer}>
-                <View style={styles.inputWrap}>
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="Community name (e.g. Synthetic Biology Hub)"
-                    placeholderTextColor="#94A3B8"
-                    style={styles.textInput}
-                    autoCapitalize="words"
-                  />
-                  {name.length > 0 && (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => setName('')}
-                      style={styles.clearInputBtn}
-                    >
-                      <X size={14} color="#64748B" />
-                    </TouchableOpacity>
-                  )}
+                <View style={styles.communityHeaderRow}>
+                  {/* Custom Avatar Picker */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handlePickAvatar}
+                    disabled={isUploadingAvatar}
+                    style={styles.avatarPickerBtn}
+                  >
+                    {isUploadingAvatar ? (
+                      <ActivityIndicator size="small" color="#164E3F" />
+                    ) : avatarUri ? (
+                      <Avatar uri={avatarUri} name={name || 'Community'} size={46} />
+                    ) : (
+                      <View style={styles.avatarPickerPlaceholder}>
+                        <Camera size={20} color="#164E3F" strokeWidth={2} />
+                      </View>
+                    )}
+                    <View style={styles.avatarCameraBadge}>
+                      <Camera size={9} color="#FFFFFF" strokeWidth={2.4} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={[styles.inputWrap, { flex: 1 }]}>
+                    <TextInput
+                      value={name}
+                      onChangeText={setName}
+                      placeholder="Community name (e.g. Synthetic Biology Hub)"
+                      placeholderTextColor="#94A3B8"
+                      style={styles.textInput}
+                      autoCapitalize="words"
+                    />
+                    {name.length > 0 && (
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setName('')}
+                        style={styles.clearInputBtn}
+                      >
+                        <X size={14} color="#64748B" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               </View>
 
@@ -855,6 +911,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 4,
+  },
+  communityHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarPickerBtn: {
+    position: 'relative',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPickerPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarCameraBadge: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 17,
+    height: 17,
+    borderRadius: 8.5,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   inputWrap: {
     flexDirection: 'row',

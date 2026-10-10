@@ -1300,7 +1300,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           onPress={() => setShowInfoModal(true)}
           style={styles.headerCenter}
         >
-          <GroupCollageAvatar size={34} name={workspace.name} />
+          <Avatar
+            uri={workspace.avatar_url || undefined}
+            name={workspace.name || "BooffIn's inner circle"}
+            size="sm"
+          />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={styles.headerTitle} numberOfLines={1}>
@@ -2193,7 +2197,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     disabled={forwardingTargetId === ws.id}
                     style={styles.forwardWsRow}
                   >
-                    <GroupCollageAvatar size={32} name={ws.name} />
+                    <Avatar uri={ws.avatar_url || undefined} name={ws.name || 'Chat'} size="sm" />
                     <View style={{ flex: 1, marginLeft: 10 }}>
                       <Text style={styles.forwardWsName}>{ws.name || 'Chat'}</Text>
                       <Text style={styles.forwardWsType}>
