@@ -345,6 +345,7 @@ export default function WorkspaceHubScreen() {
   // Render Community Channel Cards matching reference design
   const renderCommunityItem = ({ item }: { item: Workspace }) => {
     const isJoined = communities.some((c) => c.id === item.id);
+    const isDisabled = Boolean(item.is_disabled || item.status === 'disabled' || item.settings?.is_disabled);
 
     return (
       <TouchableOpacity
@@ -356,7 +357,7 @@ export default function WorkspaceHubScreen() {
             router.push(`/workspace/${item.id}` as any);
           }
         }}
-        style={styles.communityRow}
+        style={[styles.communityRow, isDisabled && styles.communityRowDisabled]}
       >
         <Avatar
           uri={item.avatar_url || undefined}
@@ -365,18 +366,29 @@ export default function WorkspaceHubScreen() {
         />
 
         <View style={styles.communityBody}>
-          <Text style={styles.communityTitle} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text style={styles.communitySnippet} numberOfLines={2}>
+          <View style={styles.communityTitleRow}>
+            <Text style={[styles.communityTitle, isDisabled && styles.communityTitleDisabled]} numberOfLines={1}>
+              {item.name}
+            </Text>
+            {isDisabled && (
+              <View style={styles.disabledBadge}>
+                <Text style={styles.disabledBadgeText}>Disabled</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.communitySnippet, isDisabled && styles.communitySnippetDisabled]} numberOfLines={2}>
             {item.description || 'Join our research group discussion and paper reviews.'}
           </Text>
-          <Text style={styles.communityMeta}>
+          <Text style={[styles.communityMeta, isDisabled && styles.communityMetaDisabled]}>
             {item.members_count || 1} {item.members_count === 1 ? 'member' : 'members'}
           </Text>
         </View>
 
-        {!isJoined ? (
+        {isDisabled ? (
+          <View style={styles.disabledPill}>
+            <Text style={styles.disabledPillText}>Disabled</Text>
+          </View>
+        ) : !isJoined ? (
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => joinCommunity(item.id)}
@@ -809,6 +821,49 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
+  },
+  communityRowDisabled: {
+    backgroundColor: '#F8FAFC',
+    borderBottomColor: '#E2E8F0',
+    opacity: 0.72,
+  },
+  communityTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  communityTitleDisabled: {
+    color: '#64748B',
+  },
+  communitySnippetDisabled: {
+    color: '#94A3B8',
+  },
+  communityMetaDisabled: {
+    color: '#94A3B8',
+  },
+  disabledBadge: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  disabledBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  disabledPill: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  disabledPillText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#64748B',
   },
   communityBody: {
     flex: 1,

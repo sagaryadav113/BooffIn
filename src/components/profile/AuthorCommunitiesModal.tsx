@@ -189,9 +189,10 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
               contentContainerStyle={styles.listContent}
               renderItem={({ item }) => {
                 const memberCount = item.members_count || 1;
+                const isDisabled = Boolean(item.is_disabled || item.status === 'disabled' || item.settings?.is_disabled);
 
                 return (
-                  <View style={styles.communityCard}>
+                  <View style={[styles.communityCard, isDisabled && styles.communityCardDisabled]}>
                     <Avatar
                       uri={item.avatar_url || undefined}
                       name={item.name}
@@ -200,36 +201,41 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
 
                     <View style={styles.communityInfo}>
                       <View style={styles.communityTitleRow}>
-                        <Text style={styles.communityName} numberOfLines={1}>
+                        <Text style={[styles.communityName, isDisabled && styles.communityNameDisabled]} numberOfLines={1}>
                           {item.name}
                         </Text>
+                        {isDisabled && (
+                          <View style={styles.disabledBadge}>
+                            <Text style={styles.disabledBadgeText}>Disabled</Text>
+                          </View>
+                        )}
                       </View>
 
                       {item.description ? (
-                        <Text style={styles.communityDesc} numberOfLines={2}>
+                        <Text style={[styles.communityDesc, isDisabled && styles.communityDescDisabled]} numberOfLines={2}>
                           {item.description}
                         </Text>
                       ) : (
-                        <Text style={styles.communityDesc} numberOfLines={1}>
+                        <Text style={[styles.communityDesc, isDisabled && styles.communityDescDisabled]} numberOfLines={1}>
                           Open scientific community for research discussion
                         </Text>
                       )}
 
                       <View style={styles.memberBadgeRow}>
-                        <Users size={12} color="#059669" />
-                        <Text style={styles.memberBadgeText}>
+                        <Users size={12} color={isDisabled ? '#94A3B8' : '#059669'} />
+                        <Text style={[styles.memberBadgeText, isDisabled && styles.memberBadgeTextDisabled]}>
                           {memberCount} member{memberCount === 1 ? '' : 's'}
                         </Text>
                       </View>
                     </View>
 
-                    {/* Dark Green View Button */}
+                    {/* View Button */}
                     <TouchableOpacity
                       activeOpacity={0.8}
                       onPress={() => handleViewCommunity(item)}
-                      style={styles.viewBtn}
+                      style={[styles.viewBtn, isDisabled && styles.viewBtnDisabled]}
                     >
-                      <Text style={styles.viewBtnText}>View</Text>
+                      <Text style={styles.viewBtnText}>{isDisabled ? 'View' : 'View'}</Text>
                       <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.4} />
                     </TouchableOpacity>
                   </View>
@@ -396,6 +402,11 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 12,
   },
+  communityCardDisabled: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+    opacity: 0.75,
+  },
   communityInfo: {
     flex: 1,
   },
@@ -409,11 +420,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
+  communityNameDisabled: {
+    color: '#64748B',
+  },
+  disabledBadge: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  disabledBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
   communityDesc: {
     fontSize: 12,
     color: '#475569',
     marginTop: 2,
     lineHeight: 16,
+  },
+  communityDescDisabled: {
+    color: '#94A3B8',
   },
   memberBadgeRow: {
     flexDirection: 'row',
@@ -425,6 +454,9 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: '#059669',
+  },
+  memberBadgeTextDisabled: {
+    color: '#94A3B8',
   },
   viewBtn: {
     flexDirection: 'row',
@@ -439,6 +471,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 2,
+  },
+  viewBtnDisabled: {
+    backgroundColor: '#64748B',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   viewBtnText: {
     fontSize: 12.5,
