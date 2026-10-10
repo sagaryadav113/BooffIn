@@ -686,6 +686,20 @@ export const workspaceService = {
       } = await supabase.auth.getUser();
       if (!user) return { workspace: null, error: 'User not authenticated' };
 
+      // Strict Community Limit: Maximum 3 communities created per user
+      const { count: existingCount, error: countErr } = await supabase
+        .from('workspaces')
+        .select('id', { count: 'exact', head: true })
+        .eq('type', 'community')
+        .or(`owner_id.eq.${user.id},creator_id.eq.${user.id}`);
+
+      if (existingCount !== null && !countErr && existingCount >= 3) {
+        return {
+          workspace: null,
+          error: 'Community Limit Reached: You cannot create more than 3 communities. You currently own 3/3 communities.',
+        };
+      }
+
       const price = TIER_PRICES[params.subscription_tier] || 0;
       const dbTierEnum = params.subscription_tier === 'free' ? null : params.subscription_tier;
 

@@ -23,6 +23,7 @@ import {
   Sparkles,
   Globe,
   Lock,
+  AlertTriangle,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
@@ -87,6 +88,16 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
 }) => {
   const currentUser = useAuthStore((s) => s.user);
   const createCommunity = useWorkspaceStore((s) => s.createCommunity);
+  const communities = useWorkspaceStore((s) => s.communities);
+
+  const ownedCommunitiesCount = useMemo(() => {
+    if (!currentUser?.id) return 0;
+    return (communities || []).filter(
+      (c) => (c.owner_id === currentUser.id || c.creator_id === currentUser.id) && c.type === 'community'
+    ).length;
+  }, [communities, currentUser?.id]);
+
+  const hasReachedLimit = ownedCommunitiesCount >= 3;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -218,6 +229,11 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
 
   // Create Community
   const handleCreateCommunity = async () => {
+    if (hasReachedLimit) {
+      setErrorText('Community Limit Reached: You cannot create more than 3 communities. You currently own 3/3 communities.');
+      return;
+    }
+
     const trimmedName = name.trim();
     if (!trimmedName) {
       setErrorText('Please enter a community name.');
@@ -283,6 +299,27 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             <View>
+              {/* Strict Capacity Limit Indicator / Warning Banner */}
+              {hasReachedLimit ? (
+                <View style={styles.limitWarningCard}>
+                  <View style={styles.limitWarningHeader}>
+                    <AlertTriangle size={17} color="#DC2626" strokeWidth={2.5} />
+                    <Text style={styles.limitWarningTitle}>Creation Limit Reached (3/3)</Text>
+                  </View>
+                  <Text style={styles.limitWarningSub}>
+                    In BooffIn Workspace, each researcher can create and manage up to 3 communities. You currently own 3/3 active communities.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.capacityBadgeContainer}>
+                  <View style={styles.capacityPill}>
+                    <Text style={styles.capacityPillText}>
+                      Community Capacity: {ownedCommunitiesCount}/3 Created
+                    </Text>
+                  </View>
+                </View>
+              )}
+
               {/* Community Name Input Box */}
               <View style={styles.inputContainer}>
                 <View style={styles.inputWrap}>
@@ -523,11 +560,12 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
         <View style={styles.bottomDock}>
           <TouchableOpacity
             activeOpacity={0.8}
-            disabled={isSubmitting || !name.trim()}
+            disabled={hasReachedLimit || isSubmitting || !name.trim()}
             onPress={handleCreateCommunity}
             style={[
               styles.createBtn,
-              !name.trim() && styles.createBtnDisabled,
+              (hasReachedLimit || !name.trim()) && styles.createBtnDisabled,
+              hasReachedLimit && styles.createBtnLimitReached,
               isSubmitting && { opacity: 0.7 },
             ]}
           >
@@ -535,7 +573,9 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Text style={styles.createBtnText}>
-                {selectedUsers.length > 0
+                {hasReachedLimit
+                  ? 'Limit Reached (3/3 Communities)'
+                  : selectedUsers.length > 0
                   ? `Create community (${selectedUsers.length} invited)`
                   : 'Create community'}
               </Text>
@@ -571,6 +611,52 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0F172A',
     letterSpacing: -0.3,
+  },
+  limitWarningCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    padding: 12,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  limitWarningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  limitWarningTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  limitWarningSub: {
+    fontSize: 12,
+    color: '#991B1B',
+    lineHeight: 16,
+  },
+  capacityBadgeContainer: {
+    alignItems: 'flex-start',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  capacityPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  capacityPillText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#166534',
+    letterSpacing: -0.1,
   },
   inputContainer: {
     paddingHorizontal: 16,
@@ -850,6 +936,10 @@ const styles = StyleSheet.create({
   createBtnDisabled: {
     backgroundColor: '#94A3B8',
     opacity: 0.6,
+  },
+  createBtnLimitReached: {
+    backgroundColor: '#DC2626',
+    opacity: 0.85,
   },
   createBtnText: {
     fontSize: 15,
