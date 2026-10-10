@@ -51,3 +51,8 @@ example
 
 # scratch test scripts
 scratch/
+
+# Desktop / Electron build artifacts
+dist-electron/
+electron-build/
+
