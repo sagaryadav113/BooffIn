@@ -33,6 +33,7 @@ import {
   Layers,
   Bell,
   BellOff,
+  Settings,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
