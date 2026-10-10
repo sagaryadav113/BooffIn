@@ -468,7 +468,7 @@ export const workspaceService = {
         // Check current user membership
         const { data: member } = await supabase
           .from('workspace_members')
-          .select('role, status, is_muted, unread_count')
+          .select('role, status, is_muted, unread_count, joined_at')
           .eq('workspace_id', workspaceId)
           .eq('user_id', effectiveUserId)
           .maybeSingle();
@@ -478,6 +478,7 @@ export const workspaceService = {
           result.my_membership_status = member.status;
           result.is_muted = member.is_muted;
           result.unread_count = member.unread_count;
+          result.my_joined_at = member.joined_at;
         }
 
         // Check if user is blocked in this workspace
@@ -908,6 +909,7 @@ export const workspaceService = {
           user_id: user.id,
           role: 'member',
           status: 'active',
+          joined_at: new Date().toISOString(),
         },
         { onConflict: 'workspace_id,user_id' }
       );
@@ -2248,6 +2250,225 @@ export const workspaceService = {
       return { success: true, error: null };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to invite researcher' };
+    }
+  },
+
+  /**
+   * Add a mutual follower directly to the workspace
+   */
+  async addDirectMember(
+    workspaceId: string,
+    targetUserId: string,
+    role: 'member' | 'moderator' | 'admin' = 'member'
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const { error } = await supabase.from('workspace_members').upsert(
+        {
+          workspace_id: workspaceId,
+          user_id: targetUserId,
+          role,
+          status: 'active',
+          joined_at: new Date().toISOString(),
+        },
+        { onConflict: 'workspace_id,user_id' }
+      );
+
+      if (error) return { success: false, error: error.message };
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to add member' };
+    }
+  },
+
+  /**
+   * Send a direct workspace invitation message to a researcher in their DM chat
+   */
+  async sendWorkspaceInvitation(
+    workspace: Workspace,
+    targetUserId: string,
+    inviterId: string
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      // 1. Get or create 1-to-1 DM workspace
+      const canonicalKey = [inviterId, targetUserId].sort().join(':');
+      let dmWorkspaceId: string | null = null;
+
+      const { data: existing } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('canonical_dm_key', canonicalKey)
+        .maybeSingle();
+
+      if (existing?.id) {
+        dmWorkspaceId = existing.id;
+      } else {
+        const userA = inviterId < targetUserId ? inviterId : targetUserId;
+        const userB = inviterId > targetUserId ? inviterId : targetUserId;
+        const { data: newWs, error: insertErr } = await supabase
+          .from('workspaces')
+          .insert({
+            type: 'dm',
+            owner_id: inviterId,
+            creator_id: inviterId,
+            dm_participant_a: userA,
+            dm_participant_b: userB,
+            canonical_dm_key: canonicalKey,
+            name: 'Direct Message',
+            is_private: true,
+            subscription_tier: 'free',
+            subscription_price_inr: 0,
+          })
+          .select('id')
+          .single();
+
+        if (newWs?.id) {
+          dmWorkspaceId = newWs.id;
+          await supabase.from('workspace_members').upsert([
+            { workspace_id: newWs.id, user_id: inviterId, role: 'member', status: 'active' },
+            { workspace_id: newWs.id, user_id: targetUserId, role: 'member', status: 'active' },
+          ]);
+        }
+      }
+
+      if (!dmWorkspaceId) {
+        return { success: false, error: 'Could not establish DM chat' };
+      }
+
+      // 2. Send workspace invite message
+      const inviteMeta: WorkspaceInviteMetadata = {
+        id: workspace.id,
+        name: workspace.name,
+        type: workspace.type === 'inner_circle' ? 'inner_circle' : 'community',
+        avatarUrl: workspace.avatar_url,
+        description: workspace.description,
+        members_count: workspace.members_count,
+      };
+
+      const inviteUrl = `https://booffin.com/join/${workspace.id}`;
+      const msgContent = `🤝 Invited you to join ${workspace.name}:\n${inviteUrl}`;
+
+      await this.sendMessage({
+        workspace_id: dmWorkspaceId,
+        content: msgContent,
+        message_type: 'workspace_invite',
+        workspace_invite_metadata: inviteMeta,
+      });
+
+      // 3. Mark in workspace_members as 'invited'
+      await supabase.from('workspace_members').upsert(
+        {
+          workspace_id: workspace.id,
+          user_id: targetUserId,
+          role: 'member',
+          status: 'invited',
+        },
+        { onConflict: 'workspace_id,user_id' }
+      );
+
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to send invite' };
+    }
+  },
+
+  /**
+   * Fetch followers and followings for member picker with mutual relation flag
+   */
+  async getFollowersAndFollowing(userId: string): Promise<{
+    researchers: Array<{
+      id: string;
+      fullName: string;
+      handle: string;
+      avatarUrl?: string | null;
+      academicTitle?: string | null;
+      institution?: string | null;
+      isMutual: boolean;
+      isFollowing: boolean;
+      isFollower: boolean;
+    }>;
+    error: string | null;
+  }> {
+    try {
+      const [followingRes, followerRes] = await Promise.all([
+        supabase
+          .from('follows')
+          .select(`
+            created_at,
+            following:profiles!following_id (
+              id,
+              username,
+              full_name,
+              avatar_url,
+              academic_title,
+              institution
+            )
+          `)
+          .eq('follower_id', userId),
+        supabase
+          .from('follows')
+          .select(`
+            created_at,
+            follower:profiles!follower_id (
+              id,
+              username,
+              full_name,
+              avatar_url,
+              academic_title,
+              institution
+            )
+          `)
+          .eq('following_id', userId),
+      ]);
+
+      const followingSet = new Set<string>();
+      const followerSet = new Set<string>();
+      const profileMap = new Map<string, any>();
+
+      (followingRes.data || []).forEach((row: any) => {
+        const p = row.following;
+        if (p?.id && p.id !== userId) {
+          followingSet.add(p.id);
+          profileMap.set(p.id, p);
+        }
+      });
+
+      (followerRes.data || []).forEach((row: any) => {
+        const p = row.follower;
+        if (p?.id && p.id !== userId) {
+          followerSet.add(p.id);
+          if (!profileMap.has(p.id)) {
+            profileMap.set(p.id, p);
+          }
+        }
+      });
+
+      const list = Array.from(profileMap.values()).map((p) => {
+        const isFollowing = followingSet.has(p.id);
+        const isFollower = followerSet.has(p.id);
+        const isMutual = isFollowing && isFollower;
+        return {
+          id: p.id,
+          fullName: p.full_name || p.username || 'Researcher',
+          handle: p.username || 'researcher',
+          avatarUrl: p.avatar_url || null,
+          academicTitle: p.academic_title || null,
+          institution: p.institution || null,
+          isMutual,
+          isFollowing,
+          isFollower,
+        };
+      });
+
+      // Sort: mutual first, then alphabetically
+      list.sort((a, b) => {
+        if (a.isMutual && !b.isMutual) return -1;
+        if (!a.isMutual && b.isMutual) return 1;
+        return a.fullName.localeCompare(b.fullName);
+      });
+
+      return { researchers: list, error: null };
+    } catch (err: any) {
+      return { researchers: [], error: err.message || 'Failed to load connections' };
     }
   },
 

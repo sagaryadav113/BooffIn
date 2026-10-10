@@ -68,6 +68,7 @@ import { Avatar } from '../core/Avatar';
 import { GroupCollageAvatar } from './GroupCollageAvatar';
 import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
 import { WorkspaceExportModal } from './WorkspaceExportModal';
+import { WorkspaceAddMembersModal } from './WorkspaceAddMembersModal';
 
 interface WorkspaceInfoModalProps {
   visible: boolean;
@@ -110,6 +111,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const [showMembersList, setShowMembersList] = useState(false);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showAddMembersModal, setShowAddMembersModal] = useState(false);
 
   // Disable Community Confirmation State
   const [showDisableCommunityModal, setShowDisableCommunityModal] = useState(false);
@@ -214,17 +216,17 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
     setOnlyAdminsInvite(Boolean(workspace.settings?.only_admins_invite));
     setOnlyAdminsPin(Boolean(workspace.settings?.only_admins_pin));
 
-    async function fetchMembers() {
-      setIsLoadingMembers(true);
-      const res = await workspaceService.getWorkspaceMembers(workspace.id);
-      if (res.members) {
-        setMembers(res.members);
-      }
-      setIsLoadingMembers(false);
-    }
-
-    fetchMembers();
+    refreshMembers();
   }, [visible, workspace.id, workspace.name, workspace.description, workspace.settings, workspace.is_muted]);
+
+  const refreshMembers = async () => {
+    setIsLoadingMembers(true);
+    const res = await workspaceService.getWorkspaceMembers(workspace.id);
+    if (res.members) {
+      setMembers(res.members);
+    }
+    setIsLoadingMembers(false);
+  };
 
   // Handle Copy Invite Link
   const handleCopyInviteLink = async () => {
@@ -941,7 +943,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
-                  handleCopyInviteLink();
+                  setShowAddMembersModal(true);
                 }}
                 style={styles.actionBtn}
               >
@@ -1924,6 +1926,15 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
           workspace={workspace}
           messages={messages}
           members={members}
+        />
+
+        {/* Add Members Sheet */}
+        <WorkspaceAddMembersModal
+          visible={showAddMembersModal}
+          onClose={() => setShowAddMembersModal(false)}
+          workspace={workspace}
+          existingMembers={members}
+          onMemberAdded={refreshMembers}
         />
       </SafeAreaView>
     </Modal>

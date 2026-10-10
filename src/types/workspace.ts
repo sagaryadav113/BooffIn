@@ -58,6 +58,7 @@ export interface Workspace {
   other_user?: WorkspaceSenderProfile | null;
   my_role?: WorkspaceMemberRole;
   my_membership_status?: 'active' | 'invited' | 'pending_payment';
+  my_joined_at?: string | null;
   is_pinned?: boolean;
   is_archived?: boolean;
   is_muted?: boolean;

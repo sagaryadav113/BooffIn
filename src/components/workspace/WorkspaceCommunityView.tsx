@@ -96,6 +96,7 @@ import { usePresenceStore } from '../../store/usePresenceStore';
 import { resolvePaper } from '../../api/paperResolver';
 import { uploadPostImage, uploadVoiceNoteAudio } from '../../api/storageService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
+import { workspaceService } from '../../api/workspaceService';
 
 const SAMPLE_COMMUNITY_DOCUMENTS = [
   {
@@ -268,6 +269,30 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     .map((t) => t.username)
     .join(', ');
   const typingTimeoutRef = useRef<any>(null);
+
+  // Membership check & Review Mode
+  const isOwner = workspace.owner_id === currentUser?.id;
+  const myMember = (members || []).find((m) => m.user_id === currentUser?.id);
+  const isMember = isOwner || myMember?.status === 'active' || workspace.my_membership_status === 'active';
+  const [isJoining, setIsJoining] = useState(false);
+
+  const handleJoinCommunity = async () => {
+    setIsJoining(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    const res = await workspaceService.joinCommunity(workspace.id);
+    if (res.success) {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      await loadMembers(workspace.id);
+      await useWorkspaceStore.getState().loadWorkspaces();
+    } else {
+      Alert.alert('Unable to Join', res.error || 'Failed to join community.');
+    }
+    setIsJoining(false);
+  };
 
   // In-chat search
   const [showSearchBar, setShowSearchBar] = useState(false);
@@ -1032,9 +1057,17 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     return null;
   };
 
-  // Filter messages by search and filter pills
+  // Filter messages by search and filter pills (non-owners can only view past 7 days chat)
   const filteredMessages = useMemo(() => {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
     return messages.filter((m) => {
+      // 0. Community Chat Retention Rule: Added people can only view past 7 days chat
+      if (!isOwner) {
+        const msgTime = new Date(m.created_at).getTime();
+        if (msgTime < sevenDaysAgo) return false;
+      }
+
       // 1. Text Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -1081,7 +1114,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
       return true;
     });
-  }, [messages, searchQuery, activeChatFilter]);
+  }, [messages, searchQuery, activeChatFilter, isOwner]);
 
   // Target workspaces for forward modal
   const forwardTargets = useMemo(() => {
@@ -1798,8 +1831,29 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                 </View>
               )}
 
-              {/* Voice Note Recorder or Standard Input Bar */}
-              {isRecordingVoice ? (
+              {/* Review Bar (Non-members) or Voice Note Recorder or Standard Input Bar */}
+              {!isMember ? (
+                <View style={styles.reviewBottomBar}>
+                  <View style={styles.reviewTextContainer}>
+                    <Text style={styles.reviewTitle}>Previewing Community</Text>
+                    <Text style={styles.reviewSubtitle}>
+                      Join to participate in discussions and live sessions
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.reviewJoinButton}
+                    onPress={handleJoinCommunity}
+                    disabled={isJoining}
+                    activeOpacity={0.8}
+                  >
+                    {isJoining ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.reviewJoinButtonText}>Join Community</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ) : isRecordingVoice ? (
                 <VoiceNoteRecorder
                   onSendVoiceNote={handleSendVoiceNote}
                   onCancel={() => setIsRecordingVoice(false)}
@@ -3616,6 +3670,43 @@ const styles = StyleSheet.create({
   },
   replyCloseBtn: {
     padding: 4,
+  },
+  reviewBottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 12,
+  },
+  reviewTextContainer: {
+    flex: 1,
+  },
+  reviewTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  reviewSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  reviewJoinButton: {
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewJoinButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   bottomDockContainer: {
     flexDirection: 'row',

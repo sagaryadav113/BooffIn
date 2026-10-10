@@ -113,6 +113,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
 import { resolvePaper } from '../../api/paperResolver';
 import { uploadPostImage, uploadVoiceNoteAudio } from '../../api/storageService';
+import { workspaceService } from '../../api/workspaceService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
 import { E2EEStatusBanner } from '../chat/E2EEStatusBanner';
 import { derivePodSessionKey, encryptTextMessage, decryptTextMessage } from '../../utils/e2eeCrypto';
@@ -315,13 +316,34 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   // User Role & Permissions (Step 2: Roles & Permissions)
   const isOwner = workspace.owner_id === currentUser?.id;
   const myMembership = members.find((m) => m.user_id === currentUser?.id);
+  const isMember = isOwner || myMembership?.status === 'active' || workspace.my_membership_status === 'active';
   const myRole = isOwner ? 'owner' : (myMembership?.role || 'member');
   const isAdminOrOwner = isOwner || myRole === 'owner' || myRole === 'admin';
   const isModOrAbove = isAdminOrOwner || myRole === 'moderator';
 
-  const canPost = !workspace.settings?.only_admins_post || isAdminOrOwner;
-  const canInvite = !workspace.settings?.only_admins_invite || isAdminOrOwner;
-  const canPin = !workspace.settings?.only_admins_pin || isAdminOrOwner;
+  const canPost = (!workspace.settings?.only_admins_post || isAdminOrOwner) && isMember;
+  const canInvite = (!workspace.settings?.only_admins_invite || isAdminOrOwner) && isMember;
+  const canPin = (!workspace.settings?.only_admins_pin || isAdminOrOwner) && isMember;
+
+  const [isJoining, setIsJoining] = useState(false);
+
+  const handleJoinInnerCircle = async () => {
+    setIsJoining(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    const res = await workspaceService.joinCommunity(workspace.id);
+    if (res.success) {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      await loadMembers(workspace.id);
+      await useWorkspaceStore.getState().loadWorkspaces();
+    } else {
+      Alert.alert('Unable to Join', res.error || 'Failed to join inner circle.');
+    }
+    setIsJoining(false);
+  };
 
   // Discussions State
   const [inputText, setInputText] = useState('');
@@ -511,6 +533,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       });
     }
 
+    // Inner Circle Chat Retention Rule: Added people cannot view previous chats; they join freshly without any previous chats
+    if (!isOwner) {
+      const myJoinedAtStr = myMembership?.joined_at || workspace.my_joined_at;
+      if (!isMember || !myJoinedAtStr) {
+        // Not a joined member yet (reviewing via invite) -> cannot view previous chats
+        list = [];
+      } else {
+        const joinTime = new Date(myJoinedAtStr).getTime();
+        list = list.filter((m) => new Date(m.created_at).getTime() >= joinTime);
+      }
+    }
+
     // Filter by type if active
     if (activeChatFilter === 'media') {
       list = list.filter(
@@ -551,7 +585,16 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     }
 
     return list;
-  }, [messages, activeChatFilter, chatSearchQuery, workspace.settings?.ephemeral_timer]);
+  }, [
+    messages,
+    activeChatFilter,
+    chatSearchQuery,
+    workspace.settings?.ephemeral_timer,
+    isOwner,
+    isMember,
+    myMembership?.joined_at,
+    workspace.my_joined_at,
+  ]);
 
   // Pinned Message
   const pinnedMessage = useMemo(() => {
@@ -1646,11 +1689,21 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   <MessageSquare size={32} color="#164E3F" />
                 </View>
                 <Text style={styles.emptyMessagesTitle}>
-                  {chatSearchQuery.trim() ? 'No matching discussions' : 'Welcome to the Research Pod'}
+                  {chatSearchQuery.trim()
+                    ? 'No matching discussions'
+                    : !isMember
+                    ? 'Reviewing Inner Circle'
+                    : !isOwner && (!myMembership?.joined_at || displayedMessages.length === 0)
+                    ? 'Fresh Pod Workspace'
+                    : 'Welcome to the Research Pod'}
                 </Text>
                 <Text style={styles.emptyMessagesSub}>
                   {chatSearchQuery.trim()
                     ? `No messages matched "${chatSearchQuery}". Try clearing filters.`
+                    : !isMember
+                    ? 'Previous pod chats are kept private. Click Join below to join freshly and collaborate.'
+                    : !isOwner && (!myMembership?.joined_at || displayedMessages.length === 0)
+                    ? 'You joined freshly without previous chats. Start the conversation below!'
                     : 'Share preprints, discuss methodology, assign tasks, and tag collaborators.'}
                 </Text>
               </View>
@@ -2151,8 +2204,29 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             </View>
           )}
 
-          {/* Bottom Capsule Input Dock / Voice Note Recorder / Announcement Mode Dock */}
-          {canPost ? (
+          {/* Bottom Capsule Input Dock / Voice Note Recorder / Announcement Mode Dock / Review Bar */}
+          {!isMember ? (
+            <View style={styles.reviewBottomBar}>
+              <View style={styles.reviewTextContainer}>
+                <Text style={styles.reviewTitle}>Previewing Inner Circle</Text>
+                <Text style={styles.reviewSubtitle}>
+                  Join this private research pod freshly to access discussions
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.reviewJoinButton}
+                onPress={handleJoinInnerCircle}
+                disabled={isJoining}
+                activeOpacity={0.8}
+              >
+                {isJoining ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.reviewJoinButtonText}>Join Inner Circle</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : canPost ? (
             isRecordingVoice ? (
               <VoiceNoteRecorder
                 onSendVoiceNote={handleSendVoiceNote}
@@ -3519,6 +3593,43 @@ const styles = StyleSheet.create({
   },
   otherTimestamp: {
     color: '#94A3B8',
+  },
+  reviewBottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    gap: 12,
+  },
+  reviewTextContainer: {
+    flex: 1,
+  },
+  reviewTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  reviewSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  reviewJoinButton: {
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewJoinButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   bottomDockContainer: {
     flexDirection: 'row',
