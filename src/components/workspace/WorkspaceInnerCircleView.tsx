@@ -106,6 +106,8 @@ import { ChatPostCard } from '../chat/ChatPostCard';
 import { ChatProfileCard } from '../chat/ChatProfileCard';
 import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
 import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
+import { PaperSearchModal } from '../chat/PaperSearchModal';
+import { Paper } from '../../types';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
@@ -823,22 +825,36 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     await votePoll(workspace.id, messageId, newVote);
   };
 
-  // Step 3: Share Document / PDF Manuscript Handler
-  const handleAttachDocument = async (doc: { name: string; sizeBytes: number; pageCount: number; fileUrl: string }) => {
+  // Step 3: Research Paper & Manuscript Search Handler
+  const handleSelectPaperToShare = async (paper: Paper) => {
     setShowDocumentPickerModal(false);
+    setShowDoiModal(false);
     setShowAttachMenu(false);
+
+    const doiMeta: DoiMetadata = {
+      doi: paper.doi || '',
+      title: paper.title,
+      authors: (paper.authors || []).map((a) => ({ name: a.name, orcid: a.orcid })),
+      publicationYear: paper.publicationYear,
+      journal: paper.journal,
+      url: paper.openAccessUrl || paper.canonicalUrl || (paper.doi ? `https://doi.org/${paper.doi}` : ''),
+      abstract: paper.abstract,
+      citationCount: paper.citationCount,
+    };
+
     const docMeta: WorkspaceDocumentMetadata = {
-      name: doc.name,
-      sizeBytes: doc.sizeBytes,
-      fileUrl: doc.fileUrl,
+      name: `${paper.title.slice(0, 45).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+      sizeBytes: 1024 * 1024 * 1.8,
+      fileUrl: paper.openAccessUrl || paper.canonicalUrl || 'https://arxiv.org/pdf/2103.00020.pdf',
       mimeType: 'application/pdf',
-      pageCount: doc.pageCount,
+      pageCount: 16,
     };
 
     await sendMessage({
       workspace_id: workspace.id,
-      content: `📄 Manuscript: ${doc.name}`,
-      message_type: 'document',
+      content: `📄 Manuscript: ${paper.title}`,
+      message_type: 'paper_doi',
+      doi_metadata: doiMeta,
       document_metadata: docMeta,
       reply_to_id: replyingTo?.id || null,
     });
@@ -3195,56 +3211,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       </Modal>
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Select Document / Manuscript PDF (Step 3)              */}
+      {/* MODAL: Academic Paper & Manuscript Search (DOI, URL, Title, Keywords) */}
       {/* ------------------------------------------------------------- */}
-      <Modal
-        visible={showDocumentPickerModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowDocumentPickerModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <FileUp size={20} color="#DC2626" />
-                <Text style={styles.modalTitle}>Attach Manuscript / PDF</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowDocumentPickerModal(false)}>
-                <X size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSubtitle}>
-              Select a preprint manuscript or protocol document to share with the pod.
-            </Text>
-
-            <ScrollView style={{ maxHeight: 280, marginTop: 4 }}>
-              {SAMPLE_POD_MANUSCRIPTS.map((doc, i) => (
-                <TouchableOpacity
-                  key={i}
-                  activeOpacity={0.7}
-                  onPress={() => handleAttachDocument(doc)}
-                  style={[styles.docItemOption, { marginBottom: 10 }]}
-                >
-                  <View style={[styles.attachIconWrap, { backgroundColor: '#FEF2F2', marginRight: 12 }]}>
-                    <FileUp size={18} color="#DC2626" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.docItemName} numberOfLines={1}>
-                      {doc.name}
-                    </Text>
-                    <Text style={styles.docItemMeta}>
-                      {(doc.sizeBytes / 1024 / 1024).toFixed(1)} MB • {doc.pageCount} pages • PDF
-                    </Text>
-                  </View>
-                  <Send size={15} color="#164E3F" />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <PaperSearchModal
+        visible={showDocumentPickerModal || showDoiModal}
+        onClose={() => {
+          setShowDocumentPickerModal(false);
+          setShowDoiModal(false);
+        }}
+        onSelectPaper={handleSelectPaperToShare}
+        title="Search & Share Manuscript / Paper"
+        subtitle="Search preprints and papers by DOI, URL, title, keywords, or author across global scientific registries."
+      />
 
     </View>
   );

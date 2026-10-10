@@ -85,6 +85,8 @@ import { ImageViewerModal } from '../modals/ImageViewerModal';
 import { VoiceNotePlayer } from '../chat/VoiceNotePlayer';
 import { VoiceNoteRecorder } from '../chat/VoiceNoteRecorder';
 import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
+import { PaperSearchModal } from '../chat/PaperSearchModal';
+import { Paper } from '../../types';
 import { ChatPostCard } from '../chat/ChatPostCard';
 import { ChatProfileCard } from '../chat/ChatProfileCard';
 import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
@@ -852,21 +854,35 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     }, 100);
   };
 
-  // Phase 3: Share Document Handler
-  const handleAttachSampleDocument = async (name: string, sizeBytes: number, pageCount: number) => {
+  // Phase 3: Research Paper / Manuscript Search & Share Handler
+  const handleSelectPaperToShare = async (paper: Paper) => {
+    setShowDoiModal(false);
     setShowAttachMenu(false);
+
+    const doiMeta: DoiMetadata = {
+      doi: paper.doi || '',
+      title: paper.title,
+      authors: (paper.authors || []).map((a) => ({ name: a.name, orcid: a.orcid })),
+      publicationYear: paper.publicationYear,
+      journal: paper.journal,
+      url: paper.openAccessUrl || paper.canonicalUrl || (paper.doi ? `https://doi.org/${paper.doi}` : ''),
+      abstract: paper.abstract,
+      citationCount: paper.citationCount,
+    };
+
     const docMeta: WorkspaceDocumentMetadata = {
-      name,
-      sizeBytes,
-      fileUrl: 'https://arxiv.org/pdf/2103.00020.pdf',
+      name: `${paper.title.slice(0, 45).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+      sizeBytes: 1024 * 1024 * 1.8,
+      fileUrl: paper.openAccessUrl || paper.canonicalUrl || 'https://arxiv.org/pdf/2103.00020.pdf',
       mimeType: 'application/pdf',
-      pageCount,
+      pageCount: 16,
     };
 
     await sendMessage({
       workspace_id: workspace.id,
-      content: `📄 Manuscript: ${name}`,
-      message_type: 'document',
+      content: `📄 Manuscript: ${paper.title}`,
+      message_type: 'paper_doi',
+      doi_metadata: doiMeta,
       document_metadata: docMeta,
       reply_to_id: replyingTo?.id || null,
     });
@@ -2635,7 +2651,8 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
-                handleAttachSampleDocument('Novel_Neural_Mechanisms_Preprint.pdf', 1024 * 1024 * 2.4, 18);
+                setShowAttachMenu(false);
+                setShowDoiModal(true);
               }}
               style={styles.optionsItemRow}
             >
@@ -2644,7 +2661,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.attachItemTitle}>PDF Manuscript / Document</Text>
-                <Text style={styles.attachItemSubtitle}>Share preprint PDFs, datasets, and protocols</Text>
+                <Text style={styles.attachItemSubtitle}>Search and share preprint PDFs, datasets, and papers</Text>
               </View>
             </TouchableOpacity>
 
@@ -3456,67 +3473,14 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       </Modal>
 
-      {/* Modal: Attach Paper via DOI */}
-      <Modal
+      {/* Research Paper & Manuscript Search Modal (DOI, URL, Keyword, Title, Author) */}
+      <PaperSearchModal
         visible={showDoiModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDoiModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <FileText size={18} color="#164E3F" />
-                <Text style={styles.modalTitle}>Attach Research Paper</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowDoiModal(false)}>
-                <X size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSubtitle}>
-              Enter a DOI (e.g. 10.1038/s41586-021-03819-2) or paste a verified paper link.
-            </Text>
-
-            <View style={styles.doiSearchRow}>
-              <TextInput
-                value={doiQuery}
-                onChangeText={(val) => setDoiQuery(val)}
-                placeholder="Paste DOI (e.g. 10.1038/...)"
-                placeholderTextColor="#94A3B8"
-                style={styles.doiInput}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                onPress={handleResolveDoi}
-                disabled={!doiQuery.trim() || isResolvingDoi}
-                style={[styles.doiLookupBtn, !doiQuery.trim() && styles.doiLookupBtnDisabled]}
-              >
-                {isResolvingDoi ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Search size={16} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {resolvedDoi && (
-              <View style={{ marginTop: spacing.md }}>
-                <WorkspaceDoiCard doiMeta={resolvedDoi} />
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={handleAttachResolvedDoi}
-                  style={styles.confirmAttachBtn}
-                >
-                  <Sparkles size={16} color="#FFFFFF" />
-                  <Text style={styles.confirmAttachBtnText}>Attach to Message</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowDoiModal(false)}
+        onSelectPaper={handleSelectPaperToShare}
+        title="Search & Share Research Paper"
+        subtitle="Search papers by DOI, URL, title, keywords, or author across global scientific registries."
+      />
 
       {/* DM Info Modal */}
       <WorkspaceInfoModal
