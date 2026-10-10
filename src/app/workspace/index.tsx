@@ -71,6 +71,9 @@ export default function WorkspaceHubScreen() {
   // DM sub-toggle: "all" vs "archived" (Phase 4)
   const [dmFilter, setDmFilter] = useState<'all' | 'archived'>('all');
 
+  // Community sub-toggle: "Your Community" vs "Joined Community"
+  const [communitySubFilter, setCommunitySubFilter] = useState<'your' | 'joined'>('your');
+
   // Inner Circle sub-toggle: "Groups" vs "People"
   const [innerCircleSubTab, setInnerCircleSubTab] = useState<'groups' | 'people'>('groups');
 
@@ -107,7 +110,12 @@ export default function WorkspaceHubScreen() {
         ? dms.filter((d) => Boolean(d.is_archived))
         : dms.filter((d) => !d.is_archived);
     } else if (activeTab === 'community') {
-      list = [...communities, ...discoverableCommunities.filter((dc) => !communities.some((c) => c.id === dc.id))];
+      const allComms = [...communities, ...discoverableCommunities.filter((dc) => !communities.some((c) => c.id === dc.id))];
+      if (communitySubFilter === 'your') {
+        list = allComms.filter((c) => c.owner_id === currentUser?.id || c.creator_id === currentUser?.id);
+      } else {
+        list = allComms.filter((c) => c.owner_id !== currentUser?.id && c.creator_id !== currentUser?.id);
+      }
     } else if (activeTab === 'inner_circle') {
       list = innerCircles;
     }
@@ -119,7 +127,7 @@ export default function WorkspaceHubScreen() {
       const desc = (w.description || '').toLowerCase();
       return name.includes(q) || desc.includes(q);
     });
-  }, [activeTab, dmFilter, dms, communities, innerCircles, discoverableCommunities, searchQuery]);
+  }, [activeTab, dmFilter, communitySubFilter, dms, communities, innerCircles, discoverableCommunities, currentUser?.id, searchQuery]);
 
   const selectedWorkspace = useMemo(() => {
     if (!selectedWorkspaceId) return activeItems[0] || null;
@@ -269,6 +277,40 @@ export default function WorkspaceHubScreen() {
           >
             <Text style={[styles.subToggleText, dmFilter === 'archived' && styles.subToggleTextActive]}>
               Archived ({dms.filter((d) => Boolean(d.is_archived)).length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Community Sub-Toggle: Your Community vs Joined Community */}
+      {activeTab === 'community' && (
+        <View style={styles.subToggleContainer}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              setCommunitySubFilter('your');
+            }}
+            style={[styles.subToggleBtn, communitySubFilter === 'your' && styles.subToggleBtnActive]}
+          >
+            <Text style={[styles.subToggleText, communitySubFilter === 'your' && styles.subToggleTextActive]}>
+              Your Community
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              } catch {}
+              setCommunitySubFilter('joined');
+            }}
+            style={[styles.subToggleBtn, communitySubFilter === 'joined' && styles.subToggleBtnActive]}
+          >
+            <Text style={[styles.subToggleText, communitySubFilter === 'joined' && styles.subToggleTextActive]}>
+              Joined Community
             </Text>
           </TouchableOpacity>
         </View>
@@ -597,14 +639,18 @@ export default function WorkspaceHubScreen() {
                     {activeTab === 'dm'
                       ? 'No direct messages yet'
                       : activeTab === 'community'
-                      ? 'No communities found'
+                      ? communitySubFilter === 'your'
+                        ? 'No created communities yet'
+                        : 'No joined communities yet'
                       : 'No inner circle pods yet'}
                   </Text>
                   <Text style={styles.emptySubtitle}>
                     {activeTab === 'dm'
                       ? 'Connect with verified researchers to start a 1-on-1 collaborative discussion.'
                       : activeTab === 'community'
-                      ? 'Explore and join open research communities to share papers and live discussions.'
+                      ? communitySubFilter === 'your'
+                        ? 'Create your own research community to host group discussions, share papers, and collaborate.'
+                        : 'Explore and join open research communities to share papers and participate in discussions.'
                       : 'Create a private 25-member research pod with E2EE encryption and shared vault.'}
                   </Text>
                   <TouchableOpacity
