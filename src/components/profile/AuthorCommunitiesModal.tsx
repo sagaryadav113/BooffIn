@@ -21,6 +21,7 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { Workspace } from '../../types/workspace';
 import { workspaceService } from '../../api/workspaceService';
 import { Avatar } from '../core/Avatar';
@@ -52,16 +53,35 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
     if (!visible || !authorId) return;
 
     let isMounted = true;
-    setIsLoading(true);
 
+    // 1. Seed instantly from store if available
+    const storeComms = useWorkspaceStore.getState().communities.filter(
+      (c) =>
+        (c.owner_id === authorId || c.creator_id === authorId) &&
+        c.type === 'community' &&
+        !c.is_disabled &&
+        c.status !== 'disabled'
+    );
+    if (storeComms.length > 0) {
+      setCommunities(storeComms.slice(0, 3));
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+
+    // 2. Query Supabase for author's communities (up to 3)
     (async () => {
       try {
         const res = await workspaceService.getUserCreatedCommunities(authorId);
-        if (isMounted) {
+        if (isMounted && res.communities && res.communities.length > 0) {
+          setCommunities(res.communities.slice(0, 3));
+        } else if (isMounted && storeComms.length === 0) {
           setCommunities(res.communities || []);
         }
       } catch {
-        if (isMounted) setCommunities([]);
+        if (isMounted && storeComms.length === 0) {
+          setCommunities([]);
+        }
       } finally {
         if (isMounted) setIsLoading(false);
       }
