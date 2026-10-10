@@ -93,6 +93,7 @@ import { IncomingCallModal } from '../chat/IncomingCallModal';
 import { webrtcSignaling, IncomingCallPayload } from '../../services/webrtcSignalingService';
 import { FEATURE_FLAGS } from '../../config/featureFlags';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { usePresenceStore } from '../../store/usePresenceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
 import { supabase } from '../../api/client';
@@ -220,12 +221,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const sendTypingIndicator = useWorkspaceStore((s) => s.sendTypingIndicator);
   const typingInThisRoom = useWorkspaceStore((s) => s.typingUsers[workspace.id]);
   const storeOtherLastRead = useWorkspaceStore((s) => s.otherLastReadMap[workspace.id]);
+  const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
 
   const [localPartner, setLocalPartner] = useState<any>(workspace.other_user || null);
   const [inputText, setInputText] = useState('');
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const partner = localPartner || workspace.other_user;
+  const partnerId = partner?.id || workspace.other_user?.id;
+  const isPartnerOnline = Boolean(partnerId && onlineUserIds[partnerId]);
   const isPartnerTyping = Boolean(typingInThisRoom && Object.keys(typingInThisRoom).length > 0);
   const typingPartnerName = isPartnerTyping
     ? Object.values(typingInThisRoom)[0]?.username || partner?.fullName || 'Researcher'
@@ -1782,7 +1786,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               name={partner?.fullName || workspace.name || 'Researcher'}
               size="sm"
             />
-            <View style={styles.presenceDot} />
+            {isPartnerOnline && <View style={styles.presenceDot} />}
           </View>
 
           <View style={styles.headerTitleCol}>
@@ -1801,8 +1805,14 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 </View>
               )}
             </View>
-            <Text style={styles.headerSubtext} numberOfLines={1}>
-              {partner?.academicTitle || 'Active Researcher'}
+            <Text
+              style={[
+                styles.headerSubtext,
+                isPartnerOnline && styles.headerSubtextActive,
+              ]}
+              numberOfLines={1}
+            >
+              {isPartnerOnline ? 'Active now' : partner?.academicTitle || 'Offline'}
             </Text>
           </View>
         </TouchableOpacity>
@@ -3366,14 +3376,18 @@ const styles = StyleSheet.create({
   },
   presenceDot: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: '#10B981',
-    borderWidth: 1.5,
+    bottom: -1,
+    right: -1,
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
+    backgroundColor: '#15803D',
+    borderWidth: 2,
     borderColor: '#FFFFFF',
+  },
+  headerSubtextActive: {
+    color: '#15803D',
+    fontWeight: '700',
   },
   headerTitle: {
     fontSize: 16,

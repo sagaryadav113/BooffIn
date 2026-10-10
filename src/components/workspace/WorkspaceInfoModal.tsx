@@ -58,6 +58,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Workspace, WorkspaceMember, WorkspaceMemberRole } from '../../types/workspace';
 import { useAuthStore } from '../../store/useAuthStore';
+import { usePresenceStore } from '../../store/usePresenceStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { workspaceService } from '../../api/workspaceService';
 import { blockUser, reportContent } from '../../api/moderationService';
@@ -138,6 +139,8 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const isOwner = workspace.owner_id === currentUser?.id;
   const isDM = workspace.type === 'dm';
   const partner = workspace.other_user;
+  const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
+  const isPartnerOnline = Boolean(isDM && partner?.id && onlineUserIds[partner.id]);
 
   // Determine current user's role in this pod
   const myMembership = useMemo(() => {
@@ -752,11 +755,14 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
           <View style={styles.heroSection}>
             <View style={styles.avatarWrapper}>
               {isDM ? (
-                <Avatar
-                  uri={partner?.avatarUrl || workspace.avatar_url || undefined}
-                  name={displayName}
-                  size="xl"
-                />
+                <View style={{ position: 'relative' }}>
+                  <Avatar
+                    uri={partner?.avatarUrl || workspace.avatar_url || undefined}
+                    name={displayName}
+                    size="xl"
+                  />
+                  {isPartnerOnline && <View style={styles.presenceDotHero} />}
+                </View>
               ) : workspace.avatar_url ? (
                 <Avatar
                   uri={workspace.avatar_url}
@@ -1803,6 +1809,22 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  presenceDotHero: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#15803D',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 3,
   },
   groupTitle: {
     fontSize: 22,

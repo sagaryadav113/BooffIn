@@ -20,6 +20,7 @@ import { GroupCollageAvatar } from './GroupCollageAvatar';
 import { Workspace } from '../../types/workspace';
 
 import { useAuthStore } from '../../store/useAuthStore';
+import { usePresenceStore } from '../../store/usePresenceStore';
 
 interface WorkspaceCardProps {
   workspace: Workspace;
@@ -33,6 +34,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   showDividers = true,
 }) => {
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
 
   const handlePress = () => {
     if (onPress) {
@@ -102,6 +104,10 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
     new Date(workspace.other_last_read_at).getTime() >= new Date(workspace.last_message.created_at).getTime()
   );
 
+  const isOtherUserOnline = Boolean(
+    isDM && workspace.other_user?.id && onlineUserIds[workspace.other_user.id]
+  );
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -115,11 +121,14 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
       {/* Left Avatar (48px) */}
       <View style={styles.avatarWrapper}>
         {isDM ? (
-          <Avatar
-            uri={workspace.other_user?.avatarUrl || workspace.avatar_url || undefined}
-            name={displayName}
-            size="md"
-          />
+          <View style={{ position: 'relative' }}>
+            <Avatar
+              uri={workspace.other_user?.avatarUrl || workspace.avatar_url || undefined}
+              name={displayName}
+              size="md"
+            />
+            {isOtherUserOnline && <View style={styles.presenceDot} />}
+          </View>
         ) : isInnerCircle ? (
           <GroupCollageAvatar size={48} name={workspace.name} />
         ) : (
@@ -279,5 +288,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  presenceDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#15803D',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 1,
+    elevation: 2,
   },
 });
