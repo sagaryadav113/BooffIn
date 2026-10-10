@@ -3785,5 +3785,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  mediaIconBtn: {
+    padding: 6,
+  },
+  detachedMicBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detachedSendBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detachedSendBtnDisabled: {
+    backgroundColor: '#CBD5E1',
+  },
 });
 
