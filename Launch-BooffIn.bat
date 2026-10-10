@@ -1,0 +1,3 @@
+@echo off
+echo Starting BooffIn Desktop...
+start "" "%~dp0dist-electron\BooffIn-win32-x64\BooffIn.exe"

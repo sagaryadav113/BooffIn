@@ -24,6 +24,7 @@ import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { ReshareButton } from '../core/ReshareButton';
 import { DiscussionButton } from '../core/DiscussionButton';
+import { ShareToChatButton } from '../core/ShareToChatButton';
 import { LikeButton } from '../core/LikeButton';
 import { SaveButton } from '../core/SaveButton';
 import { PaperCard } from './PaperCard';
@@ -31,6 +32,7 @@ import { PostImageCluster } from './PostImageCluster';
 import { PostOptionsModal } from '../modals/PostOptionsModal';
 import { EditPostModal } from '../modals/EditPostModal';
 import { SharePostModal } from '../modals/SharePostModal';
+import { SharePostToWorkspaceModal } from '../modals/SharePostToWorkspaceModal';
 import { LikesListModal } from '../modals/LikesListModal';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -51,6 +53,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isShareToWorkspaceOpen, setIsShareToWorkspaceOpen] = useState(false);
   const [isLikesModalOpen, setIsLikesModalOpen] = useState(false);
 
   const toggleLike = usePostStore((s) => s.toggleLikePost);
@@ -439,6 +442,13 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           style={styles.actionItem}
         />
 
+        {/* In-App Direct Share to Chat / Workspace (DM, Community, Inner Circle) */}
+        <ShareToChatButton
+          onPress={() => setIsShareToWorkspaceOpen(true)}
+          size={19}
+          style={styles.actionItem}
+        />
+
         {/* Re-share (Animated Paper Plane & Orbit) */}
         <ReshareButton
           isReposted={Boolean(post.isReposted)}
@@ -481,11 +491,20 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
         />
       )}
 
-      {/* Share Post Modal */}
+      {/* Share Post Modal (External / System share sheet) */}
       {isShareOpen && (
         <SharePostModal
           visible={isShareOpen}
           onClose={() => setIsShareOpen(false)}
+          post={post}
+        />
+      )}
+
+      {/* Share to Workspace Modal (In-app DM, Community, Inner Circle) */}
+      {isShareToWorkspaceOpen && (
+        <SharePostToWorkspaceModal
+          visible={isShareToWorkspaceOpen}
+          onClose={() => setIsShareToWorkspaceOpen(false)}
           post={post}
         />
       )}
