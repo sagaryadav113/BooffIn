@@ -220,20 +220,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   sendTypingIndicator: (workspaceId: string, isTyping: boolean) => {
     const currentUser = useAuthStore.getState().user;
     if (!currentUser || !workspaceId) return;
-    const channel = activeWorkspaceChannels.get(workspaceId);
-    if (channel) {
-      channel.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: {
-          workspaceId,
-          userId: currentUser.id,
-          username: currentUser.fullName || currentUser.handle || 'Researcher',
-          isTyping,
-          timestamp: Date.now(),
-        },
+    let channel = activeWorkspaceChannels.get(workspaceId);
+    if (!channel) {
+      channel = supabase.channel(`workspace_room:${workspaceId}`, {
+        config: { broadcast: { self: false } },
       });
+      activeWorkspaceChannels.set(workspaceId, channel);
+      channel.subscribe();
     }
+    channel.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: {
+        workspaceId,
+        userId: currentUser.id,
+        username: currentUser.fullName || currentUser.handle || 'Researcher',
+        isTyping,
+        timestamp: Date.now(),
+      },
+    });
   },
 
   loadWorkspaces: async (refresh = false) => {
@@ -901,6 +906,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             },
           };
         });
+
+        // Auto clear typing status after 4 seconds of inactivity if no explicit stop event
+        if (payload.isTyping) {
+          setTimeout(() => {
+            set((state) => {
+              const currentRoomTyping = state.typingUsers[workspaceId];
+              if (currentRoomTyping && currentRoomTyping[payload.userId]) {
+                const updatedRoom = { ...currentRoomTyping };
+                delete updatedRoom[payload.userId];
+                return {
+                  typingUsers: {
+                    ...state.typingUsers,
+                    [workspaceId]: updatedRoom,
+                  },
+                };
+              }
+              return state;
+            });
+          }, 4000);
+        }
       })
       // C. Realtime Instant Broadcast: Read Receipts (Green Ticks)
       .on('broadcast', { event: 'read_receipt' }, ({ payload }: any) => {

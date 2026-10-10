@@ -12,6 +12,7 @@ import {
   Platform,
   Linking,
   Alert,
+  Animated,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
@@ -125,6 +126,81 @@ const SAMPLE_POD_MANUSCRIPTS = [
   },
 ];
 
+export function getDateLabel(dateString?: string | null): string {
+  if (!dateString) return 'Today';
+  const msgDate = new Date(dateString);
+  if (isNaN(msgDate.getTime())) return 'Today';
+
+  const now = new Date();
+  const isToday =
+    msgDate.getDate() === now.getDate() &&
+    msgDate.getMonth() === now.getMonth() &&
+    msgDate.getFullYear() === now.getFullYear();
+
+  if (isToday) return 'Today';
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    msgDate.getDate() === yesterday.getDate() &&
+    msgDate.getMonth() === yesterday.getMonth() &&
+    msgDate.getFullYear() === yesterday.getFullYear();
+
+  if (isYesterday) return 'Yesterday';
+
+  const isSameYear = msgDate.getFullYear() === now.getFullYear();
+  return msgDate.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: isSameYear ? undefined : 'numeric',
+  });
+}
+
+const AnimatedTypingIndicator: React.FC<{ name: string; count?: number }> = ({ name, count = 1 }) => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const createAnim = (val: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: -4, duration: 250, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.delay(Math.max(0, 500 - delay)),
+        ])
+      );
+
+    const a1 = createAnim(dot1, 0);
+    const a2 = createAnim(dot2, 150);
+    const a3 = createAnim(dot3, 300);
+
+    a1.start();
+    a2.start();
+    a3.start();
+
+    return () => {
+      a1.stop();
+      a2.stop();
+      a3.stop();
+    };
+  }, [dot1, dot2, dot3]);
+
+  return (
+    <View style={styles.typingIndicatorBanner}>
+      <View style={styles.typingDotsWrap}>
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot1 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot2 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot3 }] }]} />
+      </View>
+      <Text style={styles.typingIndicatorText} numberOfLines={1}>
+        <Text style={{ fontWeight: '700' }}>{name}</Text> {count > 1 ? 'are typing...' : 'is typing...'}
+      </Text>
+    </View>
+  );
+};
+
 export type InnerCircleTab = 'discussions' | 'calendar' | 'jobs' | 'bookmarked';
 
 interface WorkspaceInnerCircleViewProps {
@@ -166,8 +242,12 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const deleteMessage = useWorkspaceStore((s) => s.deleteMessage);
   const forwardMessage = useWorkspaceStore((s) => s.forwardMessage);
 
+  const isAtBottomRef = useRef(true);
+  const hasInitialScrolledRef = useRef(false);
+
   // Initial Room Loader & Realtime Subscription
   useEffect(() => {
+    hasInitialScrolledRef.current = false;
     loadMessages(workspace.id);
     loadMembers(workspace.id);
     loadEvents(workspace.id);
@@ -178,6 +258,25 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       unsubscribe();
     };
   }, [workspace.id]);
+
+  // Initial scroll to latest message when messages load
+  useEffect(() => {
+    if (messages.length > 0 && !hasInitialScrolledRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+        hasInitialScrolledRef.current = true;
+      }, 50);
+    }
+  }, [messages.length, isMessagesLoading]);
+
+  // Auto-scroll when new messages arrive if user is near bottom
+  useEffect(() => {
+    if (messages.length > 0 && hasInitialScrolledRef.current && isAtBottomRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    }
+  }, [messages.length]);
 
   // Workspaces for Forwarding
   const dms = useWorkspaceStore((s) => s.dms);
@@ -1218,18 +1317,29 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             </TouchableOpacity>
           )}
 
-          {/* Centered Date Capsule: Today */}
-          <View style={styles.dateCapsuleContainer}>
-            <View style={styles.dateCapsule}>
-              <Text style={styles.dateCapsuleText}>Today</Text>
-            </View>
-          </View>
-
           <FlatList
             ref={flatListRef}
             data={displayedMessages}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messagesList}
+            showsVerticalScrollIndicator={false}
+            onScroll={(e) => {
+              const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+              const paddingToBottom = 150;
+              const isClose = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+              isAtBottomRef.current = isClose;
+            }}
+            onContentSizeChange={() => {
+              if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
+                flatListRef.current?.scrollToEnd({ animated: hasInitialScrolledRef.current });
+                hasInitialScrolledRef.current = true;
+              }
+            }}
+            onLayout={() => {
+              if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
             ListEmptyComponent={
               <View style={styles.emptyMessagesContainer}>
                 <View style={styles.emptyIconCircle}>
@@ -1245,10 +1355,13 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 </Text>
               </View>
             }
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
               const isMe = item.sender_id === currentUser?.id;
               const isPinnedThis = item.is_pinned || item.id === localPinnedMessageId;
               const isDeleted = Boolean(item.is_deleted);
+              const isFirstOfDateGroup =
+                index === 0 ||
+                getDateLabel(item.created_at) !== getDateLabel(displayedMessages[index - 1]?.created_at);
 
               const extractImageUrl = (m: WorkspaceMessage) => {
                 if (m.media_urls && m.media_urls.length > 0 && typeof m.media_urls[0] === 'string' && m.media_urls[0].startsWith('http')) {
@@ -1365,7 +1478,17 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 : item.reply_to_message;
 
               return (
-                <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
+                <View key={item.id} style={{ width: '100%' }}>
+                  {isFirstOfDateGroup && (
+                    <View style={styles.dateSeparatorRow}>
+                      <View style={styles.dateSeparatorLine} />
+                      <View style={styles.dateSeparatorPill}>
+                        <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
+                      </View>
+                      <View style={styles.dateSeparatorLine} />
+                    </View>
+                  )}
+                  <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
                   {!isMe && (
                     <Avatar
                       uri={item.sender?.avatarUrl || undefined}
@@ -1594,7 +1717,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     )}
                   </TouchableOpacity>
                 </View>
-              );
+              </View>
+            );
             }}
           />
 
@@ -1647,16 +1771,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
           {/* Realtime Pod Members Typing Bubble Indicator */}
           {isSomeoneTyping && (
-            <View style={styles.typingIndicatorBanner}>
-              <View style={styles.typingDotsWrap}>
-                <View style={[styles.typingDot, styles.typingDot1]} />
-                <View style={[styles.typingDot, styles.typingDot2]} />
-                <View style={[styles.typingDot, styles.typingDot3]} />
-              </View>
-              <Text style={styles.typingIndicatorText} numberOfLines={1}>
-                <Text style={{ fontWeight: '700' }}>{typingUserNames}</Text> {Object.keys(typingInThisRoom || {}).length > 1 ? 'are typing...' : 'is typing...'}
-              </Text>
-            </View>
+            <AnimatedTypingIndicator
+              name={typingUserNames || 'Someone'}
+              count={Object.keys(typingInThisRoom || {}).length}
+            />
           )}
 
           {/* Docked Replying-To Bar */}
@@ -3793,6 +3911,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#475569',
     fontStyle: 'italic',
+  },
+  dateSeparatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 14,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dateSeparatorPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  dateSeparatorText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'capitalize',
   },
 });
 

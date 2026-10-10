@@ -12,6 +12,7 @@ import {
   Modal,
   Alert,
   ScrollView,
+  Animated,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
@@ -106,6 +107,81 @@ import { deriveSharedSessionKey, encryptTextMessage, decryptTextMessage } from '
 
 const QUICK_EMOJIS = ['❤️', '👍', '🔬', '🔥', '👏', '💡', '🎉'];
 type ChatFilterType = 'all' | 'media' | 'papers' | 'audio' | 'polls' | 'docs';
+
+export function getDateLabel(dateString?: string | null): string {
+  if (!dateString) return 'Today';
+  const msgDate = new Date(dateString);
+  if (isNaN(msgDate.getTime())) return 'Today';
+
+  const now = new Date();
+  const isToday =
+    msgDate.getDate() === now.getDate() &&
+    msgDate.getMonth() === now.getMonth() &&
+    msgDate.getFullYear() === now.getFullYear();
+
+  if (isToday) return 'Today';
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    msgDate.getDate() === yesterday.getDate() &&
+    msgDate.getMonth() === yesterday.getMonth() &&
+    msgDate.getFullYear() === yesterday.getFullYear();
+
+  if (isYesterday) return 'Yesterday';
+
+  const isSameYear = msgDate.getFullYear() === now.getFullYear();
+  return msgDate.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: isSameYear ? undefined : 'numeric',
+  });
+}
+
+const AnimatedTypingIndicator: React.FC<{ name: string }> = ({ name }) => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const createAnim = (val: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: -4, duration: 250, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.delay(Math.max(0, 500 - delay)),
+        ])
+      );
+
+    const a1 = createAnim(dot1, 0);
+    const a2 = createAnim(dot2, 150);
+    const a3 = createAnim(dot3, 300);
+
+    a1.start();
+    a2.start();
+    a3.start();
+
+    return () => {
+      a1.stop();
+      a2.stop();
+      a3.stop();
+    };
+  }, [dot1, dot2, dot3]);
+
+  return (
+    <View style={styles.typingIndicatorBanner}>
+      <View style={styles.typingDotsWrap}>
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot1 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot2 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot3 }] }]} />
+      </View>
+      <Text style={styles.typingIndicatorText} numberOfLines={1}>
+        <Text style={{ fontWeight: '700' }}>{name}</Text> is typing...
+      </Text>
+    </View>
+  );
+};
 
 interface WorkspaceDMViewProps {
   workspace: Workspace;
@@ -271,14 +347,36 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
+  const isAtBottomRef = useRef(true);
+  const hasInitialScrolledRef = useRef(false);
 
   useEffect(() => {
+    hasInitialScrolledRef.current = false;
     loadMessages(workspace.id);
     const unsubscribe = subscribeToWorkspaceMessages(workspace.id);
     return () => {
       unsubscribe();
     };
   }, [workspace.id]);
+
+  // Initial scroll to latest message when messages load
+  useEffect(() => {
+    if (messages.length > 0 && !hasInitialScrolledRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+        hasInitialScrolledRef.current = true;
+      }, 50);
+    }
+  }, [messages.length, isMessagesLoading]);
+
+  // Auto-scroll when new messages arrive if user is at the bottom
+  useEffect(() => {
+    if (messages.length > 0 && hasInitialScrolledRef.current && isAtBottomRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    }
+  }, [messages.length]);
 
   // E2EE Auto-Decryption Effect for incoming encrypted ciphertexts
   useEffect(() => {
@@ -1183,7 +1281,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   };
 
   // Render Single Message Item
-  const renderMessageItem = ({ item }: { item: WorkspaceMessage }) => {
+  const renderMessageItem = ({ item, index }: { item: WorkspaceMessage; index: number }) => {
     const isMe = item.sender_id === currentUser?.id;
     const isDeleted = Boolean(item.is_deleted);
 
@@ -1299,13 +1397,28 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       ([, userIds]) => Array.isArray(userIds) && userIds.length > 0
     );
 
+    const isFirstOfDateGroup =
+      index === 0 ||
+      getDateLabel(item.created_at) !== getDateLabel(displayedMessages[index - 1]?.created_at);
+
     return (
-      <View
-        style={[
-          styles.messageRow,
-          isMe ? styles.myMessageRow : styles.otherMessageRow,
-        ]}
-      >
+      <View key={item.id} style={{ width: '100%' }}>
+        {isFirstOfDateGroup && (
+          <View style={styles.dateSeparatorRow}>
+            <View style={styles.dateSeparatorLine} />
+            <View style={styles.dateSeparatorPill}>
+              <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
+            </View>
+            <View style={styles.dateSeparatorLine} />
+          </View>
+        )}
+
+        <View
+          style={[
+            styles.messageRow,
+            isMe ? styles.myMessageRow : styles.otherMessageRow,
+          ]}
+        >
         {!isMe && (
           <Avatar
             uri={item.sender?.avatarUrl || partner?.avatarUrl || undefined}
@@ -1628,6 +1741,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           )}
         </View>
       </View>
+      </View>
     );
   };
 
@@ -1810,15 +1924,6 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       )}
 
-      {/* Date Capsule: Today */}
-      {!showSearchBar && (
-        <View style={styles.dateCapsuleContainer}>
-          <View style={styles.dateCapsule}>
-            <Text style={styles.dateCapsuleText}>Today</Text>
-          </View>
-        </View>
-      )}
-
       {/* Messages List */}
       {isMessagesLoading && messages.length === 0 ? (
         <View style={styles.loaderContainer}>
@@ -1833,6 +1938,23 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           renderItem={renderMessageItem}
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
+          onScroll={(e) => {
+            const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+            const paddingToBottom = 150;
+            const isClose = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+            isAtBottomRef.current = isClose;
+          }}
+          onContentSizeChange={() => {
+            if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
+              flatListRef.current?.scrollToEnd({ animated: hasInitialScrolledRef.current });
+              hasInitialScrolledRef.current = true;
+            }
+          }}
+          onLayout={() => {
+            if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Avatar
@@ -1901,18 +2023,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       )}
 
-      {/* Realtime Partner Typing Bubble Indicator */}
-      {isPartnerTyping && (
-        <View style={styles.typingIndicatorBanner}>
-          <View style={styles.typingDotsWrap}>
-            <View style={[styles.typingDot, styles.typingDot1]} />
-            <View style={[styles.typingDot, styles.typingDot2]} />
-            <View style={[styles.typingDot, styles.typingDot3]} />
-          </View>
-          <Text style={styles.typingIndicatorText} numberOfLines={1}>
-            <Text style={{ fontWeight: '700' }}>{typingPartnerName}</Text> is typing...
-          </Text>
-        </View>
+      {/* Realtime Partner Animated Typing Bubble Indicator */}
+      {isPartnerTyping && typingPartnerName && (
+        <AnimatedTypingIndicator name={typingPartnerName} />
       )}
 
       {/* Docked Quoted Reply Bar */}
@@ -4518,5 +4631,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#475569',
     fontStyle: 'italic',
+  },
+  dateSeparatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 14,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dateSeparatorPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  dateSeparatorText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'capitalize',
   },
 });
