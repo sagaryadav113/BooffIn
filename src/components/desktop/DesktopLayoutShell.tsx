@@ -46,8 +46,13 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
     return <>{children}</>;
   }
 
+  const isWorkspacePage = pathname.includes('workspace') || pathname === '/workspace';
+
   // Determine appropriate right sidebar based on active pathname
   const renderRightSidebar = () => {
+    if (isWorkspacePage) {
+      return null;
+    }
     if (pathname.includes('explore')) {
       return <DesktopExploreRightSidebar />;
     }
@@ -66,7 +71,7 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
       {/* 1. Global Top Header */}
       <DesktopHeader />
 
-      {/* 2. Main 3-Column Content Body */}
+      {/* 2. Main Content Body */}
       <div
         style={{
           display: 'flex',
@@ -82,10 +87,10 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
             display: 'flex',
             flexDirection: 'row',
             width: '100%',
-            maxWidth: 1440,
+            maxWidth: isWorkspacePage ? '100%' : 1440,
             justifyContent: 'space-between',
-            paddingLeft: 28,
-            paddingRight: 28,
+            paddingLeft: isWorkspacePage ? 16 : 28,
+            paddingRight: isWorkspacePage ? 16 : 28,
             boxSizing: 'border-box',
           }}
         >
@@ -98,11 +103,12 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              maxWidth: 700,
-              minWidth: 540,
-              margin: '0 24px',
+              maxWidth: isWorkspacePage ? 'none' : 700,
+              minWidth: isWorkspacePage ? 0 : 540,
+              margin: isWorkspacePage ? '0 0 0 16px' : '0 24px',
               backgroundColor: '#FFFFFF',
               minHeight: 'calc(100vh - 68px)',
+              overflow: 'hidden',
             }}
           >
             {children}
@@ -113,8 +119,8 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
         </div>
       </div>
 
-      {/* 3. Floating Bottom-Right LinkedIn-Style Messaging Popup */}
-      <DesktopMessagesDock />
+      {/* 3. Floating Bottom-Right LinkedIn-Style Messaging Popup (hidden on workspace) */}
+      {!isWorkspacePage && <DesktopMessagesDock />}
     </View>
   );
 };

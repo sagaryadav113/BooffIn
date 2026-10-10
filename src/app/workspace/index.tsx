@@ -34,6 +34,11 @@ import {
   Bell,
   BellOff,
   Settings,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Menu,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -87,6 +92,10 @@ export default function WorkspaceHubScreen() {
 
   // Desktop active selected workspace for 3-pane layout
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+
+  // Desktop Collapsible Columns State
+  const [isLeftRailCollapsed, setIsLeftRailCollapsed] = useState(false);
+  const [isMiddleColCollapsed, setIsMiddleColCollapsed] = useState(false);
 
   useEffect(() => {
     loadWorkspaces();
@@ -170,25 +179,37 @@ export default function WorkspaceHubScreen() {
             </TouchableOpacity>
             <Text style={styles.appBarTitle}>Messages</Text>
           </View>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-              setIsDMsMuted(!isDMsMuted);
-              if (Platform.OS === 'web') {
-                window.alert(!isDMsMuted ? 'Muted notifications for all chat messages.' : 'Unmuted chat notifications.');
-              }
-            }}
-            style={styles.headerIconBtn}
-          >
-            {isDMsMuted ? (
-              <BellOff size={22} color="#DC2626" strokeWidth={2.2} />
-            ) : (
-              <Bell size={22} color="#164E3F" strokeWidth={2.2} />
+          <View style={styles.appBarRightActions}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch {}
+                setIsDMsMuted(!isDMsMuted);
+                if (Platform.OS === 'web') {
+                  window.alert(!isDMsMuted ? 'Muted notifications for all chat messages.' : 'Unmuted chat notifications.');
+                }
+              }}
+              style={styles.headerIconBtn}
+            >
+              {isDMsMuted ? (
+                <BellOff size={22} color="#DC2626" strokeWidth={2.2} />
+              ) : (
+                <Bell size={22} color="#164E3F" strokeWidth={2.2} />
+              )}
+            </TouchableOpacity>
+            {isDesktop && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsMiddleColCollapsed(true)}
+                style={styles.headerIconBtn}
+                title="Collapse Messages"
+              >
+                <PanelLeftClose size={20} color="#64748B" />
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
         </View>
       );
     }
@@ -207,13 +228,25 @@ export default function WorkspaceHubScreen() {
             </TouchableOpacity>
             <Text style={styles.appBarTitle}>Community</Text>
           </View>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setShowCreateCommunityModal(true)}
-            style={styles.headerIconBtn}
-          >
-            <Plus size={22} color="#164E3F" strokeWidth={2.5} />
-          </TouchableOpacity>
+          <View style={styles.appBarRightActions}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowCreateCommunityModal(true)}
+              style={styles.headerIconBtn}
+            >
+              <Plus size={22} color="#164E3F" strokeWidth={2.5} />
+            </TouchableOpacity>
+            {isDesktop && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsMiddleColCollapsed(true)}
+                style={styles.headerIconBtn}
+                title="Collapse Communities"
+              >
+                <PanelLeftClose size={20} color="#64748B" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       );
     }
@@ -232,6 +265,16 @@ export default function WorkspaceHubScreen() {
             </TouchableOpacity>
             <Text style={styles.appBarTitle}>Settings</Text>
           </View>
+          {isDesktop && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setIsMiddleColCollapsed(true)}
+              style={styles.headerIconBtn}
+              title="Collapse"
+            >
+              <PanelLeftClose size={20} color="#64748B" />
+            </TouchableOpacity>
+          )}
         </View>
       );
     }
@@ -249,13 +292,25 @@ export default function WorkspaceHubScreen() {
           </TouchableOpacity>
           <Text style={styles.appBarTitle}>Inner Circle</Text>
         </View>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setShowCreateModal(true)}
-          style={styles.headerIconBtn}
-        >
-          <Plus size={22} color="#164E3F" strokeWidth={2.5} />
-        </TouchableOpacity>
+        <View style={styles.appBarRightActions}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowCreateModal(true)}
+            style={styles.headerIconBtn}
+          >
+            <Plus size={22} color="#164E3F" strokeWidth={2.5} />
+          </TouchableOpacity>
+          {isDesktop && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setIsMiddleColCollapsed(true)}
+              style={styles.headerIconBtn}
+              title="Collapse Inner Circles"
+            >
+              <PanelLeftClose size={20} color="#64748B" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
@@ -561,88 +616,184 @@ export default function WorkspaceHubScreen() {
       {/* Desktop 3-Pane Layout vs Mobile Full View */}
       {isDesktop ? (
         <View style={styles.desktopContainer}>
-          {/* Left Rail (260px) */}
-          <View style={styles.desktopLeftRail}>
-            <View style={styles.desktopRailHeader}>
-              <Text style={styles.desktopRailTitle}>BooffIn Workspace</Text>
+          {/* Left Rail (Collapsible: 220px vs 60px) */}
+          <View style={[styles.desktopLeftRail, isLeftRailCollapsed && styles.desktopLeftRailCollapsed]}>
+            <View style={[styles.desktopRailHeader, isLeftRailCollapsed && styles.desktopRailHeaderCollapsed]}>
+              {!isLeftRailCollapsed && (
+                <Text style={styles.desktopRailTitle} numberOfLines={1}>
+                  BooffIn Workspace
+                </Text>
+              )}
+              <TouchableOpacity
+                onPress={() => setIsLeftRailCollapsed(!isLeftRailCollapsed)}
+                style={styles.railToggleBtn}
+                title={isLeftRailCollapsed ? 'Expand Navigation' : 'Collapse Navigation'}
+                activeOpacity={0.7}
+              >
+                {isLeftRailCollapsed ? (
+                  <PanelLeftOpen size={18} color="#164E3F" />
+                ) : (
+                  <PanelLeftClose size={18} color="#64748B" />
+                )}
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity
               onPress={() => setActiveTab('dm')}
-              style={[styles.desktopRailTab, activeTab === 'dm' && styles.desktopRailTabActive]}
+              style={[
+                styles.desktopRailTab,
+                isLeftRailCollapsed && styles.desktopRailTabCollapsed,
+                activeTab === 'dm' && styles.desktopRailTabActive,
+              ]}
+              title="Direct Messages"
             >
-              <MessageSquare size={18} color={activeTab === 'dm' ? '#164E3F' : '#64748B'} />
-              <Text style={[styles.desktopRailTabText, activeTab === 'dm' && styles.desktopRailTabTextActive]}>
-                Direct Messages ({dms.length})
-              </Text>
+              <View style={styles.railIconWrap}>
+                <MessageSquare size={18} color={activeTab === 'dm' ? '#164E3F' : '#64748B'} />
+                {isLeftRailCollapsed && totalDMsUnread > 0 && (
+                  <View style={styles.miniBadgeDot} />
+                )}
+              </View>
+              {!isLeftRailCollapsed && (
+                <Text style={[styles.desktopRailTabText, activeTab === 'dm' && styles.desktopRailTabTextActive]}>
+                  Direct Messages ({dms.length})
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setActiveTab('community')}
-              style={[styles.desktopRailTab, activeTab === 'community' && styles.desktopRailTabActive]}
+              style={[
+                styles.desktopRailTab,
+                isLeftRailCollapsed && styles.desktopRailTabCollapsed,
+                activeTab === 'community' && styles.desktopRailTabActive,
+              ]}
+              title="Communities"
             >
-              <Users size={18} color={activeTab === 'community' ? '#164E3F' : '#64748B'} />
-              <Text style={[styles.desktopRailTabText, activeTab === 'community' && styles.desktopRailTabTextActive]}>
-                Communities ({communities.length})
-              </Text>
+              <View style={styles.railIconWrap}>
+                <Users size={18} color={activeTab === 'community' ? '#164E3F' : '#64748B'} />
+                {isLeftRailCollapsed && totalCommsUnread > 0 && (
+                  <View style={styles.miniBadgeDot} />
+                )}
+              </View>
+              {!isLeftRailCollapsed && (
+                <Text style={[styles.desktopRailTabText, activeTab === 'community' && styles.desktopRailTabTextActive]}>
+                  Communities ({communities.length})
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setActiveTab('inner_circle')}
-              style={[styles.desktopRailTab, activeTab === 'inner_circle' && styles.desktopRailTabActive]}
+              style={[
+                styles.desktopRailTab,
+                isLeftRailCollapsed && styles.desktopRailTabCollapsed,
+                activeTab === 'inner_circle' && styles.desktopRailTabActive,
+              ]}
+              title="Inner Circles"
             >
-              <Shield size={18} color={activeTab === 'inner_circle' ? '#164E3F' : '#64748B'} />
-              <Text style={[styles.desktopRailTabText, activeTab === 'inner_circle' && styles.desktopRailTabTextActive]}>
-                Inner Circles ({innerCircles.length})
-              </Text>
+              <View style={styles.railIconWrap}>
+                <Shield size={18} color={activeTab === 'inner_circle' ? '#164E3F' : '#64748B'} />
+                {isLeftRailCollapsed && totalInnersUnread > 0 && (
+                  <View style={styles.miniBadgeDot} />
+                )}
+              </View>
+              {!isLeftRailCollapsed && (
+                <Text style={[styles.desktopRailTabText, activeTab === 'inner_circle' && styles.desktopRailTabTextActive]}>
+                  Inner Circles ({innerCircles.length})
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setActiveTab('settings')}
-              style={[styles.desktopRailTab, activeTab === 'settings' && styles.desktopRailTabActive]}
+              style={[
+                styles.desktopRailTab,
+                isLeftRailCollapsed && styles.desktopRailTabCollapsed,
+                activeTab === 'settings' && styles.desktopRailTabActive,
+              ]}
+              title="Settings"
             >
-              <Settings size={18} color={activeTab === 'settings' ? '#164E3F' : '#64748B'} />
-              <Text style={[styles.desktopRailTabText, activeTab === 'settings' && styles.desktopRailTabTextActive]}>
-                Settings
-              </Text>
+              <View style={styles.railIconWrap}>
+                <Settings size={18} color={activeTab === 'settings' ? '#164E3F' : '#64748B'} />
+              </View>
+              {!isLeftRailCollapsed && (
+                <Text style={[styles.desktopRailTabText, activeTab === 'settings' && styles.desktopRailTabTextActive]}>
+                  Settings
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setShowCreateModal(true)}
-              style={styles.desktopNewBtn}
+              style={[
+                styles.desktopNewBtn,
+                isLeftRailCollapsed && styles.desktopNewBtnCollapsed,
+              ]}
+              title="New Workspace"
             >
               <Plus size={16} color="#FFFFFF" />
-              <Text style={styles.desktopNewBtnText}>New Workspace</Text>
+              {!isLeftRailCollapsed && (
+                <Text style={styles.desktopNewBtnText}>New Workspace</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          {/* Middle List Column (360px) */}
-          <View style={styles.desktopMiddleCol}>
-            {renderTopAppBar()}
-            {renderSearchBar()}
+          {/* Middle List Column (Collapsible: 340px vs Hidden) */}
+          {!isMiddleColCollapsed && (
+            <View style={styles.desktopMiddleCol}>
+              {renderTopAppBar()}
+              {renderSearchBar()}
 
-            <FlatList
-              data={activeItems}
-              keyExtractor={(item) => item.id}
-              renderItem={
-                activeTab === 'community'
-                  ? renderCommunityItem
-                  : activeTab === 'inner_circle'
-                  ? renderInnerCircleItem
-                  : ({ item }) => (
-                      <WorkspaceCard
-                        workspace={item}
-                        onPress={() => setSelectedWorkspaceId(item.id)}
-                      />
-                    )
-              }
-              contentContainerStyle={{ paddingBottom: 20 }}
-            />
-          </View>
+              <FlatList
+                data={activeItems}
+                keyExtractor={(item) => item.id}
+                renderItem={
+                  activeTab === 'community'
+                    ? renderCommunityItem
+                    : activeTab === 'inner_circle'
+                    ? renderInnerCircleItem
+                    : ({ item }) => (
+                        <WorkspaceCard
+                          workspace={item}
+                          onPress={() => setSelectedWorkspaceId(item.id)}
+                        />
+                      )
+                }
+                contentContainerStyle={{ paddingBottom: 20 }}
+              />
+            </View>
+          )}
 
-          {/* Main Workstation Canvas */}
+          {/* Main Workstation Canvas (Flexible, with restore bar when collapsed) */}
           <View style={styles.desktopMainCanvas}>
+            {(isLeftRailCollapsed || isMiddleColCollapsed) && (
+              <View style={styles.desktopCanvasRestoreBar}>
+                {isLeftRailCollapsed && (
+                  <TouchableOpacity
+                    onPress={() => setIsLeftRailCollapsed(false)}
+                    style={styles.restorePill}
+                    activeOpacity={0.8}
+                  >
+                    <PanelLeftOpen size={14} color="#064E3B" />
+                    <Text style={styles.restorePillText}>Expand Navigation</Text>
+                  </TouchableOpacity>
+                )}
+                {isMiddleColCollapsed && (
+                  <TouchableOpacity
+                    onPress={() => setIsMiddleColCollapsed(false)}
+                    style={styles.restorePill}
+                    activeOpacity={0.8}
+                  >
+                    <Menu size={14} color="#064E3B" />
+                    <Text style={styles.restorePillText}>
+                      Show {activeTab === 'dm' ? 'Messages' : activeTab === 'community' ? 'Communities' : activeTab === 'inner_circle' ? 'Pods' : 'List'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
             {activeTab === 'settings' ? (
               <WorkspaceSettingsView />
             ) : selectedWorkspace ? (
@@ -1115,19 +1266,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   desktopLeftRail: {
-    width: 240,
+    width: 220,
     borderRightWidth: 1,
     borderRightColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
     padding: 16,
+    transitionProperty: 'width, padding',
+    transitionDuration: '200ms',
+  } as any,
+  desktopLeftRailCollapsed: {
+    width: 60,
+    padding: 8,
+    alignItems: 'center',
   },
   desktopRailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 20,
   },
+  desktopRailHeaderCollapsed: {
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
   desktopRailTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#164E3F',
+    flex: 1,
+  },
+  railToggleBtn: {
+    padding: 4,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   desktopRailTab: {
     flexDirection: 'row',
@@ -1137,6 +1309,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     marginBottom: 4,
+  },
+  desktopRailTabCollapsed: {
+    paddingHorizontal: 0,
+    justifyContent: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+  railIconWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniBadgeDot: {
+    position: 'absolute',
+    top: -3,
+    right: -4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   desktopRailTabActive: {
     backgroundColor: '#ECFDF5',
@@ -1160,13 +1355,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 20,
   },
+  desktopNewBtnCollapsed: {
+    paddingHorizontal: 0,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
   desktopNewBtnText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
   },
   desktopMiddleCol: {
-    width: 360,
+    width: 330,
     borderRightWidth: 1,
     borderRightColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
@@ -1174,6 +1375,50 @@ const styles = StyleSheet.create({
   desktopMainCanvas: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  desktopCanvasRestoreBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  restorePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  restorePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#064E3B',
+  },
+  appBarRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerCollapseBtn: {
+    padding: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyDesktopCanvas: {
     flex: 1,
