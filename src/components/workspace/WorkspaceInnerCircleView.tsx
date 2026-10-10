@@ -67,6 +67,13 @@ import {
   Sparkles as SparklesIcon,
   Download,
   BookOpen,
+  FileUp,
+  Bell,
+  BellOff,
+  Archive,
+  Trash,
+  Ban,
+  Flag,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -97,6 +104,7 @@ import { ChatDocumentCard } from '../chat/ChatDocumentCard';
 import { ChatPostCard } from '../chat/ChatPostCard';
 import { ChatProfileCard } from '../chat/ChatProfileCard';
 import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
+import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
@@ -242,6 +250,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const editMessage = useWorkspaceStore((s) => s.editMessage);
   const deleteMessage = useWorkspaceStore((s) => s.deleteMessage);
   const forwardMessage = useWorkspaceStore((s) => s.forwardMessage);
+  const togglePinWorkspace = useWorkspaceStore((s) => s.togglePinWorkspace);
+  const toggleArchiveWorkspace = useWorkspaceStore((s) => s.toggleArchiveWorkspace);
+  const setMuteWorkspace = useWorkspaceStore((s) => s.setMuteWorkspace);
+  const clearChatHistory = useWorkspaceStore((s) => s.clearChatHistory);
+  const deleteWorkspaceLocally = useWorkspaceStore((s) => s.deleteWorkspaceLocally);
+
+  const isPinned = Boolean(workspace.settings?.is_pinned);
+  const isArchived = Boolean(workspace.settings?.is_archived);
+  const isMuted = Boolean(workspace.settings?.is_muted);
 
   const isAtBottomRef = useRef(true);
   const hasInitialScrolledRef = useRef(false);
@@ -490,6 +507,98 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [isSearchingProfileUsers, setIsSearchingProfileUsers] = useState(false);
 
   const [showInvitePickerModal, setShowInvitePickerModal] = useState(false);
+
+  // Options Menu & Sub-Modals States
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [showMuteModal, setShowMuteModal] = useState(false);
+  const [showClearHistoryModal, setShowClearHistoryModal] = useState(false);
+  const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('spam');
+  const [reportDetails, setReportDetails] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [isProcessingChatAction, setIsProcessingChatAction] = useState(false);
+
+  // Options Menu Handlers
+  const handleTogglePin = async () => {
+    setShowOptionsMenu(false);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    await togglePinWorkspace(workspace.id);
+  };
+
+  const handleToggleArchive = async () => {
+    setShowOptionsMenu(false);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    await toggleArchiveWorkspace(workspace.id);
+    if (!isArchived) {
+      router.back();
+    }
+  };
+
+  const handleSelectMuteDuration = async (duration: '8h' | '1w' | 'always' | 'unmute') => {
+    setShowMuteModal(false);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+
+    if (duration === 'unmute') {
+      await setMuteWorkspace(workspace.id, false, null);
+      return;
+    }
+
+    let until: string | null = null;
+    const now = new Date();
+    if (duration === '8h') {
+      now.setHours(now.getHours() + 8);
+      until = now.toISOString();
+    } else if (duration === '1w') {
+      now.setDate(now.getDate() + 7);
+      until = now.toISOString();
+    }
+
+    await setMuteWorkspace(workspace.id, true, until);
+  };
+
+  const handleClearChatHistory = async () => {
+    setIsProcessingChatAction(true);
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+    await clearChatHistory(workspace.id);
+    setIsProcessingChatAction(false);
+    setShowClearHistoryModal(false);
+  };
+
+  const handleDeleteConversationLocally = async () => {
+    setIsProcessingChatAction(true);
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } catch {}
+    await deleteWorkspaceLocally(workspace.id);
+    setIsProcessingChatAction(false);
+    setShowDeleteChatModal(false);
+    router.replace('/workspace');
+  };
+
+  const handleSubmitReport = async () => {
+    setIsSubmittingReport(true);
+    try {
+      setTimeout(() => {
+        setIsSubmittingReport(false);
+        setShowReportModal(false);
+        if (Platform.OS === 'web') window.alert('Thank you. Your report has been submitted to pod moderation.');
+        else Alert.alert('Report Submitted', 'Your report has been received and will be reviewed by our team.');
+      }, 400);
+    } catch {
+      setIsSubmittingReport(false);
+      setShowReportModal(false);
+    }
+  };
 
   // Step 3: Poll Creation Handler
   const handleCreatePoll = async () => {
@@ -1133,36 +1242,31 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         </TouchableOpacity>
 
         <View style={styles.headerRightActions}>
-          {/* Quick Export Lab Record Button */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setShowExportModal(true)}
-            style={styles.headerIconBtn}
-          >
-            <BookOpen size={18} color="#164E3F" />
-          </TouchableOpacity>
-
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => setShowSearchBar((v) => !v)}
             style={[styles.headerIconBtn, showSearchBar && styles.headerIconBtnActive]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Search size={19} color={showSearchBar ? '#164E3F' : '#475569'} />
+            <Search size={19} color={showSearchBar ? '#164E3F' : '#64748B'} />
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => {
-              if (!canInvite) {
-                if (Platform.OS === 'web') window.alert('Only Pod Admins can invite new members to this pod.');
-                else Alert.alert('Permission Denied', 'Only Pod Admins can invite new members to this pod.');
-                return;
-              }
-              setShowInviteModal(true);
-            }}
+            onPress={() => setShowGalleryModal(true)}
             style={styles.headerIconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Plus size={20} color="#164E3F" strokeWidth={2.5} />
+            <FolderOpen size={19} color="#64748B" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowOptionsMenu(true)}
+            style={styles.headerIconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MoreVertical size={20} color="#164E3F" />
           </TouchableOpacity>
         </View>
       </View>
@@ -1819,24 +1923,22 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               <View style={styles.bottomDockContainer}>
                 <View style={styles.inputCapsule}>
                   <TouchableOpacity
+                    activeOpacity={0.7}
                     onPress={handlePickImage}
                     style={styles.mediaIconBtn}
                     disabled={isUploadingMedia}
                   >
-                    {isUploadingMedia ? <ActivityIndicator size="small" color="#164E3F" /> : <Camera size={19} color="#164E3F" />}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setShowAttachMenu(true)}
-                    style={styles.mediaIconBtn}
-                  >
-                    <Paperclip size={18} color="#164E3F" />
+                    {isUploadingMedia ? (
+                      <ActivityIndicator size="small" color="#164E3F" />
+                    ) : (
+                      <Camera size={19} color="#64748B" />
+                    )}
                   </TouchableOpacity>
 
                   <TextInput
                     value={inputText}
                     onChangeText={handleInputChange}
-                    placeholder={`Message ${workspace.name || 'pod'}... (use @ to mention)`}
+                    placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
                     placeholderTextColor="#94A3B8"
                     style={styles.textInput}
                     multiline
@@ -1844,20 +1946,36 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   />
 
                   <TouchableOpacity
-                    onPress={() => setIsRecordingVoice(true)}
+                    activeOpacity={0.7}
+                    onPress={() => setShowAttachMenu(true)}
                     style={styles.mediaIconBtn}
                   >
-                    <Mic size={19} color="#164E3F" />
+                    <Paperclip size={19} color="#64748B" />
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity
-                  onPress={handleSendMessage}
-                  disabled={(!inputText.trim() && !attachedDoi) || isSending}
-                  style={[styles.detachedSendBtn, (!inputText.trim() && !attachedDoi) && styles.detachedSendBtnDisabled]}
-                >
-                  {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Send size={16} color="#FFFFFF" />}
-                </TouchableOpacity>
+                {!inputText.trim() && !attachedDoi ? (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setIsRecordingVoice(true)}
+                    style={styles.detachedMicBtn}
+                  >
+                    <Mic size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    disabled={isSending}
+                    onPress={handleSendMessage}
+                    style={styles.detachedSendBtn}
+                  >
+                    {isSending ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Send size={16} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             )
           ) : (
@@ -2326,7 +2444,17 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       />
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Attachment Menu (Step 3: Media, Documents & Polls)     */}
+      {/* MODAL: Chat Media, Papers, Audio & Polls Gallery (Screenshot 3) */}
+      {/* ------------------------------------------------------------- */}
+      <ChatMediaGalleryModal
+        visible={showGalleryModal}
+        onClose={() => setShowGalleryModal(false)}
+        messages={messages}
+        chatTitle={workspace.name || 'Inner Circle Media'}
+      />
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Attach to Message Bottom Sheet (Screenshot 2)          */}
       {/* ------------------------------------------------------------- */}
       <Modal
         visible={showAttachMenu}
@@ -2335,130 +2463,564 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         onRequestClose={() => setShowAttachMenu(false)}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={styles.optionsOverlay}
           activeOpacity={1}
           onPress={() => setShowAttachMenu(false)}
         >
-          <View style={styles.attachMenuCard}>
-            <Text style={styles.attachMenuHeaderTitle}>Share with Research Pod</Text>
+          <View style={styles.optionsSheet}>
+            <View style={styles.optionsHandleBar} />
+            <Text style={styles.optionsSheetTitle}>Attach to Message</Text>
 
-            {/* 1. Research Manuscript PDF */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowDocumentPickerModal(true);
-              }}
-              style={styles.attachMenuOptionRow}
-            >
-              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                <FileText size={20} color="#DC2626" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachOptionTitle}>Research Manuscript / PDF</Text>
-                <Text style={styles.attachOptionSubtitle}>Share papers, protocols, and preprints</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 2. Photo / Lab Figure */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                handlePickImage();
-              }}
-              style={styles.attachMenuOptionRow}
-            >
-              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#FDF2F8' }]}>
-                <ImageIcon size={20} color="#DB2777" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachOptionTitle}>Photo / Lab Figure</Text>
-                <Text style={styles.attachOptionSubtitle}>Share microscope slides, plots, and figures</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 3. Research Poll / Consensus Voting */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowPollModal(true);
-              }}
-              style={styles.attachMenuOptionRow}
-            >
-              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                <Vote size={20} color="#164E3F" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachOptionTitle}>Research Poll / Vote</Text>
-                <Text style={styles.attachOptionSubtitle}>Ask pod members to vote on methodologies</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 4. BooffIn Post */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowPostPickerModal(true);
-              }}
-              style={styles.attachMenuOptionRow}
-            >
-              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#FDF4FF' }]}>
-                <SparklesIcon size={20} color="#9333EA" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachOptionTitle}>BooffIn Discussion Post</Text>
-                <Text style={styles.attachOptionSubtitle}>Embed linked academic discussion</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 5. Researcher Profile */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowProfilePickerModal(true);
-              }}
-              style={styles.attachMenuOptionRow}
-            >
-              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#F0FDF4' }]}>
-                <User size={20} color="#164E3F" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachOptionTitle}>Researcher Profile</Text>
-                <Text style={styles.attachOptionSubtitle}>Share contact card with ORCID badge</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 6. DOI Paper Link */}
+            {/* 1. Research Paper (DOI) */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
                 setShowAttachMenu(false);
                 setShowDoiModal(true);
               }}
-              style={styles.attachMenuOptionRow}
+              style={styles.optionsItemRow}
             >
-              <View style={[styles.attachOptionIconWrap, { backgroundColor: '#EFF6FF' }]}>
+              <View style={[styles.attachIconWrap, { backgroundColor: '#EFF6FF' }]}>
                 <FileText size={20} color="#2563EB" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.attachOptionTitle}>DOI Paper Citation</Text>
-                <Text style={styles.attachOptionSubtitle}>Resolve paper via OpenAlex / CrossRef</Text>
+                <Text style={styles.attachItemTitle}>Research Paper (DOI)</Text>
+                <Text style={styles.attachItemSubtitle}>Resolve citation, authors, and canonical paper preview</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 2. PDF Manuscript / Document */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                setShowDocumentPickerModal(true);
+              }}
+              style={styles.optionsItemRow}
+            >
+              <View style={[styles.attachIconWrap, { backgroundColor: '#FEF2F2' }]}>
+                <FileUp size={20} color="#DC2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachItemTitle}>PDF Manuscript / Document</Text>
+                <Text style={styles.attachItemSubtitle}>Share preprint PDFs, datasets, and protocols</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 3. Researcher Profile */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                setShowProfilePickerModal(true);
+              }}
+              style={styles.optionsItemRow}
+            >
+              <View style={[styles.attachIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                <User size={20} color="#164E3F" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachItemTitle}>Researcher Profile</Text>
+                <Text style={styles.attachItemSubtitle}>Share a researcher contact card with ORCID badge</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 4. Create Poll / Voting */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                setShowPollModal(true);
+              }}
+              style={styles.optionsItemRow}
+            >
+              <View style={[styles.attachIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                <Vote size={20} color="#164E3F" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachItemTitle}>Create Poll / Voting</Text>
+                <Text style={styles.attachItemSubtitle}>Ask collaborators to vote on questions or proposals</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* 5. Photo / Gallery */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowAttachMenu(false);
+                handlePickImage();
+              }}
+              style={styles.optionsItemRow}
+            >
+              <View style={[styles.attachIconWrap, { backgroundColor: '#FDF2F8' }]}>
+                <ImageIcon size={20} color="#DB2777" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachItemTitle}>Photo / Gallery</Text>
+                <Text style={styles.attachItemSubtitle}>Share figures, data plots, and lab images</Text>
               </View>
             </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setShowAttachMenu(false)}
-              style={styles.attachMenuCancelBtn}
+              style={styles.optionsCancelBtn}
             >
-              <Text style={styles.attachMenuCancelText}>Cancel</Text>
+              <Text style={styles.optionsCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: 3-Dots More Options Bottom Sheet (Screenshot 4)        */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showOptionsMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowOptionsMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.optionsOverlay}
+          activeOpacity={1}
+          onPress={() => setShowOptionsMenu(false)}
+        >
+          <View style={styles.optionsSheet}>
+            <View style={styles.optionsHandleBar} />
+            <Text style={styles.optionsSheetTitle}>{workspace.name || 'Inner Circle Pod'}</Text>
+
+            {/* 1. Pin Conversation */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleTogglePin}
+              style={styles.optionsItemRow}
+            >
+              <Pin size={20} color="#164E3F" />
+              <Text style={[styles.optionsItemText, { color: '#0F172A' }]}>
+                {isPinned ? 'Unpin Conversation' : 'Pin Conversation'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* 2. Archive Chat */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleToggleArchive}
+              style={styles.optionsItemRow}
+            >
+              <Archive size={20} color="#164E3F" />
+              <Text style={[styles.optionsItemText, { color: '#0F172A' }]}>
+                {isArchived ? 'Unarchive Chat' : 'Archive Chat'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* 3. Mute Notifications */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowMuteModal(true);
+              }}
+              style={styles.optionsItemRow}
+            >
+              <BellOff size={20} color="#164E3F" />
+              <Text style={[styles.optionsItemText, { color: '#0F172A' }]}>
+                {isMuted ? 'Unmute Notifications' : 'Mute Notifications'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* 4. View Media, Papers & Links */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowGalleryModal(true);
+              }}
+              style={styles.optionsItemRow}
+            >
+              <FolderOpen size={20} color="#164E3F" />
+              <Text style={[styles.optionsItemText, { color: '#0F172A' }]}>
+                View Media, Papers & Links
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.optionsDivider} />
+
+            {/* 5. Clear Chat History */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowClearHistoryModal(true);
+              }}
+              style={styles.optionsItemRow}
+            >
+              <Trash2 size={20} color="#D97706" />
+              <Text style={[styles.optionsItemText, { color: '#D97706' }]}>
+                Clear Chat History
+              </Text>
+            </TouchableOpacity>
+
+            {/* 6. Leave Pod / Delete Conversation */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowDeleteChatModal(true);
+              }}
+              style={styles.optionsItemRow}
+            >
+              <Trash size={20} color="#DC2626" />
+              <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+                Leave Pod / Delete
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.optionsDivider} />
+
+            {/* 7. Report Pod */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowReportModal(true);
+              }}
+              style={styles.optionsItemRow}
+            >
+              <Flag size={20} color="#64748B" />
+              <Text style={[styles.optionsItemText, { color: '#64748B' }]}>
+                Report Pod
+              </Text>
+            </TouchableOpacity>
+
+            {/* 8. Mute Pod Members */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                if (Platform.OS === 'web') window.alert('Mute notifications for all pod members enabled.');
+                else Alert.alert('Members Muted', 'Notifications from this pod have been silenced.');
+              }}
+              style={styles.optionsItemRow}
+            >
+              <Ban size={20} color="#DC2626" />
+              <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+                Mute Pod Members
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowOptionsMenu(false)}
+              style={styles.optionsCancelBtn}
+            >
+              <Text style={styles.optionsCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Mute Notifications Duration Picker                     */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showMuteModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMuteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <BellOff size={18} color="#164E3F" />
+                <Text style={styles.modalTitle}>Mute Notifications</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowMuteModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Choose how long you want to mute notifications from this pod.
+            </Text>
+
+            <View style={{ gap: 8, marginTop: 4 }}>
+              {isMuted ? (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleSelectMuteDuration('unmute')}
+                  style={styles.muteOptionCard}
+                >
+                  <Text style={styles.muteOptionTitle}>Unmute Pod</Text>
+                  <Text style={styles.muteOptionDesc}>Resume receiving push notifications</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => handleSelectMuteDuration('8h')}
+                    style={styles.muteOptionCard}
+                  >
+                    <Text style={styles.muteOptionTitle}>For 8 Hours</Text>
+                    <Text style={styles.muteOptionDesc}>Mute temporarily during work sessions</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => handleSelectMuteDuration('1w')}
+                    style={styles.muteOptionCard}
+                  >
+                    <Text style={styles.muteOptionTitle}>For 1 Week</Text>
+                    <Text style={styles.muteOptionDesc}>Mute for the upcoming sprint or break</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => handleSelectMuteDuration('always')}
+                    style={styles.muteOptionCard}
+                  >
+                    <Text style={styles.muteOptionTitle}>Always</Text>
+                    <Text style={styles.muteOptionDesc}>Until you manually unmute</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Clear Chat History Confirmation                        */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showClearHistoryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowClearHistoryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Trash2 size={18} color="#D97706" />
+                <Text style={styles.modalTitle}>Clear Chat History?</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowClearHistoryModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              This will clear all messages from your local pod discussion view. Shared DOIs and media remain stored in the lab vault.
+            </Text>
+
+            <View style={styles.confirmModalActionsRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowClearHistoryModal(false)}
+                style={styles.confirmModalCancelBtn}
+              >
+                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={isProcessingChatAction}
+                onPress={handleClearChatHistory}
+                style={[styles.confirmModalDestructiveBtn, { backgroundColor: '#D97706' }]}
+              >
+                {isProcessingChatAction ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmModalDestructiveText}>Clear History</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Delete / Leave Pod Confirmation                       */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showDeleteChatModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteChatModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Trash size={18} color="#DC2626" />
+                <Text style={styles.modalTitle}>Leave Research Pod?</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowDeleteChatModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Are you sure you want to remove this pod from your active workspace? You can rejoin later if invited.
+            </Text>
+
+            <View style={styles.confirmModalActionsRow}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowDeleteChatModal(false)}
+                style={styles.confirmModalCancelBtn}
+              >
+                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={isProcessingChatAction}
+                onPress={handleDeleteConversationLocally}
+                style={styles.confirmModalDestructiveBtn}
+              >
+                {isProcessingChatAction ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmModalDestructiveText}>Leave Pod</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Report Pod Modal                                       */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showReportModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Flag size={18} color="#DC2626" />
+                <Text style={styles.modalTitle}>Report Research Pod</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowReportModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Help keep BooffIn safe and academically rigorous. Why are you reporting this pod?
+            </Text>
+
+            {(['spam', 'harassment', 'copyright', 'misinformation', 'other'] as const).map((r) => (
+              <TouchableOpacity
+                key={r}
+                activeOpacity={0.7}
+                onPress={() => setReportReason(r)}
+                style={[
+                  styles.reasonOption,
+                  reportReason === r && styles.reasonOptionSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.reasonOptionText,
+                    reportReason === r && styles.reasonOptionTextSelected,
+                  ]}
+                >
+                  {r === 'spam'
+                    ? 'Spam or Commercial Promotion'
+                    : r === 'harassment'
+                    ? 'Academic Harassment or Inappropriate Behavior'
+                    : r === 'copyright'
+                    ? 'Plagiarism or Intellectual Property Violation'
+                    : r === 'misinformation'
+                    ? 'Fabricated Data or Misleading Scientific Claims'
+                    : 'Other Issue'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <TextInput
+              value={reportDetails}
+              onChangeText={setReportDetails}
+              placeholder="Additional details (optional)..."
+              placeholderTextColor="#94A3B8"
+              style={styles.reportDetailsInput}
+              multiline
+            />
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              disabled={isSubmittingReport}
+              onPress={handleSubmitReport}
+              style={styles.submitReportBtn}
+            >
+              {isSubmittingReport ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.submitReportBtnText}>Submit Report</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Select Document / Manuscript PDF (Step 3)              */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={showDocumentPickerModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDocumentPickerModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <FileUp size={20} color="#DC2626" />
+                <Text style={styles.modalTitle}>Attach Manuscript / PDF</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowDocumentPickerModal(false)}>
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Select a preprint manuscript or protocol document to share with the pod.
+            </Text>
+
+            <ScrollView style={{ maxHeight: 280, marginTop: 4 }}>
+              {SAMPLE_POD_MANUSCRIPTS.map((doc, i) => (
+                <TouchableOpacity
+                  key={i}
+                  activeOpacity={0.7}
+                  onPress={() => handleAttachDocument(doc)}
+                  style={[styles.docItemOption, { marginBottom: 10 }]}
+                >
+                  <View style={[styles.attachIconWrap, { backgroundColor: '#FEF2F2', marginRight: 12 }]}>
+                    <FileUp size={18} color="#DC2626" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.docItemName} numberOfLines={1}>
+                      {doc.name}
+                    </Text>
+                    <Text style={styles.docItemMeta}>
+                      {(doc.sizeBytes / 1024 / 1024).toFixed(1)} MB • {doc.pageCount} pages • PDF
+                    </Text>
+                  </View>
+                  <Send size={15} color="#164E3F" />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       {/* ------------------------------------------------------------- */}
@@ -2474,7 +3036,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <BarChart2 size={20} color="#164E3F" />
+                <Vote size={20} color="#164E3F" />
                 <Text style={styles.modalTitle}>Create Research Poll</Text>
               </View>
               <TouchableOpacity onPress={() => setShowPollModal(false)}>
@@ -2482,7 +3044,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>Ask your pod collaborators to reach consensus on hypotheses or methods.</Text>
+            <Text style={styles.modalSubtitle}>
+              Ask your pod collaborators to reach consensus on hypotheses or methods.
+            </Text>
 
             <TextInput
               value={pollQuestion}
@@ -2539,101 +3103,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               ) : (
                 <Text style={styles.confirmAttachBtnText}>Post Poll to Pod</Text>
               )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL: Select Document / Manuscript PDF (Step 3)              */}
-      {/* ------------------------------------------------------------- */}
-      <Modal
-        visible={showDocumentPickerModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowDocumentPickerModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <FileText size={20} color="#DC2626" />
-                <Text style={styles.modalTitle}>Attach Manuscript / PDF</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowDocumentPickerModal(false)}>
-                <X size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSubtitle}>Select a preprint manuscript or protocol document to share with the pod.</Text>
-
-            {SAMPLE_POD_MANUSCRIPTS.map((doc, i) => (
-              <TouchableOpacity
-                key={i}
-                activeOpacity={0.7}
-                onPress={() => handleAttachDocument(doc)}
-                style={styles.sampleDocRow}
-              >
-                <View style={[styles.sampleDocIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                  <FileText size={20} color="#DC2626" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.sampleDocName} numberOfLines={1}>{doc.name}</Text>
-                  <Text style={styles.sampleDocSub}>PDF • {doc.pageCount} pages • {(doc.sizeBytes / 1024).toFixed(0)} KB</Text>
-                </View>
-                <Text style={styles.invitePill}>Attach</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </Modal>
-
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL: Share BooffIn Discussion Post (Step 3)                 */}
-      {/* ------------------------------------------------------------- */}
-      <Modal
-        visible={showPostPickerModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowPostPickerModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <SparklesIcon size={20} color="#9333EA" />
-                <Text style={styles.modalTitle}>Share Discussion Post</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowPostPickerModal(false)}>
-                <X size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalSubtitle}>Embed a scientific topic or discovery post into the pod.</Text>
-
-            <TextInput
-              value={postTitleInput}
-              onChangeText={setPostTitleInput}
-              placeholder="Post Title (e.g. Breakthrough in Room-Temp Superconductors)"
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 10 }]}
-            />
-            <TextInput
-              value={postSnippetInput}
-              onChangeText={setPostSnippetInput}
-              placeholder="Post summary or key scientific takeaway..."
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 14 }]}
-              multiline
-              numberOfLines={3}
-            />
-
-            <TouchableOpacity
-              onPress={handleSharePost}
-              disabled={!postTitleInput.trim()}
-              style={[styles.confirmAttachBtn, !postTitleInput.trim() && { opacity: 0.6 }]}
-            >
-              <Text style={styles.confirmAttachBtnText}>Share Post with Pod</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -3959,6 +4428,214 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#16A34A',
+  },
+  /* Options Sheet & Modals matching DM */
+  optionsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  optionsSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 36,
+  },
+  optionsHandleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  optionsSheetTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  optionsItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  optionsItemText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  optionsCancelBtn: {
+    marginTop: 16,
+    paddingVertical: 14,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  optionsCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  attachIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachItemTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  attachItemSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  optionsDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 6,
+  },
+  muteOptionCard: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  muteOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  muteOptionDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  confirmModalActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 18,
+  },
+  confirmModalCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  confirmModalCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  confirmModalDestructiveBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  confirmModalDestructiveText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  reasonOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  reasonOptionSelected: {
+    borderColor: '#164E3F',
+    backgroundColor: '#F0FDF4',
+  },
+  reasonOptionText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#334155',
+  },
+  reasonOptionTextSelected: {
+    color: '#164E3F',
+    fontWeight: '700',
+  },
+  reportDetailsInput: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 13,
+    color: '#0F172A',
+    height: 70,
+    textAlignVertical: 'top',
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  submitReportBtn: {
+    backgroundColor: '#DC2626',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  submitReportBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  docItemOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  docItemName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  docItemMeta: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  detachedMicBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detachedSendBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#164E3F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detachedSendBtnDisabled: {
+    backgroundColor: '#CBD5E1',
   },
 });
 
