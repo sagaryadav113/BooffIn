@@ -43,12 +43,14 @@ import { CreateCommunityModal } from '../../components/workspace/CreateCommunity
 import { WorkspaceDMView } from '../../components/workspace/WorkspaceDMView';
 import { WorkspaceCommunityView } from '../../components/workspace/WorkspaceCommunityView';
 import { WorkspaceInnerCircleView } from '../../components/workspace/WorkspaceInnerCircleView';
+import { WorkspaceSettingsView } from '../../components/workspace/WorkspaceSettingsView';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 import { Workspace } from '../../types/workspace';
 
-export type WorkspaceTabType = 'dm' | 'community' | 'inner_circle';
+export type WorkspaceTabType = 'dm' | 'community' | 'inner_circle' | 'settings';
 
 export default function WorkspaceHubScreen() {
   const { isDesktop } = useResponsiveLayout();
@@ -87,6 +89,7 @@ export default function WorkspaceHubScreen() {
 
   useEffect(() => {
     loadWorkspaces();
+    useWorkspaceSettingsStore.getState().loadSettings(currentUser?.id);
     if (currentUser?.id) {
       const unsubscribe = subscribeToGlobalWorkspaceUpdates(currentUser.id);
       return () => {
@@ -210,6 +213,24 @@ export default function WorkspaceHubScreen() {
           >
             <Plus size={22} color="#164E3F" strokeWidth={2.5} />
           </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (activeTab === 'settings') {
+      return (
+        <View style={styles.topAppBar}>
+          <View style={styles.appBarLeft}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleGoBack}
+              style={styles.backBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
+            </TouchableOpacity>
+            <Text style={styles.appBarTitle}>Settings</Text>
+          </View>
         </View>
       );
     }
@@ -513,6 +534,22 @@ export default function WorkspaceHubScreen() {
           Inner Circle
         </Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => setActiveTab('settings')}
+        style={styles.tabItem}
+      >
+        <View style={styles.tabIconWrapper}>
+          <Settings
+            size={22}
+            color={activeTab === 'settings' ? '#164E3F' : '#94A3B8'}
+          />
+        </View>
+        <Text style={[styles.tabLabel, activeTab === 'settings' && styles.tabLabelActive]}>
+          Settings
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -560,6 +597,16 @@ export default function WorkspaceHubScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              onPress={() => setActiveTab('settings')}
+              style={[styles.desktopRailTab, activeTab === 'settings' && styles.desktopRailTabActive]}
+            >
+              <Settings size={18} color={activeTab === 'settings' ? '#164E3F' : '#64748B'} />
+              <Text style={[styles.desktopRailTabText, activeTab === 'settings' && styles.desktopRailTabTextActive]}>
+                Settings
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setShowCreateModal(true)}
               style={styles.desktopNewBtn}
@@ -595,7 +642,9 @@ export default function WorkspaceHubScreen() {
 
           {/* Main Workstation Canvas */}
           <View style={styles.desktopMainCanvas}>
-            {selectedWorkspace ? (
+            {activeTab === 'settings' ? (
+              <WorkspaceSettingsView />
+            ) : selectedWorkspace ? (
               selectedWorkspace.type === 'dm' ? (
                 <WorkspaceDMView workspace={selectedWorkspace} />
               ) : selectedWorkspace.type === 'community' ? (
@@ -618,79 +667,85 @@ export default function WorkspaceHubScreen() {
         /* Mobile Layout */
         <View style={styles.mobileContainer}>
           {renderTopAppBar()}
-          {renderSearchBar()}
-
-          {isLoading && activeItems.length === 0 ? (
-            <View style={styles.centerLoader}>
-              <ActivityIndicator size="small" color="#164E3F" />
-              <Text style={styles.loaderText}>Loading conversations...</Text>
-            </View>
+          {activeTab === 'settings' ? (
+            <WorkspaceSettingsView />
           ) : (
-            <FlatList
-              data={activeItems}
-              keyExtractor={(item) => item.id}
-              renderItem={
-                activeTab === 'community'
-                  ? renderCommunityItem
-                  : activeTab === 'inner_circle'
-                  ? renderInnerCircleItem
-                  : ({ item }) => <WorkspaceCard workspace={item} />
-              }
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={handleRefresh}
-                  tintColor="#164E3F"
-                />
-              }
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <MessageSquare size={44} color="#CBD5E1" />
-                  <Text style={styles.emptyTitle}>
-                    {activeTab === 'dm'
-                      ? 'No direct messages yet'
-                      : activeTab === 'community'
-                      ? communitySubFilter === 'your'
-                        ? 'No created communities yet'
-                        : 'No joined communities yet'
-                      : 'No inner circle pods yet'}
-                  </Text>
-                  <Text style={styles.emptySubtitle}>
-                    {activeTab === 'dm'
-                      ? 'Connect with verified researchers to start a 1-on-1 collaborative discussion.'
-                      : activeTab === 'community'
-                      ? communitySubFilter === 'your'
-                        ? 'Create your own research community to host group discussions, share papers, and collaborate.'
-                        : 'Explore and join open research communities to share papers and participate in discussions.'
-                      : 'Create a private 25-member research pod with E2EE encryption and shared vault.'}
-                  </Text>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      if (activeTab === 'community') {
-                        setShowCreateCommunityModal(true);
-                      } else {
-                        setShowCreateModal(true);
-                      }
-                    }}
-                    style={styles.emptyActionBtn}
-                  >
-                    <Plus size={15} color="#FFFFFF" />
-                    <Text style={styles.emptyActionBtnText}>
-                      {activeTab === 'dm'
-                        ? 'New Message'
-                        : activeTab === 'community'
-                        ? 'Create Community'
-                        : 'Create Inner Circle'}
-                    </Text>
-                  </TouchableOpacity>
+            <>
+              {renderSearchBar()}
+
+              {isLoading && activeItems.length === 0 ? (
+                <View style={styles.centerLoader}>
+                  <ActivityIndicator size="small" color="#164E3F" />
+                  <Text style={styles.loaderText}>Loading conversations...</Text>
                 </View>
-              }
-            />
+              ) : (
+                <FlatList
+                  data={activeItems}
+                  keyExtractor={(item) => item.id}
+                  renderItem={
+                    activeTab === 'community'
+                      ? renderCommunityItem
+                      : activeTab === 'inner_circle'
+                      ? renderInnerCircleItem
+                      : ({ item }) => <WorkspaceCard workspace={item} />
+                  }
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={isRefreshing}
+                      onRefresh={handleRefresh}
+                      tintColor="#164E3F"
+                    />
+                  }
+                  contentContainerStyle={styles.listContent}
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <MessageSquare size={44} color="#CBD5E1" />
+                      <Text style={styles.emptyTitle}>
+                        {activeTab === 'dm'
+                          ? 'No direct messages yet'
+                          : activeTab === 'community'
+                          ? communitySubFilter === 'your'
+                            ? 'No created communities yet'
+                            : 'No joined communities yet'
+                          : 'No inner circle pods yet'}
+                      </Text>
+                      <Text style={styles.emptySubtitle}>
+                        {activeTab === 'dm'
+                          ? 'Connect with verified researchers to start a 1-on-1 collaborative discussion.'
+                          : activeTab === 'community'
+                          ? communitySubFilter === 'your'
+                            ? 'Create your own research community to host group discussions, share papers, and collaborate.'
+                            : 'Explore and join open research communities to share papers and participate in discussions.'
+                          : 'Create a private 25-member research pod with E2EE encryption and shared vault.'}
+                      </Text>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          if (activeTab === 'community') {
+                            setShowCreateCommunityModal(true);
+                          } else {
+                            setShowCreateModal(true);
+                          }
+                        }}
+                        style={styles.emptyActionBtn}
+                      >
+                        <Plus size={15} color="#FFFFFF" />
+                        <Text style={styles.emptyActionBtnText}>
+                          {activeTab === 'dm'
+                            ? 'New Message'
+                            : activeTab === 'community'
+                            ? 'Create Community'
+                            : 'Create Inner Circle'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  }
+                />
+              )}
+            </>
           )}
 
-          {/* Fixed 3-Tab Bottom Bar */}
+          {/* Fixed 4-Tab Bottom Bar */}
           {renderBottomNav()}
         </View>
       )}
