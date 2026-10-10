@@ -2465,41 +2465,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               </View>
             </TouchableOpacity>
 
-            {/* 4. Share BooffIn Post (Phase 3) */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowPostPickerModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#FDF4FF' }]}>
-                <Sparkles size={20} color="#9333EA" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>BooffIn Post</Text>
-                <Text style={styles.attachItemSubtitle}>Embed deep-linked scientific discussion post</Text>
-              </View>
-            </TouchableOpacity>
 
-            {/* 5. Share Pod / Community Invite (Phase 3) */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowInvitePickerModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#F0FDF4' }]}>
-                <Users size={20} color="#164E3F" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>Pod / Community Invite</Text>
-                <Text style={styles.attachItemSubtitle}>Invite collaborator to your Inner Circle pod</Text>
-              </View>
-            </TouchableOpacity>
 
             {/* 6. Create Poll / Voting */}
             <TouchableOpacity
