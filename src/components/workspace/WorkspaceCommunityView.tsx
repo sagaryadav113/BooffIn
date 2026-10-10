@@ -409,26 +409,29 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     setShowAttachMenu(false);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
+        mediaTypes: ['images'],
+        quality: 0.85,
+        base64: true,
       });
 
-      if (!result.canceled && result.assets[0]?.uri) {
-        const localUri = result.assets[0].uri;
-        const uploadedUrl = await uploadPostImage(localUri);
-        if (uploadedUrl) {
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const uploadRes = await uploadPostImage(currentUser?.id || 'anonymous', asset);
+        if (uploadRes.success && uploadRes.url) {
           await sendMessage({
             workspace_id: workspace.id,
-            content: '',
+            content: '📷 Shared photo',
             message_type: 'image',
-            media_urls: [uploadedUrl],
+            media_urls: [uploadRes.url],
             reply_to_id: replyingTo?.id || null,
           });
           setReplyingTo(null);
           setTimeout(() => {
             flatListRef.current?.scrollToEnd({ animated: true });
           }, 100);
+        } else {
+          if (Platform.OS === 'web') window.alert(uploadRes.error || 'Failed to upload photo.');
+          else Alert.alert('Upload Failed', uploadRes.error || 'Failed to upload photo.');
         }
       }
     } catch (err) {
@@ -447,23 +450,27 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       }
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
-        quality: 0.8,
+        quality: 0.85,
+        base64: true,
       });
-      if (!result.canceled && result.assets[0]?.uri) {
-        const localUri = result.assets[0].uri;
-        const uploadedUrl = await uploadPostImage(localUri);
-        if (uploadedUrl) {
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const uploadRes = await uploadPostImage(currentUser?.id || 'anonymous', asset);
+        if (uploadRes.success && uploadRes.url) {
           await sendMessage({
             workspace_id: workspace.id,
-            content: '',
+            content: '📷 Captured photo',
             message_type: 'image',
-            media_urls: [uploadedUrl],
+            media_urls: [uploadRes.url],
             reply_to_id: replyingTo?.id || null,
           });
           setReplyingTo(null);
           setTimeout(() => {
             flatListRef.current?.scrollToEnd({ animated: true });
           }, 100);
+        } else {
+          if (Platform.OS === 'web') window.alert(uploadRes.error || 'Failed to upload photo.');
+          else Alert.alert('Upload Failed', uploadRes.error || 'Failed to upload photo.');
         }
       }
     } catch (err) {
@@ -471,24 +478,42 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     }
   };
 
-  // Voice Note Finish Handler
-  const handleVoiceRecordingFinish = async (uri: string, durationMs: number) => {
+  // Voice Note Send Handler
+  const handleSendVoiceNote = async (audioData: {
+    duration: number;
+    waveform: number[];
+    uri?: string;
+    blob?: Blob;
+    mimeType?: string;
+  }) => {
     setIsRecordingVoice(false);
-    try {
-      const audioUrl = await uploadVoiceNoteAudio(uri);
-      if (audioUrl) {
-        await sendMessage({
-          workspace_id: workspace.id,
-          content: '🎤 Voice Note',
-          message_type: 'voice_note',
-          media_urls: [audioUrl],
-          reply_to_id: replyingTo?.id || null,
-        });
-        setReplyingTo(null);
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
+    const replyId = replyingTo?.id || null;
+
+    let finalAudioUrl = audioData.uri || null;
+
+    if (currentUser?.id && audioData.blob) {
+      const uploadRes = await uploadVoiceNoteAudio(
+        currentUser.id,
+        audioData.blob,
+        audioData.mimeType || 'audio/webm'
+      );
+      if (uploadRes.success && uploadRes.url) {
+        finalAudioUrl = uploadRes.url;
       }
+    }
+
+    try {
+      await sendMessage({
+        workspace_id: workspace.id,
+        content: '🎙️ Voice Note',
+        message_type: 'voice_note',
+        media_urls: finalAudioUrl ? [finalAudioUrl] : [],
+        reply_to_id: replyId,
+      });
+      setReplyingTo(null);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (err) {
       console.warn('Upload voice note error:', err);
     }
@@ -627,8 +652,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     setUserSearchResults([]);
 
     const profileMeta: WorkspaceProfileMetadata = {
-      userId: targetUser.id,
-      name: targetUser.fullName || targetUser.handle || 'Researcher',
+      id: targetUser.id,
+      fullName: targetUser.fullName || targetUser.handle || 'Researcher',
       handle: targetUser.handle || 'user',
       avatarUrl: targetUser.avatarUrl || null,
       academicTitle: targetUser.academicTitle || 'Researcher',
@@ -1080,7 +1105,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               if (isPoll && item.content) {
                 const lines = item.content.split('\n');
                 pollQuestionText = lines[0]?.replace(/^📊\s*Poll:\s*/, '').trim();
-                pollOptionsList = lines.slice(1).map((l) => l.replace(/^•\s*/, '').trim()).filter(Boolean);
+                pollOptionsList = lines.slice(1).map((l: string) => l.replace(/^•\s*/, '').trim()).filter(Boolean);
               }
 
               return (
@@ -1329,7 +1354,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               {/* Voice Note Recorder or Standard Input Bar */}
               {isRecordingVoice ? (
                 <VoiceNoteRecorder
-                  onFinish={handleVoiceRecordingFinish}
+                  onSendVoiceNote={handleSendVoiceNote}
                   onCancel={() => setIsRecordingVoice(false)}
                 />
               ) : (
@@ -2026,7 +2051,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       {viewerImageUrl && (
         <ImageViewerModal
           visible={Boolean(viewerImageUrl)}
-          imageUrl={viewerImageUrl}
+          images={[viewerImageUrl]}
           onClose={() => setViewerImageUrl(null)}
         />
       )}

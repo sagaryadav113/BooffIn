@@ -777,8 +777,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     };
   }, [workspace.id]);
 
-  const memberCount = members.length || workspace.members_count || 1;
-
   // Input change & Mention detection
   const handleInputChange = (text: string) => {
     setInputText(text);
