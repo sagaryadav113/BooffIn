@@ -341,13 +341,13 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       {/* Disabled / Read-only Archive Notice Banner */}
       {isCommunityDisabled && (
         <View style={styles.disabledCommunityBanner}>
-          <AlertTriangle size={15} color="#DC2626" strokeWidth={2.5} />
+          <Info size={16} color="#0F172A" strokeWidth={2.2} />
           <View style={{ flex: 1 }}>
             <Text style={styles.disabledCommunityBannerTitle}>
               Community Archived (Read-Only)
             </Text>
             <Text style={styles.disabledCommunityBannerSub}>
-              This community is disabled. All past chats, materials, papers, and profiles remain viewable for show purpose, but messaging is permanently disabled.
+              This community is disabled. All past chats, papers, materials, and profiles remain viewable for portfolio and reference purposes, but new messages cannot be sent.
             </Text>
           </View>
         </View>
@@ -407,13 +407,15 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
           <View style={styles.tabActionBar}>
             <Text style={styles.tabActionTitle}>Community Papers</Text>
-            <TouchableOpacity
-              onPress={() => setShowDoiModal(true)}
-              style={styles.addDoiBtn}
-            >
-              <Plus size={13} color="#FFFFFF" />
-              <Text style={styles.addDoiBtnText}>Share Paper</Text>
-            </TouchableOpacity>
+            {!isCommunityDisabled && (
+              <TouchableOpacity
+                onPress={() => setShowDoiModal(true)}
+                style={styles.addDoiBtn}
+              >
+                <Plus size={13} color="#FFFFFF" />
+                <Text style={styles.addDoiBtnText}>Share Paper</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {paperMessages.length === 0 ? (
@@ -421,15 +423,19 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               <FileText size={40} color="#CBD5E1" />
               <Text style={styles.emptyTitle}>No research papers shared yet</Text>
               <Text style={styles.emptySub}>
-                Share verified DOI papers and literature reviews with the community.
+                {isCommunityDisabled
+                  ? 'No papers were shared in this community.'
+                  : 'Share verified DOI papers and literature reviews with the community.'}
               </Text>
-              <TouchableOpacity
-                onPress={() => setShowDoiModal(true)}
-                style={styles.emptyShareBtn}
-              >
-                <Plus size={14} color="#FFFFFF" />
-                <Text style={styles.emptyShareBtnText}>Share DOI Paper</Text>
-              </TouchableOpacity>
+              {!isCommunityDisabled && (
+                <TouchableOpacity
+                  onPress={() => setShowDoiModal(true)}
+                  style={styles.emptyShareBtn}
+                >
+                  <Plus size={14} color="#FFFFFF" />
+                  <Text style={styles.emptyShareBtnText}>Share DOI Paper</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <FlatList
@@ -751,13 +757,15 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         <ScrollView contentContainerStyle={{ padding: 16 }}>
           <View style={styles.tabActionBar}>
             <Text style={styles.tabActionTitle}>Live Research Sessions</Text>
-            <TouchableOpacity
-              onPress={() => setShowEventModal(true)}
-              style={styles.addDoiBtn}
-            >
-              <Plus size={13} color="#FFFFFF" />
-              <Text style={styles.addDoiBtnText}>Schedule Session</Text>
-            </TouchableOpacity>
+            {!isCommunityDisabled && (
+              <TouchableOpacity
+                onPress={() => setShowEventModal(true)}
+                style={styles.addDoiBtn}
+              >
+                <Plus size={13} color="#FFFFFF" />
+                <Text style={styles.addDoiBtnText}>Schedule Session</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {events.filter((e) => e.event_type === 'live_session').length === 0 ? (
@@ -765,7 +773,9 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               <Video size={40} color="#CBD5E1" />
               <Text style={styles.emptyTitle}>No upcoming live sessions</Text>
               <Text style={styles.emptySub}>
-                Schedule your next journal club, Q&A, or live experiment streaming.
+                {isCommunityDisabled
+                  ? 'No live sessions scheduled for this community.'
+                  : 'Schedule your next journal club, Q&A, or live experiment streaming.'}
               </Text>
             </View>
           ) : (
@@ -1468,9 +1478,9 @@ const styles = StyleSheet.create({
   disabledCommunityBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#F8FAFC',
     borderBottomWidth: 1,
-    borderBottomColor: '#FECACA',
+    borderBottomColor: '#E2E8F0',
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 10,
@@ -1478,12 +1488,12 @@ const styles = StyleSheet.create({
   disabledCommunityBannerTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#DC2626',
+    color: '#0F172A',
     marginBottom: 2,
   },
   disabledCommunityBannerSub: {
     fontSize: 11.5,
-    color: '#991B1B',
+    color: '#64748B',
     lineHeight: 15,
   },
   disabledBottomDock: {
