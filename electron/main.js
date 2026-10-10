@@ -70,8 +70,8 @@ function createWindow() {
     callback({ cancel: false, responseHeaders });
   });
 
-  // Load the app via privileged scheme
-  mainWindow.loadURL('app://localhost/index.html').catch(() => {
+  // Load the app via privileged scheme at root route
+  mainWindow.loadURL('app://localhost/').catch(() => {
     // Fallback: direct load file
     const distIndexPath = path.join(__dirname, '../dist/index.html');
     mainWindow.loadFile(distIndexPath);
