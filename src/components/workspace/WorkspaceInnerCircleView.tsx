@@ -2710,25 +2710,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             <View style={styles.optionsHandleBar} />
             <Text style={styles.optionsSheetTitle}>Attach to Message</Text>
 
-            {/* 1. Research Paper (DOI) */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowDoiModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                <FileText size={20} color="#2563EB" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>Research Paper (DOI)</Text>
-                <Text style={styles.attachItemSubtitle}>Resolve citation, authors, and canonical paper preview</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 2. PDF Manuscript / Document */}
+            {/* 1. PDF Manuscript / Document */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -3214,11 +3196,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       {/* MODAL: Academic Paper & Manuscript Search (DOI, URL, Title, Keywords) */}
       {/* ------------------------------------------------------------- */}
       <PaperSearchModal
-        visible={showDocumentPickerModal || showDoiModal}
-        onClose={() => {
-          setShowDocumentPickerModal(false);
-          setShowDoiModal(false);
-        }}
+        visible={showDocumentPickerModal}
+        onClose={() => setShowDocumentPickerModal(false)}
         onSelectPaper={handleSelectPaperToShare}
         title="Search & Share Manuscript / Paper"
         subtitle="Search preprints and papers by DOI, URL, title, keywords, or author across global scientific registries."

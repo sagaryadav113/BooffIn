@@ -2004,20 +2004,6 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                 activeOpacity={0.7}
                 onPress={() => {
                   setShowAttachMenu(false);
-                  setShowDoiModal(true);
-                }}
-                style={styles.attachGridItem}
-              >
-                <View style={[styles.attachIconWrap, { backgroundColor: '#FEF3C7' }]}>
-                  <FileText size={22} color="#D97706" />
-                </View>
-                <Text style={styles.attachGridLabel}>DOI Paper</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setShowAttachMenu(false);
                   setShowDocumentPickerModal(true);
                 }}
                 style={styles.attachGridItem}
@@ -2259,11 +2245,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
       {/* Research Paper & Manuscript Search Modal (DOI, URL, Keyword, Title, Author) */}
       <PaperSearchModal
-        visible={showDocumentPickerModal || showDoiModal}
-        onClose={() => {
-          setShowDocumentPickerModal(false);
-          setShowDoiModal(false);
-        }}
+        visible={showDocumentPickerModal}
+        onClose={() => setShowDocumentPickerModal(false)}
         onSelectPaper={handleSelectPaperToShare}
         title="Select Manuscript / Paper to Share"
         subtitle="Search papers by DOI, URL, title, keywords, or author across global scientific registries."

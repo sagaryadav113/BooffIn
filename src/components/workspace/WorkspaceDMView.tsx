@@ -2629,25 +2629,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <View style={styles.optionsHandleBar} />
             <Text style={styles.optionsSheetTitle}>Attach to Message</Text>
 
-            {/* 1. Attach Research Paper (DOI) */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowDoiModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                <FileText size={20} color="#2563EB" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>Research Paper (DOI)</Text>
-                <Text style={styles.attachItemSubtitle}>Resolve citation, authors, and canonical paper preview</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 2. Attach PDF Manuscript / Document (Phase 3) */}
+            {/* 1. Attach PDF Manuscript / Document (Phase 3) */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
