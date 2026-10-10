@@ -1438,38 +1438,41 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                 pollOptionsList = lines.slice(1).map((l: string) => l.replace(/^•\s*/, '').trim()).filter(Boolean);
               }
 
-              return (
-                <View key={item.id} style={{ width: '100%' }}>
-                  {isFirstOfDateGroup && (
-                    <View style={styles.dateSeparatorRow}>
-                      <View style={styles.dateSeparatorLine} />
-                      <View style={styles.dateSeparatorPill}>
-                        <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
-                      </View>
-                      <View style={styles.dateSeparatorLine} />
-                    </View>
-                  )}
+                  const hasMediaContent = isVoiceNote || Boolean(docMeta) || Boolean(item.doi_metadata) || Boolean(postMeta) || Boolean(profMeta) || isPoll;
 
-                  <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
-                    {!isMe && (
-                      <Avatar
-                        uri={item.sender?.avatarUrl || undefined}
-                        name={item.sender?.fullName || item.sender?.handle || 'Researcher'}
-                        size="sm"
-                        style={{ marginRight: 8, alignSelf: 'flex-end', marginBottom: 4 }}
-                      />
-                    )}
+                  return (
+                    <View key={item.id} style={{ width: '100%' }}>
+                      {isFirstOfDateGroup && (
+                        <View style={styles.dateSeparatorRow}>
+                          <View style={styles.dateSeparatorLine} />
+                          <View style={styles.dateSeparatorPill}>
+                            <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
+                          </View>
+                          <View style={styles.dateSeparatorLine} />
+                        </View>
+                      )}
 
-                    <View style={styles.bubbleWrapper}>
-                      <TouchableOpacity
-                        activeOpacity={0.9}
-                        onLongPress={() => handleLongPressMessage(item)}
-                        style={[
-                          styles.messageBubble,
-                          isMe ? styles.myBubble : styles.otherBubble,
-                          isDeleted && styles.deletedBubble,
-                        ]}
-                      >
+                      <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
+                        {!isMe && (
+                          <Avatar
+                            uri={item.sender?.avatarUrl || undefined}
+                            name={item.sender?.fullName || item.sender?.handle || 'Researcher'}
+                            size="sm"
+                            style={{ marginRight: 8, alignSelf: 'flex-end', marginBottom: 4 }}
+                          />
+                        )}
+
+                        <View style={[styles.bubbleWrapper, hasMediaContent && styles.bubbleWithMedia]}>
+                          <TouchableOpacity
+                            activeOpacity={0.9}
+                            onLongPress={() => handleLongPressMessage(item)}
+                            style={[
+                              styles.messageBubble,
+                              isMe ? styles.myBubble : styles.otherBubble,
+                              isDeleted && styles.deletedBubble,
+                              hasMediaContent && styles.bubbleWithMedia,
+                            ]}
+                          >
                       {/* Sender Name in Group Chat */}
                       {!isMe && !isDeleted && (
                         <Text style={styles.senderName}>
@@ -3251,7 +3254,7 @@ const styles = StyleSheet.create({
   messageRow: {
     flexDirection: 'row',
     marginBottom: 10,
-    maxWidth: Platform.OS === 'web' ? '72%' : '84%',
+    maxWidth: Platform.OS === 'web' ? '82%' : '84%',
     alignItems: 'flex-end',
   },
   myMessageRow: {
@@ -3272,6 +3275,11 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     maxWidth: '100%',
     flexShrink: 1,
+    overflow: 'hidden',
+  },
+  bubbleWithMedia: {
+    minWidth: Platform.OS === 'web' ? 240 : 220,
+    maxWidth: '100%',
   },
   myBubble: {
     backgroundColor: '#164E3F',

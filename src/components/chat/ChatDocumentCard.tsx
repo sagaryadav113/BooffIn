@@ -41,8 +41,8 @@ export const ChatDocumentCard: React.FC<ChatDocumentCardProps> = ({ docMeta, isM
           <FileText size={22} color={isPdf ? '#DC2626' : '#2563EB'} />
         </View>
 
-        <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={styles.docNameText} numberOfLines={2}>
+        <View style={{ flex: 1, marginLeft: 10, minWidth: 0 }}>
+          <Text style={styles.docNameText} numberOfLines={2} ellipsizeMode="middle">
             {docMeta.name || 'Research Manuscript.pdf'}
           </Text>
           <View style={styles.metaRow}>
@@ -68,13 +68,16 @@ export const ChatDocumentCard: React.FC<ChatDocumentCardProps> = ({ docMeta, isM
 
 const styles = StyleSheet.create({
   cardContainer: {
-    width: 250,
+    width: '100%',
+    minWidth: 200,
+    maxWidth: 290,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     marginVertical: 4,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -90,6 +93,8 @@ const styles = StyleSheet.create({
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    overflow: 'hidden',
   },
   iconWrap: {
     width: 42,
@@ -97,16 +102,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   docNameText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#0F172A',
-    lineHeight: 17,
+    lineHeight: 18,
+    flexShrink: 1,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 4,
     marginTop: 4,
   },
@@ -134,5 +142,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#F0FDF4',
     marginLeft: 6,
+    flexShrink: 0,
   },
 });

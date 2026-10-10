@@ -1509,6 +1509,8 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       index === 0 ||
       getDateLabel(item.created_at) !== getDateLabel(displayedMessages[index - 1]?.created_at);
 
+    const hasMediaContent = isAudio || hasDoi || isPost || isProfile || isWorkspaceInvite || isDocument || isPoll;
+
     return (
       <View key={item.id} style={{ width: '100%' }}>
         {isFirstOfDateGroup && (
@@ -1536,7 +1538,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           />
         )}
 
-        <View style={styles.bubbleWrapper}>
+        <View style={[styles.bubbleWrapper, hasMediaContent && styles.bubbleWithMedia]}>
           <TouchableOpacity
             activeOpacity={0.92}
             onLongPress={() => handleLongPressMessage(item)}
@@ -1558,6 +1560,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 : isMe
                 ? styles.myBubble
                 : styles.otherBubble,
+              hasMediaContent && styles.bubbleWithMedia,
             ]}
           >
             {/* Quoted Reply Banner inside bubble */}
@@ -3673,6 +3676,7 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 16,
     flexGrow: 1,
     justifyContent: 'flex-end',
@@ -3680,7 +3684,7 @@ const styles = StyleSheet.create({
   messageRow: {
     flexDirection: 'row',
     marginBottom: 12,
-    maxWidth: Platform.OS === 'web' ? '72%' : '84%',
+    maxWidth: Platform.OS === 'web' ? '82%' : '84%',
   },
   myMessageRow: {
     alignSelf: 'flex-end',
@@ -3697,6 +3701,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 18,
+    maxWidth: '100%',
+    overflow: 'hidden',
+  },
+  bubbleWithMedia: {
+    minWidth: Platform.OS === 'web' ? 240 : 220,
     maxWidth: '100%',
   },
   myBubble: {

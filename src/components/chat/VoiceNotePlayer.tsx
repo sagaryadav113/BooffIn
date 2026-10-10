@@ -17,9 +17,8 @@ interface VoiceNotePlayerProps {
 }
 
 const DEFAULT_WAVEFORM = [
-  30, 45, 60, 25, 75, 90, 40, 65, 80, 50,
-  35, 70, 85, 95, 60, 45, 80, 65, 40, 55,
-  70, 85, 50, 30, 60, 75, 40, 20
+  30, 45, 65, 25, 75, 90, 40, 70, 85, 55,
+  40, 75, 90, 60, 45, 80, 65, 50, 70, 35,
 ];
 
 export const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({
@@ -261,9 +260,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 4,
-    minWidth: 220,
+    width: '100%',
+    minWidth: 180,
     maxWidth: 290,
     gap: 10,
+    overflow: 'hidden',
   },
   playBtn: {
     width: 38,
@@ -285,16 +286,21 @@ const styles = StyleSheet.create({
   },
   waveformWrap: {
     flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
   },
   barsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     height: 30,
-    gap: 2,
+    gap: 1.5,
+    width: '100%',
+    overflow: 'hidden',
   },
   barTouchWrapper: {
     flex: 1,
+    minWidth: 0,
     height: 30,
     justifyContent: 'center',
     alignItems: 'center',

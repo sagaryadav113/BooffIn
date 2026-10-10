@@ -1721,33 +1721,39 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 ? messages.find((m) => m.id === item.reply_to_id) || item.reply_to_message
                 : item.reply_to_message;
 
-              return (
-                <View key={item.id} style={{ width: '100%' }}>
-                  {isFirstOfDateGroup && (
-                    <View style={styles.dateSeparatorRow}>
-                      <View style={styles.dateSeparatorLine} />
-                      <View style={styles.dateSeparatorPill}>
-                        <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
-                      </View>
-                      <View style={styles.dateSeparatorLine} />
-                    </View>
-                  )}
-                  <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
-                  {!isMe && (
-                    <Avatar
-                      uri={item.sender?.avatarUrl || undefined}
-                      name={item.sender?.fullName || 'Researcher'}
-                      size="sm"
-                      style={{ marginRight: 8, alignSelf: 'flex-end', marginBottom: 4 }}
-                    />
-                  )}
+                  const hasMediaContent = isAudio || isDocument || Boolean(resolvedDoiMeta) || isPost || isProfile || isWorkspaceInvite || isPoll;
 
-                  <View style={styles.bubbleWrapper}>
-                    <TouchableOpacity
-                      activeOpacity={0.92}
-                      onLongPress={() => handleLongPressMessage(item)}
-                      style={[styles.messageBubble, isMe ? styles.myBubble : styles.otherBubble]}
-                    >
+                  return (
+                    <View key={item.id} style={{ width: '100%' }}>
+                      {isFirstOfDateGroup && (
+                        <View style={styles.dateSeparatorRow}>
+                          <View style={styles.dateSeparatorLine} />
+                          <View style={styles.dateSeparatorPill}>
+                            <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
+                          </View>
+                          <View style={styles.dateSeparatorLine} />
+                        </View>
+                      )}
+                      <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
+                      {!isMe && (
+                        <Avatar
+                          uri={item.sender?.avatarUrl || undefined}
+                          name={item.sender?.fullName || 'Researcher'}
+                          size="sm"
+                          style={{ marginRight: 8, alignSelf: 'flex-end', marginBottom: 4 }}
+                        />
+                      )}
+
+                      <View style={[styles.bubbleWrapper, hasMediaContent && styles.bubbleWithMedia]}>
+                        <TouchableOpacity
+                          activeOpacity={0.92}
+                          onLongPress={() => handleLongPressMessage(item)}
+                          style={[
+                            styles.messageBubble,
+                            isMe ? styles.myBubble : styles.otherBubble,
+                            hasMediaContent && styles.bubbleWithMedia,
+                          ]}
+                        >
                     {/* Pinned Tag */}
                     {isPinnedThis && (
                       <View style={styles.bubblePinTag}>
@@ -3377,6 +3383,7 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 16,
   },
   academicThreadPost: {
@@ -3492,7 +3499,7 @@ const styles = StyleSheet.create({
   messageRow: {
     flexDirection: 'row',
     marginBottom: 12,
-    maxWidth: Platform.OS === 'web' ? '72%' : '84%',
+    maxWidth: Platform.OS === 'web' ? '82%' : '84%',
     alignItems: 'flex-end',
   },
   myMessageRow: {
@@ -3513,6 +3520,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     maxWidth: '100%',
     flexShrink: 1,
+    overflow: 'hidden',
+  },
+  bubbleWithMedia: {
+    minWidth: Platform.OS === 'web' ? 240 : 220,
+    maxWidth: '100%',
   },
   myBubble: {
     backgroundColor: '#164E3F',
