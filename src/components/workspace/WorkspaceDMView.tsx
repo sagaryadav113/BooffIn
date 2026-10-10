@@ -1034,15 +1034,30 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     }
   };
 
-  // Handle Voting in Poll
-  const handleVote = (messageId: string, optionId: string) => {
+  // Handle Voting in Poll with real-time reaction sync & percentage calculation
+  const handleVote = async (messageId: string, optionId: string) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
+
+    const prevVote = localPollVotes[messageId];
+    const newVote = prevVote === optionId ? '' : optionId;
+
     setLocalPollVotes((prev) => ({
       ...prev,
-      [messageId]: prev[messageId] === optionId ? '' : optionId,
+      [messageId]: newVote,
     }));
+
+    if (currentUser?.id) {
+      if (prevVote && prevVote !== optionId) {
+        await toggleReaction(messageId, `vote:${prevVote}`);
+      }
+      if (newVote) {
+        await toggleReaction(messageId, `vote:${newVote}`);
+      } else if (prevVote === optionId) {
+        await toggleReaction(messageId, `vote:${optionId}`);
+      }
+    }
   };
 
   // Moderation Handlers: Unfollow
@@ -1428,10 +1443,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
     const mySelectedVote = localPollVotes[item.id];
 
-    // Reactions calculations
+    // Reactions calculations (excluding poll votes)
     const reactionsMap = item.reactions || {};
     const reactionEntries = Object.entries(reactionsMap).filter(
-      ([, userIds]) => Array.isArray(userIds) && userIds.length > 0
+      ([k, userIds]) => !k.startsWith('vote:') && !k.startsWith('poll:') && Array.isArray(userIds) && userIds.length > 0
     );
 
     const isFirstOfDateGroup =
@@ -1622,39 +1637,122 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 )}
 
                 {/* Interactive Poll / Voting */}
-                {isPoll && (
-                  <View style={styles.pollMsgContainer}>
-                    <View style={styles.pollHeader}>
-                      <BarChart2 size={16} color="#164E3F" />
-                      <Text style={styles.pollBadgeText}>RESEARCH POLL</Text>
-                    </View>
-                    <Text style={styles.pollQuestionTitle}>{pollQuestionText || item.content}</Text>
+                {isPoll && (() => {
+                  const optionVotersMap: Record<string, Set<string>> = {};
+                  pollOptionItems.forEach((opt) => {
+                    optionVotersMap[opt.id] = new Set<string>();
+                  });
 
-                    <View style={styles.pollOptionsList}>
-                      {pollOptionItems.map((opt) => {
-                        const isSelected = mySelectedVote === opt.id;
-                        return (
-                          <TouchableOpacity
-                            key={opt.id}
-                            activeOpacity={0.7}
-                            onPress={() => handleVote(item.id, opt.id)}
-                            style={[styles.pollOptionBtn, isSelected && styles.pollOptionBtnSelected]}
-                          >
-                            <View style={[styles.pollProgressFill, { width: isSelected ? '100%' : '0%' }]} />
-                            <View style={styles.pollOptionContent}>
-                              <View style={[styles.pollRadio, isSelected && styles.pollRadioSelected]}>
-                                {isSelected && <View style={styles.pollRadioInner} />}
+                  // 1. Reactions (keys starting with vote:)
+                  if (item.reactions && typeof item.reactions === 'object') {
+                    Object.entries(item.reactions).forEach(([key, userIds]) => {
+                      if (key.startsWith('vote:') && Array.isArray(userIds)) {
+                        const optId = key.replace('vote:', '');
+                        if (optionVotersMap[optId]) {
+                          userIds.forEach((uid) => optionVotersMap[optId].add(uid));
+                        }
+                      }
+                    });
+                  }
+
+                  // 2. Poll data if attached
+                  if (resolvedPollData && Array.isArray(resolvedPollData.options)) {
+                    resolvedPollData.options.forEach((opt: any) => {
+                      if (optionVotersMap[opt.id] && Array.isArray(opt.votes)) {
+                        opt.votes.forEach((uid: string) => optionVotersMap[opt.id].add(uid));
+                      }
+                    });
+                  }
+
+                  // 3. Optimistic local vote reconciliation
+                  if (currentUser?.id) {
+                    const localVote = localPollVotes[item.id];
+                    if (localVote) {
+                      Object.keys(optionVotersMap).forEach((optId) => {
+                        if (optId === localVote) {
+                          optionVotersMap[optId].add(currentUser.id);
+                        } else {
+                          optionVotersMap[optId].delete(currentUser.id);
+                        }
+                      });
+                    } else if (localVote === '') {
+                      Object.keys(optionVotersMap).forEach((optId) => {
+                        optionVotersMap[optId].delete(currentUser.id);
+                      });
+                    }
+                  }
+
+                  let totalVotes = 0;
+                  Object.values(optionVotersMap).forEach((vSet) => {
+                    totalVotes += vSet.size;
+                  });
+
+                  const userHasVoted = currentUser?.id
+                    ? Object.values(optionVotersMap).some((vSet) => vSet.has(currentUser.id))
+                    : false;
+
+                  return (
+                    <View style={styles.pollMsgContainer}>
+                      <View style={styles.pollHeader}>
+                        <BarChart2 size={16} color="#164E3F" />
+                        <Text style={styles.pollBadgeText}>RESEARCH POLL</Text>
+                      </View>
+                      <Text style={styles.pollQuestionTitle}>{pollQuestionText || item.content}</Text>
+
+                      <View style={styles.pollOptionsList}>
+                        {pollOptionItems.map((opt) => {
+                          const voteCount = optionVotersMap[opt.id]?.size || 0;
+                          const percent = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                          const isSelected = currentUser?.id ? Boolean(optionVotersMap[opt.id]?.has(currentUser.id)) : false;
+
+                          return (
+                            <TouchableOpacity
+                              key={opt.id}
+                              activeOpacity={0.7}
+                              onPress={() => handleVote(item.id, opt.id)}
+                              style={[styles.pollOptionBtn, isSelected && styles.pollOptionBtnSelected]}
+                            >
+                              <View
+                                style={[
+                                  styles.pollProgressFill,
+                                  { width: `${percent}%` },
+                                  isSelected && styles.pollProgressFillSelected,
+                                ]}
+                              />
+                              <View style={styles.pollOptionContent}>
+                                <View style={[styles.pollRadio, isSelected && styles.pollRadioSelected]}>
+                                  {isSelected && <View style={styles.pollRadioInner} />}
+                                </View>
+                                <Text
+                                  style={[styles.pollOptionText, isSelected && styles.pollOptionTextSelected]}
+                                  numberOfLines={2}
+                                >
+                                  {opt.text}
+                                </Text>
                               </View>
-                              <Text style={[styles.pollOptionText, isSelected && styles.pollOptionTextSelected]}>
-                                {opt.text}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
+                              <View style={styles.pollOptionRight}>
+                                <Text style={[styles.pollOptionPercent, isSelected && styles.pollOptionPercentSelected]}>
+                                  {percent}%
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      <View style={styles.pollFooterRow}>
+                        <Text style={styles.pollTotalVotesText}>
+                          {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+                        </Text>
+                        {userHasVoted ? (
+                          <Text style={styles.pollVotedBadgeText}>• Voted</Text>
+                        ) : (
+                          <Text style={styles.pollHintText}>• Tap an option to vote</Text>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                )}
+                  );
+                })()}
 
                 {/* Text Content */}
                 {(() => {
@@ -3763,6 +3861,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 9,
     gap: 8,
+    flex: 1,
+    paddingRight: 8,
+  },
+  pollOptionRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: 10,
+    minWidth: 42,
+  },
+  pollOptionPercent: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  pollOptionPercentSelected: {
+    color: '#164E3F',
+    fontWeight: '800',
+  },
+  pollProgressFillSelected: {
+    backgroundColor: '#A7F3D0',
+    opacity: 0.6,
+  },
+  pollFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  pollTotalVotesText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  pollVotedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#164E3F',
+  },
+  pollHintText: {
+    fontSize: 11,
+    color: '#94A3B8',
   },
   pollRadio: {
     width: 16,
@@ -3786,7 +3928,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     color: '#334155',
-    flex: 1,
   },
   pollOptionTextSelected: {
     fontWeight: '700',

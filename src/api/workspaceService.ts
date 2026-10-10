@@ -20,6 +20,7 @@ import {
   WorkspaceCallMetadata,
   DoiMetadata,
   WorkspaceSummaryStats,
+  WorkspacePollData,
 } from '../types/workspace';
 import { resolvePaper } from './paperResolver';
 
@@ -1207,6 +1208,7 @@ export const workspaceService = {
     profile_metadata?: WorkspaceProfileMetadata | null;
     workspace_invite_metadata?: WorkspaceInviteMetadata | null;
     document_metadata?: WorkspaceDocumentMetadata | null;
+    poll_data?: WorkspacePollData | null;
     call_metadata?: WorkspaceCallMetadata | null;
     reply_to_id?: string | null;
     media_urls?: string[] | null;
@@ -1278,6 +1280,7 @@ export const workspaceService = {
       if (params.profile_metadata) attachmentsPayload.profile_metadata = params.profile_metadata;
       if (params.audio_metadata) attachmentsPayload.audio_metadata = params.audio_metadata;
       if (params.call_metadata) attachmentsPayload.call_metadata = params.call_metadata;
+      if (params.poll_data) attachmentsPayload.poll_data = params.poll_data;
 
       // Try rich insert
       let insertPayload: any = {
@@ -1286,6 +1289,7 @@ export const workspaceService = {
         content: params.content,
         message_type: detectedType,
         doi_metadata: resolvedDoiMeta,
+        poll_data: params.poll_data || null,
         e2ee_ciphertext: params.e2ee_ciphertext || null,
         e2ee_nonce: params.e2ee_nonce || null,
         media_urls: params.media_urls || null,

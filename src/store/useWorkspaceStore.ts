@@ -16,6 +16,7 @@ import {
   WorkspaceDocumentMetadata,
   WorkspaceCallMetadata,
   DoiMetadata,
+  WorkspacePollData,
 } from '../types/workspace';
 import { workspaceService } from '../api/workspaceService';
 import { useAuthStore } from './useAuthStore';
@@ -89,6 +90,7 @@ interface WorkspaceState {
     profile_metadata?: WorkspaceProfileMetadata | null;
     workspace_invite_metadata?: WorkspaceInviteMetadata | null;
     document_metadata?: WorkspaceDocumentMetadata | null;
+    poll_data?: WorkspacePollData | null;
     call_metadata?: WorkspaceCallMetadata | null;
     reply_to_id?: string | null;
     media_urls?: string[] | null;
