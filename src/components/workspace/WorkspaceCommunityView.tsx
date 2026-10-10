@@ -91,6 +91,7 @@ import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
 import { PaperSearchModal } from '../chat/PaperSearchModal';
 import { Paper } from '../../types';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -240,6 +241,9 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const isPinned = Boolean(workspace.is_pinned);
   const isMuted = Boolean(workspace.is_muted);
   const isArchived = Boolean(workspace.is_archived);
+
+  // Global Workspace Settings
+  const settings = useWorkspaceSettingsStore((s) => s.settings);
 
   // Gallery & More Options States
   const [showGalleryModal, setShowGalleryModal] = useState(false);
@@ -1746,7 +1750,11 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                             </Text>
                             {isMe && (
                               <View style={{ marginLeft: 4 }}>
-                                <CheckCheck size={13} color="#FFFFFF" strokeWidth={2.2} />
+                                {settings.readReceiptsEnabled ? (
+                                  <CheckCheck size={13} color="#FFFFFF" strokeWidth={2.2} />
+                                ) : (
+                                  <Check size={13} color="#FFFFFF" strokeWidth={2} />
+                                )}
                               </View>
                             )}
                           </View>

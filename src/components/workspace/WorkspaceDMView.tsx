@@ -96,6 +96,7 @@ import { IncomingCallModal } from '../chat/IncomingCallModal';
 import { webrtcSignaling, IncomingCallPayload } from '../../services/webrtcSignalingService';
 import { FEATURE_FLAGS } from '../../config/featureFlags';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -221,6 +222,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const isMuted = Boolean(currentDm.is_muted);
   const isArchived = Boolean(currentDm.is_archived);
 
+  // Global Workspace Settings
+  const settings = useWorkspaceSettingsStore((s) => s.settings);
+
   // Real-time typing & presence selectors
   const sendTypingIndicator = useWorkspaceStore((s) => s.sendTypingIndicator);
   const typingInThisRoom = useWorkspaceStore((s) => s.typingUsers[workspace.id]);
@@ -233,13 +237,20 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
   const partner = localPartner || workspace.other_user;
   const partnerId = partner?.id || workspace.other_user?.id;
-  const isPartnerOnline = Boolean(partnerId && onlineUserIds[partnerId]);
-  const isPartnerTyping = Boolean(typingInThisRoom && Object.keys(typingInThisRoom).length > 0);
+  const isPartnerOnline = Boolean(
+    settings.onlinePresenceEnabled && partnerId && onlineUserIds[partnerId]
+  );
+  const isPartnerTyping = Boolean(
+    settings.typingIndicatorsEnabled &&
+      typingInThisRoom &&
+      Object.keys(typingInThisRoom).length > 0
+  );
   const typingPartnerName = isPartnerTyping
     ? Object.values(typingInThisRoom)[0]?.username || partner?.fullName || 'Researcher'
     : null;
 
   const handleUserTyping = (text: string) => {
+    if (!settings.typingIndicatorsEnabled) return;
     if (text.length > 0) {
       sendTypingIndicator(workspace.id, true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -1895,10 +1906,12 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
               {isMe && !isDeleted && (
-                effectiveOtherLastReadAt && new Date(effectiveOtherLastReadAt).getTime() >= new Date(item.created_at).getTime() ? (
+                settings.readReceiptsEnabled &&
+                effectiveOtherLastReadAt &&
+                new Date(effectiveOtherLastReadAt).getTime() >= new Date(item.created_at).getTime() ? (
                   <CheckCheck size={13} color="#34D399" style={{ marginLeft: 4 }} />
                 ) : (
-                  <CheckCheck size={13} color="#94A3B8" style={{ marginLeft: 4 }} />
+                  <Check size={13} color="#94A3B8" style={{ marginLeft: 4 }} />
                 )
               )}
             </View>

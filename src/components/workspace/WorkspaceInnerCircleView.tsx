@@ -109,6 +109,7 @@ import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
 import { PaperSearchModal } from '../chat/PaperSearchModal';
 import { Paper } from '../../types';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -264,6 +265,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const isPinned = Boolean(workspace.settings?.is_pinned);
   const isArchived = Boolean(workspace.settings?.is_archived);
   const isMuted = Boolean(workspace.settings?.is_muted);
+
+  // Global Workspace Settings
+  const settings = useWorkspaceSettingsStore((s) => s.settings);
 
   const isAtBottomRef = useRef(true);
   const hasInitialScrolledRef = useRef(false);
@@ -515,17 +519,21 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     return null;
   };
 
-  // Filtered & Searched Messages (with Step 4 Ephemeral Filtering)
+  // Filtered & Searched Messages (with Auto-Expiring & Zero-History Settings)
   const displayedMessages = useMemo(() => {
     let list = messages;
 
-    // Ephemeral message filtering if enabled by pod admin
-    const timer = workspace.settings?.ephemeral_timer;
-    if (timer && timer !== 'off') {
+    // Auto-expiring message filtering (from settings or workspace configuration)
+    const effectiveTimer = settings.autoExpiringPodMessages !== 'off'
+      ? settings.autoExpiringPodMessages
+      : workspace.settings?.ephemeral_timer;
+
+    if (effectiveTimer && effectiveTimer !== 'off') {
       const now = Date.now();
-      let maxAgeMs = 24 * 60 * 60 * 1000;
-      if (timer === '7d') maxAgeMs = 7 * 24 * 60 * 60 * 1000;
-      else if (timer === '30d') maxAgeMs = 30 * 24 * 60 * 60 * 1000;
+      let maxAgeMs = 7 * 24 * 60 * 60 * 1000;
+      if (effectiveTimer === '7d') maxAgeMs = 7 * 24 * 60 * 60 * 1000;
+      else if (effectiveTimer === '30d') maxAgeMs = 30 * 24 * 60 * 60 * 1000;
+      else if (effectiveTimer === '90d') maxAgeMs = 90 * 24 * 60 * 60 * 1000;
 
       list = list.filter((m) => {
         const msgTime = new Date(m.created_at).getTime();
@@ -533,8 +541,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       });
     }
 
-    // Inner Circle Chat Retention Rule: Added people cannot view previous chats; they join freshly without any previous chats
-    if (!isOwner) {
+    // Inner Circle Chat Retention Rule: governed by settings.innerCircleZeroHistoryDefault
+    if (settings.innerCircleZeroHistoryDefault && !isOwner) {
       const myJoinedAtStr = myMembership?.joined_at || workspace.my_joined_at;
       if (!isMember || !myJoinedAtStr) {
         // Not a joined member yet (reviewing via invite) -> cannot view previous chats
@@ -2086,7 +2094,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </Text>
                       {isMe && (
-                        <CheckCheck size={12} color="#A7F3D0" style={{ marginLeft: 3 }} />
+                        settings.readReceiptsEnabled ? (
+                          <CheckCheck size={12} color="#A7F3D0" style={{ marginLeft: 3 }} />
+                        ) : (
+                          <Check size={12} color="#A7F3D0" style={{ marginLeft: 3 }} />
+                        )
                       )}
                     </View>
 

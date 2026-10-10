@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { FileText, ExternalLink, Bookmark, Check, Copy, Quote } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { DoiMetadata } from '../../types/workspace';
+import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
 
 interface WorkspaceDoiCardProps {
   doiMeta: DoiMetadata;
@@ -19,6 +20,9 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
 }) => {
   const [copiedCitation, setCopiedCitation] = useState(false);
   const [copiedDoi, setCopiedDoi] = useState(false);
+  const doiAutoPreviewEnabled = useWorkspaceSettingsStore(
+    (s) => s.settings.doiAutoPreviewEnabled
+  );
 
   const handleOpenPaper = () => {
     if (doiMeta.doi) {
@@ -54,6 +58,22 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
     setCopiedDoi(true);
     setTimeout(() => setCopiedDoi(false), 2000);
   };
+
+  if (!doiAutoPreviewEnabled) {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={handleOpenPaper}
+        style={styles.compactContainer}
+      >
+        <FileText size={14} color="#064E3B" />
+        <Text style={styles.compactText} numberOfLines={1}>
+          {doiMeta.title || (doiMeta.doi ? `doi.org/${doiMeta.doi}` : 'View Paper')}
+        </Text>
+        <ExternalLink size={12} color="#064E3B" />
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -287,5 +307,24 @@ const styles = StyleSheet.create({
   actionBtnTextActive: {
     color: '#064E3B',
     fontWeight: '600',
+  },
+  compactContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginVertical: 4,
+    maxWidth: '100%',
+  },
+  compactText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#064E3B',
   },
 });
