@@ -39,15 +39,8 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
   const { hasNativePrompt, promptInstall } = usePWAInstall();
   const [showInstallModal, setShowInstallModal] = useState(false);
 
-  const handleInstallPress = async () => {
-    if (hasNativePrompt) {
-      const installed = await promptInstall();
-      if (!installed) {
-        setShowInstallModal(true);
-      }
-    } else {
-      setShowInstallModal(true);
-    }
+  const handleInstallPress = () => {
+    setShowInstallModal(true);
   };
 
   const isHomeActive = pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/index';
