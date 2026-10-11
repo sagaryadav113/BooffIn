@@ -247,6 +247,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const deleteWorkspaceLocally = useWorkspaceStore((s) => s.deleteWorkspaceLocally);
   const deleteCommunityPermanently = useWorkspaceStore((s) => s.deleteCommunityPermanently);
   const leaveAndRemoveCommunity = useWorkspaceStore((s) => s.leaveAndRemoveCommunity);
+  const markAsRead = useWorkspaceStore((s) => s.markAsRead);
 
   // Workspaces for forwarding
   const dms = useWorkspaceStore((s) => s.dms);
@@ -443,6 +444,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     loadMembers(workspace.id);
     loadEvents(workspace.id);
     loadBlocks(workspace.id);
+    markAsRead(workspace.id);
 
     const unsubscribe = subscribeToWorkspaceMessages(workspace.id);
     return () => {
@@ -460,14 +462,17 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     }
   }, [messages.length, isMessagesLoading]);
 
-  // Auto-scroll when new messages arrive if user is near bottom
+  // Auto-scroll and mark read when new messages arrive if user is in chat
   useEffect(() => {
-    if (messages.length > 0 && hasInitialScrolledRef.current && isAtBottomRef.current) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 80);
+    if (messages.length > 0) {
+      markAsRead(workspace.id);
+      if (hasInitialScrolledRef.current && isAtBottomRef.current) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }
     }
-  }, [messages.length]);
+  }, [messages.length, workspace.id]);
 
   const handleTextChange = (text: string) => {
     setInputText(text);

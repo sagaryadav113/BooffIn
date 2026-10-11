@@ -309,14 +309,17 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     }
   }, [messages.length, isMessagesLoading]);
 
-  // Auto-scroll when new messages arrive if user is near bottom
+  // Auto-scroll and mark read when new messages arrive if user is in chat
   useEffect(() => {
-    if (messages.length > 0 && hasInitialScrolledRef.current && isAtBottomRef.current) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 80);
+    if (messages.length > 0) {
+      markAsRead(workspace.id);
+      if (hasInitialScrolledRef.current && isAtBottomRef.current) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }
     }
-  }, [messages.length]);
+  }, [messages.length, workspace.id]);
 
   // Workspaces for Forwarding
   const dms = useWorkspaceStore((s) => s.dms);

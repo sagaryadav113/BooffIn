@@ -21,6 +21,7 @@ import { Workspace } from '../../types/workspace';
 
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 
 interface WorkspaceCardProps {
   workspace: Workspace;
@@ -37,6 +38,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
 
   const handlePress = () => {
+    useWorkspaceStore.getState().markAsRead(workspace.id);
     if (onPress) {
       onPress();
     } else {
@@ -275,16 +277,17 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   unreadBadge: {
-    backgroundColor: '#164E3F',
-    width: 20,
+    backgroundColor: '#064E3B',
+    minWidth: 20,
     height: 20,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
   unreadBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   presenceDot: {

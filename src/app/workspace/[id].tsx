@@ -8,6 +8,7 @@ import { WorkspaceDMView } from '../../components/workspace/WorkspaceDMView';
 import { WorkspaceCommunityView } from '../../components/workspace/WorkspaceCommunityView';
 import { WorkspaceInnerCircleView } from '../../components/workspace/WorkspaceInnerCircleView';
 import { workspaceService } from '../../api/workspaceService';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Workspace } from '../../types/workspace';
 
@@ -29,6 +30,7 @@ export default function DynamicWorkspaceScreen() {
         setError(res.error || 'Workspace not found');
       } else {
         setWorkspace(res.workspace);
+        useWorkspaceStore.getState().markAsRead(id);
       }
       setIsLoading(false);
     }

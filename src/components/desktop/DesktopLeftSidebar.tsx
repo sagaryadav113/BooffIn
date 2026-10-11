@@ -33,6 +33,8 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
   const pathname = usePathname();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const workspaceUnread = useWorkspaceStore((s) => s.unreadTotal);
+  const dms = useWorkspaceStore((s) => s.dms);
+  const totalDMsUnread = dms.reduce((acc, d) => acc + (d.unread_count || 0), 0);
   const currentUser = useAuthStore((s) => s.user);
   const { hasNativePrompt, promptInstall } = usePWAInstall();
   const [showInstallModal, setShowInstallModal] = useState(false);
@@ -104,6 +106,7 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
       id: 'messages',
       label: 'Messages',
       icon: Mail,
+      badge: totalDMsUnread,
       isActive: false,
       onPress: () => {
         if (onOpenMessages) {
@@ -308,7 +311,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   navBadge: {
-    backgroundColor: '#DC2626',
+    backgroundColor: '#064E3B',
     borderRadius: 8,
     minWidth: 18,
     height: 18,

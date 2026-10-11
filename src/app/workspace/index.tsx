@@ -72,6 +72,7 @@ export default function WorkspaceHubScreen() {
   const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
   const joinCommunity = useWorkspaceStore((s) => s.joinCommunity);
   const subscribeToGlobalWorkspaceUpdates = useWorkspaceStore((s) => s.subscribeToGlobalWorkspaceUpdates);
+  const markAsRead = useWorkspaceStore((s) => s.markAsRead);
 
   // Active Mobile / Desktop Tab: Strictly 3 Tabs
   const [activeTab, setActiveTab] = useState<WorkspaceTabType>('dm');
@@ -152,6 +153,22 @@ export default function WorkspaceHubScreen() {
   const totalDMsUnread = dms.reduce((acc, d) => acc + (d.unread_count || 0), 0);
   const totalCommsUnread = communities.reduce((acc, c) => acc + (c.unread_count || 0), 0);
   const totalInnersUnread = innerCircles.reduce((acc, i) => acc + (i.unread_count || 0), 0);
+
+  const handleSelectWorkspace = useCallback((wsId: string) => {
+    markAsRead(wsId);
+    if (isDesktop) {
+      setSelectedWorkspaceId(wsId);
+    } else {
+      router.push(`/workspace/${wsId}` as any);
+    }
+  }, [isDesktop, markAsRead]);
+
+  // Auto-clear unread notification when workspace is viewed in the canvas
+  useEffect(() => {
+    if (selectedWorkspace?.id && (selectedWorkspace.unread_count || 0) > 0) {
+      markAsRead(selectedWorkspace.id);
+    }
+  }, [selectedWorkspace?.id, selectedWorkspace?.unread_count, markAsRead]);
 
   const [isDMsMuted, setIsDMsMuted] = useState(false);
 
@@ -427,13 +444,7 @@ export default function WorkspaceHubScreen() {
     return (
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => {
-          if (isDesktop) {
-            setSelectedWorkspaceId(item.id);
-          } else {
-            router.push(`/workspace/${item.id}` as any);
-          }
-        }}
+        onPress={() => handleSelectWorkspace(item.id)}
         style={[styles.communityRow, isDisabled && styles.communityRowDisabled]}
       >
         <Avatar
@@ -456,9 +467,18 @@ export default function WorkspaceHubScreen() {
           <Text style={[styles.communitySnippet, isDisabled && styles.communitySnippetDisabled]} numberOfLines={2}>
             {item.description || 'Join our research group discussion and paper reviews.'}
           </Text>
-          <Text style={[styles.communityMeta, isDisabled && styles.communityMetaDisabled]}>
-            {item.members_count || 1} {item.members_count === 1 ? 'member' : 'members'}
-          </Text>
+          <View style={styles.communityMetaRow}>
+            <Text style={[styles.communityMeta, isDisabled && styles.communityMetaDisabled]}>
+              {item.members_count || 1} {item.members_count === 1 ? 'member' : 'members'}
+            </Text>
+            {isJoined && item.unread_count !== undefined && item.unread_count > 0 && (
+              <View style={styles.unreadPill}>
+                <Text style={styles.unreadPillText}>
+                  {item.unread_count > 99 ? '99+' : item.unread_count}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {isDisabled ? (
@@ -489,13 +509,7 @@ export default function WorkspaceHubScreen() {
     return (
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => {
-          if (isDesktop) {
-            setSelectedWorkspaceId(item.id);
-          } else {
-            router.push(`/workspace/${item.id}` as any);
-          }
-        }}
+        onPress={() => handleSelectWorkspace(item.id)}
         style={styles.innerCircleRow}
       >
         <Avatar uri={item.avatar_url || undefined} name={item.name} size="md" />
@@ -516,7 +530,9 @@ export default function WorkspaceHubScreen() {
             </Text>
             {unreadCount > 0 && (
               <View style={styles.unreadPill}>
-                <Text style={styles.unreadPillText}>{unreadCount}</Text>
+                <Text style={styles.unreadPillText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
               </View>
             )}
           </View>
@@ -536,11 +552,13 @@ export default function WorkspaceHubScreen() {
         <View style={styles.tabIconWrapper}>
           <MessageSquare
             size={22}
-            color={activeTab === 'dm' ? '#164E3F' : '#94A3B8'}
+            color={activeTab === 'dm' ? '#064E3B' : '#94A3B8'}
           />
           {totalDMsUnread > 0 && (
             <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{totalDMsUnread}</Text>
+              <Text style={styles.tabBadgeText}>
+                {totalDMsUnread > 99 ? '99+' : totalDMsUnread}
+              </Text>
             </View>
           )}
         </View>
@@ -557,11 +575,13 @@ export default function WorkspaceHubScreen() {
         <View style={styles.tabIconWrapper}>
           <Users
             size={22}
-            color={activeTab === 'community' ? '#164E3F' : '#94A3B8'}
+            color={activeTab === 'community' ? '#064E3B' : '#94A3B8'}
           />
           {totalCommsUnread > 0 && (
             <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{totalCommsUnread}</Text>
+              <Text style={styles.tabBadgeText}>
+                {totalCommsUnread > 99 ? '99+' : totalCommsUnread}
+              </Text>
             </View>
           )}
         </View>
@@ -578,11 +598,13 @@ export default function WorkspaceHubScreen() {
         <View style={styles.tabIconWrapper}>
           <Shield
             size={22}
-            color={activeTab === 'inner_circle' ? '#164E3F' : '#94A3B8'}
+            color={activeTab === 'inner_circle' ? '#064E3B' : '#94A3B8'}
           />
           {totalInnersUnread > 0 && (
             <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>{totalInnersUnread}</Text>
+              <Text style={styles.tabBadgeText}>
+                {totalInnersUnread > 99 ? '99+' : totalInnersUnread}
+              </Text>
             </View>
           )}
         </View>
@@ -648,15 +670,24 @@ export default function WorkspaceHubScreen() {
               accessibilityLabel="Direct Messages"
             >
               <View style={styles.railIconWrap}>
-                <MessageSquare size={18} color={activeTab === 'dm' ? '#164E3F' : '#64748B'} />
+                <MessageSquare size={18} color={activeTab === 'dm' ? '#064E3B' : '#64748B'} />
                 {isLeftRailCollapsed && totalDMsUnread > 0 && (
-                  <View style={styles.miniBadgeDot} />
+                  <View style={styles.railBadgeCollapsed}>
+                    <Text style={styles.railBadgeTextCollapsed}>{totalDMsUnread > 99 ? '99+' : totalDMsUnread}</Text>
+                  </View>
                 )}
               </View>
               {!isLeftRailCollapsed && (
-                <Text style={[styles.desktopRailTabText, activeTab === 'dm' && styles.desktopRailTabTextActive]}>
-                  Direct Messages ({dms.length})
-                </Text>
+                <View style={styles.railTabLabelRow}>
+                  <Text style={[styles.desktopRailTabText, activeTab === 'dm' && styles.desktopRailTabTextActive]}>
+                    Direct Messages
+                  </Text>
+                  {totalDMsUnread > 0 && (
+                    <View style={styles.railBadge}>
+                      <Text style={styles.railBadgeText}>{totalDMsUnread > 99 ? '99+' : totalDMsUnread}</Text>
+                    </View>
+                  )}
+                </View>
               )}
             </TouchableOpacity>
 
@@ -670,15 +701,24 @@ export default function WorkspaceHubScreen() {
               accessibilityLabel="Communities"
             >
               <View style={styles.railIconWrap}>
-                <Users size={18} color={activeTab === 'community' ? '#164E3F' : '#64748B'} />
+                <Users size={18} color={activeTab === 'community' ? '#064E3B' : '#64748B'} />
                 {isLeftRailCollapsed && totalCommsUnread > 0 && (
-                  <View style={styles.miniBadgeDot} />
+                  <View style={styles.railBadgeCollapsed}>
+                    <Text style={styles.railBadgeTextCollapsed}>{totalCommsUnread > 99 ? '99+' : totalCommsUnread}</Text>
+                  </View>
                 )}
               </View>
               {!isLeftRailCollapsed && (
-                <Text style={[styles.desktopRailTabText, activeTab === 'community' && styles.desktopRailTabTextActive]}>
-                  Communities ({communities.length})
-                </Text>
+                <View style={styles.railTabLabelRow}>
+                  <Text style={[styles.desktopRailTabText, activeTab === 'community' && styles.desktopRailTabTextActive]}>
+                    Communities
+                  </Text>
+                  {totalCommsUnread > 0 && (
+                    <View style={styles.railBadge}>
+                      <Text style={styles.railBadgeText}>{totalCommsUnread > 99 ? '99+' : totalCommsUnread}</Text>
+                    </View>
+                  )}
+                </View>
               )}
             </TouchableOpacity>
 
@@ -692,15 +732,24 @@ export default function WorkspaceHubScreen() {
               accessibilityLabel="Inner Circles"
             >
               <View style={styles.railIconWrap}>
-                <Shield size={18} color={activeTab === 'inner_circle' ? '#164E3F' : '#64748B'} />
+                <Shield size={18} color={activeTab === 'inner_circle' ? '#064E3B' : '#64748B'} />
                 {isLeftRailCollapsed && totalInnersUnread > 0 && (
-                  <View style={styles.miniBadgeDot} />
+                  <View style={styles.railBadgeCollapsed}>
+                    <Text style={styles.railBadgeTextCollapsed}>{totalInnersUnread > 99 ? '99+' : totalInnersUnread}</Text>
+                  </View>
                 )}
               </View>
               {!isLeftRailCollapsed && (
-                <Text style={[styles.desktopRailTabText, activeTab === 'inner_circle' && styles.desktopRailTabTextActive]}>
-                  Inner Circles ({innerCircles.length})
-                </Text>
+                <View style={styles.railTabLabelRow}>
+                  <Text style={[styles.desktopRailTabText, activeTab === 'inner_circle' && styles.desktopRailTabTextActive]}>
+                    Inner Circles
+                  </Text>
+                  {totalInnersUnread > 0 && (
+                    <View style={styles.railBadge}>
+                      <Text style={styles.railBadgeText}>{totalInnersUnread > 99 ? '99+' : totalInnersUnread}</Text>
+                    </View>
+                  )}
+                </View>
               )}
             </TouchableOpacity>
 
@@ -756,7 +805,7 @@ export default function WorkspaceHubScreen() {
                     : ({ item }) => (
                         <WorkspaceCard
                           workspace={item}
-                          onPress={() => setSelectedWorkspaceId(item.id)}
+                          onPress={() => handleSelectWorkspace(item.id)}
                         />
                       )
                 }
@@ -839,7 +888,12 @@ export default function WorkspaceHubScreen() {
                       ? renderCommunityItem
                       : activeTab === 'inner_circle'
                       ? renderInnerCircleItem
-                      : ({ item }) => <WorkspaceCard workspace={item} />
+                      : ({ item }) => (
+                          <WorkspaceCard
+                            workspace={item}
+                            onPress={() => handleSelectWorkspace(item.id)}
+                          />
+                        )
                   }
                   refreshControl={
                     <RefreshControl
@@ -1155,17 +1209,24 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  communityMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
   unreadPill: {
-    backgroundColor: '#164E3F',
-    width: 20,
+    backgroundColor: '#064E3B',
+    minWidth: 20,
     height: 20,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
   unreadPillText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   bottomTabBar: {
@@ -1195,14 +1256,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -8,
-    backgroundColor: '#164E3F',
+    backgroundColor: '#064E3B',
     borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 4,
     paddingVertical: 1,
   },
   tabBadgeText: {
     fontSize: 9,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   tabLabel: {
@@ -1342,8 +1407,45 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   desktopRailTabTextActive: {
-    color: '#164E3F',
+    color: '#064E3B',
     fontWeight: '700',
+  },
+  railTabLabelRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  railBadge: {
+    backgroundColor: '#064E3B',
+    borderRadius: 8,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  railBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  railBadgeCollapsed: {
+    position: 'absolute',
+    top: -5,
+    right: -7,
+    backgroundColor: '#064E3B',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  railBadgeTextCollapsed: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   desktopNewBtn: {
     flexDirection: 'row',

@@ -214,6 +214,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const setMuteWorkspace = useWorkspaceStore((s) => s.setMuteWorkspace);
   const clearChatHistory = useWorkspaceStore((s) => s.clearChatHistory);
   const deleteWorkspaceLocally = useWorkspaceStore((s) => s.deleteWorkspaceLocally);
+  const markAsRead = useWorkspaceStore((s) => s.markAsRead);
 
   // All workspaces for Forwarding and Workspace Invites
   const dms = useWorkspaceStore((s) => s.dms);
@@ -448,6 +449,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   useEffect(() => {
     hasInitialScrolledRef.current = false;
     loadMessages(workspace.id);
+    markAsRead(workspace.id);
     const unsubscribe = subscribeToWorkspaceMessages(workspace.id);
     return () => {
       unsubscribe();
@@ -464,14 +466,17 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     }
   }, [messages.length, isMessagesLoading]);
 
-  // Auto-scroll when new messages arrive if user is at the bottom
+  // Auto-scroll and mark read when new messages arrive if user is in chat
   useEffect(() => {
-    if (messages.length > 0 && hasInitialScrolledRef.current && isAtBottomRef.current) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 80);
+    if (messages.length > 0) {
+      markAsRead(workspace.id);
+      if (hasInitialScrolledRef.current && isAtBottomRef.current) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }
     }
-  }, [messages.length]);
+  }, [messages.length, workspace.id]);
 
   // E2EE Auto-Decryption Effect for incoming encrypted ciphertexts
   useEffect(() => {

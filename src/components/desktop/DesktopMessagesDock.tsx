@@ -73,6 +73,7 @@ export const DesktopMessagesDock: React.FC = () => {
   }, [activeTab, dms, communities, innerCircles, searchQuery]);
 
   const handleOpenWorkspace = (workspaceId: string) => {
+    useWorkspaceStore.getState().markAsRead(workspaceId);
     router.push(`/workspace/${workspaceId}` as any);
   };
 
