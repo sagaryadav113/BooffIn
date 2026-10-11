@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaInsetsContext, EdgeInsets } from 'react-native-safe-area-context';
 import { colors, shadows } from '../theme';
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary';
 import { useAuthStore } from '../store/useAuthStore';
@@ -131,19 +131,122 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <ErrorBoundary>
-        {isDesktop ? (
-          <DesktopLayoutShell>{stackContent}</DesktopLayoutShell>
-        ) : (
-          <View style={styles.outerContainer}>
-            <View style={styles.mobileFrame}>
-              {stackContent}
+      <WebSafeAreaInsetsWrapper>
+        <StatusBar style="dark" />
+        <ErrorBoundary>
+          {isDesktop ? (
+            <DesktopLayoutShell>{stackContent}</DesktopLayoutShell>
+          ) : (
+            <View style={styles.outerContainer}>
+              <View style={styles.mobileFrame}>
+                {stackContent}
+              </View>
             </View>
-          </View>
-        )}
-      </ErrorBoundary>
+          )}
+        </ErrorBoundary>
+      </WebSafeAreaInsetsWrapper>
     </SafeAreaProvider>
+  );
+}
+
+function WebSafeAreaInsetsWrapper({ children }: { children: React.ReactNode }) {
+  const currentInsets = React.useContext(SafeAreaInsetsContext);
+  const [windowDimensions, setWindowDimensions] = React.useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0,
+  }));
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setWindowDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
+  const resolvedInsets = React.useMemo<EdgeInsets | null>(() => {
+    if (Platform.OS !== 'web') {
+      return currentInsets;
+    }
+
+    if (typeof window === 'undefined') {
+      return currentInsets || { top: 0, bottom: 0, left: 0, right: 0 };
+    }
+
+    const width = windowDimensions.width || window.innerWidth || 0;
+    const isMobileWidth = width < 768;
+
+    // Detect iOS devices (iPhone, iPad, iPod)
+    const isIos =
+      typeof navigator !== 'undefined' &&
+      (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+    // Probe CSS env safe-area-inset if available in browser
+    let cssTop = 0;
+    let cssBottom = 0;
+    try {
+      const probe = document.createElement('div');
+      probe.style.position = 'fixed';
+      probe.style.visibility = 'hidden';
+      probe.style.top = '0';
+      probe.style.left = '0';
+      probe.style.paddingTop = 'env(safe-area-inset-top, 0px)';
+      probe.style.paddingBottom = 'env(safe-area-inset-bottom, 0px)';
+      document.body.appendChild(probe);
+      const computed = window.getComputedStyle(probe);
+      cssTop = parseInt(computed.paddingTop, 10) || 0;
+      cssBottom = parseInt(computed.paddingBottom, 10) || 0;
+      document.body.removeChild(probe);
+    } catch {}
+
+    const isStandalone =
+      Boolean((window.navigator as any)?.standalone) ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+
+    let topInset = currentInsets?.top || 0;
+    let bottomInset = currentInsets?.bottom || 0;
+
+    if (cssTop > 0) {
+      topInset = Math.max(topInset, cssTop);
+    } else if (isIos && isMobileWidth) {
+      // In iOS Safari on mobile devices, provide status bar clearance so header doesn't overlap clock/notch
+      topInset = Math.max(topInset, 47);
+    }
+
+    if (cssBottom > 0) {
+      bottomInset = Math.max(bottomInset, cssBottom);
+    } else if (isIos && isStandalone && isMobileWidth) {
+      // Home indicator bar in standalone PWA mode
+      bottomInset = Math.max(bottomInset, 34);
+    }
+
+    return {
+      top: topInset,
+      bottom: bottomInset,
+      left: currentInsets?.left || 0,
+      right: currentInsets?.right || 0,
+    };
+  }, [currentInsets, windowDimensions]);
+
+  if (!resolvedInsets || Platform.OS !== 'web') {
+    return <>{children}</>;
+  }
+
+  return (
+    <SafeAreaInsetsContext.Provider value={resolvedInsets}>
+      {children}
+    </SafeAreaInsetsContext.Provider>
   );
 }
 
@@ -161,7 +264,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     ...(Platform.OS === 'web'
       ? {
-          minHeight: '100vh' as any,
+          minHeight: '100dvh' as any,
           borderLeftWidth: 1,
           borderRightWidth: 1,
           borderColor: colors.border,

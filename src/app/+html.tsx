@@ -62,9 +62,16 @@ export default function Root({ children }: PropsWithChildren) {
         <style
           dangerouslySetInnerHTML={{
             __html: `
+              :root {
+                --sat: env(safe-area-inset-top, 0px);
+                --sab: env(safe-area-inset-bottom, 0px);
+                --sal: env(safe-area-inset-left, 0px);
+                --sar: env(safe-area-inset-right, 0px);
+              }
               html, body {
                 width: 100%;
                 height: 100%;
+                height: 100dvh;
                 margin: 0;
                 padding: 0;
                 overflow: hidden;
@@ -76,6 +83,7 @@ export default function Root({ children }: PropsWithChildren) {
               #root {
                 width: 100%;
                 height: 100%;
+                height: 100dvh;
                 overflow: hidden;
                 display: flex;
               }
