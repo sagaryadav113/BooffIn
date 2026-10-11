@@ -147,6 +147,24 @@ export async function reportContent(
       return { success: false, error: 'Authentication required to submit a report.' };
     }
 
+    if (params.reportedType === 'profile' && params.reportedId === currentUserId) {
+      return { success: false, error: 'Cannot report yourself.' };
+    }
+
+    // Check for existing pending report to avoid spam
+    const { data: existingReport } = await supabase
+      .from('reports')
+      .select('id')
+      .eq('reporter_id', currentUserId)
+      .eq('reported_type', params.reportedType)
+      .eq('reported_id', params.reportedId)
+      .eq('status', 'pending')
+      .maybeSingle();
+
+    if (existingReport) {
+      return { success: true, error: null };
+    }
+
     const { data, error } = await supabase
       .from('reports')
       .insert({

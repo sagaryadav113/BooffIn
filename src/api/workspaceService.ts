@@ -554,6 +554,20 @@ export const workspaceService = {
       } = await supabase.auth.getUser();
       if (!currentUser) return { workspaceId: null, error: 'User not authenticated' };
 
+      // Safety Hardening: Verify neither user has blocked the other
+      const { data: blockRecords } = await supabase
+        .from('user_blocks')
+        .select('id')
+        .or(`and(blocker_id.eq.${currentUser.id},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${currentUser.id})`)
+        .limit(1);
+
+      if (blockRecords && blockRecords.length > 0) {
+        return {
+          workspaceId: null,
+          error: 'Cannot start a direct message: one of the users has blocked communications.',
+        };
+      }
+
       // 1. Try atomic database RPC with p_target_user_id
       let { data, error } = await supabase.rpc('get_or_create_dm_workspace', {
         p_target_user_id: targetUserId,
@@ -864,10 +878,19 @@ export const workspaceService = {
         },
       ];
 
-      // 3. Insert all initial invited members
+      // 3. Insert all initial invited members (excluding blocked users)
       if (Array.isArray(params.member_ids) && params.member_ids.length > 0) {
+        const { data: blocks } = await supabase
+          .from('user_blocks')
+          .select('blocker_id, blocked_id')
+          .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+        const blockedSet = new Set<string>();
+        blocks?.forEach((b: any) => {
+          blockedSet.add(b.blocker_id === user.id ? b.blocked_id : b.blocker_id);
+        });
+
         for (const mid of params.member_ids) {
-          if (mid && mid !== user.id) {
+          if (mid && mid !== user.id && !blockedSet.has(mid)) {
             membersToInsert.push({
               workspace_id: ws.id,
               user_id: mid,
@@ -902,6 +925,18 @@ export const workspaceService = {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return { success: false, error: 'User not authenticated' };
+
+      // Safety Hardening: Verify user is not banned from this community
+      const { data: existingMember } = await supabase
+        .from('workspace_members')
+        .select('status')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existingMember && existingMember.status === 'banned') {
+        return { success: false, error: 'You are banned from joining this community.' };
+      }
 
       const { error } = await supabase.from('workspace_members').upsert(
         {
@@ -1367,7 +1402,7 @@ export const workspaceService = {
       // Block sending messages to a disabled/archived workspace
       const { data: targetWs } = await supabase
         .from('workspaces')
-        .select('id, is_disabled, status, settings')
+        .select('id, type, is_disabled, status, settings')
         .eq('id', params.workspace_id)
         .single();
 
@@ -1382,6 +1417,46 @@ export const workspaceService = {
           error:
             'This community has been permanently disabled and is preserved in read-only mode. New messages cannot be sent.',
         };
+      }
+
+      // Safety Hardening: Verify sender is not banned from this workspace
+      const { data: memberStatus } = await supabase
+        .from('workspace_members')
+        .select('status')
+        .eq('workspace_id', params.workspace_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (memberStatus && memberStatus.status === 'banned') {
+        return {
+          message: null,
+          error: 'You have been banned from this workspace and cannot post messages.',
+        };
+      }
+
+      // If DM, verify neither user has blocked the other
+      if (targetWs && (targetWs as any).type === 'dm') {
+        const { data: otherMember } = await supabase
+          .from('workspace_members')
+          .select('user_id')
+          .eq('workspace_id', params.workspace_id)
+          .neq('user_id', user.id)
+          .maybeSingle();
+
+        if (otherMember?.user_id) {
+          const { data: blockRecords } = await supabase
+            .from('user_blocks')
+            .select('id')
+            .or(`and(blocker_id.eq.${user.id},blocked_id.eq.${otherMember.user_id}),and(blocker_id.eq.${otherMember.user_id},blocked_id.eq.${user.id})`)
+            .limit(1);
+
+          if (blockRecords && blockRecords.length > 0) {
+            return {
+              message: null,
+              error: 'Cannot send message: communications with this user are blocked.',
+            };
+          }
+        }
       }
 
       let resolvedDoiMeta = params.doi_metadata || null;
@@ -2233,6 +2308,17 @@ export const workspaceService = {
       } = await supabase.auth.getUser();
       if (!user) return { success: false, error: 'User not authenticated' };
 
+      // Safety Hardening: Verify block status
+      const { data: blockRecords } = await supabase
+        .from('user_blocks')
+        .select('id')
+        .or(`and(blocker_id.eq.${user.id},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${user.id})`)
+        .limit(1);
+
+      if (blockRecords && blockRecords.length > 0) {
+        return { success: false, error: 'Cannot invite researcher due to active block settings.' };
+      }
+
       // 1. Try atomic RPC
       const { data: rpcRes, error: rpcErr } = await supabase.rpc('invite_inner_circle_member', {
         p_workspace_id: workspaceId,
@@ -2291,6 +2377,22 @@ export const workspaceService = {
     role: 'member' | 'moderator' | 'admin' = 'member'
   ): Promise<{ success: boolean; error: string | null }> {
     try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { success: false, error: 'User not authenticated' };
+
+      // Safety Hardening: Verify block status
+      const { data: blockRecords } = await supabase
+        .from('user_blocks')
+        .select('id')
+        .or(`and(blocker_id.eq.${user.id},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${user.id})`)
+        .limit(1);
+
+      if (blockRecords && blockRecords.length > 0) {
+        return { success: false, error: 'Cannot add researcher due to active block settings.' };
+      }
+
       const { error } = await supabase.from('workspace_members').upsert(
         {
           workspace_id: workspaceId,
@@ -2318,6 +2420,17 @@ export const workspaceService = {
     inviterId: string
   ): Promise<{ success: boolean; error: string | null }> {
     try {
+      // Safety check: verify neither party has blocked the other
+      const { data: blockRecords } = await supabase
+        .from('user_blocks')
+        .select('id')
+        .or(`and(blocker_id.eq.${inviterId},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${inviterId})`)
+        .limit(1);
+
+      if (blockRecords && blockRecords.length > 0) {
+        return { success: false, error: 'Cannot send invitation: communication with this researcher is blocked.' };
+      }
+
       // 1. Get or create 1-to-1 DM workspace
       const canonicalKey = [inviterId, targetUserId].sort().join(':');
       let dmWorkspaceId: string | null = null;
@@ -2632,6 +2745,27 @@ export const workspaceService = {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return { success: false, error: 'User not authenticated' };
+
+      // Ensure caller is owner or admin of the workspace
+      const { data: callerMember } = await supabase
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const { data: ws } = await supabase
+        .from('workspaces')
+        .select('owner_id, creator_id')
+        .eq('id', workspaceId)
+        .maybeSingle();
+
+      const isOwner = ws?.owner_id === user.id || ws?.creator_id === user.id;
+      const isAdmin = callerMember?.role === 'admin' || callerMember?.role === 'owner';
+
+      if (!isOwner && !isAdmin) {
+        return { success: false, error: 'Only workspace administrators can ban members.' };
+      }
 
       // 1. Insert into workspace_blocks
       await supabase.from('workspace_blocks').upsert({

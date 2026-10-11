@@ -1,4 +1,4 @@
-export type ReportType = 'post' | 'comment' | 'profile' | 'system_issue';
+export type ReportType = 'post' | 'comment' | 'profile' | 'system_issue' | 'workspace' | 'workspace_message';
 export type ReportReason = 'spam' | 'harassment' | 'misinformation' | 'inappropriate' | 'copyright' | 'other' | string;
 export type ReportStatus = 'pending' | 'reviewed' | 'dismissed' | 'actioned';
 
