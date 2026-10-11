@@ -54,6 +54,8 @@ import { Avatar } from '../../components/core/Avatar';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { CommentCard } from '../../components/cards/CommentCard';
 import { SaveButton } from '../../components/core/SaveButton';
+import { ShareToChatButton } from '../../components/core/ShareToChatButton';
+import { SharePostToWorkspaceModal } from '../../components/modals/SharePostToWorkspaceModal';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
@@ -118,6 +120,7 @@ export default function PaperDetailScreen() {
 
   const scrollViewRef = React.useRef<ScrollView>(null);
   const [paperMetrics, setPaperMetrics] = useState<PaperMetrics | null>(null);
+  const [isShareToWorkspaceOpen, setIsShareToWorkspaceOpen] = useState(false);
 
   // Stable Post & Comments Store Selectors
   const getCommentsForPost = usePostStore((s) => s.getCommentsForPost);
@@ -1290,12 +1293,11 @@ export default function PaperDetailScreen() {
                   </Typography>
                 </View>
 
-                <View style={styles.interactionItem}>
-                  <TrendingUp size={18} color={colors.textSecondary} />
-                  <Typography variant="captionMedium" color={colors.textSecondary}>
-                    {paper.citationCount || 18} Citations
-                  </Typography>
-                </View>
+                <ShareToChatButton
+                  onPress={() => setIsShareToWorkspaceOpen(true)}
+                  size={18}
+                  style={styles.interactionItem}
+                />
 
                 <TouchableOpacity
                   onPress={handleShare}
@@ -1415,6 +1417,14 @@ export default function PaperDetailScreen() {
       )}
     </ScrollView>
   )}
+      {/* Share to Workspace Modal (In-app DM, Community, Inner Circle) */}
+      {isShareToWorkspaceOpen && paper && (
+        <SharePostToWorkspaceModal
+          visible={isShareToWorkspaceOpen}
+          onClose={() => setIsShareToWorkspaceOpen(false)}
+          paper={paper}
+        />
+      )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

@@ -29,7 +29,8 @@ import {
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Post } from '../../types';
-import { Workspace, WorkspacePostMetadata } from '../../types/workspace';
+import { Paper } from '../../types/paper';
+import { Workspace, WorkspacePostMetadata, DoiMetadata } from '../../types/workspace';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
@@ -40,7 +41,8 @@ import { searchBooffInUsers } from '../../api/search/providers/userSearchProvide
 export interface SharePostToWorkspaceModalProps {
   visible: boolean;
   onClose: () => void;
-  post: Post;
+  post?: Post;
+  paper?: Paper;
 }
 
 type TabType = 'all' | 'dms' | 'communities' | 'inner_circles';
@@ -59,6 +61,7 @@ export const SharePostToWorkspaceModal: React.FC<SharePostToWorkspaceModalProps>
   visible,
   onClose,
   post,
+  paper,
 }) => {
   const currentUser = useAuthStore((s) => s.user);
   const dms = useWorkspaceStore((s) => s.dms);
@@ -76,9 +79,13 @@ export const SharePostToWorkspaceModal: React.FC<SharePostToWorkspaceModalProps>
   const [sentMap, setSentMap] = useState<Record<string, boolean>>({});
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
-  const postDisplayTitle = useMemo(() => {
-    return post.article?.title || post.paper?.title || (post.content ? post.content.slice(0, 80) : 'BooffIn Post');
-  }, [post]);
+  const displayTitle = useMemo(() => {
+    if (paper) return paper.title;
+    if (post) {
+      return post.article?.title || post.paper?.title || (post.content ? post.content.slice(0, 80) : 'BooffIn Post');
+    }
+    return 'BooffIn Content';
+  }, [post, paper]);
 
   // Load workspaces on modal mount/open if empty
   useEffect(() => {
@@ -250,31 +257,71 @@ export const SharePostToWorkspaceModal: React.FC<SharePostToWorkspaceModalProps>
         return;
       }
 
-      // Prepare rich post metadata
-      const postSnippet = post.content ? post.content.slice(0, 180) : '';
-      const postMeta: WorkspacePostMetadata = {
-        id: post.id,
-        title: postDisplayTitle,
-        author_name: post.author?.fullName || 'BooffIn Researcher',
-        author_avatar: post.author?.avatarUrl || null,
-        snippet: postSnippet,
-        upvotes: post.likesCount || 0,
-        tags: post.topics || [],
-      };
+      if (paper) {
+        // Prepare rich DOI / paper metadata
+        const authorsList = (paper.authors || []).map((a: any) => ({
+          name: typeof a === 'string' ? a : (a?.name || 'Author'),
+          orcid: typeof a === 'object' ? a?.orcid : undefined,
+        }));
 
-      const customContent = messageNote.trim()
-        ? `${messageNote.trim()}\n\nShared post: "${postDisplayTitle}"`
-        : `Shared a post: "${postDisplayTitle}"`;
+        const doiMeta: DoiMetadata = {
+          doi: paper.doi || '',
+          title: paper.title,
+          authors: authorsList,
+          publicationYear: paper.publicationYear,
+          journal: typeof paper.journal === 'string' ? paper.journal : ((paper.journal as any)?.name || undefined),
+          url: paper.canonicalUrl || paper.openAccessUrl,
+          abstract: paper.abstract,
+          citationCount: paper.citationCount,
+        };
 
-      const res = await sendMessage({
-        workspace_id: workspaceId,
-        content: customContent,
-        message_type: 'post',
-        post_metadata: postMeta,
-      });
+        const customContent = messageNote.trim()
+          ? `${messageNote.trim()}\n\nShared paper: "${paper.title}"`
+          : `Shared a research paper: "${paper.title}"`;
 
-      if (!res.success) {
-        setErrorBanner(res.error || 'Failed to share post to workspace.');
+        const res = await sendMessage({
+          workspace_id: workspaceId,
+          content: customContent,
+          message_type: 'paper_doi',
+          doi_metadata: doiMeta,
+        });
+
+        if (!res.success) {
+          setErrorBanner(res.error || 'Failed to share paper to workspace.');
+          setSendingMap((prev) => ({ ...prev, [item.id]: false }));
+          return;
+        }
+      } else if (post) {
+        // Prepare rich post metadata
+        const postSnippet = post.content ? post.content.slice(0, 180) : '';
+        const postMeta: WorkspacePostMetadata = {
+          id: post.id,
+          title: displayTitle,
+          author_name: post.author?.fullName || 'BooffIn Researcher',
+          author_avatar: post.author?.avatarUrl || null,
+          snippet: postSnippet,
+          upvotes: post.likesCount || 0,
+          tags: post.topics || [],
+        };
+
+        const customContent = messageNote.trim()
+          ? `${messageNote.trim()}\n\nShared post: "${displayTitle}"`
+          : `Shared a post: "${displayTitle}"`;
+
+        const res = await sendMessage({
+          workspace_id: workspaceId,
+          content: customContent,
+          message_type: 'post',
+          post_metadata: postMeta,
+        });
+
+        if (!res.success) {
+          setErrorBanner(res.error || 'Failed to share post to workspace.');
+          setSendingMap((prev) => ({ ...prev, [item.id]: false }));
+          return;
+        }
+      } else {
+        setErrorBanner('No content to share.');
         setSendingMap((prev) => ({ ...prev, [item.id]: false }));
         return;
       }
@@ -286,7 +333,7 @@ export const SharePostToWorkspaceModal: React.FC<SharePostToWorkspaceModalProps>
       setSentMap((prev) => ({ ...prev, [item.id]: true }));
       setSendingMap((prev) => ({ ...prev, [item.id]: false }));
     } catch (err: any) {
-      setErrorBanner(err?.message || 'Error occurred while sharing post.');
+      setErrorBanner(err?.message || (paper ? 'Error occurred while sharing paper.' : 'Error occurred while sharing post.'));
       setSendingMap((prev) => ({ ...prev, [item.id]: false }));
     }
   };
@@ -373,7 +420,7 @@ export const SharePostToWorkspaceModal: React.FC<SharePostToWorkspaceModalProps>
         </View>
       );
     },
-    [sendingMap, sentMap, messageNote, post, postDisplayTitle]
+    [sendingMap, sentMap, messageNote, post, paper, displayTitle]
   );
 
   return (
@@ -423,23 +470,38 @@ export const SharePostToWorkspaceModal: React.FC<SharePostToWorkspaceModalProps>
             </View>
           ) : null}
 
-          {/* Post Preview Snippet */}
+          {/* Post / Paper Preview Snippet */}
           <View style={styles.previewCard}>
-            <View style={styles.previewHeaderRow}>
-              <Avatar
-                uri={post.author?.avatarUrl || undefined}
-                name={post.author?.fullName || 'Researcher'}
-                size="xs"
-              />
-              <Text style={styles.previewAuthorName} numberOfLines={1}>
-                {post.author?.fullName || 'Researcher'}
-              </Text>
-              <Text style={styles.previewAuthorHandle} numberOfLines={1}>
-                @{post.author?.handle || 'researcher'}
-              </Text>
-            </View>
+            {paper ? (
+              <View style={styles.previewHeaderRow}>
+                <Avatar
+                  name={typeof paper.journal === 'string' ? paper.journal : ((paper.journal as any)?.name || paper.authors?.[0]?.name || 'Article')}
+                  size="xs"
+                />
+                <Text style={styles.previewAuthorName} numberOfLines={1}>
+                  {typeof paper.journal === 'string' ? paper.journal : ((paper.journal as any)?.name || 'Research Paper')}
+                </Text>
+                <Text style={styles.previewAuthorHandle} numberOfLines={1}>
+                  {paper.publicationYear ? `${paper.publicationYear}` : 'Article'}
+                </Text>
+              </View>
+            ) : post ? (
+              <View style={styles.previewHeaderRow}>
+                <Avatar
+                  uri={post.author?.avatarUrl || undefined}
+                  name={post.author?.fullName || 'Researcher'}
+                  size="xs"
+                />
+                <Text style={styles.previewAuthorName} numberOfLines={1}>
+                  {post.author?.fullName || 'Researcher'}
+                </Text>
+                <Text style={styles.previewAuthorHandle} numberOfLines={1}>
+                  @{post.author?.handle || 'researcher'}
+                </Text>
+              </View>
+            ) : null}
             <Text style={styles.previewContent} numberOfLines={2}>
-              {postDisplayTitle}
+              {displayTitle}
             </Text>
           </View>
 
@@ -542,11 +604,11 @@ export const SharePostToWorkspaceModal: React.FC<SharePostToWorkspaceModalProps>
                 <Text style={styles.emptyTitle}>
                   {searchQuery ? 'No matching spaces or researchers' : 'No spaces available yet'}
                 </Text>
-                <Text style={styles.emptySubtitle}>
-                  {searchQuery
-                    ? `Try searching for another name or handle`
-                    : 'Join a community channel or start a DM to share posts.'}
-                </Text>
+                  <Text style={styles.emptySubtitle}>
+                    {searchQuery
+                      ? `Try searching for another name or handle`
+                      : (paper ? 'Join a community channel or start a DM to share papers.' : 'Join a community channel or start a DM to share posts.')}
+                  </Text>
               </View>
             }
           />
