@@ -14,6 +14,7 @@ import {
   Alert,
   ScrollView,
   Animated,
+  Image,
   ImageBackground,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
@@ -2167,24 +2168,47 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       )}
 
-      {/* Messages List wrapped with Chat Theme Background */}
-      <ImageBackground
-        source={activeThemeConfig.backgroundImage}
-        style={{ flex: 1, backgroundColor: activeThemeConfig.backgroundColor }}
-        imageStyle={{ resizeMode: 'cover', opacity: activeThemeConfig.backgroundImage ? 0.96 : 1 }}
-      >
-        {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
-          <View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: activeThemeConfig.accentColor,
-                opacity: activeThemeConfig.overlayOpacity,
-              },
-            ]}
-          />
-        )}
+      {/* Messages List Area with Fixed Chat Theme Wallpaper */}
+      <View style={styles.chatAreaWrapper}>
+        {/* Fixed Non-Interactive Theme Background Layer */}
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: activeThemeConfig.backgroundColor,
+              overflow: 'hidden',
+              width: '100%',
+              height: '100%',
+            },
+          ]}
+        >
+          {Boolean(activeThemeConfig.backgroundImage) && (
+            <Image
+              source={activeThemeConfig.backgroundImage}
+              resizeMode="cover"
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  width: '100%',
+                  height: '100%',
+                  opacity: 0.96,
+                },
+              ]}
+            />
+          )}
+          {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: activeThemeConfig.accentColor,
+                  opacity: activeThemeConfig.overlayOpacity,
+                },
+              ]}
+            />
+          )}
+        </View>
         {isMessagesLoading && messages.length === 0 ? (
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="small" color="#164E3F" />
@@ -2287,7 +2311,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         {isPartnerTyping && typingPartnerName && (
           <AnimatedTypingIndicator name={typingPartnerName} />
         )}
-      </ImageBackground>
+      </View>
 
       {/* Docked Quoted Reply Bar */}
       {replyingTo && (
@@ -3531,6 +3555,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
+  },
+  chatAreaWrapper: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: '100%',
   },
   header: {
     height: 58,

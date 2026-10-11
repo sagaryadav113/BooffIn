@@ -56,7 +56,52 @@ export default function Root({ children }: PropsWithChildren) {
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
+          content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover"
+        />
+
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+                position: fixed;
+                touch-action: pan-x pan-y;
+                -webkit-text-size-adjust: 100%;
+                overscroll-behavior: none;
+              }
+              #root {
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                display: flex;
+              }
+              img {
+                -webkit-user-drag: none;
+                user-select: none;
+              }
+            `,
+          }}
+        />
+
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof document !== 'undefined') {
+                document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+                document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+                document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+                document.addEventListener('touchmove', function(e) {
+                  if (e.touches && e.touches.length > 1) {
+                    e.preventDefault();
+                  }
+                }, { passive: false });
+              }
+            `,
+          }}
         />
 
         {/* Primary SEO Meta Tags */}

@@ -14,6 +14,7 @@ import {
   Linking,
   Alert,
   Animated,
+  Image,
   ImageBackground,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
@@ -1411,23 +1412,46 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
       {/* Tab 2: Discussion (Real Chat Feed with Rich Academic Cards) */}
       {activeTab === 'discussion' && (
-        <ImageBackground
-          source={activeThemeConfig.backgroundImage}
-          style={{ flex: 1, backgroundColor: activeThemeConfig.backgroundColor }}
-          imageStyle={{ resizeMode: 'cover', opacity: activeThemeConfig.backgroundImage ? 0.96 : 1 }}
-        >
-          {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
-            <View
-              pointerEvents="none"
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  backgroundColor: activeThemeConfig.accentColor,
-                  opacity: activeThemeConfig.overlayOpacity,
-                },
-              ]}
-            />
-          )}
+        <View style={styles.chatAreaWrapper}>
+          {/* Fixed Non-Interactive Theme Background Layer */}
+          <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                backgroundColor: activeThemeConfig.backgroundColor,
+                overflow: 'hidden',
+                width: '100%',
+                height: '100%',
+              },
+            ]}
+          >
+            {Boolean(activeThemeConfig.backgroundImage) && (
+              <Image
+                source={activeThemeConfig.backgroundImage}
+                resizeMode="cover"
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0.96,
+                  },
+                ]}
+              />
+            )}
+            {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    backgroundColor: activeThemeConfig.accentColor,
+                    opacity: activeThemeConfig.overlayOpacity,
+                  },
+                ]}
+              />
+            )}
+          </View>
           <FlatList
             ref={flatListRef}
             data={filteredMessages}
@@ -1969,7 +1993,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               )}
             </View>
           )}
-        </ImageBackground>
+        </View>
       )}
 
       {/* Tab 3: Podcasts */}
@@ -3064,6 +3088,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
+  },
+  chatAreaWrapper: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: '100%',
   },
   header: {
     height: 58,
