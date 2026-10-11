@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Linking,
+  Modal,
 } from 'react-native';
 import {
   Settings,
@@ -31,14 +33,30 @@ import {
   Radio,
   Clock,
   Layers,
+  Mail,
+  ShieldAlert,
+  ShieldCheck,
+  Scale,
+  Copy,
+  Check,
+  X,
+  ExternalLink,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { colors, radii, spacing, typography } from '../../theme';
 import { WorkspaceSettings } from '../../types/workspaceSettings';
+import {
+  LEGAL_CONTACTS,
+  TERMS_OF_SERVICE,
+  PRIVACY_POLICY,
+  COMMUNITY_GUIDELINES,
+  LegalDocument,
+} from '../../constants/legalPolicies';
 
 export const WorkspaceSettingsView: React.FC = () => {
   const currentUser = useAuthStore((s) => s.user);
@@ -47,6 +65,30 @@ export const WorkspaceSettingsView: React.FC = () => {
 
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [cacheClearedSuccess, setCacheClearedSuccess] = useState(false);
+  const [activeLegalDoc, setActiveLegalDoc] = useState<LegalDocument | null>(null);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+
+  const handleCopyEmail = async (email: string) => {
+    try {
+      await Clipboard.setStringAsync(email);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      setCopiedEmail(email);
+      setTimeout(() => setCopiedEmail(null), 2500);
+    } catch {
+      Alert.alert('Copied', email);
+    }
+  };
+
+  const handleSendEmail = (email: string, subject = 'BooffIn Support Inquiry') => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    Linking.openURL(`mailto:${email}?subject=${encodeURIComponent(subject)}`).catch(() => {
+      Alert.alert('Email Client Error', `Could not open mail app. Please contact us directly at ${email}`);
+    });
+  };
 
   // Active owned communities count (max 3)
   const activeOwnedCommunitiesCount = (communities || []).filter(
@@ -131,11 +173,12 @@ export const WorkspaceSettingsView: React.FC = () => {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.container}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Header Banner */}
       <View style={styles.headerBanner}>
         <View style={styles.headerIconCircle}>
@@ -514,7 +557,331 @@ export const WorkspaceSettingsView: React.FC = () => {
         </View>
       </View>
 
-      {/* SECTION 5: DATA, STORAGE & RESET */}
+      {/* SECTION 5: PRIVACY, SAFETY, POLICIES & TERMS */}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <ShieldCheck size={17} color="#064E3B" strokeWidth={2.2} />
+          <Text style={styles.sectionTitle}>Privacy, Safety & Legal Terms</Text>
+        </View>
+
+        {/* Official App Support & Direct Contacts */}
+        <View style={styles.legalSectionIntro}>
+          <Text style={styles.legalSectionIntroTitle}>Official App Support & Contact</Text>
+          <Text style={styles.legalSectionIntroSub}>
+            Direct inquiries regarding workspace safety, account policies, or research data protection:
+          </Text>
+
+          <View style={styles.contactEmailList}>
+            {/* Primary Support Mail */}
+            <View style={styles.contactRow}>
+              <View style={styles.contactRowLeft}>
+                <View style={[styles.contactIconWrap, { backgroundColor: '#DCFCE7' }]}>
+                  <Mail size={16} color="#064E3B" />
+                </View>
+                <View style={styles.contactTextWrap}>
+                  <Text style={styles.contactRole}>Official App Support</Text>
+                  <Text style={styles.contactEmailText}>{LEGAL_CONTACTS.support}</Text>
+                </View>
+              </View>
+              <View style={styles.contactBtnGroup}>
+                <TouchableOpacity
+                  style={styles.contactActionBtn}
+                  onPress={() => handleSendEmail(LEGAL_CONTACTS.support, 'BooffIn Support Request')}
+                  activeOpacity={0.7}
+                >
+                  <Mail size={13} color="#064E3B" />
+                  <Text style={styles.contactActionText}>Mail</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.contactActionBtn,
+                    copiedEmail === LEGAL_CONTACTS.support && styles.contactActionBtnCopied,
+                  ]}
+                  onPress={() => handleCopyEmail(LEGAL_CONTACTS.support)}
+                  activeOpacity={0.7}
+                >
+                  {copiedEmail === LEGAL_CONTACTS.support ? (
+                    <Check size={13} color="#059669" />
+                  ) : (
+                    <Copy size={13} color="#475569" />
+                  )}
+                  <Text
+                    style={[
+                      styles.contactActionText,
+                      copiedEmail === LEGAL_CONTACTS.support && { color: '#059669' },
+                    ]}
+                  >
+                    {copiedEmail === LEGAL_CONTACTS.support ? 'Copied' : 'Copy'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Privacy Email */}
+            <View style={styles.contactRow}>
+              <View style={styles.contactRowLeft}>
+                <View style={[styles.contactIconWrap, { backgroundColor: '#EFF6FF' }]}>
+                  <Shield size={16} color="#1D4ED8" />
+                </View>
+                <View style={styles.contactTextWrap}>
+                  <Text style={styles.contactRole}>Privacy & Data Protection</Text>
+                  <Text style={styles.contactEmailText}>{LEGAL_CONTACTS.privacy}</Text>
+                </View>
+              </View>
+              <View style={styles.contactBtnGroup}>
+                <TouchableOpacity
+                  style={styles.contactActionBtn}
+                  onPress={() => handleSendEmail(LEGAL_CONTACTS.privacy, 'BooffIn Privacy & Data Protection Request')}
+                  activeOpacity={0.7}
+                >
+                  <Mail size={13} color="#1D4ED8" />
+                  <Text style={[styles.contactActionText, { color: '#1D4ED8' }]}>Mail</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.contactActionBtn,
+                    copiedEmail === LEGAL_CONTACTS.privacy && styles.contactActionBtnCopied,
+                  ]}
+                  onPress={() => handleCopyEmail(LEGAL_CONTACTS.privacy)}
+                  activeOpacity={0.7}
+                >
+                  {copiedEmail === LEGAL_CONTACTS.privacy ? (
+                    <Check size={13} color="#059669" />
+                  ) : (
+                    <Copy size={13} color="#475569" />
+                  )}
+                  <Text
+                    style={[
+                      styles.contactActionText,
+                      copiedEmail === LEGAL_CONTACTS.privacy && { color: '#059669' },
+                    ]}
+                  >
+                    {copiedEmail === LEGAL_CONTACTS.privacy ? 'Copied' : 'Copy'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Security Email */}
+            <View style={[styles.contactRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.contactRowLeft}>
+                <View style={[styles.contactIconWrap, { backgroundColor: '#FEF3C7' }]}>
+                  <Lock size={16} color="#B45309" />
+                </View>
+                <View style={styles.contactTextWrap}>
+                  <Text style={styles.contactRole}>Security & Vulnerabilities</Text>
+                  <Text style={styles.contactEmailText}>{LEGAL_CONTACTS.security}</Text>
+                </View>
+              </View>
+              <View style={styles.contactBtnGroup}>
+                <TouchableOpacity
+                  style={styles.contactActionBtn}
+                  onPress={() => handleSendEmail(LEGAL_CONTACTS.security, 'BooffIn Security Disclosure')}
+                  activeOpacity={0.7}
+                >
+                  <Mail size={13} color="#B45309" />
+                  <Text style={[styles.contactActionText, { color: '#B45309' }]}>Mail</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.contactActionBtn,
+                    copiedEmail === LEGAL_CONTACTS.security && styles.contactActionBtnCopied,
+                  ]}
+                  onPress={() => handleCopyEmail(LEGAL_CONTACTS.security)}
+                  activeOpacity={0.7}
+                >
+                  {copiedEmail === LEGAL_CONTACTS.security ? (
+                    <Check size={13} color="#059669" />
+                  ) : (
+                    <Copy size={13} color="#475569" />
+                  )}
+                  <Text
+                    style={[
+                      styles.contactActionText,
+                      copiedEmail === LEGAL_CONTACTS.security && { color: '#059669' },
+                    ]}
+                  >
+                    {copiedEmail === LEGAL_CONTACTS.security ? 'Copied' : 'Copy'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* 1. Privacy Policy Card */}
+        <View style={styles.legalDocCard}>
+          <View style={styles.legalDocCardHeader}>
+            <View style={[styles.legalDocIconWrap, { backgroundColor: '#DCFCE7' }]}>
+              <ShieldCheck size={18} color="#064E3B" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.legalDocCardTitle}>Privacy Policy & Data Security</Text>
+              <Text style={styles.legalDocCardVersion}>v2.0 • Effective Oct 2026</Text>
+            </View>
+          </View>
+
+          <Text style={styles.legalDocCardSummary}>
+            {PRIVACY_POLICY.summary}
+          </Text>
+
+          <View style={styles.legalKeyPointsBox}>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#059669" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Zero Data Selling: </Text>
+                We never sell, rent, or trade your personal information, reading history, or research topics to brokers.
+              </Text>
+            </View>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#059669" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Client-Side AEAD Encryption: </Text>
+                Direct messages and sensitive notes are secured with AES-256-GCM authenticated encryption.
+              </Text>
+            </View>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#059669" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Google OAuth Limited Use: </Text>
+                Adheres strictly to Google API Services User Data Policy with zero transfer to third-party AI models.
+              </Text>
+            </View>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#059669" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Row Level Security (RLS): </Text>
+                PostgreSQL database RLS enforces complete isolation across workspaces, communities, and pods.
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.viewDocBtn}
+            onPress={() => setActiveLegalDoc(PRIVACY_POLICY)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.viewDocBtnText}>Read Complete Privacy Policy</Text>
+            <ExternalLink size={14} color="#064E3B" />
+          </TouchableOpacity>
+        </View>
+
+        {/* 2. Terms of Service Card */}
+        <View style={styles.legalDocCard}>
+          <View style={styles.legalDocCardHeader}>
+            <View style={[styles.legalDocIconWrap, { backgroundColor: '#EFF6FF' }]}>
+              <Scale size={18} color="#1D4ED8" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.legalDocCardTitle}>Terms of Service & IP Rights</Text>
+              <Text style={styles.legalDocCardVersion}>v2.0 • Effective Oct 2026</Text>
+            </View>
+          </View>
+
+          <Text style={styles.legalDocCardSummary}>
+            {TERMS_OF_SERVICE.summary}
+          </Text>
+
+          <View style={styles.legalKeyPointsBox}>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#1D4ED8" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Researcher IP Ownership: </Text>
+                You retain full ownership of all original scientific posts, TL;DR summaries, and collaboration ideas.
+              </Text>
+            </View>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#1D4ED8" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Academic Integrity: </Text>
+                Strict prohibition of data fabrication, plagiarism, ghost-authorship, or citation manipulation.
+              </Text>
+            </View>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#1D4ED8" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Preprint Fair Use & Caching: </Text>
+                Reader targets open CC BY preprint sources with ephemeral cache that automatically expires.
+              </Text>
+            </View>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#1D4ED8" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Scientific Disclaimer: </Text>
+                Community HYPE scores and discussions represent open academic discourse, not formal clinical certifications.
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.viewDocBtn}
+            onPress={() => setActiveLegalDoc(TERMS_OF_SERVICE)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.viewDocBtnText}>Read Complete Terms of Service</Text>
+            <ExternalLink size={14} color="#064E3B" />
+          </TouchableOpacity>
+        </View>
+
+        {/* 3. Community Guidelines & Safety Standards Card */}
+        <View style={[styles.legalDocCard, { marginBottom: 0 }]}>
+          <View style={styles.legalDocCardHeader}>
+            <View style={[styles.legalDocIconWrap, { backgroundColor: '#FEF3C7' }]}>
+              <ShieldAlert size={18} color="#B45309" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.legalDocCardTitle}>Academic Safety & Guidelines</Text>
+              <Text style={styles.legalDocCardVersion}>v2.0 • Effective Oct 2026</Text>
+            </View>
+          </View>
+
+          <Text style={styles.legalDocCardSummary}>
+            {COMMUNITY_GUIDELINES.summary}
+          </Text>
+
+          <View style={styles.legalKeyPointsBox}>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#B45309" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Zero Harassment Tolerance: </Text>
+                Critique methodologies vigorously and respectfully; scholarly intimidation or insults lead to bans.
+              </Text>
+            </View>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#B45309" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Zero Media Calling Storage: </Text>
+                Audio and video research calls are peer-to-peer WebRTC with zero server recording or storage.
+              </Text>
+            </View>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#B45309" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Safety Number Verification: </Text>
+                60-digit mutual fingerprinting to independently audit and verify cryptographic session authenticity.
+              </Text>
+            </View>
+            <View style={styles.keyPointRow}>
+              <CheckCircle2 size={13} color="#B45309" style={{ marginTop: 2 }} />
+              <Text style={styles.keyPointText}>
+                <Text style={{ fontWeight: '700', color: '#0F172A' }}>Reporting & Moderator Appeals: </Text>
+                Direct in-app reporting of misconduct with rapid review and human moderation oversight.
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.viewDocBtn}
+            onPress={() => setActiveLegalDoc(COMMUNITY_GUIDELINES)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.viewDocBtnText}>Read Community Guidelines</Text>
+            <ExternalLink size={14} color="#064E3B" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* SECTION 6: DATA, STORAGE & RESET */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
           <Download size={17} color="#064E3B" strokeWidth={2.2} />
@@ -573,7 +940,129 @@ export const WorkspaceSettingsView: React.FC = () => {
         </TouchableOpacity>
       </View>
     </ScrollView>
-  );
+
+    {/* Full Document Reader Modal */}
+    <Modal
+      visible={activeLegalDoc !== null}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setActiveLegalDoc(null)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHeaderTitleWrap}>
+              <Text style={styles.modalTitle} numberOfLines={1}>
+                {activeLegalDoc?.title}
+              </Text>
+              <Text style={styles.modalSubTitle}>
+                Version {activeLegalDoc?.version} • Effective {activeLegalDoc?.effectiveDate}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setActiveLegalDoc(null)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <X size={20} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Modal Content */}
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalScrollContent}
+            showsVerticalScrollIndicator={true}
+          >
+            {/* Summary Callout */}
+            <View style={styles.modalSummaryBox}>
+              <Info size={18} color="#064E3B" style={{ marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalSummaryLabel}>Executive Summary</Text>
+                <Text style={styles.modalSummaryText}>{activeLegalDoc?.summary}</Text>
+              </View>
+            </View>
+
+            {/* Data Controller Banner */}
+            <View style={styles.controllerBanner}>
+              <Text style={styles.controllerText}>
+                Governing Entity: <Text style={{ fontWeight: '700' }}>{activeLegalDoc?.controller}</Text>
+              </Text>
+              <Text style={styles.controllerText}>
+                Designated Support: <Text style={{ fontWeight: '700' }}>{activeLegalDoc?.supportEmail}</Text>
+              </Text>
+            </View>
+
+            {/* Sections */}
+            {(activeLegalDoc?.sections || []).map((sec, sIdx) => (
+              <View key={sIdx} style={styles.modalSectionBlock}>
+                <Text style={styles.modalSectionTitle}>{sec.title}</Text>
+                {sec.content.map((paragraph, pIdx) => (
+                  <Text key={pIdx} style={styles.modalParagraph}>
+                    {paragraph}
+                  </Text>
+                ))}
+              </View>
+            ))}
+
+            {/* Modal Contact Footer */}
+            <View style={styles.modalFooterCard}>
+              <Text style={styles.modalFooterTitle}>Have questions about these terms?</Text>
+              <Text style={styles.modalFooterSub}>
+                Contact the BooffIn Legal & Support desk at{' '}
+                <Text style={{ fontWeight: '700', color: '#064E3B' }}>
+                  {activeLegalDoc?.supportEmail}
+                </Text>
+              </Text>
+              <View style={styles.modalFooterBtnRow}>
+                <TouchableOpacity
+                  style={styles.modalFooterContactBtn}
+                  onPress={() => {
+                    if (activeLegalDoc) {
+                      handleSendEmail(activeLegalDoc.supportEmail, `${activeLegalDoc.title} Inquiry`);
+                    }
+                  }}
+                >
+                  <Mail size={15} color="#FFFFFF" />
+                  <Text style={styles.modalFooterContactBtnText}>Email Support Desk</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalFooterCopyBtn}
+                  onPress={() => {
+                    if (activeLegalDoc) {
+                      handleCopyEmail(activeLegalDoc.supportEmail);
+                    }
+                  }}
+                >
+                  {copiedEmail === activeLegalDoc?.supportEmail ? (
+                    <Check size={15} color="#059669" />
+                  ) : (
+                    <Copy size={15} color="#475569" />
+                  )}
+                  <Text style={styles.modalFooterCopyBtnText}>
+                    {copiedEmail === activeLegalDoc?.supportEmail ? 'Copied' : 'Copy Email'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Modal Bottom Done Bar */}
+          <View style={styles.modalBottomBar}>
+            <TouchableOpacity
+              style={styles.modalPrimaryDoneBtn}
+              onPress={() => setActiveLegalDoc(null)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalPrimaryDoneBtnText}>Done Reading</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  </View>
+);
 };
 
 const styles = StyleSheet.create({
@@ -812,5 +1301,342 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     lineHeight: 16,
+  },
+  // Legal, Safety & Privacy Styles
+  legalSectionIntro: {
+    marginBottom: 16,
+  },
+  legalSectionIntroTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  legalSectionIntroSub: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  contactEmailList: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 8,
+  },
+  contactRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  contactIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactTextWrap: {
+    flex: 1,
+  },
+  contactRole: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  contactEmailText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  contactBtnGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  contactActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  contactActionBtnCopied: {
+    borderColor: '#86EFAC',
+    backgroundColor: '#F0FDF4',
+  },
+  contactActionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  legalDocCard: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+  },
+  legalDocCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  legalDocIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legalDocCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  legalDocCardVersion: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  legalDocCardSummary: {
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  legalKeyPointsBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+  },
+  keyPointRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  keyPointText: {
+    fontSize: 11.5,
+    color: '#334155',
+    lineHeight: 16,
+    flex: 1,
+  },
+  viewDocBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  viewDocBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#064E3B',
+  },
+  // Document Reader Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '88%',
+    minHeight: '65%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  modalHeaderTitleWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  modalSubTitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    padding: 20,
+    paddingBottom: 30,
+  },
+  modalSummaryBox: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  modalSummaryLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#064E3B',
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  modalSummaryText: {
+    fontSize: 12,
+    color: '#166534',
+    lineHeight: 17,
+  },
+  controllerBanner: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    marginBottom: 16,
+    gap: 4,
+  },
+  controllerText: {
+    fontSize: 11.5,
+    color: '#475569',
+  },
+  modalSectionBlock: {
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 12,
+  },
+  modalSectionTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  modalParagraph: {
+    fontSize: 12,
+    color: '#334155',
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  modalFooterCard: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  modalFooterTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  modalFooterSub: {
+    fontSize: 11.5,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modalFooterBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  modalFooterContactBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#064E3B',
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  modalFooterContactBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  modalFooterCopyBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  modalFooterCopyBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  modalBottomBar: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  modalPrimaryDoneBtn: {
+    backgroundColor: '#064E3B',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPrimaryDoneBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
