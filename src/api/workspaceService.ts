@@ -2884,7 +2884,15 @@ export const workspaceService = {
         return { communities: [], error: error.message };
       }
 
-      const list: Workspace[] = (data || []).map((ws: any) => ({
+      // Filter out any disabled communities (via is_disabled flag, status, or settings)
+      const activeData = (data || []).filter(
+        (ws: any) =>
+          ws.is_disabled !== true &&
+          ws.status !== 'disabled' &&
+          ws.settings?.is_disabled !== true
+      );
+
+      const list: Workspace[] = activeData.map((ws: any) => ({
         ...ws,
         members_count: ws.members_count || 1,
       }));
@@ -2898,26 +2906,6 @@ export const workspaceService = {
           .eq('status', 'active');
         if (count !== null && count !== undefined) {
           item.members_count = count;
-        }
-      }
-
-      // If user hasn't created any custom communities in dev/testing, fetch public active communities as suggestions
-      if (list.length === 0) {
-        const { data: publicData } = await supabase
-          .from('workspaces')
-          .select('*')
-          .eq('type', 'community')
-          .neq('status', 'disabled')
-          .limit(3);
-
-        if (publicData && publicData.length > 0) {
-          return {
-            communities: publicData.map((ws: any) => ({
-              ...ws,
-              members_count: ws.members_count || 1,
-            })),
-            error: null,
-          };
         }
       }
 

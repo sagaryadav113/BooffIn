@@ -54,13 +54,18 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
 
     let isMounted = true;
 
+    // Helper: only show enabled/active communities
+    const isCommunityEnabled = (c: Workspace) =>
+      c.is_disabled !== true &&
+      c.status !== 'disabled' &&
+      c.settings?.is_disabled !== true;
+
     // 1. Seed instantly from store if available
     const storeComms = useWorkspaceStore.getState().communities.filter(
       (c) =>
         (c.owner_id === authorId || c.creator_id === authorId) &&
         c.type === 'community' &&
-        !c.is_disabled &&
-        c.status !== 'disabled'
+        isCommunityEnabled(c)
     );
     if (storeComms.length > 0) {
       setCommunities(storeComms.slice(0, 3));
@@ -73,10 +78,13 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
     (async () => {
       try {
         const res = await workspaceService.getUserCreatedCommunities(authorId);
-        if (isMounted && res.communities && res.communities.length > 0) {
-          setCommunities(res.communities.slice(0, 3));
-        } else if (isMounted && storeComms.length === 0) {
-          setCommunities(res.communities || []);
+        const enabledCommunities = (res.communities || []).filter(isCommunityEnabled);
+        if (isMounted) {
+          if (enabledCommunities.length > 0) {
+            setCommunities(enabledCommunities.slice(0, 3));
+          } else {
+            setCommunities([]);
+          }
         }
       } catch {
         if (isMounted && storeComms.length === 0) {
@@ -184,15 +192,14 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
             </View>
           ) : (
             <FlatList
-              data={communities.slice(0, 3)}
+              data={communities.filter((c) => c.is_disabled !== true && c.status !== 'disabled' && c.settings?.is_disabled !== true).slice(0, 3)}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.listContent}
               renderItem={({ item }) => {
                 const memberCount = item.members_count || 1;
-                const isDisabled = Boolean(item.is_disabled || item.status === 'disabled' || item.settings?.is_disabled);
 
                 return (
-                  <View style={[styles.communityCard, isDisabled && styles.communityCardDisabled]}>
+                  <View style={styles.communityCard}>
                     <Avatar
                       uri={item.avatar_url || undefined}
                       name={item.name}
@@ -201,29 +208,24 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
 
                     <View style={styles.communityInfo}>
                       <View style={styles.communityTitleRow}>
-                        <Text style={[styles.communityName, isDisabled && styles.communityNameDisabled]} numberOfLines={1}>
+                        <Text style={styles.communityName} numberOfLines={1}>
                           {item.name}
                         </Text>
-                        {isDisabled && (
-                          <View style={styles.disabledBadge}>
-                            <Text style={styles.disabledBadgeText}>Disabled</Text>
-                          </View>
-                        )}
                       </View>
 
                       {item.description ? (
-                        <Text style={[styles.communityDesc, isDisabled && styles.communityDescDisabled]} numberOfLines={2}>
+                        <Text style={styles.communityDesc} numberOfLines={2}>
                           {item.description}
                         </Text>
                       ) : (
-                        <Text style={[styles.communityDesc, isDisabled && styles.communityDescDisabled]} numberOfLines={1}>
+                        <Text style={styles.communityDesc} numberOfLines={1}>
                           Open scientific community for research discussion
                         </Text>
                       )}
 
                       <View style={styles.memberBadgeRow}>
-                        <Users size={12} color={isDisabled ? '#94A3B8' : '#059669'} />
-                        <Text style={[styles.memberBadgeText, isDisabled && styles.memberBadgeTextDisabled]}>
+                        <Users size={12} color="#059669" />
+                        <Text style={styles.memberBadgeText}>
                           {memberCount} member{memberCount === 1 ? '' : 's'}
                         </Text>
                       </View>
@@ -233,9 +235,9 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
                     <TouchableOpacity
                       activeOpacity={0.8}
                       onPress={() => handleViewCommunity(item)}
-                      style={[styles.viewBtn, isDisabled && styles.viewBtnDisabled]}
+                      style={styles.viewBtn}
                     >
-                      <Text style={styles.viewBtnText}>{isDisabled ? 'View' : 'View'}</Text>
+                      <Text style={styles.viewBtnText}>View</Text>
                       <ChevronRight size={14} color="#FFFFFF" strokeWidth={2.4} />
                     </TouchableOpacity>
                   </View>
