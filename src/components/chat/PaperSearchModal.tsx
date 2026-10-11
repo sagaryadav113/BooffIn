@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,13 +17,18 @@ import {
   ExternalLink,
   Sparkles,
   BookOpen,
-  CheckCircle2,
+  Bookmark,
+  Globe,
+  ArrowLeft,
   AlertCircle,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Paper } from '../../types';
 import { searchPapers } from '../../api/search/providers/paperSearchProvider';
 import { resolvePaper } from '../../api/paperResolver';
+import { useAuthStore } from '../../store/useAuthStore';
+import { usePaperStore } from '../../store/usePaperStore';
+import { fetchSavedPostsAndPapers } from '../../api/socialService';
 
 interface PaperSearchModalProps {
   visible: boolean;
@@ -33,129 +38,84 @@ interface PaperSearchModalProps {
   subtitle?: string;
 }
 
-const TOPIC_SUGGESTION_CHIPS = [
-  'All',
-  'CRISPR',
-  'Neuroscience',
-  'Quantum',
-  'Cancer',
-  'RNA',
-  'AI & Biology',
-];
-
-const DEFAULT_CURATED_PAPERS: Paper[] = [
-  {
-    id: 'curated_1',
-    doi: '10.1038/s41594-026-01795-7',
-    title: 'Direct roles of long non-coding RNAs in transcription activation',
-    abstract: 'Long non-coding RNAs regulate transcription factors and chromatin accessibility across mammalian cells through sequence-specific interactions.',
-    authors: [
-      { name: 'Juan Pablo Unfried' },
-      { name: 'Igor Ulitsky' },
-    ],
-    journal: 'Nature',
-    publicationYear: 2024,
-    canonicalUrl: 'https://doi.org/10.1038/s41594-026-01795-7',
-    openAccessUrl: 'https://arxiv.org/pdf/2103.00020.pdf',
-    isOpenAccess: true,
-    topics: ['RNA', 'Genetics', 'Molecular Biology'],
-    citationCount: 2,
-    discussionCount: 14,
-    likesCount: 28,
-    savesCount: 19,
-  },
-  {
-    id: 'curated_2',
-    doi: '10.1101/2026.01.12.584930',
-    title: 'Open Science Protocol Guidelines & Reproducibility Standards',
-    abstract: 'Comprehensive standard operating procedures and open lab protocol guidelines for verifiable experimental science and cross-institutional collaboration.',
-    authors: [
-      { name: 'Elena Rostova' },
-      { name: 'Marcus Vance' },
-      { name: 'Syed Ahmad' },
-    ],
-    journal: 'Nature Protocols',
-    publicationYear: 2026,
-    canonicalUrl: 'https://doi.org/10.1101/2026.01.12.584930',
-    openAccessUrl: 'https://arxiv.org/pdf/2103.00020.pdf',
-    isOpenAccess: true,
-    topics: ['Protocols', 'Open Science', 'Methodology'],
-    citationCount: 8,
-    discussionCount: 32,
-    likesCount: 45,
-    savesCount: 38,
-  },
-  {
-    id: 'curated_3',
-    doi: '10.1016/j.cell.2025.11.014',
-    title: 'Microplastic Cellular Impact & Toxicity: A Systematic Meta-Analysis',
-    abstract: 'Investigating cellular uptake, mitochondrial degradation, and inflammatory response induced by sub-micron plastic particles across human organoid models.',
-    authors: [
-      { name: 'Hanna Lindqvist' },
-      { name: 'David K. Chen' },
-    ],
-    journal: 'Cell',
-    publicationYear: 2025,
-    canonicalUrl: 'https://doi.org/10.1016/j.cell.2025.11.014',
-    openAccessUrl: 'https://arxiv.org/pdf/2103.00020.pdf',
-    isOpenAccess: true,
-    topics: ['Toxicology', 'Cell Biology', 'Environmental Science'],
-    citationCount: 12,
-    discussionCount: 19,
-    likesCount: 34,
-    savesCount: 22,
-  },
-  {
-    id: 'curated_4',
-    doi: '10.1126/science.ade9241',
-    title: 'Quantum Coherence and Entanglement Signatures in Macroscopic Bio-Systems',
-    abstract: 'Direct spectroscopic observation of long-lived macroscopic quantum superposition and coherence within light-harvesting protein complexes.',
-    authors: [
-      { name: 'Siddharth Rao' },
-      { name: 'Camilla Moreau' },
-    ],
-    journal: 'Science',
-    publicationYear: 2026,
-    canonicalUrl: 'https://doi.org/10.1126/science.ade9241',
-    openAccessUrl: 'https://arxiv.org/pdf/2103.00020.pdf',
-    isOpenAccess: true,
-    topics: ['Quantum Biology', 'Biophysics', 'Optics'],
-    citationCount: 15,
-    discussionCount: 41,
-    likesCount: 67,
-    savesCount: 52,
-  },
-];
-
 export const PaperSearchModal: React.FC<PaperSearchModalProps> = ({
   visible,
   onClose,
   onSelectPaper,
-  title = 'Search & Share Research Paper',
-  subtitle = 'Search by DOI, URL, paper title, keywords, or author across global scientific registries.',
+  title = 'Select Manuscript / Paper to Share',
+  subtitle = 'Search global scientific registries or share directly from your bookmarks.',
 }) => {
-  const [query, setQuery] = useState('');
-  const [activeChip, setActiveChip] = useState('All');
-  const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<Paper[]>(DEFAULT_CURATED_PAPERS);
-  const [hasSearched, setHasSearched] = useState(false);
-  const searchTimeoutRef = useRef<any>(null);
+  // 1. Global Academic Search State
+  const [globalQuery, setGlobalQuery] = useState('');
+  const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
+  const [globalResults, setGlobalResults] = useState<Paper[]>([]);
+  const [hasSearchedGlobal, setHasSearchedGlobal] = useState(false);
 
-  // Trigger search execution
-  const executeSearch = useCallback(async (searchQuery: string) => {
+  // 2. Bookmarked / Saved Papers State
+  const [bookmarkedPapers, setBookmarkedPapers] = useState<Paper[]>([]);
+  const [bookmarkSearchQuery, setBookmarkSearchQuery] = useState('');
+  const [isLoadingBookmarks, setIsLoadingBookmarks] = useState(true);
+
+  // Load Bookmarked papers whenever modal opens
+  useEffect(() => {
+    if (!visible) return;
+
+    let isMounted = true;
+
+    // A. Seed immediately from usePaperStore cache
+    const storeState = usePaperStore.getState();
+    const localSaved = (storeState.papers || []).filter(
+      (p) =>
+        storeState.savedPaperIds.has(p.id) ||
+        (p.doi && storeState.savedPaperIds.has(p.doi)) ||
+        p.isSaved
+    );
+    if (localSaved.length > 0) {
+      setBookmarkedPapers(localSaved);
+      setIsLoadingBookmarks(false);
+    } else {
+      setIsLoadingBookmarks(true);
+    }
+
+    // B. Fetch fresh saved papers from database
+    const userId = useAuthStore.getState().user?.id;
+    if (userId) {
+      (async () => {
+        try {
+          const res = await fetchSavedPostsAndPapers(userId);
+          if (isMounted && res.papers) {
+            setBookmarkedPapers(res.papers);
+          }
+        } catch (err) {
+          console.warn('[PaperSearchModal] Failed to fetch saved papers:', err);
+        } finally {
+          if (isMounted) setIsLoadingBookmarks(false);
+        }
+      })();
+    } else {
+      setIsLoadingBookmarks(false);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [visible]);
+
+  // Execute Global Search
+  const executeGlobalSearch = useCallback(async (searchQuery: string) => {
     const trimmed = searchQuery.trim();
     if (!trimmed) {
-      setResults(DEFAULT_CURATED_PAPERS);
-      setIsSearching(false);
-      setHasSearched(false);
+      setGlobalResults([]);
+      setIsSearchingGlobal(false);
+      setHasSearchedGlobal(false);
       return;
     }
 
-    setIsSearching(true);
-    setHasSearched(true);
+    setIsSearchingGlobal(true);
+    setHasSearchedGlobal(true);
 
     try {
-      // 1. If it looks like a DOI or URL, resolve directly first
+      // 1. Check if query is DOI or direct URL
       const isDoiOrUrl =
         trimmed.startsWith('10.') ||
         trimmed.includes('doi.org/') ||
@@ -167,92 +127,50 @@ export const PaperSearchModal: React.FC<PaperSearchModalProps> = ({
       if (isDoiOrUrl) {
         const resolved = await resolvePaper(trimmed);
         if (resolved) {
-          setResults([resolved]);
-          setIsSearching(false);
+          setGlobalResults([resolved]);
+          setIsSearchingGlobal(false);
           return;
         }
       }
 
-      // 2. Broad academic multi-registry search (EuropePMC, arXiv, OpenAlex, Semantic Scholar, Local Store)
+      // 2. Broad academic multi-registry search (EuropePMC, arXiv, OpenAlex, Semantic Scholar)
       const papers = await searchPapers(trimmed, 15);
       if (papers && papers.length > 0) {
-        setResults(papers);
+        setGlobalResults(papers);
       } else {
-        // Fallback: search curated list locally
-        const q = trimmed.toLowerCase();
-        const localMatches = DEFAULT_CURATED_PAPERS.filter(
-          (p) =>
-            p.title.toLowerCase().includes(q) ||
-            p.abstract.toLowerCase().includes(q) ||
-            p.journal.toLowerCase().includes(q) ||
-            (p.doi && p.doi.toLowerCase().includes(q)) ||
-            p.authors.some((a) => a.name.toLowerCase().includes(q)) ||
-            p.topics.some((t) => t.toLowerCase().includes(q))
-        );
-        setResults(localMatches);
+        setGlobalResults([]);
       }
     } catch (err) {
-      console.warn('Academic paper search error:', err);
-      // Fallback to local filtering
-      const q = trimmed.toLowerCase();
-      const localMatches = DEFAULT_CURATED_PAPERS.filter(
-        (p) =>
-          p.title.toLowerCase().includes(q) ||
-          p.journal.toLowerCase().includes(q) ||
-          (p.doi && p.doi.toLowerCase().includes(q)) ||
-          p.authors.some((a) => a.name.toLowerCase().includes(q))
-      );
-      setResults(localMatches);
+      console.warn('Academic paper global search error:', err);
+      setGlobalResults([]);
     } finally {
-      setIsSearching(false);
+      setIsSearchingGlobal(false);
     }
   }, []);
 
-  // Debounced live search as user types
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
+  // Filter bookmarked papers by the in-bookmarks search term
+  const filteredBookmarks = useMemo(() => {
+    const q = bookmarkSearchQuery.trim().toLowerCase();
+    if (!q) return bookmarkedPapers;
 
-    if (!query.trim()) {
-      setResults(DEFAULT_CURATED_PAPERS);
-      setIsSearching(false);
-      setHasSearched(false);
-      return;
-    }
+    return bookmarkedPapers.filter((p) => {
+      const matchTitle = (p.title || '').toLowerCase().includes(q);
+      const matchAbstract = (p.abstract || '').toLowerCase().includes(q);
+      const matchJournal = (p.journal || '').toLowerCase().includes(q);
+      const matchDoi = (p.doi || '').toLowerCase().includes(q);
+      const matchAuthors = (p.authors || []).some((a) => (a.name || '').toLowerCase().includes(q));
+      return matchTitle || matchAbstract || matchJournal || matchDoi || matchAuthors;
+    });
+  }, [bookmarkedPapers, bookmarkSearchQuery]);
 
-    searchTimeoutRef.current = setTimeout(() => {
-      executeSearch(query);
-    }, 450);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [query, executeSearch]);
-
-  const handleChipPress = (chip: string) => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {}
-
-    setActiveChip(chip);
-    if (chip === 'All') {
-      setQuery('');
-      setResults(DEFAULT_CURATED_PAPERS);
-      setHasSearched(false);
-    } else {
-      setQuery(chip);
-      executeSearch(chip);
-    }
+  const handleClearGlobal = () => {
+    setGlobalQuery('');
+    setGlobalResults([]);
+    setHasSearchedGlobal(false);
   };
 
-  const handleClear = () => {
-    setQuery('');
-    setActiveChip('All');
-    setResults(DEFAULT_CURATED_PAPERS);
-    setHasSearched(false);
+  const handleClearBookmarkSearch = () => {
+    setBookmarkSearchQuery('');
   };
 
   const handleSelect = (paper: Paper) => {
@@ -261,6 +179,75 @@ export const PaperSearchModal: React.FC<PaperSearchModalProps> = ({
     } catch {}
     onSelectPaper(paper);
     onClose();
+  };
+
+  const renderPaperCard = (paper: Paper) => {
+    const authorsText = (paper.authors || [])
+      .map((a) => a.name)
+      .slice(0, 3)
+      .join(', ') + ((paper.authors?.length || 0) > 3 ? ' et al.' : '');
+
+    return (
+      <TouchableOpacity
+        key={paper.id}
+        activeOpacity={0.75}
+        onPress={() => handleSelect(paper)}
+        style={styles.paperCard}
+      >
+        {/* Header: Journal Pill & Year */}
+        <View style={styles.paperCardTop}>
+          <View style={styles.journalBadge}>
+            <BookOpen size={12} color="#164E3F" />
+            <Text style={styles.journalBadgeText}>{paper.journal || 'Academic Literature'}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {paper.isOpenAccess && (
+              <View style={styles.oaBadge}>
+                <Text style={styles.oaBadgeText}>PDF</Text>
+              </View>
+            )}
+            <Text style={styles.yearText}>
+              {paper.publicationYear || (paper as any).publication_year || new Date().getFullYear()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Title */}
+        <Text style={styles.paperTitle} numberOfLines={2}>
+          {paper.title}
+        </Text>
+
+        {/* Authors & Citations */}
+        <Text style={styles.paperAuthors} numberOfLines={1}>
+          {authorsText || 'Academic Researcher'}
+          {paper.citationCount !== undefined && paper.citationCount > 0
+            ? ` • ${paper.citationCount} citations`
+            : ''}
+        </Text>
+
+        {/* Abstract snippet */}
+        {paper.abstract ? (
+          <Text style={styles.paperAbstract} numberOfLines={2}>
+            {paper.abstract}
+          </Text>
+        ) : null}
+
+        {/* Footer: DOI / Link & Share Button */}
+        <View style={styles.paperCardBottom}>
+          <View style={styles.doiTag}>
+            <ExternalLink size={11} color="#64748B" />
+            <Text style={styles.doiTagText} numberOfLines={1}>
+              {paper.doi ? `doi:${paper.doi}` : paper.canonicalUrl || (paper as any).canonical_url || 'Verified Paper'}
+            </Text>
+          </View>
+
+          <View style={styles.shareBtn}>
+            <Sparkles size={12} color="#FFFFFF" />
+            <Text style={styles.shareBtnText}>Share</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -293,34 +280,31 @@ export const PaperSearchModal: React.FC<PaperSearchModalProps> = ({
 
           <Text style={styles.modalSubtitle}>{subtitle}</Text>
 
-          {/* Search Bar Input */}
+          {/* 1. Global Search Area */}
           <View style={styles.searchBarRow}>
-            <Search size={18} color="#64748B" style={styles.searchIcon} />
+            <Globe size={18} color="#059669" style={styles.searchIcon} />
             <TextInput
-              value={query}
-              onChangeText={(text) => {
-                setQuery(text);
-                setActiveChip('');
-              }}
-              placeholder="Search by DOI, URL, title, keywords, or author..."
+              value={globalQuery}
+              onChangeText={setGlobalQuery}
+              placeholder="Global search by DOI, URL, title, or keywords..."
               placeholderTextColor="#94A3B8"
               style={styles.searchInput}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="search"
-              onSubmitEditing={() => executeSearch(query)}
+              onSubmitEditing={() => executeGlobalSearch(globalQuery)}
             />
-            {query.length > 0 && (
-              <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
+            {globalQuery.length > 0 && (
+              <TouchableOpacity onPress={handleClearGlobal} style={styles.clearBtn}>
                 <X size={16} color="#64748B" />
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              onPress={() => executeSearch(query)}
-              disabled={isSearching}
-              style={[styles.searchActionBtn, isSearching && { opacity: 0.7 }]}
+              onPress={() => executeGlobalSearch(globalQuery)}
+              disabled={isSearchingGlobal || !globalQuery.trim()}
+              style={[styles.searchActionBtn, (!globalQuery.trim() || isSearchingGlobal) && { opacity: 0.7 }]}
             >
-              {isSearching ? (
+              {isSearchingGlobal ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <Search size={16} color="#FFFFFF" />
@@ -328,46 +312,62 @@ export const PaperSearchModal: React.FC<PaperSearchModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Topic Suggestion Chips */}
-          <View style={styles.chipsScrollWrapper}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipsRow}
-            >
-              {TOPIC_SUGGESTION_CHIPS.map((chip) => {
-                const isSelected = activeChip === chip || (chip === 'All' && !query && !activeChip);
-                return (
-                  <TouchableOpacity
-                    key={chip}
-                    activeOpacity={0.7}
-                    onPress={() => handleChipPress(chip)}
-                    style={[styles.topicChip, isSelected && styles.topicChipActive]}
-                  >
-                    <Text style={[styles.topicChipText, isSelected && styles.topicChipTextActive]}>
-                      {chip}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* Section Label */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeaderTitle}>
-              {isSearching
-                ? 'Searching Scientific Registries...'
-                : hasSearched
-                ? `Results for "${query.trim()}" (${results.length})`
-                : 'Verified Preprints & Manuscripts'}
-            </Text>
-            {hasSearched && (
-              <TouchableOpacity onPress={handleClear}>
-                <Text style={styles.clearSearchLink}>Reset</Text>
+          {/* 2. Global Results Mode or Bookmarks Mode */}
+          {hasSearchedGlobal ? (
+            /* Global Results Mode */
+            <View style={styles.sectionHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                <Globe size={14} color="#059669" />
+                <Text style={styles.sectionHeaderTitle} numberOfLines={1}>
+                  {isSearchingGlobal
+                    ? 'Searching Global Registries...'
+                    : `Global Results for "${globalQuery.trim()}" (${globalResults.length})`}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleClearGlobal}
+                style={styles.backToBookmarksBtn}
+                activeOpacity={0.7}
+              >
+                <ArrowLeft size={12} color="#164E3F" />
+                <Text style={styles.backToBookmarksText}>Your Bookmarks</Text>
               </TouchableOpacity>
-            )}
-          </View>
+            </View>
+          ) : (
+            /* Bookmarks Mode */
+            <>
+              <View style={styles.bookmarksHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Bookmark size={15} color="#164E3F" fill="#164E3F" />
+                  <Text style={styles.bookmarksSectionTitle}>Your Bookmarks</Text>
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countBadgeText}>{bookmarkedPapers.length}</Text>
+                  </View>
+                </View>
+                <Text style={styles.bookmarksHintText}>Saved papers from your profile</Text>
+              </View>
+
+              {/* In-Bookmarks Search Bar */}
+              <View style={styles.bookmarkSearchRow}>
+                <Search size={15} color="#64748B" style={{ marginLeft: 10, marginRight: 6 }} />
+                <TextInput
+                  value={bookmarkSearchQuery}
+                  onChangeText={setBookmarkSearchQuery}
+                  placeholder="Search in your bookmarks..."
+                  placeholderTextColor="#94A3B8"
+                  style={styles.bookmarkSearchInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                />
+                {bookmarkSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={handleClearBookmarkSearch} style={styles.clearBtn}>
+                    <X size={14} color="#64748B" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
+          )}
 
           {/* Content List */}
           <ScrollView
@@ -376,93 +376,67 @@ export const PaperSearchModal: React.FC<PaperSearchModalProps> = ({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {isSearching ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#164E3F" />
-                <Text style={styles.loadingText}>
-                  Querying OpenAlex, Crossref, arXiv, and PubMed...
-                </Text>
-              </View>
-            ) : results.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <AlertCircle size={36} color="#94A3B8" />
-                <Text style={styles.emptyTitle}>No Matching Papers Found</Text>
-                <Text style={styles.emptySub}>
-                  No scientific literature matched "{query}". Try searching by another keyword, author name, or paste a DOI / preprint URL directly.
-                </Text>
-                <TouchableOpacity onPress={handleClear} style={styles.resetBtn}>
-                  <Text style={styles.resetBtnText}>View Curated Papers</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              results.map((paper) => {
-                const authorsText = (paper.authors || [])
-                  .map((a) => a.name)
-                  .slice(0, 3)
-                  .join(', ') + ((paper.authors?.length || 0) > 3 ? ' et al.' : '');
-
-                return (
-                  <TouchableOpacity
-                    key={paper.id}
-                    activeOpacity={0.75}
-                    onPress={() => handleSelect(paper)}
-                    style={styles.paperCard}
-                  >
-                    {/* Header: Journal Pill & Year */}
-                    <View style={styles.paperCardTop}>
-                      <View style={styles.journalBadge}>
-                        <BookOpen size={12} color="#164E3F" />
-                        <Text style={styles.journalBadgeText}>{paper.journal || 'Academic Literature'}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        {paper.isOpenAccess && (
-                          <View style={styles.oaBadge}>
-                            <Text style={styles.oaBadgeText}>PDF</Text>
-                          </View>
-                        )}
-                        <Text style={styles.yearText}>
-                          {paper.publicationYear || new Date().getFullYear()}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Title */}
-                    <Text style={styles.paperTitle} numberOfLines={2}>
-                      {paper.title}
-                    </Text>
-
-                    {/* Authors & Citations */}
-                    <Text style={styles.paperAuthors} numberOfLines={1}>
-                      {authorsText || 'Academic Researcher'}
-                      {paper.citationCount !== undefined && paper.citationCount > 0
-                        ? ` • ${paper.citationCount} citations`
-                        : ''}
-                    </Text>
-
-                    {/* Abstract snippet */}
-                    {paper.abstract ? (
-                      <Text style={styles.paperAbstract} numberOfLines={2}>
-                        {paper.abstract}
-                      </Text>
-                    ) : null}
-
-                    {/* Footer: DOI / Link & Share Button */}
-                    <View style={styles.paperCardBottom}>
-                      <View style={styles.doiTag}>
-                        <ExternalLink size={11} color="#64748B" />
-                        <Text style={styles.doiTagText} numberOfLines={1}>
-                          {paper.doi ? `doi:${paper.doi}` : paper.canonicalUrl || 'Verified Paper'}
-                        </Text>
-                      </View>
-
-                      <View style={styles.shareBtn}>
-                        <Sparkles size={12} color="#FFFFFF" />
-                        <Text style={styles.shareBtnText}>Share</Text>
-                      </View>
-                    </View>
+            {hasSearchedGlobal ? (
+              /* Global Search Results */
+              isSearchingGlobal ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#164E3F" />
+                  <Text style={styles.loadingText}>
+                    Querying OpenAlex, Crossref, arXiv, and PubMed...
+                  </Text>
+                </View>
+              ) : globalResults.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <AlertCircle size={36} color="#94A3B8" />
+                  <Text style={styles.emptyTitle}>No Matching Papers Found</Text>
+                  <Text style={styles.emptySub}>
+                    No global literature matched "{globalQuery}". Try searching by another title, author, or full DOI.
+                  </Text>
+                  <TouchableOpacity onPress={handleClearGlobal} style={styles.resetBtn}>
+                    <Text style={styles.resetBtnText}>Back to Your Bookmarks</Text>
                   </TouchableOpacity>
-                );
-              })
+                </View>
+              ) : (
+                globalResults.map(renderPaperCard)
+              )
+            ) : (
+              /* Bookmarks List */
+              isLoadingBookmarks ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#164E3F" />
+                  <Text style={styles.loadingText}>Loading your bookmarked papers...</Text>
+                </View>
+              ) : bookmarkedPapers.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Bookmark size={36} color="#94A3B8" />
+                  <Text style={styles.emptyTitle}>No Bookmarked Papers Yet</Text>
+                  <Text style={styles.emptySub}>
+                    Papers you save across BooffIn will appear here so you can easily share them directly to workspace chats.
+                  </Text>
+                  <Text style={[styles.emptySub, { marginTop: 4, color: '#059669', fontWeight: '600' }]}>
+                    Tip: Use the Global Search bar above to find and share any paper!
+                  </Text>
+                </View>
+              ) : filteredBookmarks.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <AlertCircle size={36} color="#94A3B8" />
+                  <Text style={styles.emptyTitle}>No Bookmarks Found</Text>
+                  <Text style={styles.emptySub}>
+                    No saved papers match "{bookmarkSearchQuery}". Try searching globally above.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setGlobalQuery(bookmarkSearchQuery);
+                      executeGlobalSearch(bookmarkSearchQuery);
+                    }}
+                    style={styles.resetBtn}
+                  >
+                    <Text style={styles.resetBtnText}>Search Globally Instead</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                filteredBookmarks.map(renderPaperCard)
+              )
             )}
           </ScrollView>
         </View>
@@ -482,7 +456,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 520,
-    maxHeight: Platform.OS === 'web' ? '88vh' as any : '88%',
+    maxHeight: Platform.OS === 'web' ? ('88vh' as any) : '88%',
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 20,
@@ -518,10 +492,10 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   modalSubtitle: {
-    fontSize: 12.5,
+    fontSize: 12,
     color: '#64748B',
-    lineHeight: 18,
     marginBottom: 14,
+    lineHeight: 17,
   },
   searchBarRow: {
     flexDirection: 'row',
@@ -539,68 +513,99 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 13.5,
+    fontSize: 13,
     color: '#0F172A',
-    paddingVertical: 0,
-    height: '100%',
+    paddingVertical: 8,
   },
   clearBtn: {
     padding: 6,
-    marginRight: 4,
   },
   searchActionBtn: {
     backgroundColor: '#164E3F',
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 6,
   },
-  chipsScrollWrapper: {
-    marginBottom: 12,
+  bookmarksHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 8,
+    paddingHorizontal: 2,
   },
-  chipsRow: {
-    gap: 6,
+  bookmarksSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  countBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 7,
     paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
-  topicChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+  countBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#164E3F',
+  },
+  bookmarksHintText: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  bookmarkSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    borderRadius: 10,
+    marginBottom: 10,
+    height: 36,
   },
-  topicChipActive: {
-    backgroundColor: '#164E3F',
-    borderColor: '#164E3F',
-  },
-  topicChipText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  topicChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+  bookmarkSearchInput: {
+    flex: 1,
+    fontSize: 12,
+    color: '#0F172A',
+    paddingVertical: 6,
+    paddingRight: 8,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 4,
     marginBottom: 8,
     paddingHorizontal: 2,
   },
   sectionHeaderTitle: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#059669',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    flex: 1,
   },
-  clearSearchLink: {
-    fontSize: 11.5,
-    fontWeight: '600',
+  backToBookmarksBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  backToBookmarksText: {
+    fontSize: 11,
+    fontWeight: '700',
     color: '#164E3F',
   },
   resultsList: {
