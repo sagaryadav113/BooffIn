@@ -317,6 +317,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
   // Chat input
   const [inputText, setInputText] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const [showDoiModal, setShowDoiModal] = useState(false);
   const [doiQuery, setDoiQuery] = useState('');
   const [isResolvingDoi, setIsResolvingDoi] = useState(false);
@@ -1936,7 +1937,15 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               ) : (
                 <View style={styles.bottomDockContainer}>
                   {/* Capsule Input */}
-                  <View style={styles.inputCapsule}>
+                  <View
+                    style={[
+                      styles.inputCapsule,
+                      (isInputFocused || Boolean(inputText.trim())) && [
+                        styles.inputCapsuleFocused,
+                        activeThemeConfig?.accentColor ? { borderColor: activeThemeConfig.accentColor } : null,
+                      ],
+                    ]}
+                  >
                     {/* 1. Camera icon: Direct Photo Upload */}
                     <TouchableOpacity
                       activeOpacity={0.7}
@@ -1949,6 +1958,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                     <TextInput
                       value={inputText}
                       onChangeText={handleTextChange}
+                      onFocus={() => setIsInputFocused(true)}
+                      onBlur={() => setIsInputFocused(false)}
                       placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
                       placeholderTextColor="#94A3B8"
                       style={styles.textInput}
@@ -3818,13 +3829,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 24,
     paddingHorizontal: 8,
-    height: 44,
+    minHeight: 44,
+    maxHeight: 120,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    ...(Platform.OS === 'web'
+      ? ({
+          transition: 'border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease',
+        } as any)
+      : {}),
+  },
+  inputCapsuleFocused: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#164E3F',
+    ...(Platform.OS === 'web'
+      ? ({
+          boxShadow: '0 0 0 3px rgba(22, 78, 63, 0.12)',
+        } as any)
+      : {}),
   },
   textInput: {
     flex: 1,
     fontSize: 14,
     color: '#0F172A',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    paddingTop: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
+    paddingBottom: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
+    textAlignVertical: 'center',
+    lineHeight: 20,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outline: 'none',
+          border: 'none',
+          resize: 'none',
+          boxShadow: 'none',
+        } as any)
+      : {}),
   },
   podcastHeaderCard: {
     backgroundColor: '#F0FDF4',

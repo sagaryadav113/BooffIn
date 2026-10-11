@@ -245,6 +245,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
   const [localPartner, setLocalPartner] = useState<any>(workspace.other_user || null);
   const [inputText, setInputText] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const partner = localPartner || workspace.other_user;
@@ -2371,7 +2372,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         /* Bottom Input Dock with Photo, Voice Note (Mic), Attachment Menu, and Send */
         <View style={styles.bottomDockContainer}>
           {/* Capsule Input */}
-          <View style={styles.inputCapsule}>
+          <View
+            style={[
+              styles.inputCapsule,
+              (isInputFocused || Boolean(inputText.trim())) && [
+                styles.inputCapsuleFocused,
+                activeThemeConfig?.accentColor ? { borderColor: activeThemeConfig.accentColor } : null,
+              ],
+            ]}
+          >
             {/* 1. Camera icon: Direct Photo Upload */}
             <TouchableOpacity
               activeOpacity={0.7}
@@ -2388,6 +2397,8 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 setInputText(text);
                 handleUserTyping(text);
               }}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
               placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
               placeholderTextColor="#94A3B8"
               style={styles.textInput}
@@ -4212,7 +4223,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 24,
     paddingHorizontal: 8,
-    height: 44,
+    minHeight: 44,
+    maxHeight: 120,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    ...(Platform.OS === 'web'
+      ? ({
+          transition: 'border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease',
+        } as any)
+      : {}),
+  },
+  inputCapsuleFocused: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#164E3F',
+    ...(Platform.OS === 'web'
+      ? ({
+          boxShadow: '0 0 0 3px rgba(22, 78, 63, 0.12)',
+        } as any)
+      : {}),
   },
   mediaIconBtn: {
     padding: 6,
@@ -4221,7 +4249,20 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#0F172A',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    paddingTop: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
+    paddingBottom: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
+    textAlignVertical: 'center',
+    lineHeight: 20,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outline: 'none',
+          border: 'none',
+          resize: 'none',
+          boxShadow: 'none',
+        } as any)
+      : {}),
   },
   detachedMicBtn: {
     width: 42,

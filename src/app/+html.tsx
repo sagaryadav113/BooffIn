@@ -83,6 +83,15 @@ export default function Root({ children }: PropsWithChildren) {
                 -webkit-user-drag: none;
                 user-select: none;
               }
+              input, textarea {
+                outline: none !important;
+                outline-style: none !important;
+              }
+              input:focus, textarea:focus {
+                outline: none !important;
+                outline-style: none !important;
+                box-shadow: none !important;
+              }
             `,
           }}
         />
