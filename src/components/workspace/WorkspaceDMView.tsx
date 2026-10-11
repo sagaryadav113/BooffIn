@@ -14,6 +14,7 @@ import {
   Alert,
   ScrollView,
   Animated,
+  ImageBackground,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
@@ -97,6 +98,7 @@ import { webrtcSignaling, IncomingCallPayload } from '../../services/webrtcSigna
 import { FEATURE_FLAGS } from '../../config/featureFlags';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
+import { useChatThemeStore } from '../../store/useChatThemeStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -224,6 +226,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
   // Global Workspace Settings
   const settings = useWorkspaceSettingsStore((s) => s.settings);
+
+  // Per-Chat Theme Config
+  const activeThemeConfig = useChatThemeStore((s) => s.getThemeConfig(workspace.id));
+
+  useEffect(() => {
+    if (workspace.id) {
+      useChatThemeStore.getState().loadChatTheme(workspace.id);
+    }
+  }, [workspace.id]);
 
   // Real-time typing & presence selectors
   const sendTypingIndicator = useWorkspaceStore((s) => s.sendTypingIndicator);
@@ -1582,11 +1593,11 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 ? styles.callLogBubble
                 : isAudio
                 ? isMe
-                  ? styles.myBubble
-                  : styles.otherBubble
+                  ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
+                  : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }]
                 : isMe
-                ? styles.myBubble
-                : styles.otherBubble,
+                ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
+                : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }],
               hasMediaContent && styles.bubbleWithMedia,
             ]}
           >
@@ -1864,7 +1875,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                       <Text
                         style={[
                           styles.messageText,
-                          isMe ? styles.myMessageText : styles.otherMessageText,
+                          isMe
+                            ? [styles.myMessageText, { color: activeThemeConfig.myBubbleTextColor }]
+                            : [styles.otherMessageText, { color: activeThemeConfig.otherBubbleTextColor }],
                         ]}
                       >
                         {displayMessageText}
@@ -1899,8 +1912,8 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                     : hasDoi || isPoll || isPost || isProfile || isWorkspaceInvite || isDocument || isCallLog
                     ? styles.doiTimestamp
                     : isMe
-                    ? styles.myTimestamp
-                    : styles.otherTimestamp,
+                    ? [styles.myTimestamp, { color: activeThemeConfig.timestampMyColor }]
+                    : [styles.otherTimestamp, { color: activeThemeConfig.timestampOtherColor }],
                 ]}
               >
                 {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -2154,109 +2167,125 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       )}
 
-      {/* Messages List */}
-      {isMessagesLoading && messages.length === 0 ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="small" color="#164E3F" />
-          <Text style={styles.loaderText}>Loading conversation...</Text>
-        </View>
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={displayedMessages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessageItem}
-          contentContainerStyle={styles.messagesList}
-          showsVerticalScrollIndicator={false}
-          onScroll={(e) => {
-            const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-            const paddingToBottom = 150;
-            const isClose = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
-            isAtBottomRef.current = isClose;
-          }}
-          onContentSizeChange={() => {
-            if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
-              flatListRef.current?.scrollToEnd({ animated: hasInitialScrolledRef.current });
-              hasInitialScrolledRef.current = true;
+      {/* Messages List wrapped with Chat Theme Background */}
+      <ImageBackground
+        source={activeThemeConfig.backgroundImage}
+        style={{ flex: 1, backgroundColor: activeThemeConfig.backgroundColor }}
+        imageStyle={{ resizeMode: 'cover', opacity: activeThemeConfig.backgroundImage ? 0.96 : 1 }}
+      >
+        {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
+          <View
+            pointerEvents="none"
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              backgroundColor: activeThemeConfig.accentColor,
+              opacity: activeThemeConfig.overlayOpacity,
+            }}
+          />
+        )}
+        {isMessagesLoading && messages.length === 0 ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="small" color="#164E3F" />
+            <Text style={styles.loaderText}>Loading conversation...</Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={displayedMessages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessageItem}
+            contentContainerStyle={styles.messagesList}
+            showsVerticalScrollIndicator={false}
+            onScroll={(e) => {
+              const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+              const paddingToBottom = 150;
+              const isClose = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+              isAtBottomRef.current = isClose;
+            }}
+            onContentSizeChange={() => {
+              if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
+                flatListRef.current?.scrollToEnd({ animated: hasInitialScrolledRef.current });
+                hasInitialScrolledRef.current = true;
+              }
+            }}
+            onLayout={() => {
+              if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Avatar
+                  uri={partner?.avatarUrl || undefined}
+                  name={partner?.fullName || 'Researcher'}
+                  size="lg"
+                />
+                <Text style={styles.emptyTitle}>
+                  {chatSearchQuery.trim() || activeChatFilter !== 'all'
+                    ? 'No matching messages'
+                    : partner?.fullName || 'Researcher'}
+                </Text>
+                <Text style={styles.emptyBio}>
+                  {chatSearchQuery.trim() || activeChatFilter !== 'all'
+                    ? 'Try searching with another keyword or clearing filters.'
+                    : `${partner?.academicTitle || 'Academic Researcher'}${partner?.institution ? ` · ${partner.institution}` : ''}`}
+                </Text>
+                {!chatSearchQuery && activeChatFilter === 'all' && (
+                  <>
+                    <View style={styles.mutualFollowBadge}>
+                      <CheckCircle2 size={13} color="#164E3F" />
+                      <Text style={styles.mutualFollowText}>Mutual Follow Verified</Text>
+                    </View>
+                    <Text style={styles.emptyPrompt}>
+                      You can now message each other directly and collaborate on research papers.
+                    </Text>
+
+                    {/* Quick Starter Chips */}
+                    <View style={styles.quickStartersRow}>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setInputText('Hey! What are you working on today?')}
+                        style={styles.quickStarterChip}
+                      >
+                        <Text style={styles.quickStarterChipText}>👋 Say Hello</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setInputText('Looks awesome! Still on for discussing that project later?')}
+                        style={styles.quickStarterChip}
+                      >
+                        <Text style={styles.quickStarterChipText}>🔬 Project Review</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setShowDoiModal(true)}
+                        style={styles.quickStarterChip}
+                      >
+                        <Text style={styles.quickStarterChipText}>📄 Share DOI Paper</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </View>
             }
-          }}
-          onLayout={() => {
-            if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
-              flatListRef.current?.scrollToEnd({ animated: false });
-            }
-          }}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Avatar
-                uri={partner?.avatarUrl || undefined}
-                name={partner?.fullName || 'Researcher'}
-                size="lg"
-              />
-              <Text style={styles.emptyTitle}>
-                {chatSearchQuery.trim() || activeChatFilter !== 'all'
-                  ? 'No matching messages'
-                  : partner?.fullName || 'Researcher'}
-              </Text>
-              <Text style={styles.emptyBio}>
-                {chatSearchQuery.trim() || activeChatFilter !== 'all'
-                  ? 'Try searching with another keyword or clearing filters.'
-                  : `${partner?.academicTitle || 'Academic Researcher'}${partner?.institution ? ` · ${partner.institution}` : ''}`}
-              </Text>
-              {!chatSearchQuery && activeChatFilter === 'all' && (
-                <>
-                  <View style={styles.mutualFollowBadge}>
-                    <CheckCircle2 size={13} color="#164E3F" />
-                    <Text style={styles.mutualFollowText}>Mutual Follow Verified</Text>
-                  </View>
-                  <Text style={styles.emptyPrompt}>
-                    You can now message each other directly and collaborate on research papers.
-                  </Text>
+          />
+        )}
 
-                  {/* Quick Starter Chips */}
-                  <View style={styles.quickStartersRow}>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => setInputText('Hey! What are you working on today?')}
-                      style={styles.quickStarterChip}
-                    >
-                      <Text style={styles.quickStarterChipText}>👋 Say Hello</Text>
-                    </TouchableOpacity>
+        {/* Uploading Indicator */}
+        {isUploadingMedia && (
+          <View style={styles.uploadingMediaBanner}>
+            <ActivityIndicator size="small" color="#164E3F" />
+            <Text style={styles.uploadingMediaText}>Uploading image...</Text>
+          </View>
+        )}
 
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => setInputText('Looks awesome! Still on for discussing that project later?')}
-                      style={styles.quickStarterChip}
-                    >
-                      <Text style={styles.quickStarterChipText}>🔬 Project Review</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => setShowDoiModal(true)}
-                      style={styles.quickStarterChip}
-                    >
-                      <Text style={styles.quickStarterChipText}>📄 Share DOI Paper</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-            </View>
-          }
-        />
-      )}
-
-      {/* Uploading Indicator */}
-      {isUploadingMedia && (
-        <View style={styles.uploadingMediaBanner}>
-          <ActivityIndicator size="small" color="#164E3F" />
-          <Text style={styles.uploadingMediaText}>Uploading image...</Text>
-        </View>
-      )}
-
-      {/* Realtime Partner Animated Typing Bubble Indicator */}
-      {isPartnerTyping && typingPartnerName && (
-        <AnimatedTypingIndicator name={typingPartnerName} />
-      )}
+        {/* Realtime Partner Animated Typing Bubble Indicator */}
+        {isPartnerTyping && typingPartnerName && (
+          <AnimatedTypingIndicator name={typingPartnerName} />
+        )}
+      </ImageBackground>
 
       {/* Docked Quoted Reply Bar */}
       {replyingTo && (

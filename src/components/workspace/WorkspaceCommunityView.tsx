@@ -14,6 +14,7 @@ import {
   Linking,
   Alert,
   Animated,
+  ImageBackground,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
@@ -92,6 +93,7 @@ import { PaperSearchModal } from '../chat/PaperSearchModal';
 import { Paper } from '../../types';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
+import { useChatThemeStore } from '../../store/useChatThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -204,6 +206,15 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     workspace.status === 'disabled' ||
     workspace.settings?.is_disabled
   );
+
+  // Per-Chat Theme Config
+  const activeThemeConfig = useChatThemeStore((s) => s.getThemeConfig(workspace.id));
+
+  useEffect(() => {
+    if (workspace.id) {
+      useChatThemeStore.getState().loadChatTheme(workspace.id);
+    }
+  }, [workspace.id]);
 
   // Workspace Store Data & Actions
   const messages = useWorkspaceStore((s) => s.messages);
@@ -1400,7 +1411,21 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
       {/* Tab 2: Discussion (Real Chat Feed with Rich Academic Cards) */}
       {activeTab === 'discussion' && (
-        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+        <ImageBackground
+          source={activeThemeConfig.backgroundImage}
+          style={{ flex: 1, backgroundColor: activeThemeConfig.backgroundColor }}
+          imageStyle={{ resizeMode: 'cover', opacity: activeThemeConfig.backgroundImage ? 0.96 : 1 }}
+        >
+          {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
+            <View
+              pointerEvents="none"
+              style={{
+                ...StyleSheet.absoluteFillObject,
+                backgroundColor: activeThemeConfig.accentColor,
+                opacity: activeThemeConfig.overlayOpacity,
+              }}
+            />
+          )}
           <FlatList
             ref={flatListRef}
             data={filteredMessages}
@@ -1521,7 +1546,9 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                             onLongPress={() => handleLongPressMessage(item)}
                             style={[
                               styles.messageBubble,
-                              isMe ? styles.myBubble : styles.otherBubble,
+                              isMe
+                                ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
+                                : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }],
                               isDeleted && styles.deletedBubble,
                               hasMediaContent && styles.bubbleWithMedia,
                             ]}
@@ -1733,7 +1760,14 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
                           {/* Main Text Content */}
                           {item.content && !isVoiceNote && !isPoll && !item.doi_metadata && !docMeta && (
-                            <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
+                            <Text
+                              style={[
+                                styles.messageText,
+                                isMe
+                                  ? [styles.myMessageText, { color: activeThemeConfig.myBubbleTextColor }]
+                                  : [styles.otherMessageText, { color: activeThemeConfig.otherBubbleTextColor }],
+                              ]}
+                            >
                               {item.content}
                             </Text>
                           )}
@@ -1745,7 +1779,14 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                                 edited •{' '}
                               </Text>
                             )}
-                            <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
+                            <Text
+                              style={[
+                                styles.timestamp,
+                                isMe
+                                  ? [styles.myTimestamp, { color: activeThemeConfig.timestampMyColor }]
+                                  : [styles.otherTimestamp, { color: activeThemeConfig.timestampOtherColor }],
+                              ]}
+                            >
                               {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </Text>
                             {isMe && (
@@ -1926,7 +1967,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               )}
             </View>
           )}
-        </View>
+        </ImageBackground>
       )}
 
       {/* Tab 3: Podcasts */}

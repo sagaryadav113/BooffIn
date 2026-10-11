@@ -14,6 +14,7 @@ import {
   Linking,
   Alert,
   Animated,
+  ImageBackground,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
@@ -110,6 +111,7 @@ import { PaperSearchModal } from '../chat/PaperSearchModal';
 import { Paper } from '../../types';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
+import { useChatThemeStore } from '../../store/useChatThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
 import { resolvePaper } from '../../api/paperResolver';
@@ -224,6 +226,15 @@ interface WorkspaceInnerCircleViewProps {
 export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> = ({ workspace }) => {
   const currentUser = useAuthStore((s) => s.user);
   const [activeTab, setActiveTab] = useState<InnerCircleTab>('discussions');
+
+  // Per-Chat Theme Config
+  const activeThemeConfig = useChatThemeStore((s) => s.getThemeConfig(workspace.id));
+
+  useEffect(() => {
+    if (workspace.id) {
+      useChatThemeStore.getState().loadChatTheme(workspace.id);
+    }
+  }, [workspace.id]);
 
   // Workspace Store Data & Actions
   const messages = useWorkspaceStore((s) => s.messages);
@@ -1409,7 +1420,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     if (!content) return null;
     const parts = content.split(/(@[a-zA-Z0-9_]+)/g);
     return (
-      <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
+      <Text
+        style={[
+          styles.messageText,
+          isMe
+            ? [styles.myMessageText, { color: activeThemeConfig.myBubbleTextColor }]
+            : [styles.otherMessageText, { color: activeThemeConfig.otherBubbleTextColor }],
+        ]}
+      >
         {parts.map((part, i) => {
           if (part.startsWith('@')) {
             const isSpecial = part === '@everyone' || part === '@admins';
@@ -1631,7 +1649,21 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
       {/* 3. Main Discussions Feed */}
       {activeTab === 'discussions' && (
-        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+        <ImageBackground
+          source={activeThemeConfig.backgroundImage}
+          style={{ flex: 1, backgroundColor: activeThemeConfig.backgroundColor }}
+          imageStyle={{ resizeMode: 'cover', opacity: activeThemeConfig.backgroundImage ? 0.96 : 1 }}
+        >
+          {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
+            <View
+              pointerEvents="none"
+              style={{
+                ...StyleSheet.absoluteFillObject,
+                backgroundColor: activeThemeConfig.accentColor,
+                opacity: activeThemeConfig.overlayOpacity,
+              }}
+            />
+          )}
           {/* Pinned Announcement / Message Banner */}
           {pinnedMessage && (
             <TouchableOpacity
@@ -1827,7 +1859,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                           onLongPress={() => handleLongPressMessage(item)}
                           style={[
                             styles.messageBubble,
-                            isMe ? styles.myBubble : styles.otherBubble,
+                            isMe
+                              ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
+                              : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }],
                             hasMediaContent && styles.bubbleWithMedia,
                           ]}
                         >
@@ -2090,7 +2124,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                           (edited)
                         </Text>
                       )}
-                      <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
+                      <Text
+                        style={[
+                          styles.timestamp,
+                          isMe
+                            ? [styles.myTimestamp, { color: activeThemeConfig.timestampMyColor }]
+                            : [styles.otherTimestamp, { color: activeThemeConfig.timestampOtherColor }],
+                        ]}
+                      >
                         {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </Text>
                       {isMe && (
@@ -2313,7 +2354,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               </View>
             </View>
           )}
-        </View>
+        </ImageBackground>
       )}
 
       {/* Action Menu Modal (Long-Press on Message) */}

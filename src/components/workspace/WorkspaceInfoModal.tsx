@@ -52,6 +52,7 @@ import {
   Clock,
   BookOpen,
   Sparkles,
+  Palette,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -60,6 +61,7 @@ import { Workspace, WorkspaceMember, WorkspaceMemberRole } from '../../types/wor
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { useChatThemeStore } from '../../store/useChatThemeStore';
 import { workspaceService } from '../../api/workspaceService';
 import { blockUser, reportContent } from '../../api/moderationService';
 import { unfollowUser } from '../../api/socialService';
@@ -67,6 +69,7 @@ import { uploadPostImage } from '../../api/storageService';
 import { Avatar } from '../core/Avatar';
 import { GroupCollageAvatar } from './GroupCollageAvatar';
 import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
+import { ChatThemePickerModal } from '../chat/ChatThemePickerModal';
 import { WorkspaceExportModal } from './WorkspaceExportModal';
 import { WorkspaceAddMembersModal } from './WorkspaceAddMembersModal';
 
@@ -112,6 +115,15 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
+  const [showThemeModal, setShowThemeModal] = useState(false);
+
+  const currentChatThemeConfig = useChatThemeStore((s) => s.getThemeConfig(workspace.id));
+
+  useEffect(() => {
+    if (workspace.id) {
+      useChatThemeStore.getState().loadChatTheme(workspace.id);
+    }
+  }, [workspace.id]);
 
   // Disable Community Confirmation State
   const [showDisableCommunityModal, setShowDisableCommunityModal] = useState(false);
@@ -1246,6 +1258,38 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               </View>
             )}
 
+            {/* Chat Theme (Custom per-chat wallpaper & doodle palette) */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowThemeModal(true)}
+              style={styles.menuRow}
+            >
+              <View style={styles.menuIconWrap}>
+                <Palette size={22} color="#0F172A" strokeWidth={2} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={styles.menuTitle}>Chat theme</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: 8,
+                        backgroundColor: currentChatThemeConfig.previewColor,
+                        borderWidth: 1.5,
+                        borderColor: '#E2E8F0',
+                      }}
+                    />
+                    <ChevronRight size={16} color="#94A3B8" />
+                  </View>
+                </View>
+                <Text style={styles.menuSubtitle}>
+                  {currentChatThemeConfig.name} • Customize wallpaper & colors
+                </Text>
+              </View>
+            </TouchableOpacity>
+
             {/* Media, links, and docs (Vault Gallery) */}
             <TouchableOpacity
               activeOpacity={0.7}
@@ -1946,6 +1990,14 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
           workspace={workspace}
           existingMembers={members}
           onMemberAdded={handleOptimisticMembersAdded}
+        />
+
+        {/* Chat Theme Picker Modal */}
+        <ChatThemePickerModal
+          visible={showThemeModal}
+          onClose={() => setShowThemeModal(false)}
+          workspaceId={workspace.id}
+          chatName={displayName}
         />
       </SafeAreaView>
     </Modal>
