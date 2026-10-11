@@ -121,6 +121,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isInitialized: true,
         });
         get().loadFollowingIds(user.id);
+        import('../utils/e2eeCrypto').then(({ getOrCreateUserKeyPair }) => {
+          getOrCreateUserKeyPair(user.id).catch(() => {});
+        });
       } else {
         set({
           user: emptyUserProfile,
@@ -229,6 +232,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isLoading: false,
       authError: null,
     });
+    import('../utils/e2eeCrypto').then(({ getOrCreateUserKeyPair }) => {
+      getOrCreateUserKeyPair(user.id).catch(() => {});
+    });
     return true;
   },
 
@@ -252,6 +258,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authError: null,
       users: [user, ...state.users.filter((u) => u.id !== user.id)],
     }));
+    import('../utils/e2eeCrypto').then(({ getOrCreateUserKeyPair }) => {
+      getOrCreateUserKeyPair(user.id).catch(() => {});
+    });
     return true;
   },
 
@@ -276,6 +285,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         authError: null,
       });
       get().loadFollowingIds(user.id);
+      import('../utils/e2eeCrypto').then(({ getOrCreateUserKeyPair }) => {
+        getOrCreateUserKeyPair(user.id).catch(() => {});
+      });
       return true;
     }
     // Browser is actively navigating to Google OAuth consent page; keep loading active
@@ -303,6 +315,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         authError: null,
       });
       get().loadFollowingIds(user.id);
+      import('../utils/e2eeCrypto').then(({ getOrCreateUserKeyPair }) => {
+        getOrCreateUserKeyPair(user.id).catch(() => {});
+      });
       return true;
     }
     // Browser is actively navigating to ORCID OAuth consent page; keep loading active

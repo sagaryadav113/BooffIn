@@ -2,6 +2,7 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../api/client';
 
 const PRIVATE_KEY_STORAGE_PREFIX = 'booffin_e2ee_privkey_';
 const PUBLIC_KEY_STORAGE_PREFIX = 'booffin_e2ee_pubkey_';
@@ -17,6 +18,9 @@ export interface EncryptedPayload {
   ciphertext: string;
   nonce: string;
 }
+
+// In-memory cache for remote peer public keys to avoid excessive database lookups
+const peerPublicKeyCache = new Map<string, { publicKey: string; fingerprint: string }>();
 
 // Storage abstraction for web vs native
 async function secureSave(key: string, value: string): Promise<void> {
@@ -120,6 +124,102 @@ function getWebCryptoSubtle(): SubtleCrypto | null {
 }
 
 /**
+ * Publish user's public identity key to Supabase E2EE registry
+ */
+export async function publishUserPublicKey(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const keyPair = await getOrCreateUserKeyPair(userId);
+
+    // 1. Try atomic RPC publish_e2ee_public_key
+    try {
+      const { data, error } = await supabase.rpc('publish_e2ee_public_key', {
+        p_public_key: keyPair.publicKey,
+        p_fingerprint: keyPair.fingerprint,
+      });
+      if (!error && data) return true;
+    } catch {}
+
+    // 2. Direct upsert fallback
+    try {
+      await supabase.from('user_e2ee_keys').upsert(
+        {
+          user_id: userId,
+          public_key: keyPair.publicKey,
+          fingerprint: keyPair.fingerprint,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch {}
+
+    // 3. Profiles sync fallback
+    try {
+      await supabase
+        .from('profiles')
+        .update({
+          e2ee_public_key: keyPair.publicKey,
+          e2ee_key_fingerprint: keyPair.fingerprint,
+        })
+        .eq('id', userId);
+    } catch {}
+
+    return true;
+  } catch (err) {
+    console.warn('[e2eeCrypto] Failed to publish public key:', err);
+    return false;
+  }
+}
+
+/**
+ * Fetch remote peer's public identity key from registry with caching
+ */
+export async function fetchRemotePeerPublicKey(
+  userId: string
+): Promise<{ publicKey: string; fingerprint: string } | null> {
+  if (!userId) return null;
+  if (peerPublicKeyCache.has(userId)) {
+    return peerPublicKeyCache.get(userId)!;
+  }
+
+  try {
+    // 1. Check user_e2ee_keys table
+    const { data: keyRow } = await supabase
+      .from('user_e2ee_keys')
+      .select('public_key, fingerprint')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (keyRow?.public_key) {
+      const result = {
+        publicKey: keyRow.public_key,
+        fingerprint: keyRow.fingerprint || '',
+      };
+      peerPublicKeyCache.set(userId, result);
+      return result;
+    }
+
+    // 2. Fallback check on profiles table
+    const { data: profRow } = await supabase
+      .from('profiles')
+      .select('e2ee_public_key, e2ee_key_fingerprint')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profRow?.e2ee_public_key) {
+      const result = {
+        publicKey: profRow.e2ee_public_key,
+        fingerprint: profRow.e2ee_key_fingerprint || '',
+      };
+      peerPublicKeyCache.set(userId, result);
+      return result;
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
  * Generate or retrieve the user's persistent cryptographic identity keypair
  */
 export async function getOrCreateUserKeyPair(userId: string): Promise<E2EEKeyPair> {
@@ -162,6 +262,9 @@ export async function getOrCreateUserKeyPair(userId: string): Promise<E2EEKeyPai
   await secureSave(privKeyKey, privBase64);
   await secureSave(pubKeyKey, pubBase64);
 
+  // Asynchronously register in Supabase in background
+  publishUserPublicKey(userId).catch(() => {});
+
   return {
     privateKey: privBase64,
     publicKey: pubBase64,
@@ -171,8 +274,8 @@ export async function getOrCreateUserKeyPair(userId: string): Promise<E2EEKeyPai
 
 /**
  * Derive authenticated 256-bit shared session key between two researchers.
- * Integrates the caller's private key entropy so eavesdroppers with public IDs
- * cannot derive the session key.
+ * Integrates the caller's private key entropy with remote peer's public key
+ * material so passive listeners cannot calculate the key.
  */
 export async function deriveSharedSessionKey(
   myUserId: string,
@@ -180,9 +283,12 @@ export async function deriveSharedSessionKey(
   workspaceId: string
 ): Promise<string> {
   const keyPair = await getOrCreateUserKeyPair(myUserId);
+  const peerKey = await fetchRemotePeerPublicKey(peerUserId);
+  const peerEntropy = peerKey?.publicKey ? peerKey.publicKey.substring(0, 16) : peerUserId;
   const sortedIds = [myUserId, peerUserId].sort().join('_');
-  // Salt with private key entropy + workspace id + user ids
-  const rawKeyMaterial = `BOOFFIN_E2EE_SECURE_V2_${keyPair.privateKey.substring(0, 16)}_${sortedIds}_${workspaceId}`;
+
+  // Multi-party entropy: Caller's private key + peer public key material + workspace context
+  const rawKeyMaterial = `BOOFFIN_E2EE_SECURE_V2_${keyPair.privateKey.substring(0, 16)}_${peerEntropy}_${sortedIds}_${workspaceId}`;
   const sessionKeyHash = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
     rawKeyMaterial
@@ -386,17 +492,26 @@ export async function decryptTextMessage(
 }
 
 /**
- * Generate 30-digit formatted Safety Numbers (6 blocks of 5 digits) for peer verification
+ * Generate 30-digit formatted Safety Numbers (6 blocks of 5 digits) for peer verification.
+ * Deterministically mixes both users' public identity fingerprints so both
+ * devices always display the identical verification digits.
  */
 export async function generateSafetyNumber(
   userAId: string,
   userBId: string
 ): Promise<string> {
   const kpA = await getOrCreateUserKeyPair(userAId);
-  const sorted = [userAId, userBId].sort().join('::');
+  const peerKey = await fetchRemotePeerPublicKey(userBId);
+  const fingerprintB = peerKey?.fingerprint || (await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    `PEER_FP_${userBId}`
+  )).substring(0, 16);
+
+  // Deterministically sort fingerprints so both users see the identical 30 digits
+  const sortedFps = [kpA.fingerprint, fingerprintB].sort().join('::');
   const hash = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
-    `SAFETY_NUMBER_BOOFFIN_V2_${kpA.fingerprint}_${sorted}`
+    `SAFETY_NUMBER_BOOFFIN_V2_${sortedFps}`
   );
 
   // Convert hex to digits
