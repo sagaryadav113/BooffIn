@@ -103,7 +103,7 @@ interface WorkspaceState {
     media_urls?: string[] | null;
     e2ee_ciphertext?: string | null;
     e2ee_nonce?: string | null;
-  }) => Promise<{ success: boolean; error: string | null }>;
+  }) => Promise<{ success: boolean; message?: WorkspaceMessage | null; error: string | null }>;
   toggleReaction: (
     messageId: string,
     emoji: string
@@ -475,7 +475,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         });
       }
 
-      return { success: true, error: null };
+      return { success: true, message: res.message, error: null };
     } catch (err: any) {
       set({ isSending: false });
       return { success: false, error: err.message || 'Failed to send' };

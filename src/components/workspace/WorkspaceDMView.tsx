@@ -476,16 +476,32 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   // E2EE Auto-Decryption Effect for incoming encrypted ciphertexts
   useEffect(() => {
     async function decryptEncryptedMessages() {
-      const peerId = localPartner?.id || workspace.other_user?.id;
+      const peerId =
+        localPartner?.id ||
+        workspace.other_user?.id ||
+        (workspace.dm_participant_a === currentUser?.id
+          ? workspace.dm_participant_b
+          : workspace.dm_participant_a);
       if (!currentUser?.id || !peerId) return;
       try {
         const sessionKey = await deriveSharedSessionKey(currentUser.id, peerId, workspace.id);
         const updates: Record<string, string> = {};
         for (const m of messages) {
-          if (m.e2ee_ciphertext && m.e2ee_nonce && !decryptedTextMap[m.id]) {
+          if (decryptedTextMap[m.id]) continue;
+          const cipher = m.e2ee_ciphertext || m.attachments?.e2ee_ciphertext;
+          const nonce = m.e2ee_nonce || m.attachments?.e2ee_nonce;
+          if (cipher && nonce) {
             try {
-              const dec = await decryptTextMessage(m.e2ee_ciphertext, m.e2ee_nonce, sessionKey);
-              if (dec) updates[m.id] = dec;
+              const dec = await decryptTextMessage(cipher, nonce, sessionKey);
+              if (dec && !dec.startsWith('🔒 [')) {
+                updates[m.id] = dec;
+              }
+            } catch {}
+          } else {
+            // Check local persistent cache
+            try {
+              const cached = await AsyncStorage.getItem(`e2ee_cache_${m.id}`);
+              if (cached) updates[m.id] = cached;
             } catch {}
           }
         }
@@ -495,7 +511,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       } catch {}
     }
     decryptEncryptedMessages();
-  }, [messages, currentUser?.id, localPartner?.id, workspace.other_user?.id, workspace.id]);
+  }, [messages, currentUser?.id, localPartner?.id, workspace.other_user?.id, workspace.dm_participant_a, workspace.dm_participant_b, workspace.id]);
 
   useEffect(() => {
     if (workspace.other_user) {
@@ -1314,12 +1330,13 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
     if (res.success) {
       sendTypingIndicator(workspace.id, false);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      if (e2eeCipher && trimmed) {
-        // Auto-register plaintext into decrypted map for instant zero-latency rendering
-        const lastMsg = messages[messages.length - 1];
-        if (lastMsg?.id) {
-          setDecryptedTextMap((prev) => ({ ...prev, [lastMsg.id]: trimmed }));
+      if (trimmed) {
+        const newMsgId = res.message?.id;
+        if (newMsgId) {
+          setDecryptedTextMap((prev) => ({ ...prev, [newMsgId]: trimmed }));
+          try {
+            AsyncStorage.setItem(`e2ee_cache_${newMsgId}`, trimmed).catch(() => {});
+          } catch {}
         }
       }
       setInputText('');
@@ -1927,9 +1944,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
                 {/* Text Content */}
                 {(() => {
-                  const isEncrypted = Boolean(item.e2ee_ciphertext);
+                  const isEncrypted = Boolean(item.e2ee_ciphertext || item.attachments?.e2ee_ciphertext || item.content === '🔒 Encrypted message');
                   const displayMessageText = isEncrypted
-                    ? (decryptedTextMap[item.id] || item.content || '🔒 Encrypted message')
+                    ? (decryptedTextMap[item.id] || (item.content !== '🔒 Encrypted message' ? item.content : '🔒 Encrypted message'))
                     : item.content;
 
                   if (

@@ -458,10 +458,20 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         const podKey = await derivePodSessionKey(workspace.id);
         const updates: Record<string, string> = {};
         for (const m of messages) {
-          if (m.e2ee_ciphertext && m.e2ee_nonce && !decryptedTextMap[m.id]) {
+          if (decryptedTextMap[m.id]) continue;
+          const cipher = m.e2ee_ciphertext || m.attachments?.e2ee_ciphertext;
+          const nonce = m.e2ee_nonce || m.attachments?.e2ee_nonce;
+          if (cipher && nonce) {
             try {
-              const dec = await decryptTextMessage(m.e2ee_ciphertext, m.e2ee_nonce, podKey);
-              if (dec) updates[m.id] = dec;
+              const dec = await decryptTextMessage(cipher, nonce, podKey);
+              if (dec && !dec.startsWith('🔒 [')) {
+                updates[m.id] = dec;
+              }
+            } catch {}
+          } else {
+            try {
+              const cached = await AsyncStorage.getItem(`e2ee_cache_${m.id}`);
+              if (cached) updates[m.id] = cached;
             } catch {}
           }
         }
@@ -1235,10 +1245,13 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     if (res.success) {
       sendTypingIndicator(workspace.id, false);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      if (e2eeCipher && trimmed) {
-        const lastMsg = messages[messages.length - 1];
-        if (lastMsg?.id) {
-          setDecryptedTextMap((prev) => ({ ...prev, [lastMsg.id]: trimmed }));
+      if (trimmed) {
+        const newMsgId = res.message?.id;
+        if (newMsgId) {
+          setDecryptedTextMap((prev) => ({ ...prev, [newMsgId]: trimmed }));
+          try {
+            AsyncStorage.setItem(`e2ee_cache_${newMsgId}`, trimmed).catch(() => {});
+          } catch {}
         }
       }
       setInputText('');
@@ -2154,9 +2167,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         </Text>
                       </View>
                     ) : (() => {
-                      const isEncrypted = Boolean(item.e2ee_ciphertext);
+                      const isEncrypted = Boolean(item.e2ee_ciphertext || item.attachments?.e2ee_ciphertext || item.content === '🔒 Encrypted message');
                       const displayContent = isEncrypted
-                        ? (decryptedTextMap[item.id] || item.content || '🔒 Encrypted message')
+                        ? (decryptedTextMap[item.id] || (item.content !== '🔒 Encrypted message' ? item.content : '🔒 Encrypted message'))
                         : item.content;
 
                       if (

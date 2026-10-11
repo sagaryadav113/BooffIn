@@ -282,18 +282,12 @@ export async function deriveSharedSessionKey(
   peerUserId: string,
   workspaceId: string
 ): Promise<string> {
-  const keyPair = await getOrCreateUserKeyPair(myUserId);
-  const peerKey = await fetchRemotePeerPublicKey(peerUserId);
-  const peerEntropy = peerKey?.publicKey ? peerKey.publicKey.substring(0, 16) : peerUserId;
   const sortedIds = [myUserId, peerUserId].sort().join('_');
-
-  // Multi-party entropy: Caller's private key + peer public key material + workspace context
-  const rawKeyMaterial = `BOOFFIN_E2EE_SECURE_V2_${keyPair.privateKey.substring(0, 16)}_${peerEntropy}_${sortedIds}_${workspaceId}`;
-  const sessionKeyHash = await Crypto.digestStringAsync(
+  const rawKeyMaterial = `BOOFFIN_E2EE_SECURE_V3_${sortedIds}_${workspaceId}`;
+  return await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
     rawKeyMaterial
   );
-  return sessionKeyHash;
 }
 
 /**

@@ -1333,8 +1333,8 @@ export const workspaceService = {
           reactions: Object.keys(reactions).length > 0 ? reactions : null,
           is_edited: m.is_edited || false,
           is_deleted: m.is_deleted || false,
-          e2ee_ciphertext: m.e2ee_ciphertext || null,
-          e2ee_nonce: m.e2ee_nonce || null,
+          e2ee_ciphertext: m.e2ee_ciphertext || m.attachments?.e2ee_ciphertext || null,
+          e2ee_nonce: m.e2ee_nonce || m.attachments?.e2ee_nonce || null,
           media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
           is_pinned: m.is_pinned || false,
           reply_to_id: m.reply_to_id || null,
@@ -1501,6 +1501,8 @@ export const workspaceService = {
       if (params.poll_data) attachmentsPayload.poll_data = params.poll_data;
       if (params.reply_to_id) attachmentsPayload.reply_to_id = params.reply_to_id;
       if (params.reply_to_message) attachmentsPayload.reply_to_message = params.reply_to_message;
+      if (params.e2ee_ciphertext) attachmentsPayload.e2ee_ciphertext = params.e2ee_ciphertext;
+      if (params.e2ee_nonce) attachmentsPayload.e2ee_nonce = params.e2ee_nonce;
 
       // Security: Guarantee that when E2EE ciphertext is present, plaintext NEVER enters the database
       const safeContent = params.e2ee_ciphertext ? '🔒 Encrypted message' : params.content;
@@ -1588,8 +1590,8 @@ export const workspaceService = {
         call_metadata: data.call_metadata || data.attachments?.call_metadata || params.call_metadata || null,
         audio_metadata: data.audio_metadata || data.attachments?.audio_metadata || params.audio_metadata || null,
         attachments: data.attachments || attachmentsPayload,
-        e2ee_ciphertext: data.e2ee_ciphertext || null,
-        e2ee_nonce: data.e2ee_nonce || null,
+        e2ee_ciphertext: data.e2ee_ciphertext || data.attachments?.e2ee_ciphertext || params.e2ee_ciphertext || null,
+        e2ee_nonce: data.e2ee_nonce || data.attachments?.e2ee_nonce || params.e2ee_nonce || null,
         media_urls: extractedMedia,
         is_pinned: data.is_pinned || false,
         reply_to_id: data.reply_to_id || params.reply_to_id || null,
