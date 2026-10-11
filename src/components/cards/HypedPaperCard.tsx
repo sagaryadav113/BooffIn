@@ -1,19 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ViewStyle,
+  Share,
 } from 'react-native';
 import { router } from 'expo-router';
-import { TrendingUp, Share2 } from 'lucide-react-native';
+import { Share2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Paper } from '../../types';
 import { radii, typography } from '../../theme';
 import { SaveButton } from '../core/SaveButton';
 import { DiscussionIcon } from '../core/DiscussionIcon';
 import { ReadBookIcon } from '../core/ReadBookIcon';
+import { ShareToChatButton } from '../core/ShareToChatButton';
+import { SharePostToWorkspaceModal } from '../modals/SharePostToWorkspaceModal';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { getPaperMetrics, subscribeToPaperRead, PaperMetrics, calculate48hHypeScore } from '../../api/hypeScoreService';
@@ -52,6 +55,7 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
   const currentUser = useAuthStore((s) => s.user);
 
   const [metrics, setMetrics] = React.useState<PaperMetrics | null>(null);
+  const [isShareToWorkspaceOpen, setIsShareToWorkspaceOpen] = useState(false);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -98,18 +102,23 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
     toggleSavePaper(paper.id, currentUser?.id, paper);
   };
 
-  const handleShare = (e?: any) => {
+  const handleShare = async (e?: any) => {
     e?.stopPropagation?.();
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    // Share action
+    try {
+      await Share.share({
+        message: `${paper.title}\n\nRead on BooffIn: ${paper.canonicalUrl || 'https://booffin.com'}`,
+        url: paper.canonicalUrl || paper.openAccessUrl,
+        title: paper.title,
+      });
+    } catch {}
   };
 
   // Real synchronized counts across card and article viewer
   const readCount = metrics?.views ?? (paper as any).viewsCount ?? 0;
   const discussionCount = paper.discussionCount ?? 0;
-  const citationCount = paper.citationCount ?? 0;
   const shareCount = (paper as any).sharesCount ?? (readCount > 0 ? Math.floor(readCount * 0.05) : 0);
 
   // Authentic 48-Hour HYPE score (only computed if genuine community rating exists)
@@ -168,11 +177,12 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
   }, [paper.topics]);
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.88}
-      onPress={handleCardPress}
-      style={[styles.container, style]}
-    >
+    <>
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={handleCardPress}
+        style={[styles.container, style]}
+      >
       {/* Top Left Floating Rank Badge */}
       <View
         style={[
@@ -230,13 +240,13 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
               </Text>
             </View>
 
-            {/* Citations / Velocity */}
-            <View style={styles.metricItem}>
-              <TrendingUp size={14} color="#64748B" strokeWidth={2} />
-              <Text style={styles.metricValue}>
-                {formatCompactNumber(citationCount)}
-              </Text>
-            </View>
+            {/* In-App Direct Share to Chat / Workspace (DM, Community, Inner Circle) */}
+            <ShareToChatButton
+              onPress={() => setIsShareToWorkspaceOpen(true)}
+              size={14}
+              color="#64748B"
+              style={styles.shareChatBtn}
+            />
 
             {/* Shares */}
             <TouchableOpacity
@@ -284,6 +294,16 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
         </View>
       </View>
     </TouchableOpacity>
+
+    {/* Share to Workspace Modal */}
+    {isShareToWorkspaceOpen && (
+      <SharePostToWorkspaceModal
+        visible={isShareToWorkspaceOpen}
+        onClose={() => setIsShareToWorkspaceOpen(false)}
+        paper={paper}
+      />
+    )}
+  </>
   );
 };
 
@@ -449,5 +469,9 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#1B4D3E',
     borderRadius: radii.full,
+  },
+  shareChatBtn: {
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
 });
