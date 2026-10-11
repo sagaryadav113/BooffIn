@@ -318,6 +318,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signOut: async () => {
     set({ isLoading: true });
+    try {
+      const { useWorkspaceStore } = await import('./useWorkspaceStore');
+      useWorkspaceStore.getState().resetWorkspaceSession();
+    } catch {}
     await signOutUser();
     setStoredLocalSession(null);
     set({

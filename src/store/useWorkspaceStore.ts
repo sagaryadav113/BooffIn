@@ -202,6 +202,7 @@ interface WorkspaceState {
   deleteCommunityPermanently: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
   leaveAndRemoveCommunity: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
   refreshUnreadTotal: () => Promise<void>;
+  resetWorkspaceSession: () => void;
   subscribeToWorkspaceMessages: (workspaceId: string) => () => void;
   subscribeToGlobalWorkspaceUpdates: (userId: string) => () => void;
 }
@@ -230,6 +231,37 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   isMembersLoading: false,
   isSending: false,
   error: null,
+
+  resetWorkspaceSession: () => {
+    activeWorkspaceChannels.forEach((ch) => {
+      try {
+        supabase.removeChannel(ch);
+      } catch {}
+    });
+    activeWorkspaceChannels.clear();
+    set({
+      dms: [],
+      communities: [],
+      innerCircles: [],
+      discoverableCommunities: [],
+      activeWorkspace: null,
+      messages: [],
+      events: [],
+      opportunities: [],
+      savedItems: [],
+      blocks: [],
+      members: [],
+      unreadTotal: 0,
+      typingUsers: {},
+      otherLastReadMap: {},
+      error: null,
+      isLoading: false,
+      isRefreshing: false,
+      isMessagesLoading: false,
+      isMembersLoading: false,
+      isSending: false,
+    });
+  },
 
   setActiveHubTab: (tab: WorkspaceHubTab) => set({ activeHubTab: tab }),
 
@@ -951,7 +983,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       dms: state.dms.filter((d) => d.id !== workspaceId),
       communities: state.communities.filter((c) => c.id !== workspaceId),
       innerCircles: state.innerCircles.filter((i) => i.id !== workspaceId),
-      workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
+      discoverableCommunities: state.discoverableCommunities.filter((w) => w.id !== workspaceId),
       activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
     }));
 
@@ -963,7 +995,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (res.success) {
       set((state) => ({
         communities: state.communities.filter((c) => c.id !== workspaceId),
-        workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
+        discoverableCommunities: state.discoverableCommunities.filter((w) => w.id !== workspaceId),
         activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
       }));
       await get().loadWorkspaces(true);
@@ -979,7 +1011,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     set((state) => ({
       communities: state.communities.filter((c) => c.id !== workspaceId),
-      workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
+      discoverableCommunities: state.discoverableCommunities.filter((w) => w.id !== workspaceId),
       activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
     }));
     await get().loadWorkspaces(true);

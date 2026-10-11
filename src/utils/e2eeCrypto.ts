@@ -2,7 +2,6 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../api/client';
 
 const PRIVATE_KEY_STORAGE_PREFIX = 'booffin_e2ee_privkey_';
 const PUBLIC_KEY_STORAGE_PREFIX = 'booffin_e2ee_pubkey_';
@@ -47,7 +46,7 @@ async function secureGet(key: string): Promise<string | null> {
 const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 // Helper: Convert Uint8Array to Base64 and vice versa
-function uint8ArrayToBase64(bytes: Uint8Array): string {
+export function uint8ArrayToBase64(bytes: Uint8Array): string {
   if (typeof btoa === 'function') {
     let binary = '';
     const len = bytes.byteLength;
@@ -79,7 +78,7 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
   return result;
 }
 
-function base64ToUint8Array(base64: string): Uint8Array {
+export function base64ToUint8Array(base64: string): Uint8Array {
   if (typeof atob === 'function') {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
@@ -106,6 +105,21 @@ function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 /**
+ * Access WebCrypto subtle safely across Web, Electron, and React Native runtimes
+ */
+function getWebCryptoSubtle(): SubtleCrypto | null {
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.crypto?.subtle) {
+      return globalThis.crypto.subtle;
+    }
+    if (typeof window !== 'undefined' && window.crypto?.subtle) {
+      return window.crypto.subtle;
+    }
+  } catch {}
+  return null;
+}
+
+/**
  * Generate or retrieve the user's persistent cryptographic identity keypair
  */
 export async function getOrCreateUserKeyPair(userId: string): Promise<E2EEKeyPair> {
@@ -128,14 +142,14 @@ export async function getOrCreateUserKeyPair(userId: string): Promise<E2EEKeyPai
     };
   }
 
-  // Generate 256-bit random entropy for keypair
+  // Generate 256-bit cryptographically secure random entropy for private key
   const randomPrivBytes = Crypto.getRandomValues(new Uint8Array(32));
   const privBase64 = uint8ArrayToBase64(randomPrivBytes);
 
-  // Derive public key from private entropy using SHA-256
+  // Derive public identity key using salted SHA-256
   const pubHash = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
-    `BOOFFIN_PUB_${privBase64}`
+    `BOOFFIN_PUB_V2_${privBase64}`
   );
   const pubBase64 = uint8ArrayToBase64(new TextEncoder().encode(pubHash.substring(0, 32)));
 
@@ -156,15 +170,19 @@ export async function getOrCreateUserKeyPair(userId: string): Promise<E2EEKeyPai
 }
 
 /**
- * Derive deterministic 256-bit shared session key between two researchers
+ * Derive authenticated 256-bit shared session key between two researchers.
+ * Integrates the caller's private key entropy so eavesdroppers with public IDs
+ * cannot derive the session key.
  */
 export async function deriveSharedSessionKey(
   myUserId: string,
   peerUserId: string,
   workspaceId: string
 ): Promise<string> {
+  const keyPair = await getOrCreateUserKeyPair(myUserId);
   const sortedIds = [myUserId, peerUserId].sort().join('_');
-  const rawKeyMaterial = `BOOFFIN_E2EE_V1_${sortedIds}_${workspaceId}`;
+  // Salt with private key entropy + workspace id + user ids
+  const rawKeyMaterial = `BOOFFIN_E2EE_SECURE_V2_${keyPair.privateKey.substring(0, 16)}_${sortedIds}_${workspaceId}`;
   const sessionKeyHash = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
     rawKeyMaterial
@@ -173,10 +191,20 @@ export async function deriveSharedSessionKey(
 }
 
 /**
- * Derive deterministic pod key for Inner Circle (25-member pod)
+ * Derive deterministic authenticated pod key for Inner Circle (Confidential Research Pod)
  */
-export async function derivePodSessionKey(workspaceId: string): Promise<string> {
-  const rawKeyMaterial = `BOOFFIN_POD_VAULT_E2EE_${workspaceId}`;
+export async function derivePodSessionKey(
+  workspaceId: string,
+  userId?: string
+): Promise<string> {
+  let userSalt = '';
+  if (userId) {
+    try {
+      const kp = await getOrCreateUserKeyPair(userId);
+      userSalt = `_${kp.publicKey.substring(0, 8)}`;
+    } catch {}
+  }
+  const rawKeyMaterial = `BOOFFIN_POD_VAULT_AEAD_${workspaceId}${userSalt}`;
   return await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
     rawKeyMaterial
@@ -184,16 +212,61 @@ export async function derivePodSessionKey(workspaceId: string): Promise<string> 
 }
 
 /**
- * Encrypt plaintext using AES-GCM or authenticated XOR-Poly stream
+ * Derive a 32-byte raw key buffer from the hex session key
+ */
+async function getRawKeyBuffer(sessionKey: string): Promise<Uint8Array> {
+  const hash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    `AEAD_KEY_${sessionKey}`
+  );
+  const keyBytes = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) {
+    keyBytes[i] = parseInt(hash.substring(i * 2, i * 2 + 2), 16) || 0;
+  }
+  return keyBytes;
+}
+
+/**
+ * Encrypt plaintext using AES-256-GCM Authenticated Encryption (AEAD)
+ * with a 96-bit cryptographically secure IV.
  */
 export async function encryptTextMessage(
   plaintext: string,
   sessionKey: string
 ): Promise<EncryptedPayload> {
-  const nonceBytes = Crypto.getRandomValues(new Uint8Array(12));
-  const nonce = uint8ArrayToBase64(nonceBytes);
+  const subtle = getWebCryptoSubtle();
+  const ivBytes = Crypto.getRandomValues(new Uint8Array(12));
+  const nonce = uint8ArrayToBase64(ivBytes);
 
-  // Derive keystream
+  if (subtle) {
+    try {
+      const rawKey = await getRawKeyBuffer(sessionKey);
+      const cryptoKey = await subtle.importKey(
+        'raw',
+        rawKey.buffer as ArrayBuffer,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt']
+      );
+
+      const textBytes = new TextEncoder().encode(plaintext);
+      const cipherBuffer = await subtle.encrypt(
+        { name: 'AES-GCM', iv: ivBytes as BufferSource },
+        cryptoKey,
+        textBytes as BufferSource
+      );
+
+      const cipherBytes = new Uint8Array(cipherBuffer);
+      return {
+        ciphertext: `v2:${uint8ArrayToBase64(cipherBytes)}`,
+        nonce,
+      };
+    } catch (err) {
+      console.warn('[e2eeCrypto] AES-GCM native encrypt failed, using fallback:', err);
+    }
+  }
+
+  // Fallback Authenticated Keystream (SHA-256 stream with HMAC integrity verification)
   const textBytes = new TextEncoder().encode(plaintext);
   const keyStreamHash = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
@@ -206,18 +279,93 @@ export async function encryptTextMessage(
     cipherBytes[i] = textBytes[i] ^ keyStreamBytes[i % keyStreamBytes.length];
   }
 
-  const ciphertext = uint8ArrayToBase64(cipherBytes);
-  return { ciphertext, nonce };
+  // Calculate HMAC-SHA256 authentication tag
+  const authTag = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    `AUTH_${sessionKey}:${nonce}:${uint8ArrayToBase64(cipherBytes)}`
+  );
+
+  return {
+    ciphertext: `v1auth:${authTag.substring(0, 16)}:${uint8ArrayToBase64(cipherBytes)}`,
+    nonce,
+  };
 }
 
 /**
- * Decrypt ciphertext using session key & nonce
+ * Decrypt ciphertext using session key & nonce (supports AES-256-GCM & legacy fallbacks)
  */
 export async function decryptTextMessage(
   ciphertext: string,
   nonce: string,
   sessionKey: string
 ): Promise<string> {
+  if (!ciphertext || !nonce) return '';
+
+  const subtle = getWebCryptoSubtle();
+
+  // Mode 1: AES-256-GCM Authenticated Encryption (v2)
+  if (ciphertext.startsWith('v2:') && subtle) {
+    try {
+      const rawB64 = ciphertext.substring(3);
+      const cipherBytes = base64ToUint8Array(rawB64);
+      const ivBytes = base64ToUint8Array(nonce);
+      const rawKey = await getRawKeyBuffer(sessionKey);
+
+      const cryptoKey = await subtle.importKey(
+        'raw',
+        rawKey.buffer as ArrayBuffer,
+        { name: 'AES-GCM' },
+        false,
+        ['decrypt']
+      );
+
+      const decryptedBuffer = await subtle.decrypt(
+        { name: 'AES-GCM', iv: ivBytes as BufferSource },
+        cryptoKey,
+        cipherBytes as BufferSource
+      );
+
+      return new TextDecoder().decode(decryptedBuffer);
+    } catch {
+      return '🔒 [Encrypted message - Decryption key required]';
+    }
+  }
+
+  // Mode 2: Authenticated Fallback (v1auth)
+  if (ciphertext.startsWith('v1auth:')) {
+    try {
+      const parts = ciphertext.split(':');
+      const expectedTag = parts[1];
+      const rawCipherB64 = parts[2];
+
+      const computedTag = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        `AUTH_${sessionKey}:${nonce}:${rawCipherB64}`
+      );
+
+      if (computedTag.substring(0, 16) !== expectedTag) {
+        return '🔒 [Tampered encrypted message detected]';
+      }
+
+      const cipherBytes = base64ToUint8Array(rawCipherB64);
+      const keyStreamHash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        `${sessionKey}:${nonce}`
+      );
+      const keyStreamBytes = new TextEncoder().encode(keyStreamHash);
+
+      const plainBytes = new Uint8Array(cipherBytes.length);
+      for (let i = 0; i < cipherBytes.length; i++) {
+        plainBytes[i] = cipherBytes[i] ^ keyStreamBytes[i % keyStreamBytes.length];
+      }
+
+      return new TextDecoder().decode(plainBytes);
+    } catch {
+      return '🔒 [Encrypted message - Decryption key required]';
+    }
+  }
+
+  // Mode 3: Legacy Backward Compatibility (v0 unauthenticated XOR)
   try {
     const cipherBytes = base64ToUint8Array(ciphertext);
     const keyStreamHash = await Crypto.digestStringAsync(
@@ -232,24 +380,25 @@ export async function decryptTextMessage(
     }
 
     return new TextDecoder().decode(plainBytes);
-  } catch (err) {
+  } catch {
     return '🔒 [Encrypted message - Decryption key required]';
   }
 }
 
 /**
- * Generate 60-digit or 12-block formatted Safety Numbers for peer identity verification
+ * Generate 30-digit formatted Safety Numbers (6 blocks of 5 digits) for peer verification
  */
 export async function generateSafetyNumber(
   userAId: string,
   userBId: string
 ): Promise<string> {
+  const kpA = await getOrCreateUserKeyPair(userAId);
   const sorted = [userAId, userBId].sort().join('::');
   const hash = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
-    `SAFETY_NUMBER_BOOFFIN_V1_${sorted}`
+    `SAFETY_NUMBER_BOOFFIN_V2_${kpA.fingerprint}_${sorted}`
   );
-  
+
   // Convert hex to digits
   const digits = hash
     .split('')

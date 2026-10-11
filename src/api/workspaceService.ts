@@ -1427,11 +1427,14 @@ export const workspaceService = {
       if (params.reply_to_id) attachmentsPayload.reply_to_id = params.reply_to_id;
       if (params.reply_to_message) attachmentsPayload.reply_to_message = params.reply_to_message;
 
+      // Security: Guarantee that when E2EE ciphertext is present, plaintext NEVER enters the database
+      const safeContent = params.e2ee_ciphertext ? '🔒 Encrypted message' : params.content;
+
       // Try rich insert
       let insertPayload: any = {
         workspace_id: params.workspace_id,
         sender_id: user.id,
-        content: params.content,
+        content: safeContent,
         message_type: detectedType,
         doi_metadata: resolvedDoiMeta,
         poll_data: params.poll_data || null,
@@ -1455,7 +1458,7 @@ export const workspaceService = {
           .insert({
             workspace_id: params.workspace_id,
             sender_id: user.id,
-            content: params.content,
+            content: safeContent,
             attachments: attachmentsPayload,
           })
           .select()
@@ -1592,6 +1595,21 @@ export const workspaceService = {
     userId: string
   ): Promise<{ reactions: Record<string, string[]>; error: string | null }> {
     try {
+      // 1. Try atomic server-side RPC (Zero-Trust security - avoids exposing content to UPDATE tampering)
+      try {
+        const { data: rpcReactions, error: rpcErr } = await supabase.rpc(
+          'toggle_workspace_message_reaction',
+          {
+            p_message_id: messageId,
+            p_emoji: emoji,
+          }
+        );
+        if (!rpcErr && rpcReactions && typeof rpcReactions === 'object') {
+          return { reactions: rpcReactions as Record<string, string[]>, error: null };
+        }
+      } catch {}
+
+      // 2. Fallback to client-side attachments update
       const { data: msg } = await supabase
         .from('workspace_messages')
         .select('id, attachments')

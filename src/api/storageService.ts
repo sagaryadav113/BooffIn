@@ -706,12 +706,27 @@ export async function uploadVoiceNoteAudio(
       return { success: false, url: null, error: 'User must be authenticated.' };
     }
 
+    // Security: Validate against strict audio MIME allowlist
+    const ALLOWED_AUDIO_MIMES = [
+      'audio/webm',
+      'audio/mp4',
+      'audio/m4a',
+      'audio/ogg',
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/aac',
+    ];
+    const safeMime = ALLOWED_AUDIO_MIMES.includes(mimeType.toLowerCase())
+      ? mimeType.toLowerCase()
+      : 'audio/webm';
+
     const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const ext = mimeType.includes('mp4') || mimeType.includes('m4a')
+    const ext = safeMime.includes('mp4') || safeMime.includes('m4a')
       ? 'm4a'
-      : mimeType.includes('ogg')
+      : safeMime.includes('ogg')
       ? 'ogg'
-      : mimeType.includes('mp3')
+      : safeMime.includes('mp3')
       ? 'mp3'
       : 'webm';
     const fileName = `voice_${Date.now()}_${randomSuffix}.${ext}`;

@@ -1292,7 +1292,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
     const res = await sendMessage({
       workspace_id: workspace.id,
-      content: trimmed || (attachedDoi ? `Shared paper: ${attachedDoi.title}` : ''),
+      content: e2eeCipher ? '🔒 Encrypted message' : (trimmed || (attachedDoi ? `Shared paper: ${attachedDoi.title}` : '')),
       message_type: attachedDoi ? 'paper_doi' : (e2eeCipher ? 'e2ee_cipher' : 'text'),
       doi_metadata: attachedDoi,
       e2ee_ciphertext: e2eeCipher,
@@ -1304,6 +1304,13 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     if (res.success) {
       sendTypingIndicator(workspace.id, false);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (e2eeCipher && trimmed) {
+        // Auto-register plaintext into decrypted map for instant zero-latency rendering
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg?.id) {
+          setDecryptedTextMap((prev) => ({ ...prev, [lastMsg.id]: trimmed }));
+        }
+      }
       setInputText('');
       setAttachedDoi(null);
       setReplyingTo(null);
