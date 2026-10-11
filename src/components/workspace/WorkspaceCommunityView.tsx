@@ -65,6 +65,7 @@ import {
   Trash,
   Ban,
   Flag,
+  LogOut,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -244,6 +245,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const setMuteWorkspace = useWorkspaceStore((s) => s.setMuteWorkspace);
   const clearChatHistory = useWorkspaceStore((s) => s.clearChatHistory);
   const deleteWorkspaceLocally = useWorkspaceStore((s) => s.deleteWorkspaceLocally);
+  const deleteCommunityPermanently = useWorkspaceStore((s) => s.deleteCommunityPermanently);
+  const leaveAndRemoveCommunity = useWorkspaceStore((s) => s.leaveAndRemoveCommunity);
 
   // Workspaces for forwarding
   const dms = useWorkspaceStore((s) => s.dms);
@@ -287,7 +290,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const typingTimeoutRef = useRef<any>(null);
 
   // Membership check & Review Mode
-  const isOwner = workspace.owner_id === currentUser?.id;
+  const isOwner = workspace.owner_id === currentUser?.id || workspace.creator_id === currentUser?.id;
   const myMember = (members || []).find((m) => m.user_id === currentUser?.id);
   const isMember = isOwner || myMember?.status === 'active' || workspace.my_membership_status === 'active';
   const [isJoining, setIsJoining] = useState(false);
@@ -1000,15 +1003,49 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     setShowClearHistoryModal(false);
   };
 
-  const handleDeleteConversationLocally = async () => {
+  const handleDeleteOrLeaveCommunity = async () => {
     setIsProcessingChatAction(true);
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } catch {}
-    await deleteWorkspaceLocally(workspace.id);
-    setIsProcessingChatAction(false);
-    setShowDeleteChatModal(false);
-    router.replace('/workspace');
+
+    if (isOwner) {
+      const res = await deleteCommunityPermanently(workspace.id);
+      setIsProcessingChatAction(false);
+      setShowDeleteChatModal(false);
+      if (res.success) {
+        if (Platform.OS === 'web') {
+          window.alert('Community permanently deleted for everyone.');
+        } else {
+          Alert.alert('Community Deleted', 'This community has been permanently deleted for everyone.');
+        }
+        router.replace('/(tabs)/workspace' as any);
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(res.error || 'Failed to delete community');
+        } else {
+          Alert.alert('Delete Failed', res.error || 'Failed to delete community');
+        }
+      }
+    } else {
+      const res = await leaveAndRemoveCommunity(workspace.id);
+      setIsProcessingChatAction(false);
+      setShowDeleteChatModal(false);
+      if (res.success) {
+        if (Platform.OS === 'web') {
+          window.alert('You have left and removed this community.');
+        } else {
+          Alert.alert('Removed', 'You have left and removed this community from your workspace.');
+        }
+        router.replace('/(tabs)/workspace' as any);
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(res.error || 'Failed to leave community');
+        } else {
+          Alert.alert('Action Failed', res.error || 'Failed to leave community');
+        }
+      }
+    }
   };
 
   const handleSubmitReport = async () => {
@@ -1334,6 +1371,27 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             <Text style={styles.disabledCommunityBannerSub}>
               This community is disabled. All past chats, papers, materials, and profiles remain viewable for portfolio and reference purposes, but new messages cannot be sent.
             </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 8 }}>
+              {isOwner ? (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setShowDeleteChatModal(true)}
+                  style={styles.bannerDeleteBtn}
+                >
+                  <Trash2 size={13} color="#FFFFFF" />
+                  <Text style={styles.bannerDeleteBtnText}>Delete Community Permanently</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setShowDeleteChatModal(true)}
+                  style={styles.bannerLeaveBtn}
+                >
+                  <LogOut size={13} color="#DC2626" />
+                  <Text style={styles.bannerLeaveBtnText}>Leave & Remove from My List</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       )}
@@ -1911,10 +1969,37 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           {/* Bottom Input Dock */}
           {isCommunityDisabled ? (
             <View style={styles.disabledBottomDock}>
-              <Lock size={16} color="#64748B" strokeWidth={2.2} />
-              <Text style={styles.disabledBottomDockText}>
-                This community is disabled and in read-only mode.
-              </Text>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <Lock size={14} color="#64748B" strokeWidth={2.2} />
+                  <Text style={styles.disabledBottomDockTitle}>
+                    {isOwner ? 'Your Community is Disabled' : 'Community is Disabled'}
+                  </Text>
+                </View>
+                <Text style={styles.disabledBottomDockSub}>
+                  {isOwner
+                    ? 'Read-only mode. You can permanently delete this community for all members.'
+                    : 'Read-only mode. You can leave and remove this community for yourself.'}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setShowDeleteChatModal(true)}
+                style={isOwner ? styles.dockDeleteBtn : styles.dockLeaveBtn}
+              >
+                {isOwner ? (
+                  <>
+                    <Trash2 size={13} color="#FFFFFF" />
+                    <Text style={styles.dockDeleteBtnText}>Delete</Text>
+                  </>
+                ) : (
+                  <>
+                    <LogOut size={13} color="#DC2626" />
+                    <Text style={styles.dockLeaveBtnText}>Leave</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.bottomDockWrapper}>
@@ -2793,7 +2878,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               </Text>
             </TouchableOpacity>
 
-            {/* 6. Delete Conversation */}
+            {/* 6. Delete Community */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -2802,10 +2887,31 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               }}
               style={styles.optionsItemRow}
             >
-              <Trash2 size={20} color="#DC2626" />
-              <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
-                Delete Conversation
-              </Text>
+              {isOwner ? (
+                <>
+                  <Trash2 size={20} color="#DC2626" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.optionsItemText, { color: '#DC2626', fontWeight: '700' }]}>
+                      Delete Community Permanently
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                      Deletes this community for all members
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <LogOut size={20} color="#DC2626" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.optionsItemText, { color: '#DC2626', fontWeight: '700' }]}>
+                      Leave & Remove Community
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                      Removes this community only for yourself
+                    </Text>
+                  </View>
+                </>
+              )}
             </TouchableOpacity>
 
             <View style={styles.optionsDivider} />
@@ -2972,7 +3078,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         </View>
       </Modal>
 
-      {/* Modal: Delete Conversation Confirmation */}
+      {/* Modal: Delete Community Confirmation */}
       <Modal
         visible={showDeleteChatModal}
         transparent
@@ -2982,9 +3088,11 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <AlertTriangle size={18} color="#DC2626" />
-                <Text style={styles.modalTitle}>Leave / Delete Conversation?</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                <AlertTriangle size={20} color="#DC2626" />
+                <Text style={styles.modalTitle} numberOfLines={1}>
+                  {isOwner ? 'Delete Community Permanently?' : 'Leave & Remove Community?'}
+                </Text>
               </View>
               <TouchableOpacity onPress={() => setShowDeleteChatModal(false)}>
                 <X size={20} color="#64748B" />
@@ -2992,7 +3100,9 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Are you sure you want to remove this community from your active workspaces list?
+              {isOwner
+                ? `Are you sure you want to permanently delete "${workspace.name}"? This will delete the community and all of its chats, channels, and papers for ALL members. This action CANNOT be undone.`
+                : `Are you sure you want to leave "${workspace.name}"? This community will be removed from your workspaces list. Other members and the creator will not be affected.`}
             </Text>
 
             <View style={styles.confirmModalActionsRow}>
@@ -3007,13 +3117,15 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               <TouchableOpacity
                 activeOpacity={0.8}
                 disabled={isProcessingChatAction}
-                onPress={handleDeleteConversationLocally}
+                onPress={handleDeleteOrLeaveCommunity}
                 style={styles.confirmModalDestructiveBtn}
               >
                 {isProcessingChatAction ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.confirmModalDestructiveText}>Confirm</Text>
+                  <Text style={styles.confirmModalDestructiveText}>
+                    {isOwner ? 'Delete for Everyone' : 'Leave & Remove'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -3717,7 +3829,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: 10,
   },
   disabledCommunityBannerTitle: {
@@ -3731,21 +3843,92 @@ const styles = StyleSheet.create({
     color: '#64748B',
     lineHeight: 15,
   },
+  bannerDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  bannerDeleteBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  bannerLeaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  bannerLeaveBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
   disabledBottomDock: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#F8FAFC',
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 8,
+    paddingVertical: 12,
+  },
+  disabledBottomDockTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  disabledBottomDockSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
   },
   disabledBottomDockText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
     color: '#64748B',
+  },
+  dockDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  dockDeleteBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  dockLeaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  dockLeaveBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DC2626',
   },
   bottomDockWrapper: {
     backgroundColor: '#FFFFFF',

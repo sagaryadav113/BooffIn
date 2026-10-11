@@ -199,6 +199,8 @@ interface WorkspaceState {
   ) => Promise<{ success: boolean; isMuted: boolean; error: string | null }>;
   clearChatHistory: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
   deleteWorkspaceLocally: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
+  deleteCommunityPermanently: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
+  leaveAndRemoveCommunity: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
   refreshUnreadTotal: () => Promise<void>;
   subscribeToWorkspaceMessages: (workspaceId: string) => () => void;
   subscribeToGlobalWorkspaceUpdates: (userId: string) => () => void;
@@ -947,10 +949,41 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // Remove from local list immediately
     set((state) => ({
       dms: state.dms.filter((d) => d.id !== workspaceId),
+      communities: state.communities.filter((c) => c.id !== workspaceId),
+      innerCircles: state.innerCircles.filter((i) => i.id !== workspaceId),
+      workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
       activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
     }));
 
     return await workspaceService.deleteWorkspaceLocally(currentUser.id, workspaceId);
+  },
+
+  deleteCommunityPermanently: async (workspaceId: string) => {
+    const res = await workspaceService.deleteCommunityPermanently(workspaceId);
+    if (res.success) {
+      set((state) => ({
+        communities: state.communities.filter((c) => c.id !== workspaceId),
+        workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
+        activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
+      }));
+      await get().loadWorkspaces(true);
+    }
+    return res;
+  },
+
+  leaveAndRemoveCommunity: async (workspaceId: string) => {
+    const currentUser = useAuthStore.getState().user;
+    const res = await workspaceService.leaveWorkspace(workspaceId);
+    if (currentUser?.id) {
+      await workspaceService.deleteWorkspaceLocally(currentUser.id, workspaceId);
+    }
+    set((state) => ({
+      communities: state.communities.filter((c) => c.id !== workspaceId),
+      workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
+      activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
+    }));
+    await get().loadWorkspaces(true);
+    return res;
   },
 
   refreshUnreadTotal: async () => {

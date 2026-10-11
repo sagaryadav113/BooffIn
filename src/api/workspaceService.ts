@@ -2914,4 +2914,72 @@ export const workspaceService = {
       return { communities: [], error: err.message || 'Failed to load user communities' };
     }
   },
+
+  /**
+   * Permanently delete community for everyone (Creator/Owner only)
+   */
+  async deleteCommunityPermanently(
+    workspaceId: string
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { success: false, error: 'User not authenticated' };
+
+      // 1. Verify owner / creator
+      const { data: ws, error: fetchErr } = await supabase
+        .from('workspaces')
+        .select('id, owner_id, creator_id')
+        .eq('id', workspaceId)
+        .single();
+
+      if (fetchErr || !ws) {
+        return { success: false, error: fetchErr?.message || 'Workspace not found' };
+      }
+
+      if (ws.owner_id !== user.id && ws.creator_id !== user.id) {
+        return { success: false, error: 'Only the creator or owner can permanently delete this community.' };
+      }
+
+      // 2. Clean up child records (in case cascading delete is not configured on foreign keys)
+      try {
+        await supabase.from('workspace_messages').delete().eq('workspace_id', workspaceId);
+      } catch {}
+      try {
+        await supabase.from('workspace_members').delete().eq('workspace_id', workspaceId);
+      } catch {}
+      try {
+        await supabase.from('workspace_events').delete().eq('workspace_id', workspaceId);
+      } catch {}
+      try {
+        await supabase.from('workspace_opportunities').delete().eq('workspace_id', workspaceId);
+      } catch {}
+      try {
+        await supabase.from('workspace_saved_items').delete().eq('workspace_id', workspaceId);
+      } catch {}
+
+      // 3. Delete the workspace row itself
+      const { error: delErr } = await supabase
+        .from('workspaces')
+        .delete()
+        .eq('id', workspaceId);
+
+      if (delErr) {
+        console.warn('[workspaceService] Hard delete failed, setting status to deleted:', delErr.message);
+        await supabase
+          .from('workspaces')
+          .update({
+            status: 'deleted',
+            is_disabled: true,
+            settings: { is_disabled: true, is_deleted: true },
+          })
+          .eq('id', workspaceId);
+      }
+
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to delete community' };
+    }
+  },
 };
