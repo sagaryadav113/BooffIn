@@ -83,7 +83,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         )}
         {isBrandTitle ? (
           <Image
-            source={require('../../../assets/images/booffin-wordmark.jpg')}
+            source={require('../../../assets/images/booffin-wordmark.svg')}
             style={styles.brandLogoImage}
             contentFit="contain"
             accessibilityLabel="BooffIn"
@@ -185,8 +185,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   brandLogoImage: {
-    width: 108,
-    height: 34,
+    width: 120,
+    height: 31,
   },
   title: {
     fontSize: 20,

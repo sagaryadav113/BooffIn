@@ -128,8 +128,8 @@ export const BooffinIntroAnimation: React.FC<BooffinIntroAnimationProps> = ({
         {/* Animated Brand "B" Logo */}
         <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
           <Image
-            source={require('../../../assets/images/booffin-symbol.png')}
-            style={{ width: size, height: size * 1.05 }}
+            source={require('../../../assets/images/booffin-symbol.svg')}
+            style={{ width: size, height: size * 1.1 }}
             contentFit="contain"
             priority="high"
           />
@@ -139,7 +139,12 @@ export const BooffinIntroAnimation: React.FC<BooffinIntroAnimationProps> = ({
       {/* Brand Title & Tagline with smooth entrance */}
       {showTagline && (
         <View style={styles.textContainer}>
-          <Text style={styles.brandTitle}>BooffIn</Text>
+          <Image
+            source={require('../../../assets/images/booffin-wordmark.svg')}
+            style={styles.brandWordmarkImage}
+            contentFit="contain"
+            accessibilityLabel="BooffIn"
+          />
           <Text style={styles.tagline}>Research finds its people.</Text>
 
           {/* Elegant pulsing status dots */}
@@ -180,6 +185,11 @@ const styles = StyleSheet.create({
   textContainer: {
     alignItems: 'center',
     marginTop: spacing.lg,
+  },
+  brandWordmarkImage: {
+    width: 148,
+    height: 38,
+    marginBottom: 6,
   },
   brandTitle: {
     ...typography.pageTitle,

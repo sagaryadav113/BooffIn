@@ -20,8 +20,8 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
     return (
       <View style={[styles.container, style]}>
         <Image
-          source={require('../../../assets/images/booffin-wordmark.jpg')}
-          style={{ width: size * 2.8, height: size }}
+          source={require('../../../assets/images/booffin-wordmark.svg')}
+          style={{ width: size * 3.87, height: size }}
           contentFit="contain"
           transition={200}
         />
@@ -36,8 +36,8 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
     return (
       <View style={[styles.container, style]}>
         <Image
-          source={require('../../../assets/images/booffin-full-logo.jpg')}
-          style={{ width: size * 1.5, height: size * 1.5 }}
+          source={require('../../../assets/images/booffin-wordmark.svg')}
+          style={{ width: size * 3.87, height: size }}
           contentFit="contain"
           transition={200}
         />
@@ -51,14 +51,18 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
   return (
     <View style={[styles.container, style]}>
       <Image
-        source={require('../../../assets/images/booffin-symbol.png')}
-        style={{ width: size, height: size * 1.05 }}
+        source={require('../../../assets/images/booffin-symbol.svg')}
+        style={{ width: size * 0.9, height: size }}
         contentFit="contain"
         transition={200}
       />
       {showTagline && (
         <View style={styles.taglineContainer}>
-          <Text style={styles.wordmark}>BooffIn</Text>
+          <Image
+            source={require('../../../assets/images/booffin-wordmark.svg')}
+            style={{ width: 140, height: 36, marginBottom: 4 }}
+            contentFit="contain"
+          />
           <Text style={styles.tagline}>Research finds its people.</Text>
         </View>
       )}

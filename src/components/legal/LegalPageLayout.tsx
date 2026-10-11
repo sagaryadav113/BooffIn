@@ -16,6 +16,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu, X, ChevronRight, Mail } from 'lucide-react-native';
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 
 import { GoogleIcon } from '../core/GoogleIcon';
@@ -122,7 +123,15 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
             }}
             activeOpacity={0.8}
           >
-            <Text style={[styles.logoText, isSmallMobile && { fontSize: 22 }]}>BooffIn</Text>
+            <Image
+              source={require('../../../assets/images/booffin-wordmark.svg')}
+              style={[
+                styles.brandLogoImage,
+                isSmallMobile && { width: 110, height: 28 },
+              ]}
+              contentFit="contain"
+              accessibilityLabel="BooffIn"
+            />
           </TouchableOpacity>
 
           {isMobile ? (
@@ -437,7 +446,12 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
             {/* Modal Header */}
             <View style={styles.authModalHeader}>
               <View style={styles.modalLogoRow}>
-                <Text style={styles.modalLogoText}>BooffIn</Text>
+                <Image
+                  source={require('../../../assets/images/booffin-wordmark.svg')}
+                  style={styles.modalLogoImage}
+                  contentFit="contain"
+                  accessibilityLabel="BooffIn"
+                />
               </View>
               <TouchableOpacity
                 style={styles.closeBtn}
@@ -564,6 +578,10 @@ const styles = StyleSheet.create({
   logoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  brandLogoImage: {
+    width: 132,
+    height: 34,
   },
   logoText: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
@@ -839,6 +857,10 @@ const styles = StyleSheet.create({
   modalLogoRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  modalLogoImage: {
+    width: 120,
+    height: 31,
   },
   modalLogoText: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',

@@ -176,7 +176,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
             style={styles.logoSection}
           >
             <Image
-              source={require('../../../assets/images/booffin-wordmark.jpg')}
+              source={require('../../../assets/images/booffin-wordmark.svg')}
               style={styles.brandLogoImage}
               contentFit="contain"
               accessibilityLabel="BooffIn"
@@ -197,7 +197,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
           style={styles.logoSection}
         >
           <Image
-            source={require('../../../assets/images/booffin-wordmark.jpg')}
+            source={require('../../../assets/images/booffin-wordmark.svg')}
             style={styles.brandLogoImage}
             contentFit="contain"
             accessibilityLabel="BooffIn"
@@ -533,8 +533,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   brandLogoImage: {
-    width: 124,
-    height: 38,
+    width: 132,
+    height: 34,
   },
   searchContainer: {
     flexDirection: 'row',
