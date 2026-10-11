@@ -53,6 +53,11 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
     promptInstall,
   } = usePWAInstall();
 
+  const isRunningInElectron =
+    typeof window !== 'undefined' &&
+    (Boolean((window as any).booffinDesktop?.isDesktop) ||
+      Boolean(navigator.userAgent?.includes('BooffInDesktop')));
+
   const [activeTab, setActiveTab] = useState<'windows' | 'pwa'>(
     isIOS || isAndroid ? 'pwa' : 'windows'
   );
@@ -124,11 +129,20 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
           >
             {/* Header / Brand */}
             <View style={styles.headerSection}>
-              <BooffinLogo size={60} style={styles.logo} />
+              <BooffinLogo size={36} variant="wordmark" style={styles.logo} />
               <Text style={styles.title}>Install BooffIn Application</Text>
               <Text style={styles.subtitle}>
                 Professional academic & scientific research community platform.
               </Text>
+
+              {isRunningInElectron && (
+                <View style={styles.runningDesktopBanner}>
+                  <CheckCircle2 size={16} color="#065F46" />
+                  <Text style={styles.runningDesktopText}>
+                    You are currently running BooffIn Desktop (v1.0.0 Stable).
+                  </Text>
+                </View>
+              )}
 
               {/* Platform Switcher Tabs */}
               <View style={styles.tabContainer}>
@@ -553,6 +567,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 19,
     maxWidth: 420,
+  },
+  runningDesktopBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  runningDesktopText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065F46',
   },
   tabContainer: {
     flexDirection: 'row',
