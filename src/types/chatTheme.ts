@@ -1,4 +1,13 @@
-export type ChatThemeId = 'default' | 'coral' | 'peach' | 'lavender' | 'sky' | 'dark';
+export type ChatThemeId =
+  | 'default'
+  | 'coral'
+  | 'peach'
+  | 'lavender'
+  | 'sky'
+  | 'honey'
+  | 'blush'
+  | 'mint'
+  | 'dark';
 
 export interface ChatThemeConfig {
   id: ChatThemeId;
