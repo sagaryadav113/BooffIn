@@ -24,6 +24,22 @@ export interface SignalingCallbacks {
   onCallHangup?: () => void;
 }
 
+/**
+ * Generate cryptographically secure call room ID
+ */
+export function generateSecureCallRoomId(prefix = 'room'): string {
+  const randomBytes = new Uint8Array(8);
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(randomBytes);
+  } else {
+    for (let i = 0; i < randomBytes.length; i++) {
+      randomBytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  const hex = Array.from(randomBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${prefix}_${Date.now()}_${hex}`;
+}
+
 class WebRTCSignalingManager {
   private activeChannels: Map<string, RealtimeChannel> = new Map();
   private userGlobalChannel: RealtimeChannel | null = null;
@@ -31,7 +47,7 @@ class WebRTCSignalingManager {
 
   /**
    * Listen for incoming calls targeted to the current user
-   * (Zero-storage, ephemeral in-memory Realtime broadcast)
+   * (Zero-storage, ephemeral in-memory Realtime broadcast with caller verification)
    */
   public listenForIncomingCalls(
     userId: string,
@@ -48,11 +64,30 @@ class WebRTCSignalingManager {
       config: { broadcast: { self: false } },
     });
 
-    channel.on('broadcast', { event: 'incoming_call' }, (res: any) => {
+    channel.on('broadcast', { event: 'incoming_call' }, async (res: any) => {
       const payload: IncomingCallPayload = res.payload;
-      if (payload && payload.roomId && payload.callerId !== userId) {
-        onIncoming(payload);
+      if (!payload || !payload.roomId || !payload.callerId || payload.callerId === userId) {
+        return;
       }
+
+      // Privacy Hardening: Verify caller is not blocked by recipient
+      try {
+        const { data: blockRecord } = await supabase
+          .from('user_blocks')
+          .select('id')
+          .eq('blocker_id', userId)
+          .eq('blocked_id', payload.callerId)
+          .maybeSingle();
+
+        if (blockRecord) {
+          // Silently drop incoming call signal from blocked user
+          return;
+        }
+      } catch (err) {
+        console.warn('[WebRTC Signaling] Block validation error:', err);
+      }
+
+      onIncoming(payload);
     });
 
     channel.on('broadcast', { event: 'call_cancelled' }, (res: any) => {
@@ -74,11 +109,32 @@ class WebRTCSignalingManager {
 
   /**
    * Ring recipient device with an ephemeral call offer
+   * Enforces caller authentication and bidirectional block validation
    */
   public async ringRecipient(
     recipientUserId: string,
     payload: IncomingCallPayload
-  ): Promise<void> {
+  ): Promise<{ success: boolean; error?: string }> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id !== payload.callerId) {
+      return { success: false, error: 'Unauthorized call attempt.' };
+    }
+
+    // Bidirectional block check
+    try {
+      const { data: blockRecords } = await supabase
+        .from('user_blocks')
+        .select('id')
+        .or(`and(blocker_id.eq.${user.id},blocked_id.eq.${recipientUserId}),and(blocker_id.eq.${recipientUserId},blocked_id.eq.${user.id})`)
+        .limit(1);
+
+      if (blockRecords && blockRecords.length > 0) {
+        return { success: false, error: 'Cannot place call to this user.' };
+      }
+    } catch (err) {
+      console.warn('[WebRTC Signaling] Error verifying block status before ring:', err);
+    }
+
     const targetChannelName = `p2p_signaling_user_${recipientUserId}`;
     const channel = supabase.channel(targetChannelName, {
       config: { broadcast: { self: false } },
@@ -95,6 +151,8 @@ class WebRTCSignalingManager {
     setTimeout(() => {
       channel.unsubscribe();
     }, 2500);
+
+    return { success: true };
   }
 
   /**
@@ -104,6 +162,9 @@ class WebRTCSignalingManager {
     recipientUserId: string,
     roomId: string
   ): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const targetChannelName = `p2p_signaling_user_${recipientUserId}`;
     const channel = supabase.channel(targetChannelName, {
       config: { broadcast: { self: false } },
@@ -113,7 +174,7 @@ class WebRTCSignalingManager {
     await channel.send({
       type: 'broadcast',
       event: 'call_cancelled',
-      payload: { roomId },
+      payload: { roomId, callerId: user.id },
     });
 
     setTimeout(() => {
@@ -210,6 +271,16 @@ class WebRTCSignalingManager {
     event: 'call_accepted' | 'call_rejected' | 'sdp_offer' | 'sdp_answer' | 'ice_candidate' | 'media_toggle' | 'call_hangup',
     payload: any
   ): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('[WebRTC Signaling] Blocked unauthenticated signal dispatch.');
+      return;
+    }
+    const safePayload = {
+      ...payload,
+      senderId: user.id,
+    };
+
     let channel = this.activeChannels.get(roomId);
     if (!channel) {
       const channelName = `p2p_call_room_${roomId}`;
@@ -220,7 +291,7 @@ class WebRTCSignalingManager {
       await channel.send({
         type: 'broadcast',
         event,
-        payload,
+        payload: safePayload,
       });
       setTimeout(() => {
         channel?.unsubscribe();
@@ -231,7 +302,7 @@ class WebRTCSignalingManager {
     await channel.send({
       type: 'broadcast',
       event,
-      payload,
+      payload: safePayload,
     });
   }
 

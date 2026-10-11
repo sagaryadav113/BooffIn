@@ -95,7 +95,7 @@ import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
 import { ChatDocumentCard } from '../chat/ChatDocumentCard';
 import { ChatCallModal } from '../chat/ChatCallModal';
 import { IncomingCallModal } from '../chat/IncomingCallModal';
-import { webrtcSignaling, IncomingCallPayload } from '../../services/webrtcSignalingService';
+import { webrtcSignaling, IncomingCallPayload, generateSecureCallRoomId } from '../../services/webrtcSignalingService';
 import { FEATURE_FLAGS } from '../../config/featureFlags';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
@@ -106,7 +106,7 @@ import { resolvePaper } from '../../api/paperResolver';
 import { supabase } from '../../api/client';
 import { fetchUserProfile } from '../../api/authService';
 import { uploadPostImage, uploadVoiceNoteAudio } from '../../api/storageService';
-import { blockUser, reportContent } from '../../api/moderationService';
+import { blockUser, reportContent, isBidirectionalBlocked } from '../../api/moderationService';
 import { unfollowUser } from '../../api/socialService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
 import { E2EESafetyNumberModal } from '../chat/E2EESafetyNumberModal';
@@ -589,7 +589,11 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     if (!FEATURE_FLAGS.ENABLE_VOICE_VIDEO_CALLS || !currentUser?.id) return;
     const unsubscribe = webrtcSignaling.listenForIncomingCalls(
       currentUser.id,
-      (call) => {
+      async (call) => {
+        if (call.callerId) {
+          const isBlocked = await isBidirectionalBlocked(call.callerId);
+          if (isBlocked) return;
+        }
         setIncomingCall(call);
       },
       (cancelledRoomId) => {
@@ -861,8 +865,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   };
 
   // Live 1:1 Call Handlers (Phase 3 & 4)
-  const handleStartCall = (type: 'audio' | 'video') => {
-    const roomId = `room_${workspace.id}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const handleStartCall = async (type: 'audio' | 'video') => {
+    if (partner?.id) {
+      const isBlocked = await isBidirectionalBlocked(partner.id);
+      if (isBlocked) {
+        Alert.alert('Cannot Start Call', 'Calls cannot be established with this contact.');
+        return;
+      }
+    }
+    const roomId = generateSecureCallRoomId(`room_${workspace.id}`);
     setActiveCallModal({
       visible: true,
       type,

@@ -91,6 +91,49 @@ export async function getBlockedUserIds(): Promise<string[]> {
 }
 
 /**
+ * Check if a specific target user is blocked by the current user.
+ */
+export async function isUserBlocked(targetUserId: string): Promise<boolean> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { data, error } = await supabase
+      .from('user_blocks')
+      .select('id')
+      .eq('blocker_id', user.id)
+      .eq('blocked_id', targetUserId)
+      .maybeSingle();
+
+    if (error || !data) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if either user has blocked the other (bidirectional block check).
+ */
+export async function isBidirectionalBlocked(targetUserId: string): Promise<boolean> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { data, error } = await supabase
+      .from('user_blocks')
+      .select('id')
+      .or(`and(blocker_id.eq.${user.id},blocked_id.eq.${targetUserId}),and(blocker_id.eq.${targetUserId},blocked_id.eq.${user.id})`)
+      .limit(1);
+
+    if (error || !data) return false;
+    return data.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * File a moderation report for a post, comment, or profile.
  */
 export async function reportContent(

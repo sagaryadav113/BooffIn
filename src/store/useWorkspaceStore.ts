@@ -22,6 +22,7 @@ import { workspaceService } from '../api/workspaceService';
 import { useAuthStore } from './useAuthStore';
 import { supabase } from '../api/client';
 import { fetchUserProfile } from '../api/authService';
+import { getBlockedUserIds } from '../api/moderationService';
 
 export type WorkspaceHubTab = 'all' | 'dms' | 'communities' | 'inner_circles';
 
@@ -416,7 +417,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       if (res.error) {
         set({ isMessagesLoading: false, error: res.error });
       } else {
-        set({ messages: res.messages, isMessagesLoading: false });
+        const blockedIds = await getBlockedUserIds();
+        const filteredMessages = blockedIds.length > 0
+          ? res.messages.filter((m) => !blockedIds.includes(m.sender_id))
+          : res.messages;
+        set({ messages: filteredMessages, isMessagesLoading: false });
         // Mark as read immediately
         const currentUser = useAuthStore.getState().user;
         if (currentUser) {
@@ -1026,6 +1031,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   subscribeToWorkspaceMessages: (workspaceId: string) => {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser || !workspaceId) {
+      return () => {};
+    }
+
     // 1. Clean up any existing channel for this workspace first to prevent callback-after-subscribe errors
     const existing = activeWorkspaceChannels.get(workspaceId);
     if (existing) {
@@ -1055,6 +1065,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       .on('broadcast', { event: 'new_message' }, async ({ payload }: any) => {
         if (!payload?.message || payload.message.workspace_id !== workspaceId) return;
         const msg = payload.message as WorkspaceMessage;
+
+        // Privacy Hardening: Suppress realtime messages from blocked users
+        try {
+          if (msg.sender_id) {
+            const blockedIds = await getBlockedUserIds();
+            if (blockedIds.includes(msg.sender_id)) return;
+          }
+        } catch {}
 
         set((state) => {
           if (state.messages.some((m) => m.id === msg.id)) {
@@ -1193,6 +1211,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
           const newMsg = payload.new;
           if (!newMsg || !newMsg.id) return;
+
+          // Privacy Hardening: Suppress incoming database messages from blocked users
+          try {
+            if (newMsg.sender_id) {
+              const blockedIds = await getBlockedUserIds();
+              if (blockedIds.includes(newMsg.sender_id)) return;
+            }
+          } catch {}
 
           // Fetch sender profile if not populated
           let senderProfile = undefined;

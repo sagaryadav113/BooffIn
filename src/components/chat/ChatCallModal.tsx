@@ -21,7 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { Avatar } from '../core/Avatar';
 import { WorkspaceSenderProfile } from '../../types/workspace';
 import { mediaStreamManager } from '../../utils/mediaStreamManager';
-import { webrtcSignaling } from '../../services/webrtcSignalingService';
+import { webrtcSignaling, generateSecureCallRoomId } from '../../services/webrtcSignalingService';
 
 interface ChatCallModalProps {
   visible: boolean;
@@ -45,10 +45,12 @@ export const ChatCallModal: React.FC<ChatCallModalProps> = ({
   partner,
   currentUserId,
   currentUserProfile,
-  roomId = `room_${Date.now()}`,
+  roomId: propRoomId,
   isIncoming = false,
   onEndCall,
 }) => {
+  const [generatedRoomId] = useState(() => generateSecureCallRoomId('room_call'));
+  const roomId = propRoomId || generatedRoomId;
   const [callState, setCallState] = useState<'ringing' | 'connected' | 'ended'>('ringing');
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
