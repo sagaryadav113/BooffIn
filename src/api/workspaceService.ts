@@ -1276,6 +1276,8 @@ export const workspaceService = {
             content: parent.content || (parent.doi_metadata ? 'Shared a research paper' : 'Attachment'),
             message_type: parent.message_type,
           };
+        } else if (m.attachments?.reply_to_message) {
+          replyInfo = m.attachments.reply_to_message;
         }
 
         return {
@@ -1346,6 +1348,12 @@ export const workspaceService = {
     poll_data?: WorkspacePollData | null;
     call_metadata?: WorkspaceCallMetadata | null;
     reply_to_id?: string | null;
+    reply_to_message?: {
+      id: string;
+      sender_name: string;
+      content: string;
+      message_type?: string;
+    } | null;
     media_urls?: string[] | null;
     e2ee_ciphertext?: string | null;
     e2ee_nonce?: string | null;
@@ -1416,6 +1424,8 @@ export const workspaceService = {
       if (params.audio_metadata) attachmentsPayload.audio_metadata = params.audio_metadata;
       if (params.call_metadata) attachmentsPayload.call_metadata = params.call_metadata;
       if (params.poll_data) attachmentsPayload.poll_data = params.poll_data;
+      if (params.reply_to_id) attachmentsPayload.reply_to_id = params.reply_to_id;
+      if (params.reply_to_message) attachmentsPayload.reply_to_message = params.reply_to_message;
 
       // Try rich insert
       let insertPayload: any = {
@@ -1504,7 +1514,8 @@ export const workspaceService = {
         e2ee_nonce: data.e2ee_nonce || null,
         media_urls: extractedMedia,
         is_pinned: data.is_pinned || false,
-        reply_to_id: data.reply_to_id || null,
+        reply_to_id: data.reply_to_id || params.reply_to_id || null,
+        reply_to_message: params.reply_to_message || data.reply_to_message || data.attachments?.reply_to_message || null,
         created_at: data.created_at,
         updated_at: data.updated_at || data.created_at,
         sender: senderInfo,

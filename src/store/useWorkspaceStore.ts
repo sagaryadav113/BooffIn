@@ -93,6 +93,12 @@ interface WorkspaceState {
     poll_data?: WorkspacePollData | null;
     call_metadata?: WorkspaceCallMetadata | null;
     reply_to_id?: string | null;
+    reply_to_message?: {
+      id: string;
+      sender_name: string;
+      content: string;
+      message_type?: string;
+    } | null;
     media_urls?: string[] | null;
     e2ee_ciphertext?: string | null;
     e2ee_nonce?: string | null;
@@ -1206,7 +1212,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             e2ee_nonce: newMsg.e2ee_nonce || null,
             media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
             is_pinned: newMsg.is_pinned || false,
-            reply_to_id: newMsg.reply_to_id || null,
+            reply_to_id: newMsg.reply_to_id || newMsg.attachments?.reply_to_id || null,
+            reply_to_message:
+              newMsg.reply_to_message ||
+              newMsg.attachments?.reply_to_message ||
+              (() => {
+                const pId = newMsg.reply_to_id || newMsg.attachments?.reply_to_id;
+                if (!pId) return null;
+                const parent = get().messages.find((m) => m.id === pId);
+                if (!parent) return null;
+                return {
+                  id: parent.id,
+                  sender_name: parent.sender?.fullName || parent.sender?.handle || 'Researcher',
+                  content: parent.content || (parent.doi_metadata ? 'Shared a research paper' : 'Attachment'),
+                  message_type: parent.message_type,
+                };
+              })(),
             created_at: newMsg.created_at,
             updated_at: newMsg.updated_at || newMsg.created_at,
             sender: senderProfile,

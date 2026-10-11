@@ -396,9 +396,25 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [resolvedDoi, setResolvedDoi] = useState<DoiMetadata | null>(null);
   const [attachedDoi, setAttachedDoi] = useState<DoiMetadata | null>(null);
   const flatListRef = useRef<FlatList>(null);
-
   // Replying To State (Group Chat)
   const [replyingTo, setReplyingTo] = useState<WorkspaceMessage | null>(null);
+
+  const getReplyInfo = (target: WorkspaceMessage | null) => {
+    if (!target) return null;
+    return {
+      id: target.id,
+      sender_name:
+        (target as any).sender_name ||
+        (target.sender_id === currentUser?.id ? 'You' : target.sender?.fullName || target.sender?.handle || 'Researcher'),
+      content:
+        target.content ||
+        (target.doi_metadata ? '📄 Shared research paper' : '') ||
+        (target.document_metadata ? '📄 Document' : '') ||
+        (target.message_type === 'image' ? '📷 Photo' : '') ||
+        'Attachment',
+      message_type: target.message_type,
+    };
+  };
 
   // Long-Press Message Context Menu State
   const [selectedMessage, setSelectedMessage] = useState<WorkspaceMessage | null>(null);
@@ -833,6 +849,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         doi_metadata: null,
         poll_data: pollPayload,
         reply_to_id: replyingTo?.id || null,
+        reply_to_message: getReplyInfo(replyingTo),
       });
 
       if (res.success) {
@@ -921,6 +938,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       doi_metadata: doiMeta,
       document_metadata: docMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -955,6 +973,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       message_type: 'post',
       post_metadata: postMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -1006,6 +1025,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       message_type: 'profile',
       profile_metadata: profileMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -1033,6 +1053,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       message_type: 'workspace_invite',
       workspace_invite_metadata: inviteMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -1065,7 +1086,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             content: '📷 Shared photo',
             message_type: 'image',
             media_urls: [uploadRes.url],
+            reply_to_id: replyingTo?.id || null,
+            reply_to_message: getReplyInfo(replyingTo),
           });
+          setReplyingTo(null);
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
         } else {
           if (Platform.OS === 'web') window.alert(uploadRes.error || 'Failed to upload photo.');
@@ -1114,6 +1138,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         url: finalAudioUrl || undefined,
       },
       reply_to_id: replyId,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     if (res.success) {
@@ -1204,6 +1229,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       e2ee_ciphertext: e2eeCipher,
       e2ee_nonce: e2eeNonce,
       reply_to_id: replyId,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     if (res.success) {
@@ -1853,9 +1879,12 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               );
 
               // Quoted reply lookup
-              const replyParent = item.reply_to_id
-                ? messages.find((m) => m.id === item.reply_to_id) || item.reply_to_message
-                : item.reply_to_message;
+              const replyParent =
+                item.reply_to_message ||
+                item.attachments?.reply_to_message ||
+                ((item.reply_to_id || item.attachments?.reply_to_id)
+                  ? messages.find((m) => m.id === (item.reply_to_id || item.attachments?.reply_to_id))
+                  : null);
 
                   const hasMediaContent = isAudio || isDocument || Boolean(resolvedDoiMeta) || isPost || isProfile || isWorkspaceInvite || isPoll;
 
@@ -1910,10 +1939,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         <View style={[styles.quotedReplyAccent, isMe ? styles.quotedAccentMe : styles.quotedAccentOther]} />
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.quotedReplySender, isMe ? styles.quotedSenderMe : styles.quotedSenderOther]} numberOfLines={1}>
-                            {replyParent.sender?.fullName || (replyParent as any).sender_name || 'Researcher'}
+                            {(replyParent as any).sender_name || replyParent.sender?.fullName || replyParent.sender?.handle || (replyParent.sender_id === currentUser?.id ? 'You' : 'Researcher')}
                           </Text>
                           <Text style={[styles.quotedReplySnippet, isMe ? styles.quotedSnippetMe : styles.quotedSnippetOther]} numberOfLines={2}>
-                            {replyParent.content || 'Shared attachment'}
+                            {replyParent.content || (replyParent.doi_metadata ? '📄 Shared research paper' : (replyParent.message_type === 'image' ? '📷 Photo' : 'Shared attachment'))}
                           </Text>
                         </View>
                       </View>

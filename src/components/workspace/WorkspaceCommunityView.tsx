@@ -348,6 +348,23 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
   const [localPollVotes, setLocalPollVotes] = useState<Record<string, string>>({});
 
+  const getReplyInfo = (target: WorkspaceMessage | null) => {
+    if (!target) return null;
+    return {
+      id: target.id,
+      sender_name:
+        (target as any).sender_name ||
+        (target.sender_id === currentUser?.id ? 'You' : target.sender?.fullName || target.sender?.handle || 'Researcher'),
+      content:
+        target.content ||
+        (target.doi_metadata ? '📄 Shared research paper' : '') ||
+        (target.document_metadata ? '📄 Document' : '') ||
+        (target.message_type === 'image' ? '📷 Photo' : '') ||
+        'Attachment',
+      message_type: target.message_type,
+    };
+  };
+
   // Auto-hydrate user's existing poll selections from loaded messages and AsyncStorage so votes persist across restarts
   useEffect(() => {
     if (!currentUser?.id || !messages || messages.length === 0) return;
@@ -475,6 +492,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       message_type: attachedDoi ? 'paper_doi' : 'text',
       doi_metadata: attachedDoi || undefined,
       reply_to_id: replyId,
+      reply_to_message: getReplyInfo(replyingTo),
     });
     if (res.success) {
       setInputText('');
@@ -494,6 +512,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       message_type: 'paper_doi',
       doi_metadata: resolvedDoi,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
     if (res.success) {
       setShowDoiModal(false);
@@ -546,6 +565,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             message_type: 'image',
             media_urls: [uploadRes.url],
             reply_to_id: replyingTo?.id || null,
+            reply_to_message: getReplyInfo(replyingTo),
           });
           setReplyingTo(null);
           setTimeout(() => {
@@ -585,6 +605,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             message_type: 'image',
             media_urls: [uploadRes.url],
             reply_to_id: replyingTo?.id || null,
+            reply_to_message: getReplyInfo(replyingTo),
           });
           setReplyingTo(null);
           setTimeout(() => {
@@ -640,6 +661,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           url: finalAudioUrl || undefined,
         },
         reply_to_id: replyId,
+        reply_to_message: getReplyInfo(replyingTo),
       });
       setReplyingTo(null);
       setTimeout(() => {
@@ -678,6 +700,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         message_type: 'poll',
         poll_data: pollPayload,
         reply_to_id: replyingTo?.id || null,
+        reply_to_message: getReplyInfo(replyingTo),
       });
 
       if (res.success) {
@@ -765,6 +788,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       doi_metadata: doiMeta,
       document_metadata: docMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -799,6 +823,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       message_type: 'post',
       post_metadata: postMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -848,6 +873,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       message_type: 'profile',
       profile_metadata: profileMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -1506,7 +1532,13 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               const isImage = !isDeleted && !isVoiceNote && (item.message_type === 'image' || Boolean(msgImageUrl) || item.content === '📷 Shared photo');
 
               // Reply preview data
-              const replyTarget = item.reply_to || (item.reply_to_id ? messages.find((m) => m.id === item.reply_to_id) : null);
+              const replyTarget =
+                item.reply_to_message ||
+                item.attachments?.reply_to_message ||
+                item.reply_to ||
+                ((item.reply_to_id || item.attachments?.reply_to_id)
+                  ? messages.find((m) => m.id === (item.reply_to_id || item.attachments?.reply_to_id))
+                  : null);
 
               // Reactions summary (excluding poll votes)
               const reactionsMap: Record<string, { count: number; reactedByMe: boolean }> = {};
@@ -1591,10 +1623,10 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                       {replyTarget && !isDeleted && (
                         <View style={[styles.replyQuoteBubble, isMe ? styles.replyQuoteBubbleMe : styles.replyQuoteBubbleOther]}>
                           <Text style={styles.replyQuoteSender} numberOfLines={1}>
-                            {replyTarget.sender_id === currentUser?.id ? 'You' : replyTarget.sender?.fullName || 'Researcher'}
+                            {(replyTarget as any).sender_name || (replyTarget.sender_id === currentUser?.id ? 'You' : replyTarget.sender?.fullName || replyTarget.sender?.handle || 'Researcher')}
                           </Text>
-                          <Text style={styles.replyQuoteContent} numberOfLines={1}>
-                            {replyTarget.content || 'Attachment'}
+                          <Text style={styles.replyQuoteContent} numberOfLines={2}>
+                            {replyTarget.content || (replyTarget.doi_metadata ? '📄 Shared research paper' : (replyTarget.message_type === 'image' ? '📷 Photo' : 'Attachment'))}
                           </Text>
                         </View>
                       )}

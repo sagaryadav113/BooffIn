@@ -262,6 +262,26 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     ? Object.values(typingInThisRoom)[0]?.username || partner?.fullName || 'Researcher'
     : null;
 
+  const getReplyInfo = (target: WorkspaceMessage | null) => {
+    if (!target) return null;
+    return {
+      id: target.id,
+      sender_name:
+        (target as any).sender_name ||
+        target.sender?.fullName ||
+        target.sender?.handle ||
+        (target.sender_id === currentUser?.id ? 'You' : partner?.fullName) ||
+        'Researcher',
+      content:
+        target.content ||
+        (target.doi_metadata ? '📄 Shared research paper' : '') ||
+        (target.document_metadata ? '📄 Document' : '') ||
+        (target.message_type === 'image' ? '📷 Photo' : '') ||
+        'Attachment',
+      message_type: target.message_type,
+    };
+  };
+
   const handleUserTyping = (text: string) => {
     if (!settings.typingIndicatorsEnabled) return;
     if (text.length > 0) {
@@ -829,6 +849,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         url: finalAudioUrl || undefined,
       },
       reply_to_id: replyId,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     if (res.success) {
@@ -909,6 +930,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       doi_metadata: doiMeta,
       document_metadata: docMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -958,6 +980,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       message_type: 'profile',
       profile_metadata: profileMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -991,6 +1014,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       message_type: 'post',
       post_metadata: postMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -1017,6 +1041,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       message_type: 'workspace_invite',
       workspace_invite_metadata: inviteMeta,
       reply_to_id: replyingTo?.id || null,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     setReplyingTo(null);
@@ -1059,6 +1084,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             message_type: 'image',
             media_urls: [uploadRes.url],
             reply_to_id: replyingTo?.id || null,
+            reply_to_message: getReplyInfo(replyingTo),
           });
           setReplyingTo(null);
           setTimeout(() => {
@@ -1100,6 +1126,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         message_type: 'poll',
         doi_metadata: null,
         reply_to_id: replyingTo?.id || null,
+        reply_to_message: getReplyInfo(replyingTo),
       });
 
       if (res.success) {
@@ -1271,6 +1298,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       e2ee_ciphertext: e2eeCipher,
       e2ee_nonce: e2eeNonce,
       reply_to_id: replyId,
+      reply_to_message: getReplyInfo(replyingTo),
     });
 
     if (res.success) {
@@ -1604,41 +1632,66 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             ]}
           >
             {/* Quoted Reply Banner inside bubble */}
-            {item.reply_to_message && !isDeleted && (
-              <View
-                style={[
-                  styles.quotedBubbleBlock,
-                  isMe ? styles.quotedBubbleBlockMy : styles.quotedBubbleBlockOther,
-                ]}
-              >
+            {(() => {
+              const replyParent =
+                item.reply_to_message ||
+                item.attachments?.reply_to_message ||
+                ((item.reply_to_id || item.attachments?.reply_to_id)
+                  ? messages.find((m) => m.id === (item.reply_to_id || item.attachments?.reply_to_id))
+                  : null);
+
+              if (!replyParent || isDeleted) return null;
+
+              const replySenderName =
+                (replyParent as any).sender_name ||
+                replyParent.sender?.fullName ||
+                replyParent.sender?.handle ||
+                (replyParent.sender_id === currentUser?.id ? 'You' : partner?.fullName) ||
+                'Researcher';
+
+              const replySnippet =
+                replyParent.content ||
+                (replyParent.doi_metadata ? '📄 Shared paper' : '') ||
+                (replyParent.document_metadata ? '📄 Document' : '') ||
+                (replyParent.message_type === 'image' ? '📷 Photo' : '') ||
+                'Attachment';
+
+              return (
                 <View
                   style={[
-                    styles.quotedAccentBar,
-                    isMe ? styles.quotedAccentBarMy : styles.quotedAccentBarOther,
+                    styles.quotedBubbleBlock,
+                    isMe ? styles.quotedBubbleBlockMy : styles.quotedBubbleBlockOther,
                   ]}
-                />
-                <View style={styles.quotedContentWrap}>
-                  <Text
+                >
+                  <View
                     style={[
-                      styles.quotedSenderName,
-                      isMe ? styles.quotedSenderNameMy : styles.quotedSenderNameOther,
+                      styles.quotedAccentBar,
+                      isMe ? styles.quotedAccentBarMy : styles.quotedAccentBarOther,
                     ]}
-                    numberOfLines={1}
-                  >
-                    {item.reply_to_message.sender_name || 'Researcher'}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.quotedSnippetText,
-                      isMe ? styles.quotedSnippetTextMy : styles.quotedSnippetTextOther,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.reply_to_message.content}
-                  </Text>
+                  />
+                  <View style={styles.quotedContentWrap}>
+                    <Text
+                      style={[
+                        styles.quotedSenderName,
+                        isMe ? styles.quotedSenderNameMy : styles.quotedSenderNameOther,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {replySenderName}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.quotedSnippetText,
+                        isMe ? styles.quotedSnippetTextMy : styles.quotedSnippetTextOther,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {replySnippet}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            )}
+              );
+            })()}
 
             {/* Deleted Message Notice */}
             {isDeleted ? (
