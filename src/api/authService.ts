@@ -118,10 +118,36 @@ export async function fetchUserProfile(userId: string, viewerId?: string): Promi
       console.warn('[authService] get_user_profile RPC error:', rpcError.message);
     }
 
-    // Fail safe: NEVER fall back to unrestricted table select('*')
+    // 2. Self-profile recovery: If this is the active user reading their own profile,
+    // Supabase RLS safely allows reading own row directly from 'profiles' table if RPC timed out or failed.
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id === userId) {
+        const { data: directData, error: directError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (!directError && directData && directData.id) {
+          return mapProfileRecord(directData);
+        }
+      }
+    } catch {}
+
+    // 3. Resilient cache fallback: If network is offline or request timed out, return stored profile
+    const cached = getStoredLocalSession();
+    if (cached && cached.id === userId && cached.handle && cached.handle !== 'researcher') {
+      return cached;
+    }
+
     return null;
   } catch (err) {
     console.warn('[authService] fetchUserProfile error:', err);
+    const cached = getStoredLocalSession();
+    if (cached && cached.id === userId && cached.handle && cached.handle !== 'researcher') {
+      return cached;
+    }
     return null;
   }
 }
@@ -171,6 +197,20 @@ export function getStoredLocalSession(): UserProfile | null {
 }
 
 export function setStoredLocalSession(profile: UserProfile | null): void {
+  // Guard: Never downgrade an established cached profile with an empty or default fallback!
+  if (profile && memoryLocalSession && memoryLocalSession.id === profile.id) {
+    const hasExistingInterests = Array.isArray(memoryLocalSession.researchInterests) && memoryLocalSession.researchInterests.length > 0;
+    const hasNewInterests = Array.isArray(profile.researchInterests) && profile.researchInterests.length > 0;
+    
+    profile = {
+      ...profile,
+      researchInterests: hasNewInterests ? profile.researchInterests : (hasExistingInterests ? memoryLocalSession.researchInterests : []),
+      handle: (profile.handle === 'researcher' && memoryLocalSession.handle) ? memoryLocalSession.handle : profile.handle,
+      fullName: (profile.fullName === 'Researcher' && memoryLocalSession.fullName) ? memoryLocalSession.fullName : profile.fullName,
+      avatarUrl: profile.avatarUrl || memoryLocalSession.avatarUrl,
+    };
+  }
+
   memoryLocalSession = profile;
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -205,7 +245,23 @@ export async function getInitialAuthSession(): Promise<UserProfile | null> {
       } catch {}
     }
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+    let { data: { session }, error } = await supabase.auth.getSession();
+
+    // In React Native / mobile cold boots, AsyncStorage session restoration
+    // can take a moment. If session is not immediately ready but we have a cached user,
+    // briefly retry so we never cause a false automatic logout.
+    if (!session?.user && memoryLocalSession?.id) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise((r) => setTimeout(r, 150));
+        const retryRes = await supabase.auth.getSession();
+        if (retryRes.data.session?.user) {
+          session = retryRes.data.session;
+          error = null;
+          break;
+        }
+      }
+    }
+
     if (error || !session?.user) {
       return null;
     }
@@ -216,12 +272,18 @@ export async function getInitialAuthSession(): Promise<UserProfile | null> {
       return profile;
     }
 
-    // If profile table row is not yet provisioned, construct profile from metadata
+    // Keep cached session if fetchUserProfile could not retrieve over network/DB
+    if (memoryLocalSession && memoryLocalSession.id === session.user.id) {
+      return memoryLocalSession;
+    }
+
+    // If profile table row is not yet provisioned (brand new user), construct initial fallback
     const metadata = session.user.user_metadata || {};
     const fallbackProfile: UserProfile = {
       id: session.user.id,
       handle: (metadata.handle || metadata.username || session.user.email?.split('@')[0] || 'researcher').toLowerCase(),
       fullName: metadata.full_name || metadata.name || 'Researcher',
+      avatarUrl: metadata.avatar_url || metadata.picture,
       academicTitle: metadata.academic_title || 'Research Enthusiast',
       institution: metadata.institution || 'Independent',
       bio: '',
@@ -234,7 +296,6 @@ export async function getInitialAuthSession(): Promise<UserProfile | null> {
       joinedDate: 'Recently',
       researchInterests: [],
     };
-    setStoredLocalSession(fallbackProfile);
     return fallbackProfile;
   } catch {
     return memoryLocalSession;
@@ -716,7 +777,22 @@ export function isProfileComplete(user: UserProfile | null): boolean {
     user.fullName.trim().length > 0 &&
     user.fullName.trim().toLowerCase() !== 'researcher'
   );
-  return hasInterests && hasValidName;
+  const hasCustomHandle = Boolean(
+    user.handle &&
+    user.handle.trim().length > 0 &&
+    user.handle.trim().toLowerCase() !== 'researcher'
+  );
+
+  // If user has provided a valid name and chosen research interests -> complete
+  if (hasInterests && hasValidName) return true;
+
+  // If user is an established account (has custom handle and valid name and activity/bio/existing join date),
+  // never falsely eject them into onboarding if interests array was empty or temporarily failed to load.
+  if (hasCustomHandle && hasValidName && (user.postsCount > 0 || user.followersCount > 0 || user.followingCount > 0 || Boolean(user.bio?.trim()) || (user.joinedDate && user.joinedDate !== 'Just now' && user.joinedDate !== 'Recently'))) {
+    return true;
+  }
+
+  return false;
 }
 
 function extractOAuthParams(rawUrl: string) {

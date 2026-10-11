@@ -9,11 +9,12 @@ import {
   sendPasswordResetEmail,
   getInitialAuthSession,
   fetchUserProfile,
+  getStoredLocalSession,
   setStoredLocalSession,
   persistUserProfile,
   SignUpParams,
 } from '../api/authService';
-import { followUser, unfollowUser, toggleFollowUserRpc, fetchUserFollowingIds } from '../api/socialService';
+import { toggleFollowUserRpc, fetchUserFollowingIds } from '../api/socialService';
 import { useSearchStore } from './useSearchStore';
 import { supabase } from '../api/client';
 
@@ -140,10 +141,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         if (session?.user) {
           const currentLoadedUser = get().user;
-          let profile = currentLoadedUser?.id === session.user.id && currentLoadedUser.handle
+          let profile = currentLoadedUser?.id === session.user.id && currentLoadedUser.handle && currentLoadedUser.handle !== 'researcher'
             ? currentLoadedUser
             : await fetchUserProfile(session.user.id);
+
           if (!profile) {
+            const stored = getStoredLocalSession();
+            if (stored && stored.id === session.user.id && stored.handle && stored.handle !== 'researcher') {
+              profile = stored;
+            }
+          }
+
+          if (!profile) {
+            // Read-only memory fallback for freshly signed-up users - NEVER upsert or overwrite DB here!
             const metadata = session.user.user_metadata || {};
             const fullName = metadata.full_name || metadata.name || session.user.email?.split('@')[0] || 'Researcher';
             const rawHandle = metadata.user_name || metadata.preferred_username || session.user.email?.split('@')[0] || 'researcher';
@@ -167,19 +177,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               joinedDate: 'Just now',
               researchInterests: [],
             };
-
-            try {
-              await supabase.from('profiles').upsert({
-                id: session.user.id,
-                username: profile.handle,
-                full_name: fullName,
-                avatar_url: avatarUrl,
-                academic_title: profile.academicTitle,
-                institution: profile.institution,
-              });
-            } catch {}
+          } else {
+            setStoredLocalSession(profile);
           }
-          setStoredLocalSession(profile);
           set({
             user: profile,
             authStatus: 'authenticated',

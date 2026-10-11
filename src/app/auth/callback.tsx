@@ -9,6 +9,7 @@ import {
   getStoredLocalSession,
   getInitialAuthSession,
   isProfileComplete,
+  mapProfileRecord,
 } from '../../api/authService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { BooffinLogo } from '../../components/core/BooffinLogo';
@@ -153,6 +154,26 @@ export default function AuthCallbackScreen() {
         // Retrieve existing profile or construct a newly authenticated Google/OAuth profile
         let profile = await fetchUserProfile(user.id);
         if (!profile) {
+          // Double check directly from profiles table to ensure an existing account is NEVER overwritten
+          const { data: directData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (directData && directData.id) {
+            profile = mapProfileRecord(directData);
+          }
+        }
+
+        if (!profile) {
+          const stored = getStoredLocalSession();
+          if (stored && stored.id === user.id && stored.handle && stored.handle !== 'researcher') {
+            profile = stored;
+          }
+        }
+
+        if (!profile) {
           const metadata = user.user_metadata || {};
           const fullName =
             metadata.full_name ||
@@ -186,14 +207,23 @@ export default function AuthCallbackScreen() {
           };
 
           try {
-            await supabase.from('profiles').upsert({
-              id: user.id,
-              username: newProfile.handle,
-              full_name: fullName,
-              avatar_url: avatarUrl,
-              academic_title: newProfile.academicTitle,
-              institution: newProfile.institution,
-            });
+            // Check if profile exists before inserting to never overwrite an existing researcher row
+            const { data: existingRow } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('id', user.id)
+              .maybeSingle();
+
+            if (!existingRow) {
+              await supabase.from('profiles').insert({
+                id: user.id,
+                username: newProfile.handle,
+                full_name: fullName,
+                avatar_url: avatarUrl,
+                academic_title: newProfile.academicTitle,
+                institution: newProfile.institution,
+              });
+            }
           } catch (e) {
             console.warn('Profile sync warning:', e);
           }
