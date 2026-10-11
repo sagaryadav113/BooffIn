@@ -100,9 +100,8 @@ export const ChatThemePickerModal: React.FC<ChatThemePickerModalProps> = ({
           <View style={styles.livePreviewContainer}>
             <ImageBackground
               source={activeThemeConfig.backgroundImage}
-              style={styles.livePreviewBg}
+              style={[styles.livePreviewBg, { backgroundColor: activeThemeConfig.backgroundColor }]}
               imageStyle={{ resizeMode: 'cover', borderRadius: 14 }}
-              backgroundColor={activeThemeConfig.backgroundColor}
             >
               <View
                 style={[

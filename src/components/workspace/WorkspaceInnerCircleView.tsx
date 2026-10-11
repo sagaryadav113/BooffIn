@@ -1657,11 +1657,13 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
             <View
               pointerEvents="none"
-              style={{
-                ...StyleSheet.absoluteFillObject,
-                backgroundColor: activeThemeConfig.accentColor,
-                opacity: activeThemeConfig.overlayOpacity,
-              }}
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: activeThemeConfig.accentColor,
+                  opacity: activeThemeConfig.overlayOpacity,
+                },
+              ]}
             />
           )}
           {/* Pinned Announcement / Message Banner */}

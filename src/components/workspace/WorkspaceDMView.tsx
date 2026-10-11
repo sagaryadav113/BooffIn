@@ -2176,11 +2176,13 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
           <View
             pointerEvents="none"
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              backgroundColor: activeThemeConfig.accentColor,
-              opacity: activeThemeConfig.overlayOpacity,
-            }}
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                backgroundColor: activeThemeConfig.accentColor,
+                opacity: activeThemeConfig.overlayOpacity,
+              },
+            ]}
           />
         )}
         {isMessagesLoading && messages.length === 0 ? (

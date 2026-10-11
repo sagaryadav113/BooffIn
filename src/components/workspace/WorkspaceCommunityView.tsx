@@ -1419,11 +1419,13 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           {Boolean(activeThemeConfig.backgroundImage && activeThemeConfig.overlayOpacity) && (
             <View
               pointerEvents="none"
-              style={{
-                ...StyleSheet.absoluteFillObject,
-                backgroundColor: activeThemeConfig.accentColor,
-                opacity: activeThemeConfig.overlayOpacity,
-              }}
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: activeThemeConfig.accentColor,
+                  opacity: activeThemeConfig.overlayOpacity,
+                },
+              ]}
             />
           )}
           <FlatList
