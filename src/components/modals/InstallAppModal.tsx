@@ -32,8 +32,8 @@ import { BooffinLogo } from '../core/BooffinLogo';
 import { Button } from '../core/Button';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 
-const GOOGLE_DRIVE_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=17zpIPDXDNA-Itb035Pq-vgsCSre5cjfS&confirm=t';
-const GOOGLE_DRIVE_VIEW_URL = 'https://drive.google.com/file/d/17zpIPDXDNA-Itb035Pq-vgsCSre5cjfS/view?usp=sharing';
+const GOOGLE_DRIVE_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=15mc1TNG3skxbIvJqo3FisdCcTJNz5QxK&confirm=t';
+const GOOGLE_DRIVE_VIEW_URL = 'https://drive.google.com/file/d/15mc1TNG3skxbIvJqo3FisdCcTJNz5QxK/view?usp=sharing';
 const WINDOWS_SETUP_URL = GOOGLE_DRIVE_DOWNLOAD_URL;
 const WINDOWS_PORTABLE_URL = GOOGLE_DRIVE_DOWNLOAD_URL;
 const GITHUB_RELEASES_URL = 'https://github.com/sagaryadav113/BooffIn/releases';
@@ -227,7 +227,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                     <View style={styles.downloadBtnTextCol}>
                       <Text style={styles.downloadBtnTitle}>Download for Windows (.exe)</Text>
                       <Text style={styles.downloadBtnMeta}>
-                        BooffIn.exe • 234 MB • Windows 10/11 (64-bit)
+                        BooffIn Setup 1.0.0.exe • 118 MB • Setup Wizard (x64)
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -262,7 +262,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                           Download link opened!
                         </Text>
                         <Text style={styles.downloadSuccessDesc}>
-                          Your download from Google Drive is ready. Once downloaded, double-click <Text style={{ fontWeight: '700' }}>BooffIn.exe</Text> to launch your desktop app.
+                          Your download from Google Drive is ready. Once downloaded, double-click <Text style={{ fontWeight: '700' }}>BooffIn Setup 1.0.0.exe</Text> to install and launch your desktop app.
                         </Text>
                       </View>
                     </View>
