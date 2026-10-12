@@ -1936,7 +1936,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                 <View style={styles.confirmBulletItem}>
                   <Text style={styles.confirmBulletDot}>•</Text>
                   <Text style={styles.confirmBulletText}>
-                    <Text style={{ fontWeight: '700' }}>No Communication:</Text> Sending messages, calls, podcasts, and live discussions will be permanently blocked.
+                    <Text style={{ fontWeight: '700' }}>No Communication:</Text> Sending messages, calls, and live discussions will be permanently blocked.
                   </Text>
                 </View>
                 <View style={styles.confirmBulletItem}>

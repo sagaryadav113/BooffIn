@@ -195,7 +195,7 @@ const AnimatedTypingIndicator: React.FC<{ name: string; count: number }> = ({ na
   );
 };
 
-export type CommunityTab = 'papers' | 'discussion' | 'podcasts' | 'live_sessions';
+export type CommunityTab = 'papers' | 'discussion' | 'live_sessions';
 
 interface WorkspaceCommunityViewProps {
   workspace: Workspace;
@@ -1446,16 +1446,6 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => setActiveTab('podcasts')}
-            style={[styles.segmentPill, activeTab === 'podcasts' && styles.segmentPillActive]}
-          >
-            <Text style={[styles.segmentPillText, activeTab === 'podcasts' && styles.segmentPillTextActive]}>
-              Podcasts
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
             onPress={() => setActiveTab('live_sessions')}
             style={[styles.segmentPill, activeTab === 'live_sessions' && styles.segmentPillActive]}
           >
@@ -2145,39 +2135,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         </View>
       )}
 
-      {/* Tab 3: Podcasts */}
-      {activeTab === 'podcasts' && (
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <View style={styles.podcastHeaderCard}>
-            <Mic size={28} color="#164E3F" />
-            <Text style={styles.podcastHeaderTitle}>Community Podcasts & Audio Summaries</Text>
-            <Text style={styles.podcastHeaderSub}>
-              Listen to 15-minute paper walkthroughs and interactive Q&As.
-            </Text>
-          </View>
-
-          {/* Podcast Episode Card */}
-          <View style={styles.podcastCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Mic size={16} color="#164E3F" />
-              <Text style={styles.podcastTitle}>Episode 14: Open Science in Cellular Biology</Text>
-            </View>
-            <Text style={styles.podcastDuration}>Duration: 24 mins • Recorded Oct 7</Text>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => {
-                if (Platform.OS === 'web') window.alert('Playing Episode 14...');
-              }}
-              style={styles.playBtn}
-            >
-              <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
-              <Text style={styles.playBtnText}>Play Podcast</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      )}
-
-      {/* Tab 4: Live Sessions */}
+      {/* Tab 3: Live Sessions */}
       {activeTab === 'live_sessions' && (
         <ScrollView contentContainerStyle={{ padding: 16 }}>
           <View style={styles.tabActionBar}>

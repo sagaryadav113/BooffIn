@@ -795,7 +795,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                 <View style={styles.confirmBulletItem}>
                   <Text style={styles.confirmBulletDot}>•</Text>
                   <Text style={styles.confirmBulletText}>
-                    <Text style={{ fontWeight: '600', color: '#0F172A' }}>Communication Closed:</Text> Sending new messages, podcasts, and calls will be disabled.
+                    <Text style={{ fontWeight: '600', color: '#0F172A' }}>Communication Closed:</Text> Sending new messages and calls will be disabled.
                   </Text>
                 </View>
                 <View style={styles.confirmBulletItem}>
