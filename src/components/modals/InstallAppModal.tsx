@@ -32,8 +32,10 @@ import { BooffinLogo } from '../core/BooffinLogo';
 import { Button } from '../core/Button';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 
-const WINDOWS_SETUP_URL = 'https://github.com/sagaryadav113/BooffIn/releases/latest/download/BooffIn-Setup.exe';
-const WINDOWS_PORTABLE_URL = 'https://github.com/sagaryadav113/BooffIn/releases/latest/download/BooffIn.exe';
+const GOOGLE_DRIVE_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=17zpIPDXDNA-Itb035Pq-vgsCSre5cjfS&confirm=t';
+const GOOGLE_DRIVE_VIEW_URL = 'https://drive.google.com/file/d/17zpIPDXDNA-Itb035Pq-vgsCSre5cjfS/view?usp=sharing';
+const WINDOWS_SETUP_URL = GOOGLE_DRIVE_DOWNLOAD_URL;
+const WINDOWS_PORTABLE_URL = GOOGLE_DRIVE_DOWNLOAD_URL;
 const GITHUB_RELEASES_URL = 'https://github.com/sagaryadav113/BooffIn/releases';
 
 interface InstallAppModalProps {
@@ -63,21 +65,14 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
   );
   const [downloadStarted, setDownloadStarted] = useState(false);
 
-  const handleDownloadWindows = (url: string) => {
+  const handleDownloadWindows = (url: string = GOOGLE_DRIVE_DOWNLOAD_URL) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
     setDownloadStarted(true);
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = url.split('/').pop() || 'BooffIn-Setup.exe';
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      window.open(url, '_blank', 'noopener,noreferrer');
     } else {
       Linking.openURL(url);
     }
@@ -226,13 +221,13 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                   <TouchableOpacity
                     style={styles.primaryDownloadBtn}
                     activeOpacity={0.85}
-                    onPress={() => handleDownloadWindows(WINDOWS_SETUP_URL)}
+                    onPress={() => handleDownloadWindows(GOOGLE_DRIVE_DOWNLOAD_URL)}
                   >
                     <Download size={20} color="#FFFFFF" strokeWidth={2.3} />
                     <View style={styles.downloadBtnTextCol}>
                       <Text style={styles.downloadBtnTitle}>Download for Windows (.exe)</Text>
                       <Text style={styles.downloadBtnMeta}>
-                        BooffIn-Setup.exe • Professional Setup Wizard (NSIS)
+                        BooffIn.exe • 234 MB • Windows 10/11 (64-bit)
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -242,10 +237,10 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                     <TouchableOpacity
                       style={styles.secondaryOptionBtn}
                       activeOpacity={0.75}
-                      onPress={() => handleDownloadWindows(WINDOWS_PORTABLE_URL)}
+                      onPress={() => handleOpenExternal(GOOGLE_DRIVE_VIEW_URL)}
                     >
                       <HardDrive size={13} color="#064E3B" strokeWidth={2} />
-                      <Text style={styles.secondaryOptionText}>Portable .exe</Text>
+                      <Text style={styles.secondaryOptionText}>Google Drive Mirror</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -254,7 +249,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       onPress={() => handleOpenExternal(GITHUB_RELEASES_URL)}
                     >
                       <ExternalLink size={13} color="#064E3B" strokeWidth={2} />
-                      <Text style={styles.secondaryOptionText}>All GitHub Releases</Text>
+                      <Text style={styles.secondaryOptionText}>GitHub Releases</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -264,10 +259,10 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       <CheckCircle2 size={18} color="#065F46" />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.downloadSuccessTitle}>
-                          Download initiated!
+                          Download link opened!
                         </Text>
                         <Text style={styles.downloadSuccessDesc}>
-                          Run <Text style={{ fontWeight: '700' }}>BooffIn-Setup.exe</Text> once downloaded to complete installation. Desktop and Start Menu shortcuts will be generated automatically.
+                          Your download from Google Drive is ready. Once downloaded, double-click <Text style={{ fontWeight: '700' }}>BooffIn.exe</Text> to launch your desktop app.
                         </Text>
                       </View>
                     </View>
@@ -333,7 +328,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       <Text style={styles.stepNumText}>2</Text>
                     </View>
                     <Text style={styles.stepInstruction}>
-                      Open <Text style={{ fontWeight: '700' }}>BooffIn-Setup.exe</Text>. If Windows SmartScreen shows a prompt, click <Text style={{ fontWeight: '700' }}>"More info" → "Run anyway"</Text>.
+                      Open the downloaded <Text style={{ fontWeight: '700' }}>BooffIn.exe</Text>. If Windows SmartScreen prompts on first run, click <Text style={{ fontWeight: '700' }}>"More info" → "Run anyway"</Text>.
                     </Text>
                   </View>
 
@@ -342,7 +337,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       <Text style={styles.stepNumText}>3</Text>
                     </View>
                     <Text style={styles.stepInstruction}>
-                      Follow the setup wizard to create Desktop shortcuts, then launch BooffIn and sign in to your research feed.
+                      Right-click <Text style={{ fontWeight: '700' }}>BooffIn.exe</Text> → <Text style={{ fontWeight: '700' }}>Send to → Desktop</Text> to place an instant shortcut on your desktop, and sign in to your research feed.
                     </Text>
                   </View>
                 </View>
