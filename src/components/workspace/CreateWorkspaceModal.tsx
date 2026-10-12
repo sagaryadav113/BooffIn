@@ -197,6 +197,12 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
 
   // Create Group Chat / Inner Circle
   const handleCreateGroup = async () => {
+    const finalName = groupName.trim();
+    if (!finalName) {
+      setErrorText('Please enter a group name.');
+      return;
+    }
+
     if (selectedUsers.length === 0) {
       setErrorText('Please select at least one researcher to start a group.');
       return;
@@ -209,16 +215,6 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } catch {}
-
-      // Default title if left optional
-      let finalName = groupName.trim();
-      if (!finalName) {
-        if (selectedUsers.length === 1) {
-          finalName = `${selectedUsers[0].fullName || selectedUsers[0].handle}'s Pod`;
-        } else {
-          finalName = `${selectedUsers[0].fullName?.split(' ')[0] || 'Member'}, ${selectedUsers[1].fullName?.split(' ')[0] || 'Member'}${selectedUsers.length > 2 ? ` & ${selectedUsers.length - 2} others` : ''}`;
-        }
-      }
 
       const memberIds = selectedUsers.map((u) => u.id);
 
@@ -290,8 +286,11 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
             <View style={styles.groupNameInputWrap}>
               <TextInput
                 value={groupName}
-                onChangeText={setGroupName}
-                placeholder="Group name (optional)"
+                onChangeText={(text) => {
+                  setGroupName(text);
+                  if (errorText) setErrorText(null);
+                }}
+                placeholder="Group name"
                 placeholderTextColor="#94A3B8"
                 style={styles.groupNameInput}
                 autoCapitalize="words"
@@ -459,11 +458,11 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
         <View style={styles.bottomDock}>
           <TouchableOpacity
             activeOpacity={0.8}
-            disabled={isSubmitting || selectedUsers.length === 0}
+            disabled={isSubmitting || selectedUsers.length === 0 || !groupName.trim()}
             onPress={handleCreateGroup}
             style={[
               styles.createBtn,
-              selectedUsers.length === 0 && styles.createBtnDisabled,
+              (selectedUsers.length === 0 || !groupName.trim()) && styles.createBtnDisabled,
               isSubmitting && { opacity: 0.7 },
             ]}
           >
