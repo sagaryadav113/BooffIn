@@ -48,6 +48,8 @@ export interface Workspace {
   disabled_at?: string | null;
   disabled_by?: string | null;
   settings: Record<string, any>;
+  topics?: string[];
+  research_fields?: string[];
   created_at: string;
   updated_at: string;
 

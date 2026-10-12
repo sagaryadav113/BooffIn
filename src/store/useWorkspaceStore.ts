@@ -171,6 +171,8 @@ interface WorkspaceState {
     avatar_url?: string;
     banner_url?: string;
     member_ids?: string[];
+    topics?: string[];
+    research_fields?: string[];
   }) => Promise<{ workspace: Workspace | null; error: string | null }>;
   createInnerCircle: (params: {
     name: string;

@@ -695,6 +695,8 @@ export const workspaceService = {
     avatar_url?: string;
     banner_url?: string;
     member_ids?: string[];
+    topics?: string[];
+    research_fields?: string[];
   }): Promise<{ workspace: Workspace | null; error: string | null }> {
     try {
       const {
@@ -727,6 +729,12 @@ export const workspaceService = {
       const price = TIER_PRICES[params.subscription_tier] || 0;
       const dbTierEnum = params.subscription_tier === 'free' ? null : params.subscription_tier;
 
+      const chosenTopics = Array.isArray(params.topics) && params.topics.length > 0
+        ? params.topics
+        : Array.isArray(params.research_fields) && params.research_fields.length > 0
+        ? params.research_fields
+        : [];
+
       // 1. Insert workspace
       let wsPayload: any = {
         type: 'community',
@@ -741,6 +749,10 @@ export const workspaceService = {
         subscription_price_inr: price,
         pricing_tier: dbTierEnum,
         price_inr: price,
+        settings: {
+          topics: chosenTopics,
+          research_fields: chosenTopics,
+        },
       };
 
       let { data: ws, error: wsErr } = await supabase

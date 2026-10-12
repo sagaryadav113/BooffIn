@@ -24,9 +24,16 @@ import {
   Lock,
   Info,
   Camera,
+  Compass,
+  Plus,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import {
+  searchResearchTaxonomy,
+  POPULAR_DISCIPLINES,
+  TaxonomyItem,
+} from '../../data/researchTaxonomy';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { fetchFollowing } from '../../api/socialService';
@@ -75,6 +82,8 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [topicSearchQuery, setTopicSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<UserProfile[]>([]);
   const [followingList, setFollowingList] = useState<UserProfile[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
@@ -90,6 +99,8 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
       setDescription('');
       setIsPrivate(false);
       setSearchQuery('');
+      setSelectedTopics([]);
+      setTopicSearchQuery('');
       setSelectedUsers([]);
       setErrorText(null);
       return;
@@ -247,6 +258,26 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
     }
   };
 
+  const handleToggleTopic = (topicName: string) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    if (selectedTopics.includes(topicName)) {
+      setSelectedTopics((prev) => prev.filter((t) => t !== topicName));
+    } else {
+      if (selectedTopics.length >= 8) {
+        setErrorText('You can select up to 8 fields of interest for your community.');
+        return;
+      }
+      setSelectedTopics((prev) => [...prev, topicName]);
+    }
+  };
+
+  const topicSearchResults = useMemo(() => {
+    if (!topicSearchQuery.trim()) return [];
+    return searchResearchTaxonomy(topicSearchQuery, 12);
+  }, [topicSearchQuery]);
+
   // Create Community
   const handleCreateCommunity = async () => {
     if (hasReachedLimit) {
@@ -277,6 +308,8 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
         is_private: isPrivate,
         avatar_url: avatarUri || undefined,
         member_ids: memberIds,
+        topics: selectedTopics,
+        research_fields: selectedTopics,
       });
 
       if (res.error || !res.workspace) {
@@ -444,6 +477,138 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                     </TouchableOpacity>
                   )}
                 </View>
+              </View>
+
+              {/* Fields of Interest (1,200+ Research Disciplines) */}
+              <View style={styles.fieldsSection}>
+                <View style={styles.fieldsSectionHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Compass size={17} color="#164E3F" strokeWidth={2.2} />
+                    <Text style={styles.fieldsSectionTitle}>Fields of Interest</Text>
+                  </View>
+                  <Text style={styles.fieldsCounter}>
+                    {selectedTopics.length}/8 selected
+                  </Text>
+                </View>
+                <Text style={styles.fieldsSectionSub}>
+                  Tag up to 8 scientific fields from our 1,200+ taxonomy so researchers in your niche discover and receive recommendations for this community.
+                </Text>
+
+                {/* Selected Topic Pills */}
+                {selectedTopics.length > 0 && (
+                  <View style={styles.selectedTopicsWrap}>
+                    {selectedTopics.map((topic) => (
+                      <TouchableOpacity
+                        key={topic}
+                        activeOpacity={0.7}
+                        onPress={() => handleToggleTopic(topic)}
+                        style={styles.selectedTopicChip}
+                      >
+                        <Text style={styles.selectedTopicChipText}>{topic}</Text>
+                        <X size={13} color="#FFFFFF" strokeWidth={2.4} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Topic Search Input */}
+                <View style={styles.topicSearchBar}>
+                  <Search size={16} color="#94A3B8" />
+                  <TextInput
+                    value={topicSearchQuery}
+                    onChangeText={setTopicSearchQuery}
+                    placeholder="Search 1,200+ disciplines (e.g. Neuroscience, AI, CRISPR)"
+                    placeholderTextColor="#94A3B8"
+                    style={styles.topicSearchInput}
+                    returnKeyType="search"
+                  />
+                  {topicSearchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setTopicSearchQuery('')}>
+                      <X size={15} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Autocomplete suggestions or popular disciplines */}
+                {topicSearchQuery.trim().length > 0 ? (
+                  <View style={styles.topicDropdownContainer}>
+                    {topicSearchResults.length === 0 ? (
+                      <Text style={styles.topicNoResultText}>
+                        No exact discipline found. Try a broader term (e.g. Biology, AI, Physics, Genetics).
+                      </Text>
+                    ) : (
+                      topicSearchResults.map((item) => {
+                        const isSelected = selectedTopics.includes(item.name);
+                        return (
+                          <TouchableOpacity
+                            key={item.id}
+                            activeOpacity={0.7}
+                            onPress={() => handleToggleTopic(item.name)}
+                            style={[
+                              styles.topicDropdownItem,
+                              isSelected && styles.topicDropdownItemSelected,
+                            ]}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                style={[
+                                  styles.topicDropdownItemName,
+                                  isSelected && { color: '#164E3F', fontWeight: '700' },
+                                ]}
+                              >
+                                {item.name}
+                              </Text>
+                              <Text style={styles.topicDropdownItemHier} numberOfLines={1}>
+                                {item.hierarchy}
+                              </Text>
+                            </View>
+                            {isSelected ? (
+                              <Check size={16} color="#164E3F" strokeWidth={2.4} />
+                            ) : (
+                              <Plus size={16} color="#94A3B8" />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.popularTopicsWrap}>
+                    <Text style={styles.popularTopicsLabel}>Popular fields:</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.popularTopicsScroll}
+                    >
+                      {POPULAR_DISCIPLINES.map((discipline) => {
+                        const isSelected = selectedTopics.includes(discipline);
+                        return (
+                          <TouchableOpacity
+                            key={discipline}
+                            activeOpacity={0.7}
+                            onPress={() => handleToggleTopic(discipline)}
+                            style={[
+                              styles.popularTopicChip,
+                              isSelected && styles.popularTopicChipSelected,
+                            ]}
+                          >
+                            {isSelected && (
+                              <Check size={12} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 4 }} />
+                            )}
+                            <Text
+                              style={[
+                                styles.popularTopicText,
+                                isSelected && styles.popularTopicTextSelected,
+                              ]}
+                            >
+                              {discipline}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
 
               {/* Search Bar for Inviting Collaborators */}
@@ -1115,6 +1280,149 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#DC2626',
     textAlign: 'center',
+  },
+  fieldsSection: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+  fieldsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  fieldsSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  fieldsCounter: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#164E3F',
+  },
+  fieldsSectionSub: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  selectedTopicsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  selectedTopicChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#164E3F',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+  },
+  selectedTopicChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  topicSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 42,
+    gap: 8,
+  },
+  topicSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  topicDropdownContainer: {
+    marginTop: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 4,
+    maxHeight: 220,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  topicDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  topicDropdownItemSelected: {
+    backgroundColor: '#ECFDF5',
+  },
+  topicDropdownItemName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  topicDropdownItemHier: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  topicNoResultText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    padding: 12,
+    textAlign: 'center',
+  },
+  popularTopicsWrap: {
+    marginTop: 10,
+  },
+  popularTopicsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  popularTopicsScroll: {
+    gap: 6,
+    paddingBottom: 2,
+  },
+  popularTopicChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 6,
+    paddingHorizontal: 11,
+    borderRadius: 16,
+  },
+  popularTopicChipSelected: {
+    backgroundColor: '#164E3F',
+    borderColor: '#164E3F',
+  },
+  popularTopicText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  popularTopicTextSelected: {
+    color: '#FFFFFF',
   },
   bottomDock: {
     position: 'absolute',

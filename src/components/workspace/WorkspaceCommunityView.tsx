@@ -67,6 +67,7 @@ import {
   Ban,
   Flag,
   LogOut,
+  Eye,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -1403,6 +1404,16 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               )}
             </View>
           </View>
+        </View>
+      )}
+
+      {/* 7-Day Preview Mode Banner for Prospective Members */}
+      {!isMember && !isCommunityDisabled && (
+        <View style={styles.previewModeBanner}>
+          <Eye size={15} color="#164E3F" strokeWidth={2.4} />
+          <Text style={styles.previewModeBannerText}>
+            Preview Mode · Showing past 7 days of community conversations.
+          </Text>
         </View>
       )}
 
@@ -4517,6 +4528,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  previewModeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#ECFDF5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#D1FAE5',
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+  },
+  previewModeBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#164E3F',
   },
   reasonOption: {
     paddingVertical: 10,

@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   StyleSheet,
   StatusBar,
@@ -19,6 +19,11 @@ import { AppHeader } from '../../components/layout/AppHeader';
 import { FeedNavigation } from '../../components/layout/FeedNavigation';
 import { PostCard } from '../../components/cards/PostCard';
 import { EmptyState } from '../../components/feedback/EmptyState';
+import { RecommendedCommunitiesCarousel } from '../../components/workspace/RecommendedCommunitiesCarousel';
+import {
+  communityRecommendationService,
+  RecommendedCommunity,
+} from '../../api/communityRecommendationService';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
@@ -41,6 +46,9 @@ export default function HomeScreen() {
   const feedError = usePostStore((s) => s.feedError);
   const currentUser = useAuthStore((s) => s.user);
 
+  const [recommendations, setRecommendations] = useState<RecommendedCommunity[]>([]);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+
   // Dynamic feed navigation tabs: For You, Following, plus user's chosen research interests
   const userInterests = useMemo(() => {
     return Array.isArray(currentUser?.researchInterests)
@@ -52,9 +60,37 @@ export default function HomeScreen() {
     return ['For You', 'Following', ...userInterests];
   }, [userInterests]);
 
+  // Load personalized community recommendations (with frequency-capping and interest matching)
+  const loadCommunityRecommendations = useCallback(async () => {
+    try {
+      const shouldShow = await communityRecommendationService.shouldDisplayRecommendations();
+      if (!shouldShow) {
+        setShowRecommendations(false);
+        return;
+      }
+      const recs = await communityRecommendationService.getPersonalizedRecommendations(
+        currentUser?.id,
+        userInterests
+      );
+      if (recs && recs.length > 0) {
+        setRecommendations(recs);
+        setShowRecommendations(true);
+        await communityRecommendationService.recordRecommendationsShown();
+      } else {
+        setShowRecommendations(false);
+      }
+    } catch {
+      setShowRecommendations(false);
+    }
+  }, [currentUser?.id, userInterests]);
+
   useEffect(() => {
     fetchFeed(activeTab, currentUser?.id);
   }, [activeTab, currentUser?.id]);
+
+  useEffect(() => {
+    loadCommunityRecommendations();
+  }, [loadCommunityRecommendations]);
 
   const handleTabChange = useCallback(
     (tab: string) => {
@@ -69,10 +105,16 @@ export default function HomeScreen() {
     } catch {}
     await Promise.all([
       refreshFeed(currentUser?.id),
+      loadCommunityRecommendations(),
       useNotificationStore.getState().loadUnreadCount(),
       useAuthStore.getState().refreshCurrentUserProfile(),
     ]);
-  }, [currentUser?.id, refreshFeed]);
+  }, [currentUser?.id, refreshFeed, loadCommunityRecommendations]);
+
+  const handleDismissRecommendations = useCallback(async () => {
+    setShowRecommendations(false);
+    await communityRecommendationService.dismissRecommendations();
+  }, []);
 
   const handleEndReached = useCallback(() => {
     if (!isLoading && !isLoadingMore && hasMore) {
@@ -93,8 +135,25 @@ export default function HomeScreen() {
   }, [posts, activeTab]);
 
   const renderItem = useCallback(
-    ({ item }: { item: Post }) => <PostCard post={item} />,
-    []
+    ({ item, index }: { item: Post; index: number }) => {
+      // Show recommendations after first 2 or 3 posts from top (index === 2, or index === 1 if only 2 posts)
+      const targetIndex = filteredPosts.length <= 2 ? 1 : 2;
+      const shouldShowCarousel =
+        showRecommendations && recommendations.length > 0 && index === targetIndex;
+
+      return (
+        <View>
+          <PostCard post={item} />
+          {shouldShowCarousel && (
+            <RecommendedCommunitiesCarousel
+              recommendations={recommendations}
+              onDismiss={handleDismissRecommendations}
+            />
+          )}
+        </View>
+      );
+    },
+    [filteredPosts.length, showRecommendations, recommendations, handleDismissRecommendations]
   );
 
   const keyExtractor = useCallback((item: Post) => item.id, []);
