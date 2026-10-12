@@ -483,12 +483,22 @@ export default function CurrentUserProfileScreen() {
     return allPosts.filter((p) => p.author.id === user.id || (p.isReposted && p.author.id !== user.id));
   }, [userPosts, allPosts, user?.id]);
 
-  // Helper to check if a post is a shared research paper or repost
-  const isSharedPost = (p: Post) =>
-    p.postType === 'research_share' ||
-    Boolean(p.paper) ||
-    Boolean(p.repostedBy) ||
-    Boolean(p.isReposted);
+  // Helper to check if a post is a shared research paper or repost of someone else
+  const isSharedPost = (p: Post) => {
+    // Authored articles never belong in Shared
+    if (p.postType === 'article' || Boolean(p.article)) {
+      return false;
+    }
+    // Shared paper or research share
+    if (p.postType === 'research_share' || Boolean(p.paper)) {
+      return true;
+    }
+    // Repost of someone else's post
+    if (p.repostedBy && p.author?.id !== user?.id) {
+      return true;
+    }
+    return false;
+  };
 
   // Compute posts filtered by sub-section ("All", "Hyped", "Articles", "Shared")
   const displayFilteredPosts = useMemo(() => {
@@ -511,19 +521,18 @@ export default function CurrentUserProfileScreen() {
       });
     }
     if (postsSubFilter === 'Articles') {
-      // Only long-form articles written by author (excluding shared/reposted)
+      // Long-form articles authored by this user
       return posts.filter(
         (p) =>
           (p.postType === 'article' || Boolean(p.article)) &&
-          !p.repostedBy &&
-          !p.isReposted
+          (p.author?.id === user?.id || !p.repostedBy || p.repostedBy.id === user?.id)
       );
     }
     if (postsSubFilter === 'Shared') {
       return posts.filter((p) => isSharedPost(p));
     }
     return posts;
-  }, [posts, postsSubFilter]);
+  }, [posts, postsSubFilter, user?.id]);
 
   const postCounts = useMemo(() => {
     return {
@@ -532,12 +541,11 @@ export default function CurrentUserProfileScreen() {
       articles: posts.filter(
         (p) =>
           (p.postType === 'article' || Boolean(p.article)) &&
-          !p.repostedBy &&
-          !p.isReposted
+          (p.author?.id === user?.id || !p.repostedBy || p.repostedBy.id === user?.id)
       ).length,
       shared: posts.filter((p) => isSharedPost(p)).length,
     };
-  }, [posts]);
+  }, [posts, user?.id]);
 
   // Combine database saved posts with any in-store saved posts
   const displaySavedPosts = useMemo(() => {

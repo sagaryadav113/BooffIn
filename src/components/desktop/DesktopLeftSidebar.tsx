@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { usePathname, router } from 'expo-router';
+import { usePathname, router, useLocalSearchParams } from 'expo-router';
 import {
   Home,
   Compass,
@@ -47,8 +47,12 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
   const isExploreActive = pathname.includes('explore');
   const isWorkspaceActive = pathname.includes('workspace');
   const isTopicsActive = pathname.includes('topic');
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const tabLower = params.tab?.toLowerCase();
   const isNotificationsActive = pathname.includes('notifications');
-  const isProfileActive = pathname.includes('profile');
+  const isArticlesActive = pathname.includes('profile') && tabLower === 'articles';
+  const isSavedActive = pathname.includes('profile') && tabLower === 'saved';
+  const isProfileActive = pathname.includes('profile') && !isArticlesActive && !isSavedActive;
   const isSettingsActive = pathname.includes('settings');
 
   const navItems = [
@@ -85,7 +89,7 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
       id: 'saved',
       label: 'Saved',
       icon: Bookmark,
-      isActive: false,
+      isActive: isSavedActive,
       onPress: () => router.push('/(tabs)/profile?tab=Saved'),
     },
     {
@@ -131,7 +135,7 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
       id: 'my-articles',
       label: 'My Articles',
       icon: FileText,
-      isActive: false,
+      isActive: isArticlesActive,
       onPress: () => router.push('/(tabs)/profile?tab=Articles'),
     },
   ];
