@@ -52,6 +52,12 @@ function createWindow() {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = { ...details.responseHeaders };
 
+    // Do NOT alter headers for Supabase API or auth calls
+    if (details.url.includes('supabase.co') || details.url.includes('lvstuqhrmagzqkgwlisl')) {
+      callback({ cancel: false, responseHeaders });
+      return;
+    }
+
     const headersToRemove = [
       'x-frame-options',
       'X-Frame-Options',
@@ -70,6 +76,51 @@ function createWindow() {
     callback({ cancel: false, responseHeaders });
   });
 
+  // Handle in-app OAuth popup window so Google/ORCID login stays inside the desktop app
+  function openOAuthPopup(authUrl) {
+    const authWindow = new BrowserWindow({
+      parent: mainWindow,
+      modal: true,
+      width: 520,
+      height: 700,
+      title: 'Sign In to BooffIn',
+      autoHideMenuBar: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+
+    authWindow.loadURL(authUrl);
+
+    const checkCallback = (targetUrl) => {
+      if (!targetUrl) return;
+      if (
+        targetUrl.includes('/auth/callback') ||
+        targetUrl.includes('access_token=') ||
+        targetUrl.includes('code=') ||
+        targetUrl.startsWith('booffin://')
+      ) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('oauth-callback', targetUrl);
+        }
+        setTimeout(() => {
+          if (!authWindow.isDestroyed()) {
+            authWindow.close();
+          }
+        }, 300);
+      }
+    };
+
+    authWindow.webContents.on('will-navigate', (event, url) => {
+      checkCallback(url);
+    });
+
+    authWindow.webContents.on('will-redirect', (event, url) => {
+      checkCallback(url);
+    });
+  }
+
   // Load the app via privileged scheme at root route
   mainWindow.loadURL('app://localhost/').catch(() => {
     // Fallback: direct load file
@@ -82,21 +133,35 @@ function createWindow() {
     mainWindow.show();
   });
 
-  // Prevent any iframe or external script from navigating the main app window away from BooffIn
+  // Prevent external navigation and capture OAuth in the in-app popup
   mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    if (
+      navigationUrl.includes('accounts.google.com') ||
+      navigationUrl.includes('supabase.co/auth/v1/authorize') ||
+      navigationUrl.includes('orcid.org/oauth')
+    ) {
+      event.preventDefault();
+      openOAuthPopup(navigationUrl);
+      return;
+    }
     if (!navigationUrl.startsWith('app://localhost')) {
       event.preventDefault();
       shell.openExternal(navigationUrl);
     }
   });
 
-  // Handle external links
+  // Handle external links and OAuth popups
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://accounts.google.com') || url.startsWith('https://github.com/login')) {
-      shell.openExternal(url);
+    if (
+      url.includes('accounts.google.com') ||
+      url.includes('supabase.co/auth/v1/authorize') ||
+      url.includes('orcid.org/oauth')
+    ) {
+      openOAuthPopup(url);
       return { action: 'deny' };
     }
-    return { action: 'allow' };
+    shell.openExternal(url);
+    return { action: 'deny' };
   });
 
   mainWindow.on('closed', () => {

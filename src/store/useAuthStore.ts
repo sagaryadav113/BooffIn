@@ -13,6 +13,7 @@ import {
   setStoredLocalSession,
   persistUserProfile,
   SignUpParams,
+  extractOAuthParams,
 } from '../api/authService';
 import { toggleFollowUserRpc, fetchUserFollowingIds } from '../api/socialService';
 import { useSearchStore } from './useSearchStore';
@@ -202,6 +203,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           });
         }
       });
+
+      // 3. Desktop Electron OAuth listener (captures Google / ORCID popup callback)
+      if (typeof window !== 'undefined' && (window as any).booffinDesktop?.onOAuthCallback) {
+        (window as any).booffinDesktop.onOAuthCallback(async (rawUrl: string) => {
+          try {
+            const { code, accessToken, refreshToken } = extractOAuthParams(rawUrl);
+            if (code) {
+              await supabase.auth.exchangeCodeForSession(code);
+            } else if (accessToken && refreshToken) {
+              await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+            }
+            await get().refreshCurrentUserProfile();
+          } catch (e) {
+            console.warn('[useAuthStore] Desktop OAuth processing error:', e);
+          }
+        });
+      }
     } catch {
       set({
         user: emptyUserProfile,

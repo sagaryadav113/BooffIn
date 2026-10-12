@@ -5,4 +5,7 @@ contextBridge.exposeInMainWorld('booffinDesktop', {
   isDesktop: true,
   platform: 'windows',
   version: '1.0.0',
+  onOAuthCallback: (callback) => {
+    ipcRenderer.on('oauth-callback', (_event, url) => callback(url));
+  },
 });

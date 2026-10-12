@@ -349,25 +349,37 @@ export async function signInWithEmail(
       }
     }
 
-    let { data, error } = await supabase.auth.signInWithPassword({
-      email: emailToAuth,
-      password,
-    });
+    const authTimeout = new Promise<{ data: any; error: any }>((_, reject) =>
+      setTimeout(() => reject(new Error('Sign in timed out. Please check your internet connection and try again.')), 15000)
+    );
+
+    let { data, error } = await Promise.race([
+      supabase.auth.signInWithPassword({
+        email: emailToAuth,
+        password,
+      }),
+      authTimeout,
+    ]);
 
     // Fallback try with domain pattern if initial attempt failed and identifier was a username
     if (error && !cleanIdentifier.includes('@') && emailToAuth !== `${cleanIdentifier.replace(/^@/, '')}@letsbooffin.com`) {
-      const retry = await supabase.auth.signInWithPassword({
-        email: `${cleanIdentifier.replace(/^@/, '')}@letsbooffin.com`,
-        password,
-      });
-      if (!retry.error && retry.data) {
-        data = retry.data;
-        error = null;
-      }
+      try {
+        const retry = await Promise.race([
+          supabase.auth.signInWithPassword({
+            email: `${cleanIdentifier.replace(/^@/, '')}@letsbooffin.com`,
+            password,
+          }),
+          authTimeout,
+        ]);
+        if (!retry.error && retry.data) {
+          data = retry.data;
+          error = null;
+        }
+      } catch {}
     }
 
     if (error) {
-      return { user: null, error: error.message };
+      return { user: null, error: error.message || 'Invalid email or password.' };
     }
 
     if (data.user) {
@@ -795,7 +807,7 @@ export function isProfileComplete(user: UserProfile | null): boolean {
   return false;
 }
 
-function extractOAuthParams(rawUrl: string) {
+export function extractOAuthParams(rawUrl: string) {
   const codeMatch = rawUrl.match(/[?&]code=([^&#]+)/);
   const tokenMatch = rawUrl.match(/[#?&]access_token=([^&#]+)/);
   const refreshMatch = rawUrl.match(/[#?&]refresh_token=([^&#]+)/);
