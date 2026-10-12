@@ -8,6 +8,7 @@ import {
   ScrollView,
   FlatList,
   TextInput,
+  KeyboardAvoidingView,
   ActivityIndicator,
   Modal,
   Platform,
@@ -1243,7 +1244,11 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const paperMessages = messages.filter((m) => m.message_type === 'paper_doi' && m.doi_metadata);
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
       {/* Community Header matching modern BooffIn academic aesthetic */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -3222,7 +3227,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         onClose={() => setShowInfoModal(false)}
         workspace={workspace}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

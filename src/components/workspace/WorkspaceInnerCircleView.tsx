@@ -8,6 +8,7 @@ import {
   ScrollView,
   FlatList,
   TextInput,
+  KeyboardAvoidingView,
   ActivityIndicator,
   Modal,
   Platform,
@@ -1501,7 +1502,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
       {/* 1. Header Bar matching BooffIn academic aesthetic */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -3418,7 +3423,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         subtitle="Search preprints and papers by DOI, URL, title, keywords, or author across global scientific registries."
       />
 
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
