@@ -58,17 +58,26 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
     const isCommunityEnabled = (c: Workspace) =>
       c.is_disabled !== true &&
       c.status !== 'disabled' &&
-      c.settings?.is_disabled !== true;
+      c.settings?.is_disabled !== true &&
+      c.settings?.status !== 'disabled' &&
+      c.settings?.is_deleted !== true;
+
+    // Helper: check if community belongs to author or current user
+    const getStoreCommunities = () => {
+      const allComms = useWorkspaceStore.getState().communities || [];
+      return allComms.filter((c) => {
+        const isMatch =
+          c.owner_id === authorId ||
+          c.creator_id === authorId ||
+          (isOwnProfile && (c.my_role === 'owner' || c.my_role === 'admin'));
+        return isMatch && c.type === 'community' && isCommunityEnabled(c);
+      });
+    };
 
     // 1. Seed instantly from store if available
-    const storeComms = useWorkspaceStore.getState().communities.filter(
-      (c) =>
-        (c.owner_id === authorId || c.creator_id === authorId) &&
-        c.type === 'community' &&
-        isCommunityEnabled(c)
-    );
-    if (storeComms.length > 0) {
-      setCommunities(storeComms.slice(0, 3));
+    const initialComms = getStoreCommunities();
+    if (initialComms.length > 0) {
+      setCommunities(initialComms.slice(0, 3));
       setIsLoading(false);
     } else {
       setIsLoading(true);
@@ -77,18 +86,35 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
     // 2. Query Supabase for author's communities (up to 3)
     (async () => {
       try {
+        // If it's own profile and store didn't have communities yet, refresh store
+        if (isOwnProfile && initialComms.length === 0) {
+          await useWorkspaceStore.getState().loadWorkspaces();
+          const refreshedComms = getStoreCommunities();
+          if (refreshedComms.length > 0 && isMounted) {
+            setCommunities(refreshedComms.slice(0, 3));
+            setIsLoading(false);
+          }
+        }
+
         const res = await workspaceService.getUserCreatedCommunities(authorId);
         const enabledCommunities = (res.communities || []).filter(isCommunityEnabled);
         if (isMounted) {
           if (enabledCommunities.length > 0) {
             setCommunities(enabledCommunities.slice(0, 3));
           } else {
-            setCommunities([]);
+            // Keep any store communities if direct fetch returned empty
+            const fallback = getStoreCommunities();
+            if (fallback.length > 0) {
+              setCommunities(fallback.slice(0, 3));
+            } else {
+              setCommunities([]);
+            }
           }
         }
       } catch {
-        if (isMounted && storeComms.length === 0) {
-          setCommunities([]);
+        if (isMounted) {
+          const fallback = getStoreCommunities();
+          setCommunities(fallback.slice(0, 3));
         }
       } finally {
         if (isMounted) setIsLoading(false);

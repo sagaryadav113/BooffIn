@@ -705,15 +705,15 @@ export const workspaceService = {
       // Strict Community Limit: Maximum 3 active communities created per user
       const { data: userCommunities, error: countErr } = await supabase
         .from('workspaces')
-        .select('id, is_disabled, status, settings')
+        .select('id, settings')
         .eq('type', 'community')
         .or(`owner_id.eq.${user.id},creator_id.eq.${user.id}`);
 
       const activeCount = (userCommunities || []).filter(
         (c: any) =>
-          c.is_disabled !== true &&
-          c.status !== 'disabled' &&
-          c.settings?.is_disabled !== true
+          c.settings?.is_disabled !== true &&
+          c.settings?.status !== 'disabled' &&
+          c.settings?.is_deleted !== true
       ).length;
 
       if (!countErr && activeCount >= 3) {
@@ -3025,25 +3025,47 @@ export const workspaceService = {
    */
   async getUserCreatedCommunities(userId: string): Promise<{ communities: Workspace[]; error: string | null }> {
     try {
-      const { data, error } = await supabase
+      // 1. Fetch communities where user is creator or owner
+      let { data, error } = await supabase
         .from('workspaces')
         .select('*')
         .eq('type', 'community')
         .or(`owner_id.eq.${userId},creator_id.eq.${userId}`)
-        .neq('status', 'disabled')
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (error) {
+      // 2. Fallback: if data is empty, check workspace_members where user has role 'owner'
+      if (!error && (!data || data.length === 0)) {
+        const { data: memberRows } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', userId)
+          .eq('role', 'owner');
+
+        if (memberRows && memberRows.length > 0) {
+          const wsIds = memberRows.map((r: any) => r.workspace_id);
+          const { data: wsByMember } = await supabase
+            .from('workspaces')
+            .select('*')
+            .eq('type', 'community')
+            .in('id', wsIds);
+
+          if (wsByMember && wsByMember.length > 0) {
+            data = wsByMember;
+          }
+        }
+      }
+
+      if (error && (!data || data.length === 0)) {
         return { communities: [], error: error.message };
       }
 
-      // Filter out any disabled communities (via is_disabled flag, status, or settings)
+      // Filter out any disabled communities (via settings)
       const activeData = (data || []).filter(
         (ws: any) =>
-          ws.is_disabled !== true &&
-          ws.status !== 'disabled' &&
-          ws.settings?.is_disabled !== true
+          ws.settings?.is_disabled !== true &&
+          ws.settings?.status !== 'disabled' &&
+          ws.settings?.is_deleted !== true
       );
 
       const list: Workspace[] = activeData.map((ws: any) => ({
@@ -3053,14 +3075,16 @@ export const workspaceService = {
 
       // Enrich with real member counts
       for (const item of list) {
-        const { count } = await supabase
-          .from('workspace_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', item.id)
-          .eq('status', 'active');
-        if (count !== null && count !== undefined) {
-          item.members_count = count;
-        }
+        try {
+          const { count } = await supabase
+            .from('workspace_members')
+            .select('*', { count: 'exact', head: true })
+            .eq('workspace_id', item.id)
+            .eq('status', 'active');
+          if (count !== null && count !== undefined) {
+            item.members_count = count;
+          }
+        } catch {}
       }
 
       return { communities: list, error: null };
