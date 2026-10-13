@@ -7,7 +7,6 @@ import {
   Users,
   Bookmark,
   UserCheck,
-  Mail,
   Bell,
   User,
   FileText,
@@ -33,8 +32,6 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
   const pathname = usePathname();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const workspaceUnread = useWorkspaceStore((s) => s.unreadTotal);
-  const dms = useWorkspaceStore((s) => s.dms);
-  const totalDMsUnread = dms.reduce((acc, d) => acc + (d.unread_count || 0), 0);
   const currentUser = useAuthStore((s) => s.user);
   const { hasNativePrompt, promptInstall } = usePWAInstall();
   const [showInstallModal, setShowInstallModal] = useState(false);
@@ -98,20 +95,6 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
       icon: UserCheck,
       isActive: false,
       onPress: () => router.push('/(tabs)?tab=Following'),
-    },
-    {
-      id: 'messages',
-      label: 'Messages',
-      icon: Mail,
-      badge: totalDMsUnread,
-      isActive: false,
-      onPress: () => {
-        if (onOpenMessages) {
-          onOpenMessages();
-        } else {
-          router.push('/workspace' as any);
-        }
-      },
     },
     {
       id: 'notifications',
