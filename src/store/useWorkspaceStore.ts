@@ -124,7 +124,7 @@ interface WorkspaceState {
   forwardMessage: (
     targetWorkspaceId: string,
     message: WorkspaceMessage
-  ) => Promise<{ success: boolean; error: string | null }>;
+  ) => Promise<{ success: boolean; message?: WorkspaceMessage | null; error: string | null }>;
   markAsRead: (workspaceId: string) => Promise<void>;
   loadEvents: (workspaceId: string) => Promise<void>;
   createEvent: (params: {
@@ -717,9 +717,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   forwardMessage: async (targetWorkspaceId, message) => {
     try {
       const res = await workspaceService.forwardMessage(targetWorkspaceId, message);
+      if (res.success && res.message) {
+        if (get().activeWorkspace?.id === targetWorkspaceId) {
+          set((state) => {
+            const exists = state.messages.some((m) => m.id === res.message!.id);
+            if (exists) return state;
+            return { messages: [...state.messages, res.message!] };
+          });
+        }
+        const channel = activeWorkspaceChannels.get(targetWorkspaceId);
+        if (channel) {
+          channel.send({
+            type: 'broadcast',
+            event: 'new_message',
+            payload: { message: res.message },
+          });
+        }
+      }
       return res;
     } catch (err: any) {
-      return { success: false, error: err.message };
+      return { success: false, message: null, error: err.message };
     }
   },
 
@@ -1305,6 +1322,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             e2ee_nonce: newMsg.e2ee_nonce || null,
             media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
             is_pinned: newMsg.is_pinned || false,
+            is_forwarded: newMsg.is_forwarded ?? (newMsg.attachments?.is_forwarded || false),
             reply_to_id: newMsg.reply_to_id || newMsg.attachments?.reply_to_id || null,
             reply_to_message:
               newMsg.reply_to_message ||

@@ -1374,7 +1374,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const handleSendForward = async (targetId: string) => {
     if (!forwardingMessage) return;
     setForwardingTargetId(targetId);
-    await forwardMessage(targetId, forwardingMessage);
+    const msgToForward = {
+      ...forwardingMessage,
+      content: decryptedTextMap[forwardingMessage.id] || forwardingMessage.content,
+    };
+    await forwardMessage(targetId, msgToForward);
     setForwardingTargetId(null);
     setForwardingMessage(null);
     try {
@@ -1948,6 +1952,16 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                             hasMediaContent && styles.bubbleWithMedia,
                           ]}
                         >
+                    {/* Forwarded Indicator */}
+                    {Boolean(item.is_forwarded || (item.attachments as any)?.is_forwarded) && !isDeleted && (
+                      <View style={styles.forwardedBadgeRow}>
+                        <CornerUpRight size={11} color={isMe ? 'rgba(255, 255, 255, 0.8)' : '#64748B'} style={{ marginRight: 4 }} />
+                        <Text style={[styles.forwardedBadgeText, isMe ? styles.forwardedBadgeTextMy : styles.forwardedBadgeTextOther]}>
+                          Forwarded
+                        </Text>
+                      </View>
+                    )}
+
                     {/* Pinned Tag */}
                     {isPinnedThis && (
                       <View style={styles.bubblePinTag}>
@@ -5081,6 +5095,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#164E3F',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  forwardedBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  forwardedBadgeText: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    fontWeight: '500',
+  },
+  forwardedBadgeTextMy: {
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  forwardedBadgeTextOther: {
+    color: '#64748B',
   },
 });
 

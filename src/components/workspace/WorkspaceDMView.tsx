@@ -1671,6 +1671,16 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               hasMediaContent && styles.bubbleWithMedia,
             ]}
           >
+            {/* Forwarded Indicator */}
+            {Boolean(item.is_forwarded || (item.attachments as any)?.is_forwarded) && !isDeleted && (
+              <View style={styles.forwardedBadgeRow}>
+                <CornerUpRight size={11} color={isMe ? 'rgba(255, 255, 255, 0.8)' : '#64748B'} style={{ marginRight: 4 }} />
+                <Text style={[styles.forwardedBadgeText, isMe ? styles.forwardedBadgeTextMy : styles.forwardedBadgeTextOther]}>
+                  Forwarded
+                </Text>
+              </View>
+            )}
+
             {/* Quoted Reply Banner inside bubble */}
             {(() => {
               const replyParent =
@@ -4552,6 +4562,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
+  },
+  forwardedBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  forwardedBadgeText: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    fontWeight: '500',
+  },
+  forwardedBadgeTextMy: {
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  forwardedBadgeTextOther: {
+    color: '#64748B',
   },
   forwardPreviewSnippet: {
     backgroundColor: '#F8FAFC',

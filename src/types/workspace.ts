@@ -188,6 +188,7 @@ export interface WorkspaceMessage {
   e2ee_nonce: string | null;
   media_urls: string[] | null;
   is_pinned: boolean;
+  is_forwarded?: boolean;
   reply_to_id: string | null;
   reply_to_message?: {
     id: string;

@@ -23,6 +23,7 @@ import {
   WorkspacePollData,
 } from '../types/workspace';
 import { resolvePaper } from './paperResolver';
+import { deriveSharedSessionKey, derivePodSessionKey, encryptTextMessage } from '../utils/e2eeCrypto';
 
 export interface UserChatPreferences {
   pinned: string[];
@@ -1349,6 +1350,7 @@ export const workspaceService = {
           e2ee_nonce: m.e2ee_nonce || m.attachments?.e2ee_nonce || null,
           media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
           is_pinned: m.is_pinned || false,
+          is_forwarded: m.is_forwarded ?? (m.attachments?.is_forwarded || false),
           reply_to_id: m.reply_to_id || null,
           reply_to_message: replyInfo,
           created_at: m.created_at,
@@ -1404,6 +1406,8 @@ export const workspaceService = {
     media_urls?: string[] | null;
     e2ee_ciphertext?: string | null;
     e2ee_nonce?: string | null;
+    attachments?: any;
+    is_forwarded?: boolean;
   }): Promise<{ message: WorkspaceMessage | null; error: string | null }> {
     try {
       const {
@@ -1498,7 +1502,7 @@ export const workspaceService = {
       }
 
       // Prepare rich attachments payload
-      const attachmentsPayload: any = {};
+      const attachmentsPayload: any = { ...(params.attachments || {}) };
       if (params.media_urls && params.media_urls.length > 0) {
         attachmentsPayload.media_urls = params.media_urls;
         attachmentsPayload.url = params.media_urls[0];
@@ -1515,6 +1519,7 @@ export const workspaceService = {
       if (params.reply_to_message) attachmentsPayload.reply_to_message = params.reply_to_message;
       if (params.e2ee_ciphertext) attachmentsPayload.e2ee_ciphertext = params.e2ee_ciphertext;
       if (params.e2ee_nonce) attachmentsPayload.e2ee_nonce = params.e2ee_nonce;
+      if (params.is_forwarded) attachmentsPayload.is_forwarded = true;
 
       // Security: Guarantee that when E2EE ciphertext is present, plaintext NEVER enters the database
       const safeContent = params.e2ee_ciphertext ? '🔒 Encrypted message' : params.content;
@@ -1533,6 +1538,9 @@ export const workspaceService = {
         attachments: attachmentsPayload,
         reply_to_id: params.reply_to_id || null,
       };
+      if (params.is_forwarded) {
+        insertPayload.is_forwarded = true;
+      }
 
       let { data, error } = await supabase
         .from('workspace_messages')
@@ -1606,6 +1614,7 @@ export const workspaceService = {
         e2ee_nonce: data.e2ee_nonce || data.attachments?.e2ee_nonce || params.e2ee_nonce || null,
         media_urls: extractedMedia,
         is_pinned: data.is_pinned || false,
+        is_forwarded: data.is_forwarded ?? (data.attachments?.is_forwarded || params.is_forwarded || false),
         reply_to_id: data.reply_to_id || params.reply_to_id || null,
         reply_to_message: params.reply_to_message || data.reply_to_message || data.attachments?.reply_to_message || null,
         created_at: data.created_at,
@@ -1981,18 +1990,26 @@ export const workspaceService = {
   async forwardMessage(
     targetWorkspaceId: string,
     message: WorkspaceMessage
-  ): Promise<{ success: boolean; error: string | null }> {
+  ): Promise<{ success: boolean; message?: WorkspaceMessage | null; error: string | null }> {
     try {
       const res = await this.sendMessage({
         workspace_id: targetWorkspaceId,
         content: message.content,
         message_type: message.message_type,
         doi_metadata: message.doi_metadata,
+        poll_data: message.poll_data,
+        audio_metadata: message.audio_metadata,
+        document_metadata: message.document_metadata,
+        post_metadata: message.post_metadata,
+        profile_metadata: message.profile_metadata,
+        workspace_invite_metadata: message.workspace_invite_metadata,
         media_urls: message.media_urls,
+        attachments: message.attachments,
+        is_forwarded: true,
       });
-      return { success: Boolean(res.message), error: res.error };
+      return { success: Boolean(res.message), message: res.message, error: res.error };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Failed to forward message' };
+      return { success: false, message: null, error: err.message || 'Failed to forward message' };
     }
   },
 

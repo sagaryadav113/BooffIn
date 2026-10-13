@@ -1681,6 +1681,16 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                               hasMediaContent && styles.bubbleWithMedia,
                             ]}
                           >
+                      {/* Forwarded Indicator */}
+                      {Boolean(item.is_forwarded || (item.attachments as any)?.is_forwarded) && !isDeleted && (
+                        <View style={styles.forwardedBadgeRow}>
+                          <CornerUpRight size={11} color={isMe ? 'rgba(255, 255, 255, 0.8)' : '#64748B'} style={{ marginRight: 4 }} />
+                          <Text style={[styles.forwardedBadgeText, isMe ? styles.forwardedBadgeTextMy : styles.forwardedBadgeTextOther]}>
+                            Forwarded
+                          </Text>
+                        </View>
+                      )}
+
                       {/* Sender Name in Group Chat */}
                       {!isMe && !isDeleted && (
                         <Text style={styles.senderName}>
@@ -4568,6 +4578,22 @@ const styles = StyleSheet.create({
   },
   detachedSendBtnDisabled: {
     backgroundColor: '#CBD5E1',
+  },
+  forwardedBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  forwardedBadgeText: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    fontWeight: '500',
+  },
+  forwardedBadgeTextMy: {
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  forwardedBadgeTextOther: {
+    color: '#64748B',
   },
 });
 
