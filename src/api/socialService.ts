@@ -2,6 +2,7 @@ import { supabase } from './client';
 import { Post, Comment, PostType, Paper, UserProfile } from '../types';
 import { getFeedRanker, buildUserRankingContext } from './ranking/feedRanker';
 import { sanitizeExternalUrl, sanitizeTextContent } from '../utils/security';
+import { useAuthStore } from '../store/useAuthStore';
 import {
   isCommentLikedSync,
   loadUserLikedComments,
@@ -546,16 +547,50 @@ export async function fetchFeed(
       let followedUserIds: string[] = [];
 
       if (resolvedUserId) {
+        // 1. Fetch user's profile research interests (1,200+ taxonomy fields)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('research_interests')
+          .eq('id', resolvedUserId)
+          .maybeSingle();
+
+        if (profile?.research_interests && Array.isArray(profile.research_interests)) {
+          profile.research_interests.forEach((ri: string) => {
+            if (ri && typeof ri === 'string' && ri.trim()) {
+              followedTopicNames.push(ri.trim().toLowerCase());
+            }
+          });
+        }
+
+        // 2. Fetch explicit topic follows
         const { data: topicFollows } = await supabase
           .from('topic_follows')
           .select('topic:topics(name, slug)')
           .eq('user_id', resolvedUserId);
 
         if (topicFollows) {
-          followedTopicNames = topicFollows
-            .map((tf: any) => tf.topic?.name?.toLowerCase())
-            .filter(Boolean);
+          topicFollows.forEach((tf: any) => {
+            const name = tf.topic?.name?.toLowerCase();
+            if (name && !followedTopicNames.includes(name)) {
+              followedTopicNames.push(name);
+            }
+          });
         }
+
+        // 3. Fallback to auth store if active user matches (instant local state sync)
+        try {
+          const authUser = useAuthStore.getState().user;
+          if (authUser?.id === resolvedUserId && Array.isArray(authUser.researchInterests)) {
+            authUser.researchInterests.forEach((ri: string) => {
+              if (ri && typeof ri === 'string' && ri.trim()) {
+                const lower = ri.trim().toLowerCase();
+                if (!followedTopicNames.includes(lower)) {
+                  followedTopicNames.push(lower);
+                }
+              }
+            });
+          }
+        } catch {}
 
         const { data: userFollows } = await supabase
           .from('follows')
@@ -576,7 +611,11 @@ export async function fetchFeed(
     } else if (tab !== 'For You' && tab !== 'Following') {
       const targetTopic = tab.toLowerCase();
       filtered = mappedPosts.filter((p) =>
-        p.topics.some((t) => t.toLowerCase().includes(targetTopic))
+        Array.isArray(p.topics) &&
+        p.topics.some((t) => {
+          const lower = t.toLowerCase();
+          return lower.includes(targetTopic) || targetTopic.includes(lower);
+        })
       );
     }
 

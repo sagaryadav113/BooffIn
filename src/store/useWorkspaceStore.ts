@@ -34,8 +34,13 @@ interface WorkspaceState {
   discoverableCommunities: Workspace[];
 
   // Active Workspace Room State
+  activeWorkspaceId: string | null;
   activeWorkspace: Workspace | null;
   messages: WorkspaceMessage[];
+  messagesByRoom: Record<string, WorkspaceMessage[]>;
+  hasMoreOlderMessages: Record<string, boolean>;
+  isLoadingOlderMessages: boolean;
+  unreadBelowCountByRoom: Record<string, number>;
   events: WorkspaceEvent[];
   opportunities: WorkspaceRoleOpportunity[];
   savedItems: WorkspaceSavedItem[];
@@ -55,6 +60,7 @@ interface WorkspaceState {
   error: string | null;
 
   // Actions
+  setActiveWorkspaceId: (workspaceId: string | null) => void;
   setActiveHubTab: (tab: WorkspaceHubTab) => void;
   sendTypingIndicator: (workspaceId: string, isTyping: boolean) => void;
   loadWorkspaces: (refresh?: boolean) => Promise<void>;
@@ -81,6 +87,9 @@ interface WorkspaceState {
   ) => Promise<{ success: boolean; error: string | null }>;
   leaveWorkspace: (workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
   loadMessages: (workspaceId: string) => Promise<void>;
+  loadOlderMessages: (workspaceId: string) => Promise<void>;
+  incrementUnreadBelow: (workspaceId: string) => void;
+  resetUnreadBelow: (workspaceId: string) => void;
   sendMessage: (params: {
     workspace_id: string;
     content: string;
@@ -211,14 +220,20 @@ interface WorkspaceState {
 }
 
 const activeWorkspaceChannels = new Map<string, any>();
+let currentMessagesRequestId = 0;
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   dms: [],
   communities: [],
   innerCircles: [],
   discoverableCommunities: [],
+  activeWorkspaceId: null,
   activeWorkspace: null,
   messages: [],
+  messagesByRoom: {},
+  hasMoreOlderMessages: {},
+  isLoadingOlderMessages: false,
+  unreadBelowCountByRoom: {},
   events: [],
   opportunities: [],
   savedItems: [],
@@ -234,6 +249,31 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   isMembersLoading: false,
   isSending: false,
   error: null,
+
+  setActiveWorkspaceId: (workspaceId: string | null) => {
+    set((state) => ({
+      activeWorkspaceId: workspaceId,
+      messages: workspaceId ? (state.messagesByRoom[workspaceId] || []) : [],
+    }));
+  },
+
+  incrementUnreadBelow: (workspaceId: string) => {
+    set((state) => ({
+      unreadBelowCountByRoom: {
+        ...state.unreadBelowCountByRoom,
+        [workspaceId]: (state.unreadBelowCountByRoom[workspaceId] || 0) + 1,
+      },
+    }));
+  },
+
+  resetUnreadBelow: (workspaceId: string) => {
+    set((state) => ({
+      unreadBelowCountByRoom: {
+        ...state.unreadBelowCountByRoom,
+        [workspaceId]: 0,
+      },
+    }));
+  },
 
   resetWorkspaceSession: () => {
     activeWorkspaceChannels.forEach((ch) => {
@@ -413,9 +453,42 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   loadMessages: async (workspaceId: string) => {
-    set({ isMessagesLoading: true, error: null });
+    const reqId = ++currentMessagesRequestId;
+    const existingRoomMsgs = get().messagesByRoom[workspaceId] || [];
+
+    // Immediately isolate active workspace and display cached messages so previous chat never lingers or sticks!
+    set({
+      activeWorkspaceId: workspaceId,
+      messages: existingRoomMsgs,
+      isMessagesLoading: existingRoomMsgs.length === 0,
+      error: null,
+    });
+
     try {
-      const res = await workspaceService.getMessages(workspaceId);
+      const currentUser = useAuthStore.getState().user;
+      const res = await workspaceService.getMessages(workspaceId, 30, undefined, currentUser?.id);
+
+      // If another room was opened while this request was in flight, discard UI update for messages
+      if (reqId !== currentMessagesRequestId || get().activeWorkspaceId !== workspaceId) {
+        if (!res.error) {
+          const blockedIds = await getBlockedUserIds();
+          const filteredMessages = blockedIds.length > 0
+            ? res.messages.filter((m) => !blockedIds.includes(m.sender_id))
+            : res.messages;
+          set((state) => ({
+            messagesByRoom: {
+              ...state.messagesByRoom,
+              [workspaceId]: filteredMessages,
+            },
+            hasMoreOlderMessages: {
+              ...state.hasMoreOlderMessages,
+              [workspaceId]: res.messages.length >= 30,
+            },
+          }));
+        }
+        return;
+      }
+
       if (res.error) {
         set({ isMessagesLoading: false, error: res.error });
       } else {
@@ -423,15 +496,82 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const filteredMessages = blockedIds.length > 0
           ? res.messages.filter((m) => !blockedIds.includes(m.sender_id))
           : res.messages;
-        set({ messages: filteredMessages, isMessagesLoading: false });
+
+        set((state) => ({
+          messages: filteredMessages,
+          messagesByRoom: {
+            ...state.messagesByRoom,
+            [workspaceId]: filteredMessages,
+          },
+          hasMoreOlderMessages: {
+            ...state.hasMoreOlderMessages,
+            [workspaceId]: res.messages.length >= 30,
+          },
+          isMessagesLoading: false,
+        }));
+
         // Mark as read immediately
-        const currentUser = useAuthStore.getState().user;
         if (currentUser) {
           get().markAsRead(workspaceId);
         }
       }
     } catch (err: any) {
-      set({ isMessagesLoading: false, error: err.message });
+      if (reqId === currentMessagesRequestId && get().activeWorkspaceId === workspaceId) {
+        set({ isMessagesLoading: false, error: err.message });
+      }
+    }
+  },
+
+  loadOlderMessages: async (workspaceId: string) => {
+    const state = get();
+    if (state.isLoadingOlderMessages) return;
+    const hasMore = state.hasMoreOlderMessages[workspaceId] ?? true;
+    if (!hasMore) return;
+
+    const roomMsgs = state.messagesByRoom[workspaceId] || (state.activeWorkspaceId === workspaceId ? state.messages : []);
+    if (roomMsgs.length === 0) return;
+
+    const oldestMsg = roomMsgs[0];
+    const beforeCursor = oldestMsg.created_at;
+
+    set({ isLoadingOlderMessages: true });
+    try {
+      const currentUser = useAuthStore.getState().user;
+      const res = await workspaceService.getMessages(workspaceId, 30, beforeCursor, currentUser?.id);
+      if (res.error) {
+        set({ isLoadingOlderMessages: false });
+        return;
+      }
+
+      const blockedIds = await getBlockedUserIds();
+      const olderFiltered = blockedIds.length > 0
+        ? res.messages.filter((m) => !blockedIds.includes(m.sender_id))
+        : res.messages;
+
+      const stillHasMore = res.messages.length >= 30;
+
+      set((s) => {
+        const existing = s.messagesByRoom[workspaceId] || (s.activeWorkspaceId === workspaceId ? s.messages : []);
+        const existingIds = new Set(existing.map((m) => m.id));
+        const uniqueOlder = olderFiltered.filter((m) => !existingIds.has(m.id));
+        const merged = [...uniqueOlder, ...existing];
+        const isCurrentRoom = s.activeWorkspaceId === workspaceId;
+
+        return {
+          messages: isCurrentRoom ? merged : s.messages,
+          messagesByRoom: {
+            ...s.messagesByRoom,
+            [workspaceId]: merged,
+          },
+          hasMoreOlderMessages: {
+            ...s.hasMoreOlderMessages,
+            [workspaceId]: stillHasMore,
+          },
+          isLoadingOlderMessages: false,
+        };
+      });
+    } catch {
+      set({ isLoadingOlderMessages: false });
     }
   },
 
@@ -446,10 +586,28 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
       // Optimistically append message if not already present
       set((state) => {
-        const exists = state.messages.some((m) => m.id === res.message!.id);
+        const roomMessages = state.messagesByRoom[params.workspace_id] || (state.activeWorkspaceId === params.workspace_id ? state.messages : []);
+        const exists = roomMessages.some((m) => m.id === res.message!.id);
         if (exists) return { isSending: false };
+        const updatedRoom = [...roomMessages, res.message!];
+
+        // Also update last_message in the workspace lists with the actual plaintext content
+        const previewMsg = {
+          ...res.message!,
+          content: params.content !== '🔒 Encrypted message' ? params.content : (res.message!.content !== '🔒 Encrypted message' ? res.message!.content : 'Message'),
+        };
+        const updateWs = (w: Workspace) =>
+          w.id === params.workspace_id ? { ...w, last_message: previewMsg, updated_at: previewMsg.created_at } : w;
+
         return {
-          messages: [...state.messages, res.message!],
+          messages: state.activeWorkspaceId === params.workspace_id ? updatedRoom : state.messages,
+          messagesByRoom: {
+            ...state.messagesByRoom,
+            [params.workspace_id]: updatedRoom,
+          },
+          dms: state.dms.map(updateWs),
+          communities: state.communities.map(updateWs),
+          innerCircles: state.innerCircles.map(updateWs),
           isSending: false,
         };
       });
@@ -992,8 +1150,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const currentUser = useAuthStore.getState().user;
     if (!currentUser?.id) return { success: false, error: 'Not authenticated' };
 
-    // Clear local messages immediately
-    set({ messages: [] });
+    // Clear local messages and reset previews immediately
+    set((state) => ({
+      messages: state.activeWorkspaceId === workspaceId ? [] : state.messages,
+      messagesByRoom: { ...state.messagesByRoom, [workspaceId]: [] },
+      dms: state.dms.map((d) => (d.id === workspaceId ? { ...d, last_message: null, unread_count: 0 } : d)),
+      communities: state.communities.map((c) => (c.id === workspaceId ? { ...c, last_message: null, unread_count: 0 } : c)),
+      innerCircles: state.innerCircles.map((i) => (i.id === workspaceId ? { ...i, last_message: null, unread_count: 0 } : i)),
+    }));
 
     return await workspaceService.clearChatHistory(currentUser.id, workspaceId);
   },
@@ -1003,27 +1167,37 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!currentUser?.id) return { success: false, error: 'Not authenticated' };
 
     // Remove from local list immediately
-    set((state) => ({
-      dms: state.dms.filter((d) => d.id !== workspaceId),
-      communities: state.communities.filter((c) => c.id !== workspaceId),
-      innerCircles: state.innerCircles.filter((i) => i.id !== workspaceId),
-      discoverableCommunities: state.discoverableCommunities.filter((w) => w.id !== workspaceId),
-      activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
-    }));
+    set((state) => {
+      const updatedMessagesByRoom = { ...state.messagesByRoom };
+      delete updatedMessagesByRoom[workspaceId];
+      return {
+        dms: state.dms.filter((d) => d.id !== workspaceId),
+        communities: state.communities.filter((c) => c.id !== workspaceId),
+        innerCircles: state.innerCircles.filter((i) => i.id !== workspaceId),
+        discoverableCommunities: state.discoverableCommunities.filter((w) => w.id !== workspaceId),
+        activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
+        messages: state.activeWorkspaceId === workspaceId ? [] : state.messages,
+        messagesByRoom: updatedMessagesByRoom,
+      };
+    });
 
     return await workspaceService.deleteWorkspaceLocally(currentUser.id, workspaceId);
   },
 
   deleteCommunityPermanently: async (workspaceId: string) => {
-    const res = await workspaceService.deleteCommunityPermanently(workspaceId);
-    if (res.success) {
-      set((state) => ({
-        communities: state.communities.filter((c) => c.id !== workspaceId),
-        discoverableCommunities: state.discoverableCommunities.filter((w) => w.id !== workspaceId),
-        activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
-      }));
-      await get().loadWorkspaces(true);
+    const currentUser = useAuthStore.getState().user;
+    if (currentUser?.id) {
+      await workspaceService.deleteWorkspaceLocally(currentUser.id, workspaceId);
     }
+    const res = await workspaceService.deleteCommunityPermanently(workspaceId);
+    set((state) => ({
+      communities: state.communities.filter((c) => c.id !== workspaceId),
+      innerCircles: state.innerCircles.filter((i) => i.id !== workspaceId),
+      discoverableCommunities: state.discoverableCommunities.filter((w) => w.id !== workspaceId),
+      activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
+      messages: state.activeWorkspace?.id === workspaceId ? [] : state.messages,
+    }));
+    await get().loadWorkspaces(true);
     return res;
   },
 
@@ -1035,8 +1209,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     set((state) => ({
       communities: state.communities.filter((c) => c.id !== workspaceId),
+      innerCircles: state.innerCircles.filter((i) => i.id !== workspaceId),
       discoverableCommunities: state.discoverableCommunities.filter((w) => w.id !== workspaceId),
       activeWorkspace: state.activeWorkspace?.id === workspaceId ? null : state.activeWorkspace,
+      messages: state.activeWorkspace?.id === workspaceId ? [] : state.messages,
     }));
     await get().loadWorkspaces(true);
     return res;
@@ -1094,13 +1270,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         } catch {}
 
         set((state) => {
-          if (state.messages.some((m) => m.id === msg.id)) {
-            return {
-              messages: state.messages.map((m) => (m.id === msg.id ? { ...m, ...msg } : m)),
-            };
-          }
+          const roomMsgs = state.messagesByRoom[workspaceId] || (state.activeWorkspaceId === workspaceId ? state.messages : []);
+          const exists = roomMsgs.some((m) => m.id === msg.id);
+          const updatedRoom = exists
+            ? roomMsgs.map((m) => (m.id === msg.id ? { ...m, ...msg } : m))
+            : [...roomMsgs, msg];
+          const isCurrentRoom = state.activeWorkspaceId === workspaceId;
+
+          const updateWs = (w: Workspace) =>
+            w.id === workspaceId ? { ...w, last_message: msg, updated_at: msg.created_at } : w;
+
           return {
-            messages: [...state.messages, msg],
+            messages: isCurrentRoom ? updatedRoom : state.messages,
+            messagesByRoom: {
+              ...state.messagesByRoom,
+              [workspaceId]: updatedRoom,
+            },
+            dms: state.dms.map(updateWs),
+            communities: state.communities.map(updateWs),
+            innerCircles: state.innerCircles.map(updateWs),
           };
         });
 
@@ -1171,41 +1359,76 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       .on('broadcast', { event: 'message_updated' }, ({ payload }: any) => {
         if (!payload || payload.workspaceId !== workspaceId) return;
         if (payload.action === 'delete') {
-          set((state) => ({
-            messages: payload.deleteForEveryone
-              ? state.messages.map((m) =>
-                  m.id === payload.messageId
-                    ? {
-                        ...m,
-                        content: '🚫 This message was deleted',
-                        is_deleted: true,
-                        media_urls: null,
-                        doi_metadata: null,
-                      }
-                    : m
-                )
-              : state.messages.filter((m) => m.id !== payload.messageId),
-          }));
+          set((state) => {
+            const isCurrentRoom = state.activeWorkspaceId === workspaceId;
+            const updateItem = (m: WorkspaceMessage) =>
+              m.id === payload.messageId
+                ? {
+                    ...m,
+                    content: '🚫 This message was deleted',
+                    is_deleted: true,
+                    media_urls: null,
+                    doi_metadata: null,
+                  }
+                : m;
+            const updatedMsgs = payload.deleteForEveryone
+              ? state.messages.map(updateItem)
+              : state.messages.filter((m) => m.id !== payload.messageId);
+
+            const room = state.messagesByRoom[workspaceId];
+            const updatedRoom = room
+              ? (payload.deleteForEveryone ? room.map(updateItem) : room.filter((m) => m.id !== payload.messageId))
+              : undefined;
+
+            return {
+              messages: isCurrentRoom ? updatedMsgs : state.messages,
+              messagesByRoom: updatedRoom
+                ? { ...state.messagesByRoom, [workspaceId]: updatedRoom }
+                : state.messagesByRoom,
+            };
+          });
         } else if (payload.action === 'edit') {
-          set((state) => ({
-            messages: state.messages.map((m) =>
+          set((state) => {
+            const isCurrentRoom = state.activeWorkspaceId === workspaceId;
+            const updateItem = (m: WorkspaceMessage) =>
               m.id === payload.messageId
                 ? { ...m, content: payload.newContent, is_edited: true, updated_at: new Date().toISOString() }
-                : m
-            ),
-          }));
+                : m;
+
+            const updatedMsgs = state.messages.map(updateItem);
+            const room = state.messagesByRoom[workspaceId];
+            const updatedRoom = room ? room.map(updateItem) : undefined;
+
+            return {
+              messages: isCurrentRoom ? updatedMsgs : state.messages,
+              messagesByRoom: updatedRoom
+                ? { ...state.messagesByRoom, [workspaceId]: updatedRoom }
+                : state.messagesByRoom,
+            };
+          });
         } else if (payload.action === 'reaction' || payload.action === 'poll_vote') {
-          set((state) => ({
-            messages: state.messages.map((m) =>
+          set((state) => {
+            const isCurrentRoom = state.activeWorkspaceId === workspaceId;
+            const updateItem = (m: WorkspaceMessage) =>
               m.id === payload.messageId
                 ? {
                     ...m,
                     reactions: payload.reactions ?? m.reactions,
                     poll_data: payload.poll_data ?? m.poll_data,
                   }
-                : m
-            ),
-          }));
+                : m;
+
+            const updatedMsgs = state.messages.map(updateItem);
+            const room = state.messagesByRoom[workspaceId];
+            const updatedRoom = room ? room.map(updateItem) : undefined;
+
+            return {
+              messages: isCurrentRoom ? updatedMsgs : state.messages,
+              messagesByRoom: updatedRoom
+                ? { ...state.messagesByRoom, [workspaceId]: updatedRoom }
+                : state.messagesByRoom,
+            };
+          });
         }
       })
       // E. Postgres Changes for Workspace Messages (Resilience & Background Sync)
@@ -1221,9 +1444,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           if (payload.eventType === 'DELETE') {
             const oldId = payload.old?.id;
             if (oldId) {
-              set((state) => ({
-                messages: state.messages.filter((m) => m.id !== oldId),
-              }));
+              set((state) => {
+                const isCurrentRoom = state.activeWorkspaceId === workspaceId;
+                const room = state.messagesByRoom[workspaceId];
+                return {
+                  messages: isCurrentRoom ? state.messages.filter((m) => m.id !== oldId) : state.messages,
+                  messagesByRoom: room
+                    ? { ...state.messagesByRoom, [workspaceId]: room.filter((m) => m.id !== oldId) }
+                    : state.messagesByRoom,
+                };
+              });
             }
             return;
           }
@@ -1286,7 +1516,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           const callMeta = newMsg.call_metadata || newMsg.attachments?.call_metadata || null;
           const audioMeta = newMsg.audio_metadata || newMsg.attachments?.audio_metadata || null;
           const doiMeta = newMsg.doi_metadata || newMsg.attachments?.doi_metadata || null;
-          const pollData = newMsg.poll_data || newMsg.attachments?.poll_data || null;
+          let pollData = newMsg.poll_data || newMsg.attachments?.poll_data || null;
+
+          // Reconstruct pollData from content if it was not explicitly in attachments
+          if (!pollData && typeof newMsg.content === 'string' && (newMsg.content.startsWith('📊 Poll:') || newMsg.content.includes('Poll:'))) {
+            const lines = newMsg.content.split('\n');
+            const q = lines[0].replace('📊 Poll:', '').replace(/^[^\w]*/, '').trim();
+            const optLines = lines.slice(1).filter((l: string) => l.startsWith('• ') || l.startsWith('- '));
+            const parsedOptions = optLines.map((l: string, idx: number) => ({
+              id: `opt_${idx}`,
+              text: l.replace(/^[•\-\d\.]+\s*/, '').trim(),
+              votes: [] as string[],
+            }));
+            if (parsedOptions.length > 0) {
+              pollData = {
+                question: q,
+                options: parsedOptions,
+                totalVotes: 0,
+              };
+            }
+          }
 
           let detectedType = newMsg.message_type;
           if (isImg) detectedType = 'image';
@@ -1297,8 +1546,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           else if (callMeta) detectedType = 'call_log';
           else if (audioMeta) detectedType = 'audio';
           else if (doiMeta) detectedType = 'paper_doi';
-          else if (pollData) detectedType = 'poll';
+          else if (pollData || (typeof newMsg.content === 'string' && newMsg.content.startsWith('📊 Poll:'))) detectedType = 'poll';
           else if (!detectedType) detectedType = 'text';
+
+          // Extract reactions properly from either reactions column or attachments.reactions
+          let extractedReactions: Record<string, string[]> | null = null;
+          if (newMsg.reactions && typeof newMsg.reactions === 'object' && !Array.isArray(newMsg.reactions)) {
+            extractedReactions = newMsg.reactions;
+          } else if (newMsg.attachments?.reactions && typeof newMsg.attachments.reactions === 'object' && !Array.isArray(newMsg.attachments.reactions)) {
+            extractedReactions = newMsg.attachments.reactions;
+          }
 
           const messageObj: WorkspaceMessage = {
             id: newMsg.id,
@@ -1315,7 +1572,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             audio_metadata: audioMeta,
             poll_data: pollData,
             attachments: newMsg.attachments || null,
-            reactions: newMsg.reactions || null,
+            reactions: extractedReactions,
             is_edited: newMsg.is_edited || false,
             is_deleted: newMsg.is_deleted || false,
             e2ee_ciphertext: newMsg.e2ee_ciphertext || null,
@@ -1345,9 +1602,54 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           };
 
           if (payload.eventType === 'UPDATE') {
-            set((state) => ({
-              messages: state.messages.map((m) => (m.id === messageObj.id ? { ...m, ...messageObj } : m)),
-            }));
+            set((state) => {
+              const isCurrentRoom = state.activeWorkspaceId === workspaceId;
+              const room = state.messagesByRoom[workspaceId];
+              const mergeUpdate = (m: WorkspaceMessage): WorkspaceMessage => {
+                if (m.id !== messageObj.id) return m;
+                // Preserve reactions and poll_data if incoming update does not contain them
+                const mergedReactions = messageObj.reactions || m.reactions || null;
+                let mergedPollData = messageObj.poll_data || m.poll_data || null;
+
+                // Reconcile poll options with vote keys from mergedReactions so votes never vanish
+                if (mergedPollData && Array.isArray(mergedPollData.options) && mergedReactions) {
+                  mergedPollData = {
+                    ...mergedPollData,
+                    options: mergedPollData.options.map((opt: any) => {
+                      const voteKey = `vote:${opt.id}`;
+                      const voterSet = new Set<string>(Array.isArray(opt.votes) ? opt.votes : []);
+                      if (Array.isArray(mergedReactions[voteKey])) {
+                        mergedReactions[voteKey].forEach((uid: string) => voterSet.add(uid));
+                      }
+                      return { ...opt, votes: Array.from(voterSet) };
+                    }),
+                  };
+                  let tot = 0;
+                  mergedPollData.options.forEach((o: any) => {
+                    tot += (o.votes?.length || 0);
+                  });
+                  mergedPollData.totalVotes = tot;
+                }
+
+                return {
+                  ...m,
+                  ...messageObj,
+                  reactions: mergedReactions,
+                  poll_data: mergedPollData,
+                  sender: messageObj.sender || m.sender,
+                };
+              };
+
+              return {
+                messages: isCurrentRoom ? state.messages.map(mergeUpdate) : state.messages,
+                messagesByRoom: room
+                  ? {
+                      ...state.messagesByRoom,
+                      [workspaceId]: room.map(mergeUpdate),
+                    }
+                  : state.messagesByRoom,
+              };
+            });
             return;
           }
 
@@ -1375,8 +1677,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             }
 
             if (pollId && voterId) {
-              set((state) => ({
-                messages: state.messages.map((m) => {
+              set((state) => {
+                const updatePoll = (m: WorkspaceMessage) => {
                   if (m.id === pollId) {
                     const currentReactions = { ...(m.reactions || {}) };
                     Object.keys(currentReactions).forEach((k) => {
@@ -1393,10 +1695,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                     }
 
                     let pd = m.poll_data ? { ...m.poll_data } : null;
+                    if (!pd && typeof m.content === 'string' && (m.content.startsWith('📊 Poll:') || m.content.includes('Poll:'))) {
+                      const lines = m.content.split('\n');
+                      const q = lines[0].replace('📊 Poll:', '').trim();
+                      const optLines = lines.slice(1).filter((l) => l.startsWith('• ') || l.startsWith('- '));
+                      const opts = optLines.map((l, idx) => ({
+                        id: `opt_${idx}`,
+                        text: l.replace(/^[•\-\d\.]+\s*/, '').trim(),
+                        votes: [] as string[],
+                      }));
+                      if (opts.length > 0) {
+                        pd = { question: q, options: opts, totalVotes: 0 };
+                      }
+                    }
+
                     if (pd && Array.isArray(pd.options)) {
                       const updatedOpts = pd.options.map((opt) => {
                         let votes: string[] = Array.isArray(opt.votes) ? opt.votes.filter((uid) => uid !== voterId) : [];
-                        if (opt.id === optionId) {
+                        const isMatch = opt.id === optionId || `opt_${opt.id}` === optionId || opt.id === `opt_${optionId}`;
+                        if (isMatch) {
                           votes.push(voterId);
                         }
                         return { ...opt, votes };
@@ -1409,21 +1726,36 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                     return { ...m, reactions: currentReactions, poll_data: pd };
                   }
                   return m;
-                }),
-              }));
+                };
+
+                const isCurrentRoom = state.activeWorkspaceId === workspaceId;
+                const room = state.messagesByRoom[workspaceId];
+                return {
+                  messages: isCurrentRoom ? state.messages.map(updatePoll) : state.messages,
+                  messagesByRoom: room
+                    ? { ...state.messagesByRoom, [workspaceId]: room.map(updatePoll) }
+                    : state.messagesByRoom,
+                };
+              });
             }
             return;
           }
 
           // INSERT event
           set((state) => {
-            if (state.messages.some((m) => m.id === messageObj.id)) {
-              return {
-                messages: state.messages.map((m) => (m.id === messageObj.id ? { ...m, ...messageObj } : m)),
-              };
-            }
+            const roomMsgs = state.messagesByRoom[workspaceId] || (state.activeWorkspaceId === workspaceId ? state.messages : []);
+            const exists = roomMsgs.some((m) => m.id === messageObj.id);
+            const updatedRoom = exists
+              ? roomMsgs.map((m) => (m.id === messageObj.id ? { ...m, ...messageObj } : m))
+              : [...roomMsgs, messageObj];
+            const isCurrentRoom = state.activeWorkspaceId === workspaceId;
+
             return {
-              messages: [...state.messages, messageObj],
+              messages: isCurrentRoom ? updatedRoom : state.messages,
+              messagesByRoom: {
+                ...state.messagesByRoom,
+                [workspaceId]: updatedRoom,
+              },
             };
           });
 

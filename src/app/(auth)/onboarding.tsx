@@ -16,17 +16,11 @@ import { router } from 'expo-router';
 import {
   ArrowLeft,
   ArrowRight,
-  User,
-  Tag,
-  GraduationCap,
-  Building,
   CheckCircle2,
   AlertCircle,
   Sparkles,
-  BookOpen,
   Search,
   X,
-  Layers,
   ChevronRight,
   ChevronDown,
   Plus,
@@ -46,7 +40,6 @@ import {
   POPULAR_DISCIPLINES,
   RESEARCH_TAXONOMY_FAMILIES,
   INTERDISCIPLINARY_GROUPS,
-  TaxonomyItem,
   searchResearchTaxonomy,
 } from '../../data/researchTaxonomy';
 
@@ -60,12 +53,15 @@ export default function OnboardingScreen() {
   // Step 1: Academic Identity State
   const initialName =
     user?.fullName && user.fullName.toLowerCase() !== 'researcher' ? user.fullName : '';
-  const initialHandle = user?.handle && user.handle !== 'researcher' ? user.handle : '';
+  // Username must NOT be auto-filled for new users; they must choose and fill it explicitly (compulsory)
+  const initialHandle = '';
 
   const [fullName, setFullName] = useState(initialName);
   const [handle, setHandle] = useState(initialHandle);
   const [academicTitle, setAcademicTitle] = useState(user?.academicTitle || '');
   const [institution, setInstitution] = useState(user?.institution || '');
+  // Bio is optional and must NOT be auto-filled with default boilerplate text
+  const [bio, setBio] = useState('');
   const [step1Error, setStep1Error] = useState<string | null>(null);
 
   // Async verification status
@@ -147,7 +143,6 @@ export default function OnboardingScreen() {
   const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
 
   const [orcidId, setOrcidId] = useState(user?.orcidId || '');
-  const [bio, setBio] = useState(user?.bio || '');
   const [step2Error, setStep2Error] = useState<string | null>(null);
 
   // Search matches computed in real-time
@@ -190,9 +185,14 @@ export default function OnboardingScreen() {
       return;
     }
 
+    if (!cleanHandle) {
+      setStep1Error('Username is compulsory. Please choose your username.');
+      return;
+    }
+
     const val = validateUsername(cleanHandle);
     if (!val.isValid) {
-      setStep1Error(val.error || 'Please enter a valid researcher handle.');
+      setStep1Error(val.error || 'Please enter a valid researcher username.');
       return;
     }
 
@@ -239,9 +239,7 @@ export default function OnboardingScreen() {
       researchInterests: selectedTopics,
       orcidId: cleanOrcid || undefined,
       orcidVerified: Boolean(cleanOrcid && cleanOrcid.length >= 16),
-      bio:
-        bio.trim() ||
-        'Exploring scientific literature, asking questions, and discussing peer-reviewed science on BooffIn.',
+      bio: bio.trim(),
     };
 
     const res = await updateProfile(updatedData);
@@ -263,11 +261,15 @@ export default function OnboardingScreen() {
     }, 200);
   };
 
+  const isHandleValid =
+    Boolean(cleanHandle) &&
+    valResult?.isValid === true &&
+    handleStatus.available === true &&
+    !handleStatus.checking;
+
   const isStep1Valid =
     Boolean(fullName.trim()) &&
-    Boolean(handle.trim()) &&
-    handleStatus.available !== false &&
-    !handleStatus.checking;
+    isHandleValid;
 
   // Filtered families based on category tab
   const displayedFamilies = useMemo(() => {
@@ -336,7 +338,7 @@ export default function OnboardingScreen() {
 
                   <View>
                     <Input
-                      label="Researcher Handle *"
+                      label="Username * (Compulsory)"
                       placeholder="e.g. sagaryadav"
                       value={handle}
                       onChangeText={(text) => {
@@ -347,7 +349,7 @@ export default function OnboardingScreen() {
                       autoCapitalize="none"
                       maxLength={16}
                       leftIcon="Tag"
-                      hint="3–16 characters (letters, numbers, _ and .). No spaces."
+                      hint="Compulsory. 3–16 characters (letters, numbers, _ and .). No spaces."
                     />
 
                     {/* Real-time Availability Badge */}
@@ -393,6 +395,17 @@ export default function OnboardingScreen() {
                     value={institution}
                     onChangeText={setInstitution}
                     leftIcon="Inbox"
+                  />
+
+                  <Input
+                    label="Bio (Optional)"
+                    placeholder="Briefly describe your research focus, interests, or background..."
+                    value={bio}
+                    onChangeText={setBio}
+                    multiline
+                    numberOfLines={3}
+                    maxLength={240}
+                    hint="Optional. You can edit this anytime in your profile."
                   />
                 </View>
 
@@ -535,7 +548,7 @@ export default function OnboardingScreen() {
                     ) : (
                       <View style={styles.noResultsBox}>
                         <Text style={styles.noResultsText}>
-                          No standardized field found for "{searchQuery}".
+                          No standardized field found for &quot;{searchQuery}&quot;.
                         </Text>
                         <TouchableOpacity
                           style={styles.addCustomTopicBtn}
@@ -547,7 +560,7 @@ export default function OnboardingScreen() {
                         >
                           <Plus size={15} color={colors.white} />
                           <Text style={styles.addCustomTopicText}>
-                            Add "{searchQuery.trim()}" as custom topic
+                            Add &quot;{searchQuery.trim()}&quot; as custom topic
                           </Text>
                         </TouchableOpacity>
                       </View>

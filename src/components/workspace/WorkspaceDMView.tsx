@@ -16,7 +16,9 @@ import {
   Animated,
   Image,
   ImageBackground,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import {
@@ -64,6 +66,7 @@ import {
   Trash,
   AlertTriangle,
   Lock,
+  ChevronDown,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -215,6 +218,11 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const clearChatHistory = useWorkspaceStore((s) => s.clearChatHistory);
   const deleteWorkspaceLocally = useWorkspaceStore((s) => s.deleteWorkspaceLocally);
   const markAsRead = useWorkspaceStore((s) => s.markAsRead);
+  const loadOlderMessages = useWorkspaceStore((s) => s.loadOlderMessages);
+  const isLoadingOlderMessages = useWorkspaceStore((s) => s.isLoadingOlderMessages);
+  const hasMoreOlderMessages = useWorkspaceStore((s) => s.hasMoreOlderMessages[workspace.id] ?? true);
+  const unreadBelowCount = useWorkspaceStore((s) => s.unreadBelowCountByRoom[workspace.id] || 0);
+  const resetUnreadBelow = useWorkspaceStore((s) => s.resetUnreadBelow);
 
   // All workspaces for Forwarding and Workspace Invites
   const dms = useWorkspaceStore((s) => s.dms);
@@ -432,7 +440,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         }
       }
       if (Object.keys(detected).length > 0) {
-        setLocalPollVotes((prev) => ({ ...detected, ...prev }));
+        setLocalPollVotes((prev) => ({ ...prev, ...detected }));
       }
     })();
   }, [messages, currentUser?.id]);
@@ -445,9 +453,41 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   const textInputRef = useRef<TextInput>(null);
   const isAtBottomRef = useRef(true);
   const hasInitialScrolledRef = useRef(false);
+  const [currentRoomId, setCurrentRoomId] = useState(workspace.id);
+  const [isScrolledUp, setIsScrolledUp] = useState(false);
+  const [localUnreadBelow, setLocalUnreadBelow] = useState(0);
+  const prevMsgCountRef = useRef(messages.length);
+
+  const insets = useSafeAreaInsets();
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const bottomInset = (!isKeyboardVisible && Platform.OS !== 'web' ? insets.bottom : 0) || 0;
+
+  if (currentRoomId !== workspace.id) {
+    setCurrentRoomId(workspace.id);
+    setIsScrolledUp(false);
+    setLocalUnreadBelow(0);
     hasInitialScrolledRef.current = false;
+    isAtBottomRef.current = true;
+  }
+
+  useEffect(() => {
+    resetUnreadBelow(workspace.id);
     loadMessages(workspace.id);
     markAsRead(workspace.id);
     const unsubscribe = subscribeToWorkspaceMessages(workspace.id);
@@ -466,16 +506,20 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     }
   }, [messages.length, isMessagesLoading]);
 
-  // Auto-scroll and mark read when new messages arrive if user is in chat
+  // Handle incoming new messages: unread badge counter if scrolled up, or auto-scroll if at bottom
   useEffect(() => {
-    if (messages.length > 0) {
-      markAsRead(workspace.id);
-      if (hasInitialScrolledRef.current && isAtBottomRef.current) {
+    if (messages.length > prevMsgCountRef.current) {
+      const diff = messages.length - prevMsgCountRef.current;
+      if (!isAtBottomRef.current) {
+        setLocalUnreadBelow((prev) => prev + diff);
+      } else {
+        markAsRead(workspace.id);
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
-        }, 80);
+        }, 60);
       }
     }
+    prevMsgCountRef.current = messages.length;
   }, [messages.length, workspace.id]);
 
   // E2EE Auto-Decryption Effect for incoming encrypted ciphertexts
@@ -500,6 +544,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               const dec = await decryptTextMessage(cipher, nonce, sessionKey);
               if (dec && !dec.startsWith('🔒 [')) {
                 updates[m.id] = dec;
+                AsyncStorage.setItem(`e2ee_cache_${m.id}`, dec).catch(() => {});
               }
             } catch {}
           } else {
@@ -1591,12 +1636,20 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     let pollQuestionText = '';
     let pollOptionItems: Array<{ id: string; text: string }> = [];
     if (isPoll) {
-      const lines = item.content.split('\n').filter(Boolean);
-      pollQuestionText = lines[0].replace('📊 Poll:', '').trim();
-      pollOptionItems = lines.slice(1).map((line, idx) => ({
-        id: `opt_${idx}`,
-        text: line.replace(/^[•\-\d\.]+\s*/, '').trim(),
-      }));
+      if (resolvedPollData && Array.isArray(resolvedPollData.options) && resolvedPollData.options.length > 0) {
+        pollQuestionText = resolvedPollData.question || '';
+        pollOptionItems = resolvedPollData.options.map((opt: any, idx: number) => ({
+          id: opt.id || `opt_${idx}`,
+          text: opt.text,
+        }));
+      } else {
+        const lines = item.content.split('\n').filter(Boolean);
+        pollQuestionText = lines[0].replace('📊 Poll:', '').trim();
+        pollOptionItems = lines.slice(1).map((line, idx) => ({
+          id: `opt_${idx}`,
+          text: line.replace(/^[•\-\d\.]+\s*/, '').trim(),
+        }));
+      }
       if (pollOptionItems.length === 0) {
         pollOptionItems = [
           { id: 'opt_0', text: 'Agree / Support' },
@@ -1850,19 +1903,23 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                   if (reactionsMapRaw && typeof reactionsMapRaw === 'object') {
                     Object.entries(reactionsMapRaw).forEach(([key, userIds]) => {
                       if (key.startsWith('vote:') && Array.isArray(userIds)) {
-                        const optId = key.replace('vote:', '');
-                        if (optionVotersMap[optId]) {
-                          userIds.forEach((uid) => optionVotersMap[optId].add(uid));
-                        }
+                        const rawOptId = key.replace('vote:', '');
+                        const targetOpt = pollOptionItems.find((o, idx) => o.id === rawOptId || `opt_${idx}` === rawOptId || `opt_${o.id}` === rawOptId || o.id === `opt_${rawOptId}`);
+                        const optKey = targetOpt ? targetOpt.id : rawOptId;
+                        if (!optionVotersMap[optKey]) optionVotersMap[optKey] = new Set();
+                        userIds.forEach((uid) => optionVotersMap[optKey].add(uid));
                       }
                     });
                   }
 
                   // 2. Poll data if attached
                   if (resolvedPollData && Array.isArray(resolvedPollData.options)) {
-                    resolvedPollData.options.forEach((opt: any) => {
-                      if (optionVotersMap[opt.id] && Array.isArray(opt.votes)) {
-                        opt.votes.forEach((uid: string) => optionVotersMap[opt.id].add(uid));
+                    resolvedPollData.options.forEach((opt: any, idx: number) => {
+                      const targetOpt = pollOptionItems.find((o, oIdx) => o.id === opt.id || o.id === `opt_${idx}` || opt.id === `opt_${oIdx}`);
+                      const optKey = targetOpt ? targetOpt.id : opt.id;
+                      if (!optionVotersMap[optKey]) optionVotersMap[optKey] = new Set();
+                      if (Array.isArray(opt.votes)) {
+                        opt.votes.forEach((uid: string) => optionVotersMap[optKey].add(uid));
                       }
                     });
                   }
@@ -1996,9 +2053,6 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
             {/* Timestamp & status footer */}
             <View style={styles.msgFooter}>
-              {Boolean(item.e2ee_ciphertext) && !isDeleted && (
-                <Lock size={10} color={isMe ? '#A7F3D0' : '#166534'} style={{ marginRight: 4 }} />
-              )}
               {item.is_edited && !isDeleted && (
                 <Text
                   style={[
@@ -2100,7 +2154,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Top Header */}
@@ -2328,13 +2382,24 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             showsVerticalScrollIndicator={false}
             onScroll={(e) => {
               const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-              const paddingToBottom = 150;
+              const paddingToBottom = 120;
               const isClose = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
               isAtBottomRef.current = isClose;
+              setIsScrolledUp(!isClose);
+
+              if (isClose) {
+                setLocalUnreadBelow(0);
+                resetUnreadBelow(workspace.id);
+              }
+
+              // WhatsApp-style pagination: Load older messages when user scrolls near top
+              if (contentOffset.y < 80 && !isLoadingOlderMessages && hasMoreOlderMessages) {
+                loadOlderMessages(workspace.id);
+              }
             }}
             onContentSizeChange={() => {
               if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
-                flatListRef.current?.scrollToEnd({ animated: hasInitialScrolledRef.current });
+                flatListRef.current?.scrollToEnd({ animated: false });
                 hasInitialScrolledRef.current = true;
               }
             }}
@@ -2343,6 +2408,14 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 flatListRef.current?.scrollToEnd({ animated: false });
               }
             }}
+            ListHeaderComponent={
+              isLoadingOlderMessages ? (
+                <View style={styles.loadingOlderContainer}>
+                  <ActivityIndicator size="small" color="#164E3F" />
+                  <Text style={styles.loadingOlderText}>Loading older messages...</Text>
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Avatar
@@ -2415,6 +2488,31 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         {isPartnerTyping && typingPartnerName && (
           <AnimatedTypingIndicator name={typingPartnerName} />
         )}
+
+        {/* Floating WhatsApp-style Scroll to Bottom Arrow & Unread Badge */}
+        {isScrolledUp && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+              isAtBottomRef.current = true;
+              setIsScrolledUp(false);
+              setLocalUnreadBelow(0);
+              resetUnreadBelow(workspace.id);
+            }}
+            style={[styles.scrollToBottomBtn, { bottom: 16 + bottomInset }]}
+            accessibilityLabel="Scroll to bottom"
+          >
+            <ChevronDown size={22} color="#164E3F" strokeWidth={2.5} />
+            {(localUnreadBelow > 0 || unreadBelowCount > 0) && (
+              <View style={styles.unreadBelowBadge}>
+                <Text style={styles.unreadBelowBadgeText}>
+                  {(localUnreadBelow || unreadBelowCount) > 99 ? '99+' : (localUnreadBelow || unreadBelowCount)}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Docked Quoted Reply Bar */}
@@ -2467,13 +2565,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
       {/* Live Voice Note Recorder Dock */}
       {isRecordingVoice ? (
-        <VoiceNoteRecorder
-          onSendVoiceNote={handleSendVoiceNote}
-          onCancel={() => setIsRecordingVoice(false)}
-        />
+        <View style={{ paddingBottom: bottomInset > 0 ? bottomInset + 8 : 0, backgroundColor: '#FFFFFF' }}>
+          <VoiceNoteRecorder
+            onSendVoiceNote={handleSendVoiceNote}
+            onCancel={() => setIsRecordingVoice(false)}
+          />
+        </View>
       ) : (
         /* Bottom Input Dock with Photo, Voice Note (Mic), Attachment Menu, and Send */
-        <View style={styles.bottomDockContainer}>
+        <View style={[styles.bottomDockContainer, { paddingBottom: bottomInset > 0 ? bottomInset + 8 : 8 }]}>
           {/* Capsule Input */}
           <View
             style={[
@@ -4356,14 +4456,11 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
     paddingBottom: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
     textAlignVertical: 'center',
-    lineHeight: 20,
+    borderWidth: 0,
     ...(Platform.OS === 'web'
       ? ({
           outlineStyle: 'none',
-          outline: 'none',
-          border: 'none',
-          resize: 'none',
-          boxShadow: 'none',
+          outlineWidth: 0,
         } as any)
       : {}),
   },
@@ -5068,5 +5165,55 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#64748B',
     textTransform: 'capitalize',
+  },
+  loadingOlderContainer: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  loadingOlderText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  scrollToBottomBtn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 5,
+    zIndex: 99,
+  },
+  unreadBelowBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  unreadBelowBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

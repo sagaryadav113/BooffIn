@@ -170,6 +170,18 @@ export default function WorkspaceHubScreen() {
     }
   }, [selectedWorkspace?.id, selectedWorkspace?.unread_count, markAsRead]);
 
+  // If selected workspace was deleted or removed from active workspaces, reset selection
+  useEffect(() => {
+    if (selectedWorkspaceId) {
+      const exists = [...dms, ...communities, ...innerCircles, ...discoverableCommunities].some(
+        (w) => w.id === selectedWorkspaceId
+      );
+      if (!exists) {
+        setSelectedWorkspaceId(null);
+      }
+    }
+  }, [selectedWorkspaceId, dms, communities, innerCircles, discoverableCommunities]);
+
   const [isDMsMuted, setIsDMsMuted] = useState(false);
 
   // Header Title & Actions tailored to each tab
@@ -525,9 +537,11 @@ export default function WorkspaceHubScreen() {
           </View>
 
           <View style={styles.innerCircleSnippetRow}>
-            <Text style={styles.innerCircleSnippet} numberOfLines={1}>
-              {item.last_message?.content || item.description || 'Alex: What are we doing for the project review?'}
-            </Text>
+              {item.last_message?.content && item.last_message.content !== '🔒 Encrypted message' && !item.last_message.content.startsWith('🔒 [')
+                ? item.last_message.content
+                : item.last_message
+                ? 'Message'
+                : item.description || 'Alex: What are we doing for the project review?'}
             {unreadCount > 0 && (
               <View style={styles.unreadPill}>
                 <Text style={styles.unreadPillText}>

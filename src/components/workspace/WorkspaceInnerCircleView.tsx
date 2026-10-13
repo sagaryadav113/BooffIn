@@ -17,7 +17,9 @@ import {
   Animated,
   Image,
   ImageBackground,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import {
@@ -78,6 +80,7 @@ import {
   Trash,
   Ban,
   Flag,
+  ChevronDown,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -274,6 +277,13 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const setMuteWorkspace = useWorkspaceStore((s) => s.setMuteWorkspace);
   const clearChatHistory = useWorkspaceStore((s) => s.clearChatHistory);
   const deleteWorkspaceLocally = useWorkspaceStore((s) => s.deleteWorkspaceLocally);
+  const deleteCommunityPermanently = useWorkspaceStore((s) => s.deleteCommunityPermanently);
+  const leaveAndRemoveCommunity = useWorkspaceStore((s) => s.leaveAndRemoveCommunity);
+  const loadOlderMessages = useWorkspaceStore((s) => s.loadOlderMessages);
+  const isLoadingOlderMessages = useWorkspaceStore((s) => s.isLoadingOlderMessages);
+  const hasMoreOlderMessages = useWorkspaceStore((s) => s.hasMoreOlderMessages[workspace.id] ?? true);
+  const unreadBelowCount = useWorkspaceStore((s) => s.unreadBelowCountByRoom[workspace.id] || 0);
+  const resetUnreadBelow = useWorkspaceStore((s) => s.resetUnreadBelow);
 
   const isPinned = Boolean(workspace.settings?.is_pinned);
   const isArchived = Boolean(workspace.settings?.is_archived);
@@ -284,10 +294,22 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
   const isAtBottomRef = useRef(true);
   const hasInitialScrolledRef = useRef(false);
+  const [currentRoomId, setCurrentRoomId] = useState(workspace.id);
+  const [isScrolledUp, setIsScrolledUp] = useState(false);
+  const [localUnreadBelow, setLocalUnreadBelow] = useState(0);
+  const prevMsgCountRef = useRef(messages.length);
+
+  if (currentRoomId !== workspace.id) {
+    setCurrentRoomId(workspace.id);
+    setIsScrolledUp(false);
+    setLocalUnreadBelow(0);
+    hasInitialScrolledRef.current = false;
+    isAtBottomRef.current = true;
+  }
 
   // Initial Room Loader & Realtime Subscription
   useEffect(() => {
-    hasInitialScrolledRef.current = false;
+    resetUnreadBelow(workspace.id);
     loadMessages(workspace.id);
     loadMembers(workspace.id);
     loadEvents(workspace.id);
@@ -310,16 +332,20 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     }
   }, [messages.length, isMessagesLoading]);
 
-  // Auto-scroll and mark read when new messages arrive if user is in chat
+  // Handle incoming new messages: unread badge counter if scrolled up, or auto-scroll if at bottom
   useEffect(() => {
-    if (messages.length > 0) {
-      markAsRead(workspace.id);
-      if (hasInitialScrolledRef.current && isAtBottomRef.current) {
+    if (messages.length > prevMsgCountRef.current) {
+      const diff = messages.length - prevMsgCountRef.current;
+      if (!isAtBottomRef.current) {
+        setLocalUnreadBelow((prev) => prev + diff);
+      } else {
+        markAsRead(workspace.id);
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
-        }, 80);
+        }, 60);
       }
     }
+    prevMsgCountRef.current = messages.length;
   }, [messages.length, workspace.id]);
 
   // Workspaces for Forwarding
@@ -334,7 +360,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   }, [members, onlineUserIds]);
 
   // User Role & Permissions (Step 2: Roles & Permissions)
-  const isOwner = workspace.owner_id === currentUser?.id;
+  const isOwner =
+    workspace.owner_id === currentUser?.id ||
+    workspace.creator_id === currentUser?.id ||
+    workspace.my_role === 'owner';
   const myMembership = members.find((m) => m.user_id === currentUser?.id);
   const isMember = isOwner || myMembership?.status === 'active' || workspace.my_membership_status === 'active';
   const myRole = isOwner ? 'owner' : (myMembership?.role || 'member');
@@ -400,6 +429,27 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [resolvedDoi, setResolvedDoi] = useState<DoiMetadata | null>(null);
   const [attachedDoi, setAttachedDoi] = useState<DoiMetadata | null>(null);
   const flatListRef = useRef<FlatList>(null);
+
+  const insets = useSafeAreaInsets();
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const bottomInset = (!isKeyboardVisible && Platform.OS !== 'web' ? insets.bottom : 0) || 0;
+
   // Replying To State (Group Chat)
   const [replyingTo, setReplyingTo] = useState<WorkspaceMessage | null>(null);
 
@@ -470,6 +520,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               const dec = await decryptTextMessage(cipher, nonce, podKey);
               if (dec && !dec.startsWith('🔒 [')) {
                 updates[m.id] = dec;
+                AsyncStorage.setItem(`e2ee_cache_${m.id}`, dec).catch(() => {});
               }
             } catch {}
           } else {
@@ -723,7 +774,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         }
       }
       if (Object.keys(detected).length > 0) {
-        setLocalPollVotes((prev) => ({ ...detected, ...prev }));
+        setLocalPollVotes((prev) => ({ ...prev, ...detected }));
       }
     })();
   }, [messages, currentUser?.id]);
@@ -810,10 +861,44 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } catch {}
-    await deleteWorkspaceLocally(workspace.id);
-    setIsProcessingChatAction(false);
-    setShowDeleteChatModal(false);
-    router.replace('/workspace');
+
+    if (isOwner) {
+      const res = await deleteCommunityPermanently(workspace.id);
+      setIsProcessingChatAction(false);
+      setShowDeleteChatModal(false);
+      if (res.success) {
+        if (Platform.OS === 'web') {
+          window.alert('Research pod permanently deleted for everyone.');
+        } else {
+          Alert.alert('Pod Deleted', 'This research pod has been permanently deleted for everyone.');
+        }
+        router.replace('/workspace' as any);
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(res.error || 'Failed to delete pod');
+        } else {
+          Alert.alert('Delete Failed', res.error || 'Failed to delete pod');
+        }
+      }
+    } else {
+      const res = await leaveAndRemoveCommunity(workspace.id);
+      setIsProcessingChatAction(false);
+      setShowDeleteChatModal(false);
+      if (res.success) {
+        if (Platform.OS === 'web') {
+          window.alert('You have left and removed this pod from your workspace.');
+        } else {
+          Alert.alert('Removed', 'You have left and removed this research pod from your workspace.');
+        }
+        router.replace('/workspace' as any);
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(res.error || 'Failed to leave pod');
+        } else {
+          Alert.alert('Action Failed', res.error || 'Failed to leave pod');
+        }
+      }
+    }
   };
 
   const handleSubmitReport = async () => {
@@ -1508,7 +1593,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* 1. Header Bar matching BooffIn academic aesthetic */}
@@ -1792,13 +1877,24 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             showsVerticalScrollIndicator={false}
             onScroll={(e) => {
               const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-              const paddingToBottom = 150;
+              const paddingToBottom = 120;
               const isClose = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
               isAtBottomRef.current = isClose;
+              setIsScrolledUp(!isClose);
+
+              if (isClose) {
+                setLocalUnreadBelow(0);
+                resetUnreadBelow(workspace.id);
+              }
+
+              // WhatsApp-style pagination: Load older messages when user scrolls near top
+              if (contentOffset.y < 80 && !isLoadingOlderMessages && hasMoreOlderMessages) {
+                loadOlderMessages(workspace.id);
+              }
             }}
             onContentSizeChange={() => {
               if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
-                flatListRef.current?.scrollToEnd({ animated: hasInitialScrolledRef.current });
+                flatListRef.current?.scrollToEnd({ animated: false });
                 hasInitialScrolledRef.current = true;
               }
             }}
@@ -1807,6 +1903,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 flatListRef.current?.scrollToEnd({ animated: false });
               }
             }}
+            ListHeaderComponent={
+              isLoadingOlderMessages ? (
+                <View style={styles.loadingOlderContainer}>
+                  <ActivityIndicator size="small" color="#164E3F" />
+                  <Text style={styles.loadingOlderText}>Loading older messages...</Text>
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <View style={styles.emptyMessagesContainer}>
                 <View style={styles.emptyIconCircle}>
@@ -1887,12 +1991,20 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               let pollQuestionText = '';
               let pollOptionItems: Array<{ id: string; text: string }> = [];
               if (isPoll) {
-                const lines = item.content.split('\n').filter(Boolean);
-                pollQuestionText = lines[0].replace('📊 Poll:', '').trim();
-                pollOptionItems = lines.slice(1).map((line: string, idx: number) => ({
-                  id: `opt_${idx}`,
-                  text: line.replace(/^[•\-\d\.]+\s*/, '').trim(),
-                }));
+                if (resolvedPollData && Array.isArray(resolvedPollData.options) && resolvedPollData.options.length > 0) {
+                  pollQuestionText = resolvedPollData.question || '';
+                  pollOptionItems = resolvedPollData.options.map((opt: any, idx: number) => ({
+                    id: opt.id || `opt_${idx}`,
+                    text: opt.text,
+                  }));
+                } else {
+                  const lines = item.content.split('\n').filter(Boolean);
+                  pollQuestionText = lines[0].replace('📊 Poll:', '').trim();
+                  pollOptionItems = lines.slice(1).map((line: string, idx: number) => ({
+                    id: `opt_${idx}`,
+                    text: line.replace(/^[•\-\d\.]+\s*/, '').trim(),
+                  }));
+                }
                 if (pollOptionItems.length === 0) {
                   pollOptionItems = [
                     { id: 'opt_0', text: 'Agree / Support' },
@@ -2074,19 +2186,23 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                       if (reactionsMapRaw && typeof reactionsMapRaw === 'object') {
                         Object.entries(reactionsMapRaw).forEach(([key, userIds]) => {
                           if (key.startsWith('vote:') && Array.isArray(userIds)) {
-                            const optId = key.replace('vote:', '');
-                            if (optionVotersMap[optId]) {
-                              userIds.forEach((uid) => optionVotersMap[optId].add(uid));
-                            }
+                            const rawOptId = key.replace('vote:', '');
+                            const targetOpt = pollOptionItems.find((o, idx) => o.id === rawOptId || `opt_${idx}` === rawOptId || `opt_${o.id}` === rawOptId || o.id === `opt_${rawOptId}`);
+                            const optKey = targetOpt ? targetOpt.id : rawOptId;
+                            if (!optionVotersMap[optKey]) optionVotersMap[optKey] = new Set();
+                            userIds.forEach((uid) => optionVotersMap[optKey].add(uid));
                           }
                         });
                       }
 
                       // 2. Poll data if attached
                       if (resolvedPollData && Array.isArray(resolvedPollData.options)) {
-                        resolvedPollData.options.forEach((opt: any) => {
-                          if (optionVotersMap[opt.id] && Array.isArray(opt.votes)) {
-                            opt.votes.forEach((uid: string) => optionVotersMap[opt.id].add(uid));
+                        resolvedPollData.options.forEach((opt: any, idx: number) => {
+                          const targetOpt = pollOptionItems.find((o, oIdx) => o.id === opt.id || o.id === `opt_${idx}` || opt.id === `opt_${oIdx}`);
+                          const optKey = targetOpt ? targetOpt.id : opt.id;
+                          if (!optionVotersMap[optKey]) optionVotersMap[optKey] = new Set();
+                          if (Array.isArray(opt.votes)) {
+                            opt.votes.forEach((uid: string) => optionVotersMap[optKey].add(uid));
                           }
                         });
                       }
@@ -2213,9 +2329,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
                     {/* Metadata: Edited, Time, Status */}
                     <View style={styles.messageFooterRow}>
-                      {Boolean(item.e2ee_ciphertext) && !item.is_deleted && (
-                        <Lock size={10} color={isMe ? '#A7F3D0' : '#166534'} style={{ marginRight: 4 }} />
-                      )}
                       {item.is_edited && !item.is_deleted && (
                         <Text style={[styles.editedIndicator, isMe ? styles.myEditedIndicator : styles.otherEditedIndicator]}>
                           (edited)
@@ -2276,6 +2389,31 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             );
             }}
           />
+
+          {/* Floating WhatsApp-style Scroll to Bottom Arrow & Unread Badge */}
+          {isScrolledUp && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+                isAtBottomRef.current = true;
+                setIsScrolledUp(false);
+                setLocalUnreadBelow(0);
+                resetUnreadBelow(workspace.id);
+              }}
+              style={[styles.scrollToBottomBtn, { bottom: 80 + bottomInset }]}
+              accessibilityLabel="Scroll to bottom"
+            >
+              <ChevronDown size={22} color="#164E3F" strokeWidth={2.5} />
+              {(localUnreadBelow > 0 || unreadBelowCount > 0) && (
+                <View style={styles.unreadBelowBadge}>
+                  <Text style={styles.unreadBelowBadgeText}>
+                    {(localUnreadBelow || unreadBelowCount) > 99 ? '99+' : (localUnreadBelow || unreadBelowCount)}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Mention Autocomplete Floating Popup */}
           {showMentionPopup && mentionSuggestions.length > 0 && (
@@ -2356,7 +2494,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
           {/* Bottom Capsule Input Dock / Voice Note Recorder / Announcement Mode Dock / Review Bar */}
           {!isMember ? (
-            <View style={styles.reviewBottomBar}>
+            <View style={[styles.reviewBottomBar, { paddingBottom: bottomInset > 0 ? bottomInset + 12 : 12 }]}>
               <View style={styles.reviewTextContainer}>
                 <Text style={styles.reviewTitle}>Previewing Inner Circle</Text>
                 <Text style={styles.reviewSubtitle}>
@@ -2378,12 +2516,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             </View>
           ) : canPost ? (
             isRecordingVoice ? (
-              <VoiceNoteRecorder
-                onSendVoiceNote={handleSendVoiceNote}
-                onCancel={() => setIsRecordingVoice(false)}
-              />
+              <View style={{ paddingBottom: bottomInset > 0 ? bottomInset + 8 : 0, backgroundColor: '#FFFFFF' }}>
+                <VoiceNoteRecorder
+                  onSendVoiceNote={handleSendVoiceNote}
+                  onCancel={() => setIsRecordingVoice(false)}
+                />
+              </View>
             ) : (
-              <View style={styles.bottomDockContainer}>
+              <View style={[styles.bottomDockContainer, { paddingBottom: bottomInset > 0 ? bottomInset + 8 : 8 }]}>
                 <View
                   style={[
                     styles.inputCapsule,
@@ -2452,7 +2592,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               </View>
             )
           ) : (
-            <View style={styles.announcementModeDockContainer}>
+            <View style={[styles.announcementModeDockContainer, { paddingBottom: bottomInset > 0 ? bottomInset + 12 : 12 }]}>
               <View style={styles.announcementModeDock}>
                 <Lock size={15} color="#047857" />
                 <Text style={styles.announcementModeDockText}>
@@ -3310,7 +3450,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Trash size={18} color="#DC2626" />
-                <Text style={styles.modalTitle}>Leave Research Pod?</Text>
+                <Text style={styles.modalTitle}>
+                  {isOwner ? 'Delete Research Pod?' : 'Leave Research Pod?'}
+                </Text>
               </View>
               <TouchableOpacity onPress={() => setShowDeleteChatModal(false)}>
                 <X size={20} color="#64748B" />
@@ -3318,7 +3460,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Are you sure you want to remove this pod from your active workspace? You can rejoin later if invited.
+              {isOwner
+                ? 'Are you sure you want to permanently delete this research pod? All messages, documents, and discussions will be removed for all members.'
+                : 'Are you sure you want to remove this pod from your active workspace? You can rejoin later if invited.'}
             </Text>
 
             <View style={styles.confirmModalActionsRow}>
@@ -3339,7 +3483,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 {isProcessingChatAction ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.confirmModalDestructiveText}>Leave Pod</Text>
+                  <Text style={styles.confirmModalDestructiveText}>
+                    {isOwner ? 'Delete Pod' : 'Leave Pod'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -3848,14 +3994,11 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
     paddingBottom: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
     textAlignVertical: 'center',
-    lineHeight: 20,
+    borderWidth: 0,
     ...(Platform.OS === 'web'
       ? ({
           outlineStyle: 'none',
-          outline: 'none',
-          border: 'none',
-          resize: 'none',
-          boxShadow: 'none',
+          outlineWidth: 0,
         } as any)
       : {}),
   },
@@ -5111,6 +5254,56 @@ const styles = StyleSheet.create({
   },
   forwardedBadgeTextOther: {
     color: '#64748B',
+  },
+  loadingOlderContainer: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  loadingOlderText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  scrollToBottomBtn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 80,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 5,
+    zIndex: 99,
+  },
+  unreadBelowBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  unreadBelowBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });
 

@@ -114,6 +114,88 @@ export function getNotificationDeepLink(notification: AppNotification): {
 }
 
 /**
+ * Deduplicate notification rows from database triggers or multiple concurrent events.
+ * Identifies duplicate notifications representing the exact same underlying user action
+ * (e.g. same actor, same type, same target/entity, and created within a similar timeframe).
+ */
+export function deduplicateNotificationList(
+  notifications: AppNotification[]
+): { uniqueNotifications: AppNotification[]; duplicateIds: string[] } {
+  if (!Array.isArray(notifications) || notifications.length === 0) {
+    return { uniqueNotifications: [], duplicateIds: [] };
+  }
+
+  const seenIds = new Set<string>();
+  const seenEventKeys = new Map<string, AppNotification>();
+  const duplicateIds: string[] = [];
+
+  for (const notif of notifications) {
+    if (!notif || !notif.id) continue;
+
+    // 1. Direct ID deduplication
+    if (seenIds.has(notif.id)) {
+      duplicateIds.push(notif.id);
+      continue;
+    }
+    seenIds.add(notif.id);
+
+    // 2. Semantic event signature deduplication
+    const actorId = notif.actor?.id || 'unknown_actor';
+    const type = notif.type;
+    const targetEntity =
+      type === 'follow'
+        ? 'follow_event'
+        : notif.targetPostId || notif.targetPaperId || notif.entityId || notif.targetTopicName || '';
+
+    const rawTime = notif.metadata?.raw_created_at;
+    const timeBucket = rawTime
+      ? Math.floor(new Date(rawTime).getTime() / 10000)
+      : notif.createdAt || '';
+
+    const primaryKey = `${actorId}::${type}::${targetEntity}::${timeBucket}`;
+    const coarseKey = `${actorId}::${type}::${targetEntity}`;
+
+    const existing =
+      seenEventKeys.get(primaryKey) ||
+      (type === 'follow' || type === 'like' ? seenEventKeys.get(coarseKey) : undefined);
+
+    if (existing) {
+      // Pick the richer notification (prefer populated target IDs, metadata, or explicit snippets)
+      const currentScore =
+        (notif.targetPostId ? 3 : 0) +
+        (notif.targetPaperId ? 3 : 0) +
+        (notif.entityId ? 1 : 0) +
+        (notif.messageSnippet ? 2 : 0) +
+        (notif.metadata && Object.keys(notif.metadata).length > 1 ? 2 : 0);
+
+      const existingScore =
+        (existing.targetPostId ? 3 : 0) +
+        (existing.targetPaperId ? 3 : 0) +
+        (existing.entityId ? 1 : 0) +
+        (existing.messageSnippet ? 2 : 0) +
+        (existing.metadata && Object.keys(existing.metadata).length > 1 ? 2 : 0);
+
+      if (currentScore > existingScore) {
+        duplicateIds.push(existing.id);
+        seenEventKeys.set(primaryKey, notif);
+        if (type === 'follow' || type === 'like') seenEventKeys.set(coarseKey, notif);
+      } else {
+        duplicateIds.push(notif.id);
+      }
+    } else {
+      seenEventKeys.set(primaryKey, notif);
+      if (type === 'follow' || type === 'like') seenEventKeys.set(coarseKey, notif);
+    }
+  }
+
+  // Preserve original ordering while filtering out duplicates
+  const keptIds = new Set(Array.from(seenEventKeys.values()).map((n) => n.id));
+  const uniqueNotifications = notifications.filter((n) => keptIds.has(n.id));
+
+  return { uniqueNotifications, duplicateIds };
+}
+
+/**
  * Filter notifications by tab
  */
 export function filterNotificationList(
@@ -121,15 +203,19 @@ export function filterNotificationList(
   filter: NotificationFilter
 ): AppNotification[] {
   if (!Array.isArray(notifications)) return [];
-  if (filter === 'All') return notifications;
+  // Ensure the list is strictly deduplicated first
+  const { uniqueNotifications } = deduplicateNotificationList(notifications);
+  const list = uniqueNotifications;
+
+  if (filter === 'All') return list;
   if (filter === 'Mentions') {
-    return notifications.filter((n) => n.type === 'comment' || n.type === 'reply' || n.type === 'mention');
+    return list.filter((n) => n.type === 'comment' || n.type === 'reply' || n.type === 'mention');
   }
   if (filter === 'Follows') {
-    return notifications.filter((n) => n.type === 'follow');
+    return list.filter((n) => n.type === 'follow');
   }
   if (filter === 'Discussions') {
-    return notifications.filter(
+    return list.filter(
       (n) =>
         n.type === 'comment' ||
         n.type === 'reply' ||
@@ -139,7 +225,7 @@ export function filterNotificationList(
     );
   }
   if (filter === 'Updates') {
-    return notifications.filter(
+    return list.filter(
       (n) =>
         n.type === 'researcher_post' ||
         n.type === 'topic_activity' ||
@@ -148,9 +234,8 @@ export function filterNotificationList(
         n.type === 'publisher_update'
     );
   }
-  return notifications;
+  return list;
 }
-
 
 /**
  * Fetch paginated real notifications for the authenticated user from Supabase
@@ -158,7 +243,7 @@ export function filterNotificationList(
 export async function fetchNotifications(
   filter: NotificationFilter = 'All',
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 40,
   currentUserId?: string
 ): Promise<{ data: AppNotification[]; hasMore: boolean; error: string | null }> {
   try {
@@ -222,7 +307,7 @@ export async function fetchNotifications(
       return { data: [], hasMore: false, error: error?.message || null };
     }
 
-    const notifications: AppNotification[] = data.map((row: any) => {
+    const mappedNotifications: AppNotification[] = data.map((row: any) => {
       const actor = mapSupabaseProfile(row.actor);
       const metadata = row.metadata || {};
       const type = row.notification_type as NotificationType;
@@ -242,14 +327,38 @@ export async function fetchNotifications(
         targetTopicName: topicName,
         targetCommentId: metadata.comment_id,
         messageSnippet: row.message_snippet,
-        metadata,
+        metadata: {
+          ...metadata,
+          raw_created_at: row.created_at,
+        },
         createdAt: formatNotificationTime(row.created_at),
         isRead: Boolean(row.read_status),
       };
     });
 
+    // 3. Robust deduplication of trigger-duplicated rows
+    const { uniqueNotifications, duplicateIds } = deduplicateNotificationList(mappedNotifications);
+
+    // 4. Background purge of redundant duplicate notification rows for the authenticated user
+    if (duplicateIds.length > 0 && userId) {
+      (async () => {
+        try {
+          const { error: delError } = await supabase
+            .from('notifications')
+            .delete()
+            .in('id', duplicateIds)
+            .eq('recipient_id', userId);
+          if (!delError) {
+            console.log(`[notificationService] Purged ${duplicateIds.length} duplicate notification records from database.`);
+          }
+        } catch {
+          // ignore background cleanup failures
+        }
+      })();
+    }
+
     return {
-      data: notifications,
+      data: uniqueNotifications,
       hasMore: data.length === pageSize,
       error: null,
     };

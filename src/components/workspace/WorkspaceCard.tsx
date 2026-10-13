@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Shield,
   Users,
@@ -22,6 +23,7 @@ import { Workspace } from '../../types/workspace';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresenceStore } from '../../store/usePresenceStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { deriveSharedSessionKey, derivePodSessionKey, decryptTextMessage } from '../../utils/e2eeCrypto';
 
 interface WorkspaceCardProps {
   workspace: Workspace;
@@ -71,6 +73,75 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
     ? workspace.other_user?.fullName || workspace.name || 'Researcher'
     : workspace.name;
 
+  const [decryptedSnippet, setDecryptedSnippet] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function resolvePreview() {
+      const lm = workspace.last_message;
+      if (!lm) {
+        if (isMounted) setDecryptedSnippet(null);
+        return;
+      }
+
+      // If message is not encrypted and already has real plaintext, nothing to decrypt
+      if (lm.content && lm.content !== '🔒 Encrypted message' && !lm.content.startsWith('🔒 [')) {
+        if (isMounted) setDecryptedSnippet(null);
+        return;
+      }
+
+      // 1. Check local device cache
+      try {
+        const cached = await AsyncStorage.getItem(`e2ee_cache_${lm.id}`);
+        if (cached && isMounted) {
+          setDecryptedSnippet(cached);
+          return;
+        }
+      } catch {}
+
+      // 2. Decrypt on-the-fly using session key
+      const cipher = lm.e2ee_ciphertext || (lm as any).attachments?.e2ee_ciphertext;
+      const nonce = lm.e2ee_nonce || (lm as any).attachments?.e2ee_nonce;
+      if (cipher && nonce && currentUserId) {
+        try {
+          let sessionKey: string | null = null;
+          if (isDM) {
+            const peerId =
+              workspace.other_user?.id ||
+              (workspace.dm_participant_a === currentUserId
+                ? workspace.dm_participant_b
+                : workspace.dm_participant_a);
+            if (peerId) {
+              sessionKey = await deriveSharedSessionKey(currentUserId, peerId, workspace.id);
+            }
+          } else if (isInnerCircle) {
+            sessionKey = await derivePodSessionKey(workspace.id, currentUserId);
+          }
+
+          if (sessionKey) {
+            const dec = await decryptTextMessage(cipher, nonce, sessionKey);
+            if (dec && !dec.startsWith('🔒 [') && isMounted) {
+              setDecryptedSnippet(dec);
+              AsyncStorage.setItem(`e2ee_cache_${lm.id}`, dec).catch(() => {});
+            }
+          }
+        } catch {}
+      }
+    }
+    resolvePreview();
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    workspace.last_message?.id,
+    workspace.last_message?.content,
+    workspace.last_message?.e2ee_ciphertext,
+    currentUserId,
+    workspace.id,
+    isDM,
+    isInnerCircle,
+  ]);
+
   const getPreviewSnippet = () => {
     if (!workspace.last_message) {
       return isDM
@@ -87,7 +158,12 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
     if (lm.message_type === 'post') return '📑 Shared post';
     if (lm.message_type === 'profile') return '👤 Shared researcher profile';
     if (lm.message_type === 'call_log') return lm.content;
-    return lm.content || 'Message';
+
+    if (decryptedSnippet) return decryptedSnippet;
+    if (lm.content && lm.content !== '🔒 Encrypted message' && !lm.content.startsWith('🔒 [')) {
+      return lm.content;
+    }
+    return 'Message';
   };
 
   const previewSnippet = getPreviewSnippet();

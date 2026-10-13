@@ -45,18 +45,23 @@ export const Input: React.FC<InputProps> = ({
       <View
         style={[
           styles.inputWrapper,
+          props.multiline && { alignItems: 'flex-start', paddingTop: spacing.xs, paddingBottom: spacing.xs },
           isFocused && styles.inputWrapperFocused,
           error ? styles.inputWrapperError : null,
         ]}
       >
         {leftIcon && (
-          <View style={styles.leftIconWrapper}>
+          <View style={[styles.leftIconWrapper, props.multiline && { marginTop: spacing.sm }]}>
             <Icon name={leftIcon} size="sm" color={colors.textSecondary} />
           </View>
         )}
 
         <TextInput
-          style={[styles.input, style]}
+          style={[
+            styles.input,
+            props.multiline && { minHeight: 68, textAlignVertical: 'top' },
+            style,
+          ]}
           placeholderTextColor={colors.textMuted}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}

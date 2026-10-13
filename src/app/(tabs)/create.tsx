@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,11 +27,9 @@ import {
   Users,
   Plus,
   Trash2,
-  Check,
   Camera,
   Images,
   Link2,
-  Sparkles,
 } from 'lucide-react-native';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -42,6 +40,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 import { Paper, PostType, Poll, ArticleData } from '../../types';
 import { ArticleComposer } from '../../components/composer/ArticleComposer';
+import { ResearchDisciplinePicker } from '../../components/taxonomy/ResearchDisciplinePicker';
 import {
   pickPostImages,
   capturePostImage,
@@ -53,24 +52,16 @@ import * as SecureStore from 'expo-secure-store';
 import { MentionSuggestions } from '../../components/composer/MentionSuggestions';
 import { useMentionAutocomplete } from '../../hooks/useMentionAutocomplete';
 
-const POPULAR_TOPICS = [
-  'Neuroscience',
-  'AI & Bio',
-  'Genetics',
-  'Cancer',
-  'Immunology',
-  'Bioinformatics',
-  'Physics',
-  'Quantum Computing',
-  'Chemistry',
-  'Biophysics',
-  'Materials Science',
-  'Ecology',
-];
-
 export default function CreatePostScreen() {
   const user = useAuthStore((s) => s.user);
   const createPost = usePostStore((s) => s.createPost);
+
+  const searchParams = useLocalSearchParams<{
+    initialContent?: string;
+    paperData?: string;
+    initialImages?: string;
+    type?: string;
+  }>();
 
   const {
     text: content,
@@ -80,10 +71,29 @@ export default function CreatePostScreen() {
     isMentionActive,
     mentionQuery,
     insertMention,
-  } = useMentionAutocomplete('');
+  } = useMentionAutocomplete(searchParams.initialContent || '');
 
-  const [postType, setPostType] = useState<PostType>('discussion');
-  const [attachedPaper, setAttachedPaper] = useState<Paper | null>(null);
+  const [postType, setPostType] = useState<PostType>(() => {
+    if (searchParams.type === 'article') return 'article';
+    if (searchParams.paperData) {
+      try {
+        const parsed = JSON.parse(searchParams.paperData);
+        if (parsed?.title) return 'research_share';
+      } catch {}
+    }
+    return 'discussion';
+  });
+
+  const [attachedPaper, setAttachedPaper] = useState<Paper | null>(() => {
+    if (searchParams.paperData) {
+      try {
+        const parsed = JSON.parse(searchParams.paperData);
+        if (parsed?.title) return parsed;
+      } catch {}
+    }
+    return null;
+  });
+
   const [paperModalVisible, setPaperModalVisible] = useState(false);
 
   // Instant Auto-Detection State for pasted DOIs & Research Links
@@ -91,7 +101,15 @@ export default function CreatePostScreen() {
   const [dismissedPaperKey, setDismissedPaperKey] = useState<string | null>(null);
 
   // Attached Images & Upload State
-  const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [attachedImages, setAttachedImages] = useState<string[]>(() => {
+    if (searchParams.initialImages) {
+      try {
+        const parsed = JSON.parse(searchParams.initialImages);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return [];
+  });
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
@@ -107,30 +125,50 @@ export default function CreatePostScreen() {
   // Selected Topics
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [topicModalVisible, setTopicModalVisible] = useState(false);
-  const [customTopicInput, setCustomTopicInput] = useState('');
 
   const [visibility, setVisibility] = useState<'public' | 'followers'>('public');
   const [isPublishing, setIsPublishing] = useState(false);
 
-  const searchParams = useLocalSearchParams<{
-    initialContent?: string;
-    paperData?: string;
-  }>();
-
+  const lastParamsRef = useRef<string>('');
   useEffect(() => {
-    if (searchParams.initialContent) {
-      setContent(searchParams.initialContent);
-    }
-    if (searchParams.paperData) {
-      try {
-        const parsed = JSON.parse(searchParams.paperData);
-        if (parsed && parsed.title) {
-          setAttachedPaper(parsed);
-          setPostType('research_share');
-        }
-      } catch (e) {}
-    }
-  }, [searchParams.initialContent, searchParams.paperData]);
+    const key = `${searchParams.initialContent || ''}|${searchParams.paperData || ''}|${searchParams.initialImages || ''}|${searchParams.type || ''}`;
+    if (lastParamsRef.current === key) return;
+    lastParamsRef.current = key;
+
+    const timer = setTimeout(() => {
+      if (searchParams.initialContent) {
+        setContent(searchParams.initialContent);
+      }
+      if (searchParams.paperData) {
+        try {
+          const parsed = JSON.parse(searchParams.paperData);
+          if (parsed?.title) {
+            setAttachedPaper(parsed);
+            setPostType('research_share');
+          }
+        } catch {}
+      }
+      if (searchParams.initialImages) {
+        try {
+          const parsed = JSON.parse(searchParams.initialImages);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAttachedImages(parsed);
+          }
+        } catch {}
+      }
+      if (searchParams.type === 'article') {
+        setPostType('article');
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [
+    searchParams.initialContent,
+    searchParams.paperData,
+    searchParams.initialImages,
+    searchParams.type,
+    setContent,
+  ]);
 
   // Instant DOI / URL Auto-Detection Effect
   useEffect(() => {
@@ -310,20 +348,14 @@ export default function CreatePostScreen() {
   };
 
   const handleToggleTopic = (topic: string) => {
-    if (selectedTopics.includes(topic)) {
-      setSelectedTopics(selectedTopics.filter((t) => t !== topic));
+    if (selectedTopics.some((t) => t.toLowerCase() === topic.toLowerCase())) {
+      setSelectedTopics(selectedTopics.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
     } else {
       setSelectedTopics([...selectedTopics, topic]);
     }
   };
 
-  const handleAddCustomTopic = () => {
-    const trimmed = customTopicInput.trim().replace(/^#/, '');
-    if (trimmed && !selectedTopics.includes(trimmed)) {
-      setSelectedTopics([...selectedTopics, trimmed]);
-      setCustomTopicInput('');
-    }
-  };
+
 
   const handlePublish = async () => {
     const hasContent = content.trim().length > 0;
@@ -374,12 +406,19 @@ export default function CreatePostScreen() {
   const handlePublishArticle = async (articleData: ArticleData) => {
     setIsPublishing(true);
     try {
+      const finalTopics =
+        articleData.topics && articleData.topics.length > 0
+          ? articleData.topics
+          : selectedTopics.length > 0
+          ? selectedTopics
+          : ['Research Article'];
+
       await createPost(
         {
           content: articleData.abstract || articleData.title,
           postType: 'article',
           article: articleData,
-          topics: selectedTopics.length > 0 ? selectedTopics : ['Research Article'],
+          topics: finalTopics,
           visibility,
         },
         user.id
@@ -438,7 +477,7 @@ export default function CreatePostScreen() {
         >
           {/* Post Type Selector Pills */}
           <View style={styles.postTypeRow}>
-            {(['discussion', 'question', 'insight', 'article'] as const).map((type) => (
+            {(['discussion', 'article'] as const).map((type) => (
               <TouchableOpacity
                 key={type}
                 onPress={() => setPostType(type)}
@@ -893,7 +932,7 @@ export default function CreatePostScreen() {
           </TouchableWithoutFeedback>
         </Modal>
 
-        {/* Tag Topics Modal */}
+        {/* Tag Topics Modal (1,200+ Disciplines & Fields Taxonomy Search) */}
         <Modal
           visible={topicModalVisible}
           transparent
@@ -903,64 +942,50 @@ export default function CreatePostScreen() {
           <TouchableWithoutFeedback onPress={() => setTopicModalVisible(false)}>
             <View style={styles.modalOverlay}>
               <TouchableWithoutFeedback>
-                <View style={styles.modalCard}>
-                  <Text style={styles.modalTitle}>Tag Research Topics</Text>
-                  <Text style={styles.modalSubtitle}>
-                    Select disciplines to ensure your post reaches relevant researchers.
-                  </Text>
-
-                  {/* Custom topic input */}
-                  <View style={styles.customTopicRow}>
-                    <TextInput
-                      style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
-                      placeholder="Add custom topic (e.g. Epigenetics)"
-                      placeholderTextColor={colors.textMuted}
-                      value={customTopicInput}
-                      onChangeText={setCustomTopicInput}
-                      onSubmitEditing={handleAddCustomTopic}
-                    />
+                <View style={[styles.modalCard, styles.topicModalCard]}>
+                  <View style={styles.topicModalHeader}>
+                    <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                      <Text style={styles.modalTitle}>Tag Research Topics</Text>
+                      <Text style={styles.modalSubtitle}>
+                        Select from 1,200+ disciplines to ensure your post reaches relevant researchers.
+                      </Text>
+                    </View>
                     <TouchableOpacity
-                      onPress={handleAddCustomTopic}
-                      style={styles.addCustomTopicBtn}
+                      onPress={() => setTopicModalVisible(false)}
+                      style={styles.topicModalCloseBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Plus size={16} color={colors.white} />
+                      <X size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
 
-                  {/* Popular topics grid */}
-                  <View style={styles.topicSelectionWrap}>
-                    {POPULAR_TOPICS.map((topic) => {
-                      const isSelected = selectedTopics.includes(topic);
-                      return (
-                        <TouchableOpacity
-                          key={topic}
-                          onPress={() => handleToggleTopic(topic)}
-                          style={[
-                            styles.topicSelectPill,
-                            isSelected && styles.topicSelectPillActive,
-                          ]}
-                        >
-                          {isSelected && <Check size={12} color={colors.white} style={{ marginRight: 4 }} />}
-                          <Text
-                            style={[
-                              styles.topicSelectPillText,
-                              isSelected && styles.topicSelectPillTextActive,
-                            ]}
-                          >
-                            {topic}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                  <ScrollView
+                    style={styles.topicPickerScroll}
+                    contentContainerStyle={{ paddingBottom: spacing.sm }}
+                    showsVerticalScrollIndicator={true}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    <ResearchDisciplinePicker
+                      selectedTopics={selectedTopics}
+                      onToggleTopic={handleToggleTopic}
+                      onRemoveTopic={(topic) =>
+                        setSelectedTopics(selectedTopics.filter((t) => t.toLowerCase() !== topic.toLowerCase()))
+                      }
+                      onClearAll={() => setSelectedTopics([])}
+                      searchPlaceholder="Search 1,200+ fields, subfields, or topics..."
+                      hint="Selected disciplines ensure your post reaches relevant researchers and matching feeds."
+                    />
+                  </ScrollView>
 
-                  <Button
-                    title="Done"
-                    variant="primary"
-                    size="sm"
-                    onPress={() => setTopicModalVisible(false)}
-                    style={{ marginTop: spacing.md }}
-                  />
+                  <View style={styles.topicModalFooter}>
+                    <Button
+                      title={`Done (${selectedTopics.length} selected)`}
+                      variant="primary"
+                      size="sm"
+                      onPress={() => setTopicModalVisible(false)}
+                      style={{ flex: 1 }}
+                    />
+                  </View>
                 </View>
               </TouchableWithoutFeedback>
             </View>
@@ -1241,6 +1266,39 @@ const styles = StyleSheet.create({
   addOptionBtnText: {
     ...typography.captionBold,
     color: colors.textPrimary,
+  },
+  topicModalCard: {
+    maxHeight: '90%',
+    width: '94%',
+    maxWidth: 680,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+  },
+  topicModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    marginBottom: spacing.xs,
+  },
+  topicModalCloseBtn: {
+    padding: 6,
+    borderRadius: radii.full,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  topicPickerScroll: {
+    maxHeight: 520,
+    flexGrow: 0,
+  },
+  topicModalFooter: {
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+    marginTop: spacing.xs,
   },
   customTopicRow: {
     flexDirection: 'row',

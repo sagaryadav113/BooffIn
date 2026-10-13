@@ -6,6 +6,7 @@ import {
   markNotificationAsRead as apiMarkAsRead,
   markAllNotificationsAsRead as apiMarkAllAsRead,
   filterNotificationList,
+  deduplicateNotificationList,
 } from '../api/notificationService';
 import { useAuthStore } from './useAuthStore';
 import { supabase } from '../api/client';
@@ -45,12 +46,13 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }
 
     try {
-      const { data, error } = await fetchNotifications(get().activeFilter, 1, 30, currentUserId);
+      const { data, error } = await fetchNotifications(get().activeFilter, 1, 50, currentUserId);
       if (error) {
         set({ error, isLoading: false, isRefreshing: false });
       } else {
-        const unread = data.filter((n) => !n.isRead).length;
-        set({ notifications: data, unreadCount: unread, isLoading: false, isRefreshing: false });
+        const { uniqueNotifications } = deduplicateNotificationList(data);
+        const unread = uniqueNotifications.filter((n) => !n.isRead).length;
+        set({ notifications: uniqueNotifications, unreadCount: unread, isLoading: false, isRefreshing: false });
       }
     } catch (err: any) {
       set({

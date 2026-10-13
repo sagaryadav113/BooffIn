@@ -11,6 +11,8 @@ import {
   Alert,
   ActivityIndicator,
   Keyboard,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -29,6 +31,7 @@ import {
   MoreHorizontal,
   ChevronDown,
   Sparkles,
+  Tag,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
@@ -37,6 +40,8 @@ import { ArticleData, ArticleReference, ArticleSection, ArticleImage } from '../
 import { UserProfile } from '../../types/user';
 import { AddReferenceModal } from './AddReferenceModal';
 import { pickPostImages, capturePostImage, uploadPostImage } from '../../api/storageService';
+import { ResearchDisciplinePicker } from '../taxonomy/ResearchDisciplinePicker';
+import { Button } from '../core/Button';
 
 const ARTICLE_DRAFT_KEY = 'booffin_article_draft_v1';
 
@@ -86,6 +91,18 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
     initialData?.references || []
   );
 
+  // Tagged Research Topics from 1,200+ Taxonomy
+  const [topics, setTopics] = useState<string[]>(initialData?.topics || []);
+  const [topicModalVisible, setTopicModalVisible] = useState(false);
+
+  const handleToggleTopic = (topic: string) => {
+    if (topics.some((t) => t.toLowerCase() === topic.toLowerCase())) {
+      setTopics(topics.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
+    } else {
+      setTopics([...topics, topic]);
+    }
+  };
+
   // Active focus tracking for insertion (which section body has cursor)
   const [activeSectionId, setActiveSectionId] = useState<string>('sec_1');
   const [referenceModalVisible, setReferenceModalVisible] = useState(false);
@@ -109,6 +126,7 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
           abstract,
           sections,
           references,
+          topics,
           isDraft: true,
         };
         await SecureStore.setItemAsync(ARTICLE_DRAFT_KEY, JSON.stringify(draftPayload));
@@ -119,7 +137,7 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [title, subheading, authors, abstract, sections, references, isEditing]);
+  }, [title, subheading, authors, abstract, sections, references, topics, isEditing]);
 
   // Load existing draft if present and no initial data was passed
   useEffect(() => {
@@ -139,6 +157,9 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
             }
             if (parsed.references) {
               setReferences(parsed.references);
+            }
+            if (parsed.topics && Array.isArray(parsed.topics)) {
+              setTopics(parsed.topics);
             }
           }
         }
@@ -390,6 +411,7 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
       sections: sections.filter((s) => s.heading.trim() || s.content.trim() || (s.images && s.images.length > 0)),
       references,
       readingTimeMinutes: readingTime,
+      topics: topics.length > 0 ? topics : undefined,
       isDraft: false,
     };
 
@@ -513,6 +535,53 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
           <Text style={styles.authorByline}>
             By {authors.join(', ')}
           </Text>
+        </View>
+
+        {/* Tagged Research Topics / Fields (1,200+ Taxonomy) */}
+        <View style={styles.topicsSectionCard}>
+          <View style={styles.topicsHeaderRow}>
+            <View style={styles.topicsTitleWrap}>
+              <Tag size={15} color={colors.accentLink} />
+              <Text style={styles.topicsSectionTitle}>RESEARCH FIELDS & TOPICS</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.addTopicsBtn}
+              onPress={() => setTopicModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Plus size={13} color={colors.accentLink} />
+              <Text style={styles.addTopicsBtnText}>
+                {topics.length > 0 ? 'Edit Topics' : 'Tag Topics'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {topics.length > 0 ? (
+            <View style={styles.topicChipsWrap}>
+              {topics.map((t) => (
+                <View key={t} style={styles.topicChip}>
+                  <Text style={styles.topicChipText}>#{t}</Text>
+                  <TouchableOpacity
+                    onPress={() => setTopics(topics.filter((x) => x.toLowerCase() !== t.toLowerCase()))}
+                    style={styles.topicChipRemove}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <X size={12} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.emptyTopicsPrompt}
+              onPress={() => setTopicModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.emptyTopicsPromptText}>
+                Tag 1,200+ academic fields to ensure your article reaches interested researchers and journals.
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Abstract & Key Findings Card (Matching Screenshot 2) */}
@@ -662,6 +731,14 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
           <Link2 size={21} color={colors.textPrimary} />
         </TouchableOpacity>
 
+        {/* 🏷️ Tag Research Topics (1,200+ Fields) */}
+        <TouchableOpacity
+          style={styles.toolButton}
+          onPress={() => setTopicModalVisible(true)}
+        >
+          <Tag size={20} color={topics.length > 0 ? colors.accentLink : colors.textPrimary} />
+        </TouchableOpacity>
+
         {/* •≡ Bullet List */}
         <TouchableOpacity style={styles.toolButton} onPress={handleInsertBulletList}>
           <List size={21} color={colors.textPrimary} />
@@ -722,6 +799,66 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
         onClose={() => setReferenceModalVisible(false)}
         onInsertReference={handleInsertReference}
       />
+
+      {/* Tag Article Research Topics Modal (1,200+ Disciplines Taxonomy Search) */}
+      <Modal
+        visible={topicModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTopicModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setTopicModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalCard, styles.topicModalCard]}>
+                <View style={styles.topicModalHeader}>
+                  <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                    <Text style={styles.modalTitle}>Tag Article Research Topics</Text>
+                    <Text style={styles.modalSubtitle}>
+                      Select from 1,200+ disciplines to ensure your article reaches relevant readers and research feeds.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setTopicModalVisible(false)}
+                    style={styles.topicModalCloseBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <X size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  style={styles.topicPickerScroll}
+                  contentContainerStyle={{ paddingBottom: spacing.sm }}
+                  showsVerticalScrollIndicator={true}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <ResearchDisciplinePicker
+                    selectedTopics={topics}
+                    onToggleTopic={handleToggleTopic}
+                    onRemoveTopic={(topic) =>
+                      setTopics(topics.filter((t) => t.toLowerCase() !== topic.toLowerCase()))
+                    }
+                    onClearAll={() => setTopics([])}
+                    searchPlaceholder="Search 1,200+ fields, subfields, or topics..."
+                    hint="Tagged topics personalize discovery in readers' home feed and category tabs."
+                  />
+                </ScrollView>
+
+                <View style={styles.topicModalFooter}>
+                  <Button
+                    title={`Done (${topics.length} selected)`}
+                    variant="primary"
+                    size="sm"
+                    onPress={() => setTopicModalVisible(false)}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -1075,5 +1212,138 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.textPrimary,
     fontWeight: '600',
+  },
+
+  /* Research Topics / Fields Metadata Card */
+  topicsSectionCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  topicsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs + 2,
+  },
+  topicsTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  topicsSectionTitle: {
+    ...typography.micro,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 0.6,
+  },
+  addTopicsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+  },
+  addTopicsBtnText: {
+    ...typography.captionBold,
+    fontSize: 11.5,
+    color: colors.accentLink,
+  },
+  topicChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingTop: 4,
+  },
+  topicChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.black,
+    paddingLeft: spacing.sm + 2,
+    paddingRight: 6,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+  },
+  topicChipText: {
+    ...typography.micro,
+    fontWeight: '600',
+    color: colors.white,
+    fontSize: 12,
+  },
+  topicChipRemove: {
+    marginLeft: 4,
+    padding: 2,
+  },
+  emptyTopicsPrompt: {
+    paddingVertical: 4,
+  },
+  emptyTopicsPromptText: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.textMuted,
+    fontStyle: 'italic',
+  },
+
+  /* Tag Topics Modal */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.lg,
+    padding: spacing.md,
+  },
+  modalTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  topicModalCard: {
+    maxHeight: '90%',
+    width: '94%',
+    maxWidth: 680,
+    borderRadius: radii.lg,
+  },
+  topicModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    marginBottom: spacing.xs,
+  },
+  topicModalCloseBtn: {
+    padding: 6,
+    borderRadius: radii.full,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  topicPickerScroll: {
+    maxHeight: 520,
+    flexGrow: 0,
+  },
+  topicModalFooter: {
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+    marginTop: spacing.xs,
   },
 });

@@ -475,7 +475,7 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
         <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
           <ArticleComposer
             currentUser={currentUser || post.author}
-            initialData={post.article}
+            initialData={{ ...post.article, topics: post.article?.topics || post.topics }}
             isEditing={true}
             submitButtonTitle="Save Changes"
             isPublishing={isSavingArticle}
@@ -483,10 +483,15 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
             onPublish={async (updatedArticleData) => {
               setIsSavingArticle(true);
               try {
+                const finalArticleTopics =
+                  updatedArticleData.topics && updatedArticleData.topics.length > 0
+                    ? updatedArticleData.topics
+                    : topics;
+
                 const success = await updatePost(
                   post.id,
                   updatedArticleData.abstract || updatedArticleData.title,
-                  topics,
+                  finalArticleTopics,
                   updatedArticleData
                 );
                 if (success) {

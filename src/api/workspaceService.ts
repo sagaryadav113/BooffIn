@@ -23,7 +23,11 @@ import {
   WorkspacePollData,
 } from '../types/workspace';
 import { resolvePaper } from './paperResolver';
-import { deriveSharedSessionKey, derivePodSessionKey, encryptTextMessage } from '../utils/e2eeCrypto';
+import { deriveSharedSessionKey, derivePodSessionKey, encryptTextMessage, decryptTextMessage } from '../utils/e2eeCrypto';
+
+// Fast in-memory sender profile cache to avoid redundant network RPCs
+const senderProfileCache = new Map<string, { profile: any; timestamp: number }>();
+const SENDER_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 export interface UserChatPreferences {
   pinned: string[];
@@ -33,28 +37,52 @@ export interface UserChatPreferences {
   clearedAt: Record<string, string>;
 }
 
+const memoryPrefsCache: Record<string, UserChatPreferences> = {};
+
 async function getChatPreferences(userId: string): Promise<UserChatPreferences> {
+  if (memoryPrefsCache[userId]) {
+    return memoryPrefsCache[userId];
+  }
   try {
-    const raw = await AsyncStorage.getItem(`booffin_chat_prefs_${userId}`);
+    let raw: string | null = null;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        raw = window.localStorage.getItem(`booffin_chat_prefs_${userId}`);
+      } catch {}
+    }
+    if (!raw) {
+      raw = await AsyncStorage.getItem(`booffin_chat_prefs_${userId}`);
+    }
     if (raw) {
       const parsed = JSON.parse(raw);
-      return {
+      const res: UserChatPreferences = {
         pinned: Array.isArray(parsed.pinned) ? parsed.pinned : [],
         archived: Array.isArray(parsed.archived) ? parsed.archived : [],
         muted: parsed.muted && typeof parsed.muted === 'object' ? parsed.muted : {},
         deleted: Array.isArray(parsed.deleted) ? parsed.deleted : [],
         clearedAt: parsed.clearedAt && typeof parsed.clearedAt === 'object' ? parsed.clearedAt : {},
       };
+      memoryPrefsCache[userId] = res;
+      return res;
     }
   } catch (err) {
     console.warn('[workspaceService] Failed to load chat preferences:', err);
   }
-  return { pinned: [], archived: [], muted: {}, deleted: [], clearedAt: {} };
+  const empty: UserChatPreferences = { pinned: [], archived: [], muted: {}, deleted: [], clearedAt: {} };
+  memoryPrefsCache[userId] = empty;
+  return empty;
 }
 
 async function saveChatPreferences(userId: string, prefs: UserChatPreferences): Promise<void> {
+  memoryPrefsCache[userId] = prefs;
+  const serialized = JSON.stringify(prefs);
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      window.localStorage.setItem(`booffin_chat_prefs_${userId}`, serialized);
+    } catch {}
+  }
   try {
-    await AsyncStorage.setItem(`booffin_chat_prefs_${userId}`, JSON.stringify(prefs));
+    await AsyncStorage.setItem(`booffin_chat_prefs_${userId}`, serialized);
   } catch (err) {
     console.warn('[workspaceService] Failed to save chat preferences:', err);
   }
@@ -281,7 +309,7 @@ export const workspaceService = {
         }
       }
 
-      const enrichWorkspace = (ws: Workspace): Workspace => {
+      const enrichWorkspace = async (ws: Workspace): Promise<Workspace> => {
         let lastMsg = latestMsgMap.get(ws.id) || null;
         const mem = memberMap.get(ws.id);
         const myLastReadTime = mem?.last_read_at ? new Date(mem.last_read_at).getTime() : 0;
@@ -337,11 +365,46 @@ export const workspaceService = {
           const audioMeta = lastMsg.audio_metadata || lastMsg.attachments?.audio_metadata || null;
           const inviteMeta = lastMsg.workspace_invite_metadata || lastMsg.attachments?.workspace_invite_metadata || null;
 
+          const cipher = lastMsg.e2ee_ciphertext || lastMsg.attachments?.e2ee_ciphertext || null;
+          const nonce = lastMsg.e2ee_nonce || lastMsg.attachments?.e2ee_nonce || null;
+
+          let displayContent = lastMsg.content;
+          if (cipher && nonce) {
+            try {
+              const cached = await AsyncStorage.getItem(`e2ee_cache_${lastMsg.id}`).catch(() => null);
+              if (cached) {
+                displayContent = cached;
+              } else {
+                let sessionKey: string | null = null;
+                if (ws.type === 'dm') {
+                  const otherId = ws.other_user?.id || (ws.dm_participant_a === userId ? ws.dm_participant_b : ws.dm_participant_a);
+                  if (otherId) {
+                    sessionKey = await deriveSharedSessionKey(userId, otherId, ws.id);
+                  }
+                } else if (ws.type === 'inner_circle') {
+                  sessionKey = await derivePodSessionKey(ws.id, userId);
+                }
+                if (sessionKey) {
+                  const dec = await decryptTextMessage(cipher, nonce, sessionKey);
+                  if (dec && !dec.startsWith('🔒 [')) {
+                    displayContent = dec;
+                    AsyncStorage.setItem(`e2ee_cache_${lastMsg.id}`, dec).catch(() => {});
+                  }
+                }
+              }
+            } catch {}
+          } else if (displayContent === '🔒 Encrypted message') {
+            const cached = await AsyncStorage.getItem(`e2ee_cache_${lastMsg.id}`).catch(() => null);
+            if (cached) {
+              displayContent = cached;
+            }
+          }
+
           formattedLastMessage = {
             id: lastMsg.id,
             workspace_id: lastMsg.workspace_id,
             sender_id: lastMsg.sender_id,
-            content: lastMsg.content,
+            content: displayContent,
             message_type: isImg ? 'image' : (lastMsg.message_type || (doiMeta ? 'paper_doi' : 'text')),
             doi_metadata: doiMeta,
             document_metadata: docMeta,
@@ -354,8 +417,8 @@ export const workspaceService = {
             media_urls: extractedMedia,
             created_at: lastMsg.created_at,
             updated_at: lastMsg.updated_at || lastMsg.created_at,
-            e2ee_ciphertext: null,
-            e2ee_nonce: null,
+            e2ee_ciphertext: cipher,
+            e2ee_nonce: nonce,
             is_pinned: false,
             reply_to_id: null,
           };
@@ -370,28 +433,56 @@ export const workspaceService = {
         };
       };
 
-      const enrichedRawDms = dms.map(enrichWorkspace);
-      const enrichedCommunities = communities.map(enrichWorkspace);
-      const enrichedInnerCircles = innerCircles.map(enrichWorkspace);
+      const isWsDeleted = (ws: any) => {
+        if (!prefs.deleted.includes(ws.id)) return false;
+        // If in prefs.deleted, check if any NEW message was created after clearedAt
+        const clearedIso = prefs.clearedAt?.[ws.id];
+        const lastMsg = latestMsgMap.get(ws.id);
+        if (lastMsg && clearedIso) {
+          if (new Date(lastMsg.created_at).getTime() > new Date(clearedIso).getTime()) {
+            return false; // A brand new message arrived since deletion!
+          }
+        }
+        return true;
+      };
 
-      // Filter deleted DMs and enrich with preference flags
-      const enrichedDms: Workspace[] = enrichedRawDms
-        .filter((dm) => !prefs.deleted.includes(dm.id))
-        .map((dm) => ({
-          ...dm,
-          is_pinned: prefs.pinned.includes(dm.id),
-          is_archived: prefs.archived.includes(dm.id),
-          is_muted: dm.is_muted || Boolean(prefs.muted[dm.id]?.isMuted),
-          muted_until: prefs.muted[dm.id]?.until || null,
-        }))
-        .sort((a, b) => {
-          // Pinned conversations always stay pinned at the top
-          if (a.is_pinned && !b.is_pinned) return -1;
-          if (!a.is_pinned && b.is_pinned) return 1;
-          const timeA = new Date(a.updated_at || a.created_at).getTime();
-          const timeB = new Date(b.updated_at || b.created_at).getTime();
-          return timeB - timeA;
-        });
+      const isWsActive = (ws: any) => {
+        if (ws.status === 'deleted' || ws.is_disabled === true || ws.settings?.is_disabled === true || ws.settings?.is_deleted === true) {
+          return false;
+        }
+        return !isWsDeleted(ws);
+      };
+
+      const sortWorkspaces = (a: Workspace, b: Workspace) => {
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+        const timeA = new Date(a.updated_at || a.created_at).getTime();
+        const timeB = new Date(b.updated_at || b.created_at).getTime();
+        return timeB - timeA;
+      };
+
+      const mapPrefs = (ws: Workspace): Workspace => ({
+        ...ws,
+        is_pinned: prefs.pinned.includes(ws.id),
+        is_archived: prefs.archived.includes(ws.id),
+        is_muted: ws.is_muted || Boolean(prefs.muted[ws.id]?.isMuted),
+        muted_until: prefs.muted[ws.id]?.until || null,
+      });
+
+      const enrichedDms: Workspace[] = (await Promise.all(dms.map(enrichWorkspace)))
+        .filter(isWsActive)
+        .map(mapPrefs)
+        .sort(sortWorkspaces);
+
+      const enrichedCommunities: Workspace[] = (await Promise.all(communities.map(enrichWorkspace)))
+        .filter(isWsActive)
+        .map(mapPrefs)
+        .sort(sortWorkspaces);
+
+      const enrichedInnerCircles: Workspace[] = (await Promise.all(innerCircles.map(enrichWorkspace)))
+        .filter(isWsActive)
+        .map(mapPrefs)
+        .sort(sortWorkspaces);
 
       // 6. Fetch public discoverable communities not yet joined
       const { data: discoverRows } = await supabase
@@ -403,7 +494,7 @@ export const workspaceService = {
         .limit(20);
 
       const discoverableCommunities: Workspace[] = (discoverRows || [])
-        .filter((ws: any) => !joinedWorkspaceIds.has(ws.id))
+        .filter((ws: any) => isWsActive(ws) && !joinedWorkspaceIds.has(ws.id))
         .map((ws: any) => ({
           ...ws,
           my_membership_status: undefined,
@@ -634,6 +725,15 @@ export const workspaceService = {
             .maybeSingle();
 
           if (existing?.id) {
+            // Un-delete if previously deleted locally
+            const prefs = await getChatPreferences(currentUser.id);
+            if (prefs.deleted.includes(existing.id)) {
+              await saveChatPreferences(currentUser.id, {
+                ...prefs,
+                deleted: prefs.deleted.filter((id) => id !== existing.id),
+              });
+            }
+
             // Ensure members are active
             await supabase.from('workspace_members').upsert([
               { workspace_id: existing.id, user_id: currentUser.id, role: 'member', status: 'active' },
@@ -679,6 +779,15 @@ export const workspaceService = {
       }
 
       const wsId = typeof data === 'object' && data !== null ? data.id : (data as string);
+      if (wsId && currentUser?.id) {
+        const prefs = await getChatPreferences(currentUser.id);
+        if (prefs.deleted.includes(wsId)) {
+          await saveChatPreferences(currentUser.id, {
+            ...prefs,
+            deleted: prefs.deleted.filter((id) => id !== wsId),
+          });
+        }
+      }
       return { workspaceId: wsId, error: null };
     } catch (err: any) {
       return { workspaceId: null, error: err.message || 'Failed to start DM' };
@@ -1078,10 +1187,20 @@ export const workspaceService = {
    */
   async getMessages(
     workspaceId: string,
-    limit: number = 50,
-    beforeCursor?: string
+    limit: number = 30,
+    beforeCursor?: string,
+    userId?: string
   ): Promise<{ messages: WorkspaceMessage[]; error: string | null }> {
     try {
+      let effectiveUserId = userId;
+      if (!effectiveUserId) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        effectiveUserId = authUser?.id;
+      }
+
+      const prefs = effectiveUserId ? await getChatPreferences(effectiveUserId) : null;
+      const clearedIso = prefs?.clearedAt?.[workspaceId];
+
       let query = supabase
         .from('workspace_messages')
         .select('*')
@@ -1093,6 +1212,10 @@ export const workspaceService = {
         query = query.lt('created_at', beforeCursor);
       }
 
+      if (clearedIso) {
+        query = query.gt('created_at', clearedIso);
+      }
+
       const { data, error } = await query;
 
       if (error) {
@@ -1100,52 +1223,100 @@ export const workspaceService = {
       }
 
       const rawList = data || [];
-      const senderIds = Array.from(new Set(rawList.map((m: any) => m.sender_id).filter(Boolean)));
+      const senderIds = Array.from(new Set(rawList.map((m: any) => m.sender_id).filter(Boolean))) as string[];
       const senderMap = new Map<string, any>();
+      const missingSenderIds: string[] = [];
+      const now = Date.now();
 
-      if (senderIds.length > 0) {
-        const profs = await Promise.all(
-          senderIds.map(async (sId: any) => {
-            try {
-              const p = await fetchUserProfile(sId);
-              return { sId, p };
-            } catch {
-              return { sId, p: null };
-            }
-          })
-        );
+      // 1. Resolve from fast in-memory cache first
+      senderIds.forEach((sId) => {
+        const cached = senderProfileCache.get(sId);
+        if (cached && now - cached.timestamp < SENDER_CACHE_TTL) {
+          senderMap.set(sId, cached.profile);
+        } else {
+          missingSenderIds.push(sId);
+        }
+      });
 
-        profs.forEach(({ sId, p }) => {
-          if (p) {
-            senderMap.set(sId, {
-              id: p.id,
-              fullName: p.fullName || p.handle || 'Researcher',
-              handle: p.handle,
-              avatarUrl: p.avatarUrl || null,
-              academicTitle: p.academicTitle,
-              institution: p.institution,
-              orcidVerified: p.orcidVerified,
+      // 2. Batch resolve missing profiles in 1 single query instead of N serial RPC calls
+      if (missingSenderIds.length > 0) {
+        try {
+          const { data: profRows } = await supabase
+            .from('profiles')
+            .select('id, full_name, username, avatar_url, academic_title, institution, orcid_verified')
+            .in('id', missingSenderIds);
+
+          if (Array.isArray(profRows)) {
+            profRows.forEach((p: any) => {
+              const mapped = {
+                id: p.id,
+                fullName: p.full_name || p.username || 'Researcher',
+                handle: p.username,
+                avatarUrl: p.avatar_url || null,
+                academicTitle: p.academic_title,
+                institution: p.institution,
+                orcidVerified: p.orcid_verified,
+              };
+              senderProfileCache.set(p.id, { profile: mapped, timestamp: now });
+              senderMap.set(p.id, mapped);
             });
           }
-        });
+        } catch {}
+
+        // Fallback for any remaining unmapped senders
+        const stillMissing = missingSenderIds.filter((sId) => !senderMap.has(sId));
+        if (stillMissing.length > 0) {
+          await Promise.all(
+            stillMissing.map(async (sId) => {
+              try {
+                const p = await fetchUserProfile(sId);
+                if (p) {
+                  const mapped = {
+                    id: p.id,
+                    fullName: p.fullName || p.handle || 'Researcher',
+                    handle: p.handle,
+                    avatarUrl: p.avatarUrl || null,
+                    academicTitle: p.academicTitle,
+                    institution: p.institution,
+                    orcidVerified: p.orcidVerified,
+                  };
+                  senderProfileCache.set(sId, { profile: mapped, timestamp: now });
+                  senderMap.set(sId, mapped);
+                }
+              } catch {}
+            })
+          );
+        }
       }
 
       const rawMap = new Map<string, any>();
       rawList.forEach((m: any) => rawMap.set(m.id, m));
 
-      // 1. Fetch and reconcile all poll vote action transactions across the workspace
+      // 3. Fetch and reconcile poll vote action transactions across the workspace ONLY if polls exist in this batch
+      const hasPollInPage = rawList.some(
+        (m: any) =>
+          m.message_type === 'poll' ||
+          m.attachments?.poll_data ||
+          m.poll_data ||
+          (typeof m.content === 'string' && (m.content.startsWith('📊 Poll:') || m.content.includes('Poll:'))) ||
+          m.attachments?.is_poll_vote_action === true ||
+          (typeof m.content === 'string' && (m.content.includes('Vote:') || m.content.includes('[POLL_VOTE]')))
+      );
+
       let voteActions: any[] = [];
-      try {
-        const { data: vData } = await supabase
-          .from('workspace_messages')
-          .select('id, sender_id, content, attachments, created_at')
-          .eq('workspace_id', workspaceId)
-          .or('content.ilike.%Vote:%,content.ilike.%[POLL_VOTE]%')
-          .order('created_at', { ascending: true });
-        if (Array.isArray(vData)) {
-          voteActions = vData;
-        }
-      } catch {}
+      if (hasPollInPage) {
+        try {
+          const { data: vData } = await supabase
+            .from('workspace_messages')
+            .select('id, sender_id, content, attachments, created_at')
+            .eq('workspace_id', workspaceId)
+            .or('content.ilike.*Vote:*,content.ilike.*POLL_VOTE*,attachments->>is_poll_vote_action.eq.true')
+            .order('created_at', { ascending: true });
+          if (Array.isArray(vData)) {
+            voteActions = vData;
+          }
+        } catch {}
+      }
 
       const allVoteRecords = [
         ...rawList.filter(
@@ -1299,6 +1470,23 @@ export const workspaceService = {
           }
         }
 
+        // Ensure pollData has votes from reactions map as well
+        if (pollData && Array.isArray(pollData.options)) {
+          pollData.options = pollData.options.map((opt: any) => {
+            const voteKey = `vote:${opt.id}`;
+            const voterSet = new Set<string>(Array.isArray(opt.votes) ? opt.votes : []);
+            if (Array.isArray(reactions[voteKey])) {
+              reactions[voteKey].forEach((uid: string) => voterSet.add(uid));
+            }
+            return { ...opt, votes: Array.from(voterSet) };
+          });
+          let total = 0;
+          pollData.options.forEach((opt: any) => {
+            total += (opt.votes?.length || 0);
+          });
+          pollData.totalVotes = total;
+        }
+
         const isImgType = Boolean(extractedMedia && extractedMedia.length > 0) || m.message_type === 'image';
 
         let detectedType = m.message_type;
@@ -1363,16 +1551,11 @@ export const workspaceService = {
       let orderedMessages = messages.reverse();
 
       // Check if user cleared history for this workspace
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser?.id) {
-        const prefs = await getChatPreferences(authUser.id);
-        const clearedIso = prefs.clearedAt[workspaceId];
-        if (clearedIso) {
-          const clearedTime = new Date(clearedIso).getTime();
-          orderedMessages = orderedMessages.filter(
-            (m) => new Date(m.created_at).getTime() > clearedTime
-          );
-        }
+      if (clearedIso) {
+        const clearedTime = new Date(clearedIso).getTime();
+        orderedMessages = orderedMessages.filter(
+          (m) => new Date(m.created_at).getTime() > clearedTime
+        );
       }
 
       return { messages: orderedMessages, error: null };
@@ -1783,10 +1966,10 @@ export const workspaceService = {
         }
       } catch {}
 
-      // 2. Fetch target poll message (ONLY query valid columns: id, attachments, content)
+      // 2. Fetch target poll message (query valid columns including reactions)
       const { data: msg } = await supabase
         .from('workspace_messages')
-        .select('id, attachments, content')
+        .select('id, attachments, content, reactions')
         .eq('id', messageId)
         .single();
 
@@ -1796,20 +1979,22 @@ export const workspaceService = {
       }
 
       let currentReactions: Record<string, string[]> = {};
-      if (currentAttachments.reactions && typeof currentAttachments.reactions === 'object' && !Array.isArray(currentAttachments.reactions)) {
+      if (msg?.reactions && typeof msg.reactions === 'object' && !Array.isArray(msg.reactions)) {
+        currentReactions = { ...msg.reactions };
+      } else if (currentAttachments.reactions && typeof currentAttachments.reactions === 'object' && !Array.isArray(currentAttachments.reactions)) {
         currentReactions = { ...currentAttachments.reactions };
       }
 
       let currentPollData: WorkspacePollData | null = currentAttachments.poll_data || null;
 
       // Robust fallback: if attachments.poll_data is missing, reconstruct it from message content
-      if (!currentPollData && typeof msg?.content === 'string' && msg.content.startsWith('📊 Poll:')) {
+      if (!currentPollData && typeof msg?.content === 'string' && (msg.content.startsWith('📊 Poll:') || msg.content.includes('Poll:'))) {
         const lines = msg.content.split('\n');
-        const q = lines[0].replace('📊 Poll:', '').trim();
-        const optLines = lines.slice(1).filter((l: string) => l.startsWith('• '));
+        const q = lines[0].replace('📊 Poll:', '').replace(/^[^\w]*/, '').trim();
+        const optLines = lines.slice(1).filter((l: string) => l.startsWith('• ') || l.startsWith('- '));
         const options = optLines.map((l: string, idx: number) => ({
           id: `opt_${idx}`,
-          text: l.replace('• ', '').trim(),
+          text: l.replace(/^[•\-\d\.]+\s*/, '').trim(),
           votes: [] as string[],
         }));
         if (options.length > 0) {
@@ -1821,7 +2006,54 @@ export const workspaceService = {
         }
       }
 
-      // 3. Reconcile user vote in reactions map
+      // 3. Atomically sync user vote using server-side SECURITY DEFINER RPC toggle_workspace_message_reaction
+      // First find if the user had any prior vote recorded in reactions
+      let prevOptionId: string | null = null;
+      Object.entries(currentReactions).forEach(([k, uids]) => {
+        if (k.startsWith('vote:') && Array.isArray(uids) && uids.includes(userId)) {
+          prevOptionId = k.replace('vote:', '');
+        }
+      });
+
+      // If user had a previous vote on another option, toggle it off first
+      if (prevOptionId && prevOptionId !== optionId) {
+        try {
+          await supabase.rpc('toggle_workspace_message_reaction', {
+            p_message_id: messageId,
+            p_emoji: `vote:${prevOptionId}`,
+          });
+        } catch (e) {
+          console.warn('[workspaceService] toggle off prev vote error:', e);
+        }
+      }
+
+      // If user selected a new option (not just retracting), toggle it on
+      if (optionId && prevOptionId !== optionId) {
+        try {
+          const { data: rpcRes, error: rpcErr } = await supabase.rpc('toggle_workspace_message_reaction', {
+            p_message_id: messageId,
+            p_emoji: `vote:${optionId}`,
+          });
+          if (!rpcErr && rpcRes && typeof rpcRes === 'object') {
+            currentReactions = rpcRes as Record<string, string[]>;
+          }
+        } catch (e) {
+          console.warn('[workspaceService] toggle on new vote error:', e);
+        }
+      } else if (optionId && prevOptionId === optionId) {
+        // User tapped the same option to toggle/retract it
+        try {
+          const { data: rpcRes } = await supabase.rpc('toggle_workspace_message_reaction', {
+            p_message_id: messageId,
+            p_emoji: `vote:${optionId}`,
+          });
+          if (rpcRes && typeof rpcRes === 'object') {
+            currentReactions = rpcRes as Record<string, string[]>;
+          }
+        } catch {}
+      }
+
+      // 4. Reconcile user vote in reactions map locally
       const updatedReactions: Record<string, string[]> = { ...currentReactions };
       Object.keys(updatedReactions).forEach((key) => {
         if (key.startsWith('vote:') && Array.isArray(updatedReactions[key])) {
@@ -1841,7 +2073,7 @@ export const workspaceService = {
         updatedReactions[voteKey] = users;
       }
 
-      // 4. Reconcile user vote in poll_data
+      // 5. Reconcile user vote in poll_data
       let updatedPollData: WorkspacePollData | null = null;
       if (currentPollData && Array.isArray(currentPollData.options)) {
         const updatedOptions = currentPollData.options.map((opt) => {
@@ -1869,17 +2101,18 @@ export const workspaceService = {
         currentAttachments.poll_data = updatedPollData;
       }
 
-      // 5. Direct message update attempt (succeeds if user is allowed to update)
+      // 6. Direct message update attempt (succeeds if user is allowed to update)
       try {
         await supabase
           .from('workspace_messages')
           .update({
+            reactions: updatedReactions,
             attachments: currentAttachments,
           })
           .eq('id', messageId);
       } catch {}
 
-      // 6. Guaranteed insert transaction (only valid columns: workspace_id, sender_id, content, attachments)
+      // 7. Guaranteed insert transaction (only valid columns: workspace_id, sender_id, content, attachments)
       try {
         const { error: insErr } = await supabase
           .from('workspace_messages')
@@ -1902,7 +2135,7 @@ export const workspaceService = {
         console.warn('[workspaceService] vote record insert exception:', err);
       }
 
-      // 7. Persist updated poll data into AsyncStorage cache as backup
+      // 8. Persist updated poll data into AsyncStorage cache as backup
       try {
         if (updatedPollData) {
           await AsyncStorage.setItem(`@booffin_poll_data_${messageId}`, JSON.stringify(updatedPollData));
@@ -3013,16 +3246,33 @@ export const workspaceService = {
   ): Promise<{ success: boolean; error: string | null }> {
     try {
       const prefs = await getChatPreferences(userId);
+      const nowIso = new Date().toISOString();
       const newDeleted = Array.from(new Set([...prefs.deleted, workspaceId]));
       const newPinned = prefs.pinned.filter((id) => id !== workspaceId);
       const newArchived = prefs.archived.filter((id) => id !== workspaceId);
+      const newCleared = {
+        ...prefs.clearedAt,
+        [workspaceId]: nowIso,
+      };
 
       await saveChatPreferences(userId, {
         ...prefs,
         deleted: newDeleted,
         pinned: newPinned,
         archived: newArchived,
+        clearedAt: newCleared,
       });
+
+      // Remove from workspace_members in Supabase so server queries stop returning active membership
+      try {
+        await supabase
+          .from('workspace_members')
+          .delete()
+          .eq('workspace_id', workspaceId)
+          .eq('user_id', userId);
+      } catch (memErr) {
+        console.warn('[workspaceService] Error removing workspace_members row on delete:', memErr);
+      }
 
       return { success: true, error: null };
     } catch (err: any) {
@@ -3149,6 +3399,9 @@ export const workspaceService = {
         return { success: false, error: 'Only the creator or owner can permanently delete this community.' };
       }
 
+      // Also clean up locally for deleting user immediately
+      await this.deleteWorkspaceLocally(user.id, workspaceId);
+
       // 2. Clean up child records (in case cascading delete is not configured on foreign keys)
       try {
         await supabase.from('workspace_messages').delete().eq('workspace_id', workspaceId);
@@ -3189,4 +3442,7 @@ export const workspaceService = {
       return { success: false, error: err.message || 'Failed to delete community' };
     }
   },
+
+  getChatPreferences,
+  saveChatPreferences,
 };

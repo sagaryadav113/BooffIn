@@ -41,6 +41,7 @@ export interface ArticleData {
   doi?: string;
   readingTimeMinutes?: number;
   isDraft?: boolean;
+  topics?: string[];
 }
 
 export interface Comment {

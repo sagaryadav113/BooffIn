@@ -1,13 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { FileText, MessageSquare, Image as ImageIcon } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { FileText, MessageSquare, Image as ImageIcon, BookOpen } from 'lucide-react-native';
+import { radii } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
+import { PaperLookupModal } from '../modals/PaperLookupModal';
+import { ImageAttachmentModal } from '../modals/ImageAttachmentModal';
+import { Paper } from '../../types';
 
 export const DesktopWritePostCard: React.FC = () => {
   const currentUser = useAuthStore((s) => s.user);
+  const [paperModalVisible, setPaperModalVisible] = useState(false);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+
+  const handleSelectPaper = (paper: Paper) => {
+    setPaperModalVisible(false);
+    router.push({
+      pathname: '/(tabs)/create',
+      params: { paperData: JSON.stringify(paper) },
+    });
+  };
+
+  const handleImagesSelected = (urls: string[]) => {
+    setImageModalVisible(false);
+    router.push({
+      pathname: '/(tabs)/create',
+      params: { initialImages: JSON.stringify(urls) },
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -31,17 +52,19 @@ export const DesktopWritePostCard: React.FC = () => {
       <View style={styles.divider} />
 
       <View style={styles.actionsRow}>
+        {/* 1. Share Paper - Directly opens Add Paper lookup without first opening post section */}
         <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => router.push('/(tabs)/create')}
+          activeOpacity={0.75}
+          onPress={() => setPaperModalVisible(true)}
           style={styles.actionPill}
         >
           <FileText size={16} color="#064E3B" strokeWidth={2.2} />
           <Text style={styles.actionPillText}>Share Paper</Text>
         </TouchableOpacity>
 
+        {/* 2. Discussion - Opens standard post writing section */}
         <TouchableOpacity
-          activeOpacity={0.7}
+          activeOpacity={0.75}
           onPress={() => router.push('/(tabs)/create')}
           style={styles.actionPill}
         >
@@ -49,15 +72,46 @@ export const DesktopWritePostCard: React.FC = () => {
           <Text style={styles.actionPillText}>Discussion</Text>
         </TouchableOpacity>
 
+        {/* 3. Figure / Media - Directly opens file selection / camera options without first opening post section */}
         <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => router.push('/(tabs)/create')}
+          activeOpacity={0.75}
+          onPress={() => setImageModalVisible(true)}
           style={styles.actionPill}
         >
           <ImageIcon size={16} color="#D97706" strokeWidth={2.2} />
           <Text style={styles.actionPillText}>Figure / Media</Text>
         </TouchableOpacity>
+
+        {/* 4. Article - Directly opens long-form research article composer */}
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() =>
+            router.push({
+              pathname: '/(tabs)/create',
+              params: { type: 'article' },
+            })
+          }
+          style={styles.actionPill}
+        >
+          <BookOpen size={16} color="#7C3AED" strokeWidth={2.2} />
+          <Text style={styles.actionPillText}>Article</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Reference External Paper Modal */}
+      <PaperLookupModal
+        visible={paperModalVisible}
+        onClose={() => setPaperModalVisible(false)}
+        onSelectPaper={handleSelectPaper}
+      />
+
+      {/* Add Figure / Image Attachment Modal */}
+      <ImageAttachmentModal
+        visible={imageModalVisible}
+        onClose={() => setImageModalVisible(false)}
+        onImagesSelected={handleImagesSelected}
+        userId={currentUser?.id}
+      />
     </View>
   );
 };

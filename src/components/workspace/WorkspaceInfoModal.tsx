@@ -91,6 +91,8 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   const removeMember = useWorkspaceStore((s) => s.removeMember);
   const banMember = useWorkspaceStore((s) => s.banMember);
   const leaveWorkspace = useWorkspaceStore((s) => s.leaveWorkspace);
+  const deleteCommunityPermanently = useWorkspaceStore((s) => s.deleteCommunityPermanently);
+  const leaveAndRemoveCommunity = useWorkspaceStore((s) => s.leaveAndRemoveCommunity);
   const clearChatHistory = useWorkspaceStore((s) => s.clearChatHistory);
   const setMuteWorkspace = useWorkspaceStore((s) => s.setMuteWorkspace);
   const updateWorkspaceDetails = useWorkspaceStore((s) => s.updateWorkspaceDetails);
@@ -705,10 +707,14 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
       const confirmDelete = async () => {
         setIsActionLoading(true);
         try {
-          await workspaceService.leaveWorkspace(workspace.id);
-          await loadWorkspaces(true);
-          onClose();
-          router.replace('/workspace' as any);
+          const res = await deleteCommunityPermanently(workspace.id);
+          if (res.success) {
+            onClose();
+            router.replace('/workspace' as any);
+          } else {
+            if (Platform.OS === 'web') window.alert(res.error || 'Failed to delete pod');
+            else Alert.alert('Delete Failed', res.error || 'Failed to delete pod');
+          }
         } catch (err) {
           console.warn('Delete pod error:', err);
         } finally {
@@ -734,10 +740,13 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
       const confirmLeave = async () => {
         setIsActionLoading(true);
         try {
-          const res = await leaveWorkspace(workspace.id);
+          const res = await leaveAndRemoveCommunity(workspace.id);
           if (res.success) {
             onClose();
             router.replace('/workspace' as any);
+          } else {
+            if (Platform.OS === 'web') window.alert(res.error || 'Failed to leave pod');
+            else Alert.alert('Leave Failed', res.error || 'Failed to leave pod');
           }
         } catch (err) {
           console.warn('Leave pod error:', err);

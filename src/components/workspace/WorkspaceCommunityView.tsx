@@ -17,7 +17,9 @@ import {
   Animated,
   Image,
   ImageBackground,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import {
@@ -68,6 +70,7 @@ import {
   Flag,
   LogOut,
   Eye,
+  ChevronDown,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -250,6 +253,11 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const deleteCommunityPermanently = useWorkspaceStore((s) => s.deleteCommunityPermanently);
   const leaveAndRemoveCommunity = useWorkspaceStore((s) => s.leaveAndRemoveCommunity);
   const markAsRead = useWorkspaceStore((s) => s.markAsRead);
+  const loadOlderMessages = useWorkspaceStore((s) => s.loadOlderMessages);
+  const isLoadingOlderMessages = useWorkspaceStore((s) => s.isLoadingOlderMessages);
+  const hasMoreOlderMessages = useWorkspaceStore((s) => s.hasMoreOlderMessages[workspace.id] ?? true);
+  const unreadBelowCount = useWorkspaceStore((s) => s.unreadBelowCountByRoom[workspace.id] || 0);
+  const resetUnreadBelow = useWorkspaceStore((s) => s.resetUnreadBelow);
 
   // Workspaces for forwarding
   const dms = useWorkspaceStore((s) => s.dms);
@@ -409,7 +417,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         }
       }
       if (Object.keys(detected).length > 0) {
-        setLocalPollVotes((prev) => ({ ...detected, ...prev }));
+        setLocalPollVotes((prev) => ({ ...prev, ...detected }));
       }
     })();
   }, [messages, currentUser?.id]);
@@ -439,9 +447,41 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const flatListRef = useRef<FlatList>(null);
   const isAtBottomRef = useRef(true);
   const hasInitialScrolledRef = useRef(false);
+  const [currentRoomId, setCurrentRoomId] = useState(workspace.id);
+  const [isScrolledUp, setIsScrolledUp] = useState(false);
+  const [localUnreadBelow, setLocalUnreadBelow] = useState(0);
+
+  const insets = useSafeAreaInsets();
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const bottomInset = (!isKeyboardVisible && Platform.OS !== 'web' ? insets.bottom : 0) || 0;
+  const prevMsgCountRef = useRef(messages.length);
+
+  if (currentRoomId !== workspace.id) {
+    setCurrentRoomId(workspace.id);
+    setIsScrolledUp(false);
+    setLocalUnreadBelow(0);
     hasInitialScrolledRef.current = false;
+    isAtBottomRef.current = true;
+  }
+
+  useEffect(() => {
+    resetUnreadBelow(workspace.id);
     loadMessages(workspace.id);
     loadMembers(workspace.id);
     loadEvents(workspace.id);
@@ -464,16 +504,20 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     }
   }, [messages.length, isMessagesLoading]);
 
-  // Auto-scroll and mark read when new messages arrive if user is in chat
+  // Handle incoming new messages: unread badge counter if scrolled up, or auto-scroll if at bottom
   useEffect(() => {
-    if (messages.length > 0) {
-      markAsRead(workspace.id);
-      if (hasInitialScrolledRef.current && isAtBottomRef.current) {
+    if (messages.length > prevMsgCountRef.current) {
+      const diff = messages.length - prevMsgCountRef.current;
+      if (!isAtBottomRef.current) {
+        setLocalUnreadBelow((prev) => prev + diff);
+      } else {
+        markAsRead(workspace.id);
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
-        }, 80);
+        }, 60);
       }
     }
+    prevMsgCountRef.current = messages.length;
   }, [messages.length, workspace.id]);
 
   const handleTextChange = (text: string) => {
@@ -1026,7 +1070,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         } else {
           Alert.alert('Community Deleted', 'This community has been permanently deleted for everyone.');
         }
-        router.replace('/(tabs)/workspace' as any);
+        router.replace('/workspace' as any);
       } else {
         if (Platform.OS === 'web') {
           window.alert(res.error || 'Failed to delete community');
@@ -1044,7 +1088,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         } else {
           Alert.alert('Removed', 'You have left and removed this community from your workspace.');
         }
-        router.replace('/(tabs)/workspace' as any);
+        router.replace('/workspace' as any);
       } else {
         if (Platform.OS === 'web') {
           window.alert(res.error || 'Failed to leave community');
@@ -1247,7 +1291,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Community Header matching modern BooffIn academic aesthetic */}
@@ -1556,13 +1600,24 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             showsVerticalScrollIndicator={false}
             onScroll={(e) => {
               const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-              const paddingToBottom = 150;
+              const paddingToBottom = 120;
               const isClose = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
               isAtBottomRef.current = isClose;
+              setIsScrolledUp(!isClose);
+
+              if (isClose) {
+                setLocalUnreadBelow(0);
+                resetUnreadBelow(workspace.id);
+              }
+
+              // WhatsApp-style pagination: Load older messages when user scrolls near top
+              if (contentOffset.y < 80 && !isLoadingOlderMessages && hasMoreOlderMessages) {
+                loadOlderMessages(workspace.id);
+              }
             }}
             onContentSizeChange={() => {
               if (!hasInitialScrolledRef.current || isAtBottomRef.current) {
-                flatListRef.current?.scrollToEnd({ animated: hasInitialScrolledRef.current });
+                flatListRef.current?.scrollToEnd({ animated: false });
                 hasInitialScrolledRef.current = true;
               }
             }}
@@ -1571,6 +1626,14 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                 flatListRef.current?.scrollToEnd({ animated: false });
               }
             }}
+            ListHeaderComponent={
+              isLoadingOlderMessages ? (
+                <View style={styles.loadingOlderContainer}>
+                  <ActivityIndicator size="small" color="#164E3F" />
+                  <Text style={styles.loadingOlderText}>Loading older messages...</Text>
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <View style={styles.emptyChatState}>
                 <View style={styles.emptyChatIconCircle}>
@@ -1635,13 +1698,19 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               const profMeta = item.profile_metadata;
 
               // Poll Parsing
-              const isPoll = item.message_type === 'poll' || item.content?.startsWith('📊 Poll:');
+              const pollData = item.poll_data || (item.attachments as any)?.poll_data;
+              const isPoll = item.message_type === 'poll' || item.content?.startsWith('📊 Poll:') || Boolean(pollData);
               let pollQuestionText = '';
               let pollOptionsList: string[] = [];
-              if (isPoll && item.content) {
-                const lines = item.content.split('\n');
-                pollQuestionText = lines[0]?.replace(/^📊\s*Poll:\s*/, '').trim();
-                pollOptionsList = lines.slice(1).map((l: string) => l.replace(/^•\s*/, '').trim()).filter(Boolean);
+              if (isPoll) {
+                if (pollData && Array.isArray(pollData.options) && pollData.options.length > 0) {
+                  pollQuestionText = pollData.question || '';
+                  pollOptionsList = pollData.options.map((o: any) => o.text);
+                } else if (item.content) {
+                  const lines = item.content.split('\n');
+                  pollQuestionText = lines[0]?.replace(/^📊\s*Poll:\s*/, '').trim();
+                  pollOptionsList = lines.slice(1).map((l: string) => l.replace(/^•\s*/, '').trim()).filter(Boolean);
+                }
               }
 
                   const hasMediaContent = isVoiceNote || Boolean(docMeta) || Boolean(item.doi_metadata) || Boolean(postMeta) || Boolean(profMeta) || isPoll;
@@ -1789,20 +1858,29 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                             if (reactionsMapRaw && typeof reactionsMapRaw === 'object') {
                               Object.entries(reactionsMapRaw).forEach(([key, userIds]: [string, any]) => {
                                 if (key.startsWith('vote:') && Array.isArray(userIds)) {
-                                  const optId = key.replace('vote:', '');
-                                  if (optionVotersMap[optId]) {
-                                    userIds.forEach((uid: string) => optionVotersMap[optId].add(uid));
+                                  const rawOptId = key.replace('vote:', '');
+                                  const optKey = optionVotersMap[rawOptId]
+                                    ? rawOptId
+                                    : optionVotersMap[`opt_${rawOptId}`]
+                                    ? `opt_${rawOptId}`
+                                    : null;
+                                  if (optKey) {
+                                    userIds.forEach((uid: string) => optionVotersMap[optKey].add(uid));
                                   }
                                 }
                               });
                             }
 
                             // 2. Poll data if attached
-                            const pollData = item.poll_data || (item.attachments as any)?.poll_data;
                             if (pollData && Array.isArray(pollData.options)) {
-                              pollData.options.forEach((opt: any) => {
-                                if (optionVotersMap[opt.id] && Array.isArray(opt.votes)) {
-                                  opt.votes.forEach((uid: string) => optionVotersMap[opt.id].add(uid));
+                              pollData.options.forEach((opt: any, optIdx: number) => {
+                                const optKey = optionVotersMap[opt.id]
+                                  ? opt.id
+                                  : optionVotersMap[`opt_${optIdx}`]
+                                  ? `opt_${optIdx}`
+                                  : null;
+                                if (optKey && Array.isArray(opt.votes)) {
+                                  opt.votes.forEach((uid: string) => optionVotersMap[optKey].add(uid));
                                 }
                               });
                             }
@@ -1964,6 +2042,31 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             }}
           />
 
+          {/* Floating WhatsApp-style Scroll to Bottom Arrow & Unread Badge */}
+          {isScrolledUp && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+                isAtBottomRef.current = true;
+                setIsScrolledUp(false);
+                setLocalUnreadBelow(0);
+                resetUnreadBelow(workspace.id);
+              }}
+              style={[styles.scrollToBottomBtn, { bottom: 80 + bottomInset }]}
+              accessibilityLabel="Scroll to bottom"
+            >
+              <ChevronDown size={22} color="#164E3F" strokeWidth={2.5} />
+              {(localUnreadBelow > 0 || unreadBelowCount > 0) && (
+                <View style={styles.unreadBelowBadge}>
+                  <Text style={styles.unreadBelowBadgeText}>
+                    {(localUnreadBelow || unreadBelowCount) > 99 ? '99+' : (localUnreadBelow || unreadBelowCount)}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+
           {/* Attached DOI Card in Draft Mode */}
           {attachedDoi && (
             <View style={styles.attachedDoiPreview}>
@@ -1989,7 +2092,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
           {/* Bottom Input Dock */}
           {isCommunityDisabled ? (
-            <View style={styles.disabledBottomDock}>
+            <View style={[styles.disabledBottomDock, { paddingBottom: bottomInset > 0 ? bottomInset + 12 : 12 }]}>
               <View style={{ flex: 1, marginRight: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <Lock size={14} color="#64748B" strokeWidth={2.2} />
@@ -2047,7 +2150,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
               {/* Review Bar (Non-members) or Voice Note Recorder or Standard Input Bar */}
               {!isMember ? (
-                <View style={styles.reviewBottomBar}>
+                <View style={[styles.reviewBottomBar, { paddingBottom: bottomInset > 0 ? bottomInset + 12 : 12 }]}>
                   <View style={styles.reviewTextContainer}>
                     <Text style={styles.reviewTitle}>Previewing Community</Text>
                     <Text style={styles.reviewSubtitle}>
@@ -2068,12 +2171,14 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                   </TouchableOpacity>
                 </View>
               ) : isRecordingVoice ? (
-                <VoiceNoteRecorder
-                  onSendVoiceNote={handleSendVoiceNote}
-                  onCancel={() => setIsRecordingVoice(false)}
-                />
+                <View style={{ paddingBottom: bottomInset > 0 ? bottomInset + 8 : 0, backgroundColor: '#FFFFFF' }}>
+                  <VoiceNoteRecorder
+                    onSendVoiceNote={handleSendVoiceNote}
+                    onCancel={() => setIsRecordingVoice(false)}
+                  />
+                </View>
               ) : (
-                <View style={styles.bottomDockContainer}>
+                <View style={[styles.bottomDockContainer, { paddingBottom: bottomInset > 0 ? bottomInset + 8 : 8 }]}>
                   {/* Capsule Input */}
                   <View
                     style={[
@@ -4042,14 +4147,11 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
     paddingBottom: Platform.OS === 'ios' ? 8 : (Platform.OS === 'web' ? 8 : 6),
     textAlignVertical: 'center',
-    lineHeight: 20,
+    borderWidth: 0,
     ...(Platform.OS === 'web'
       ? ({
           outlineStyle: 'none',
-          outline: 'none',
-          border: 'none',
-          resize: 'none',
-          boxShadow: 'none',
+          outlineWidth: 0,
         } as any)
       : {}),
   },
@@ -4594,6 +4696,56 @@ const styles = StyleSheet.create({
   },
   forwardedBadgeTextOther: {
     color: '#64748B',
+  },
+  loadingOlderContainer: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  loadingOlderText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  scrollToBottomBtn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 80,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 5,
+    zIndex: 99,
+  },
+  unreadBelowBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  unreadBelowBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });
 

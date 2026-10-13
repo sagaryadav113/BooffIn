@@ -113,6 +113,11 @@ export class RuleBasedFeedRanker implements IFeedRanker {
       if (post.paper.doi) {
         researchPaperSignal += 10;
       }
+    } else if (post.article || post.postType === 'article') {
+      researchPaperSignal += 50;
+      if (post.article?.references && post.article.references.length > 0) {
+        researchPaperSignal += 15;
+      }
     } else if (post.postType === 'research_share') {
       researchPaperSignal += 25;
     }
