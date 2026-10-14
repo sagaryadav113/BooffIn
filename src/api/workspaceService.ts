@@ -362,72 +362,104 @@ export const workspaceService = {
             }
           }
 
-          const isImg = (extractedMedia && extractedMedia.length > 0) || lastMsg.message_type === 'image';
-          const docMeta = lastMsg.document_metadata || lastMsg.attachments?.document_metadata || null;
-          const doiMeta = lastMsg.doi_metadata || lastMsg.attachments?.doi_metadata || null;
-          const postMeta = lastMsg.post_metadata || lastMsg.attachments?.post_metadata || null;
-          const profMeta = lastMsg.profile_metadata || lastMsg.attachments?.profile_metadata || null;
-          const callMeta = lastMsg.call_metadata || lastMsg.attachments?.call_metadata || null;
-          const audioMeta = lastMsg.audio_metadata || lastMsg.attachments?.audio_metadata || null;
-          const inviteMeta = lastMsg.workspace_invite_metadata || lastMsg.attachments?.workspace_invite_metadata || null;
+          const isLastMsgDeleted = Boolean(
+            lastMsg.is_deleted === true ||
+            lastMsg.content === '🚫 This message was deleted' ||
+            (prefs?.deletedForEveryoneMessages && prefs.deletedForEveryoneMessages.includes(lastMsg.id))
+          );
 
-          const cipher = lastMsg.e2ee_ciphertext || lastMsg.attachments?.e2ee_ciphertext || null;
-          const nonce = lastMsg.e2ee_nonce || lastMsg.attachments?.e2ee_nonce || null;
+          if (isLastMsgDeleted) {
+            AsyncStorage.removeItem(`e2ee_cache_${lastMsg.id}`).catch(() => {});
+            formattedLastMessage = {
+              id: lastMsg.id,
+              workspace_id: lastMsg.workspace_id,
+              sender_id: lastMsg.sender_id,
+              content: '🚫 This message was deleted',
+              message_type: 'text',
+              doi_metadata: null,
+              document_metadata: null,
+              post_metadata: null,
+              profile_metadata: null,
+              call_metadata: null,
+              audio_metadata: null,
+              workspace_invite_metadata: null,
+              is_deleted: true,
+              media_urls: null,
+              created_at: lastMsg.created_at,
+              updated_at: lastMsg.updated_at || lastMsg.created_at,
+              e2ee_ciphertext: null,
+              e2ee_nonce: null,
+              is_pinned: false,
+              reply_to_id: null,
+            };
+          } else {
+            const isImg = (extractedMedia && extractedMedia.length > 0) || lastMsg.message_type === 'image';
+            const docMeta = lastMsg.document_metadata || lastMsg.attachments?.document_metadata || null;
+            const doiMeta = lastMsg.doi_metadata || lastMsg.attachments?.doi_metadata || null;
+            const postMeta = lastMsg.post_metadata || lastMsg.attachments?.post_metadata || null;
+            const profMeta = lastMsg.profile_metadata || lastMsg.attachments?.profile_metadata || null;
+            const callMeta = lastMsg.call_metadata || lastMsg.attachments?.call_metadata || null;
+            const audioMeta = lastMsg.audio_metadata || lastMsg.attachments?.audio_metadata || null;
+            const inviteMeta = lastMsg.workspace_invite_metadata || lastMsg.attachments?.workspace_invite_metadata || null;
 
-          let displayContent = lastMsg.content;
-          if (cipher && nonce) {
-            try {
+            const cipher = lastMsg.e2ee_ciphertext || lastMsg.attachments?.e2ee_ciphertext || null;
+            const nonce = lastMsg.e2ee_nonce || lastMsg.attachments?.e2ee_nonce || null;
+
+            let displayContent = lastMsg.content;
+            if (cipher && nonce) {
+              try {
+                const cached = await AsyncStorage.getItem(`e2ee_cache_${lastMsg.id}`).catch(() => null);
+                if (cached) {
+                  displayContent = cached;
+                } else {
+                  let sessionKey: string | null = null;
+                  if (ws.type === 'dm') {
+                    const otherId = ws.other_user?.id || (ws.dm_participant_a === userId ? ws.dm_participant_b : ws.dm_participant_a);
+                    if (otherId) {
+                      sessionKey = await deriveSharedSessionKey(userId, otherId, ws.id);
+                    }
+                  } else if (ws.type === 'inner_circle') {
+                    sessionKey = await derivePodSessionKey(ws.id, userId);
+                  }
+                  if (sessionKey) {
+                    const dec = await decryptTextMessage(cipher, nonce, sessionKey);
+                    if (dec && !dec.startsWith('🔒 [')) {
+                      displayContent = dec;
+                      AsyncStorage.setItem(`e2ee_cache_${lastMsg.id}`, dec).catch(() => {});
+                    }
+                  }
+                }
+              } catch {}
+            } else if (displayContent === '🔒 Encrypted message') {
               const cached = await AsyncStorage.getItem(`e2ee_cache_${lastMsg.id}`).catch(() => null);
               if (cached) {
                 displayContent = cached;
-              } else {
-                let sessionKey: string | null = null;
-                if (ws.type === 'dm') {
-                  const otherId = ws.other_user?.id || (ws.dm_participant_a === userId ? ws.dm_participant_b : ws.dm_participant_a);
-                  if (otherId) {
-                    sessionKey = await deriveSharedSessionKey(userId, otherId, ws.id);
-                  }
-                } else if (ws.type === 'inner_circle') {
-                  sessionKey = await derivePodSessionKey(ws.id, userId);
-                }
-                if (sessionKey) {
-                  const dec = await decryptTextMessage(cipher, nonce, sessionKey);
-                  if (dec && !dec.startsWith('🔒 [')) {
-                    displayContent = dec;
-                    AsyncStorage.setItem(`e2ee_cache_${lastMsg.id}`, dec).catch(() => {});
-                  }
-                }
               }
-            } catch {}
-          } else if (displayContent === '🔒 Encrypted message') {
-            const cached = await AsyncStorage.getItem(`e2ee_cache_${lastMsg.id}`).catch(() => null);
-            if (cached) {
-              displayContent = cached;
             }
-          }
 
-          formattedLastMessage = {
-            id: lastMsg.id,
-            workspace_id: lastMsg.workspace_id,
-            sender_id: lastMsg.sender_id,
-            content: displayContent,
-            message_type: isImg ? 'image' : (lastMsg.message_type || (doiMeta ? 'paper_doi' : 'text')),
-            doi_metadata: doiMeta,
-            document_metadata: docMeta,
-            post_metadata: postMeta,
-            profile_metadata: profMeta,
-            call_metadata: callMeta,
-            audio_metadata: audioMeta,
-            workspace_invite_metadata: inviteMeta,
-            is_deleted: lastMsg.is_deleted || false,
-            media_urls: extractedMedia,
-            created_at: lastMsg.created_at,
-            updated_at: lastMsg.updated_at || lastMsg.created_at,
-            e2ee_ciphertext: cipher,
-            e2ee_nonce: nonce,
-            is_pinned: false,
-            reply_to_id: null,
-          };
+            formattedLastMessage = {
+              id: lastMsg.id,
+              workspace_id: lastMsg.workspace_id,
+              sender_id: lastMsg.sender_id,
+              content: displayContent,
+              message_type: isImg ? 'image' : (lastMsg.message_type || (doiMeta ? 'paper_doi' : 'text')),
+              doi_metadata: doiMeta,
+              document_metadata: docMeta,
+              post_metadata: postMeta,
+              profile_metadata: profMeta,
+              call_metadata: callMeta,
+              audio_metadata: audioMeta,
+              workspace_invite_metadata: inviteMeta,
+              is_deleted: false,
+              media_urls: extractedMedia,
+              created_at: lastMsg.created_at,
+              updated_at: lastMsg.updated_at || lastMsg.created_at,
+              e2ee_ciphertext: cipher,
+              e2ee_nonce: nonce,
+              is_pinned: false,
+              reply_to_id: null,
+            };
+          }
         }
 
         return {
@@ -1528,6 +1560,10 @@ export const workspaceService = {
           (prefs?.deletedForEveryoneMessages && prefs.deletedForEveryoneMessages.includes(m.id))
         );
 
+        if (isMsgDeleted) {
+          AsyncStorage.removeItem(`e2ee_cache_${m.id}`).catch(() => {});
+        }
+
         return {
           id: m.id,
           workspace_id: m.workspace_id,
@@ -2226,12 +2262,17 @@ export const workspaceService = {
           } catch {}
         }
 
+        // Clean local E2EE decrypted plaintext cache immediately
+        AsyncStorage.removeItem(`e2ee_cache_${messageId}`).catch(() => {});
+
         const updatePayload: any = {
           content: '🚫 This message was deleted',
           is_deleted: true,
           media_urls: null,
           attachments: null,
           doi_metadata: null,
+          e2ee_ciphertext: null,
+          e2ee_nonce: null,
           updated_at: new Date().toISOString(),
         };
 
@@ -2249,12 +2290,28 @@ export const workspaceService = {
               content: '🚫 This message was deleted',
               is_deleted: true,
               attachments: null,
+              e2ee_ciphertext: null,
+              e2ee_nonce: null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', messageId)
             .select('id');
           updatedRows = retry.data;
           error = retry.error;
+
+          // If is_deleted or e2ee columns don't exist in Supabase, update content only
+          if (error && (error.message.includes('column') || error.message.includes('schema cache'))) {
+            const retry2 = await supabase
+              .from('workspace_messages')
+              .update({
+                content: '🚫 This message was deleted',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', messageId)
+              .select('id');
+            updatedRows = retry2.data;
+            error = retry2.error;
+          }
         }
 
         // If update failed OR affected 0 rows (e.g. RLS policy restriction or workspace owner moderation), execute hard delete

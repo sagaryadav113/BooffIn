@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Workspace,
   WorkspaceMember,
@@ -872,7 +873,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           break;
         }
       }
+      if (!targetWorkspaceId) {
+        const allWs = [...state.dms, ...state.communities, ...state.innerCircles];
+        const matchWs = allWs.find((w) => w.last_message?.id === messageId);
+        if (matchWs) targetWorkspaceId = matchWs.id;
+      }
     }
+
+    // Clean local E2EE plaintext cache immediately
+    AsyncStorage.removeItem(`e2ee_cache_${messageId}`).catch(() => {});
 
     // Optimistic update for both messages and messagesByRoom
     set((s) => {
@@ -887,6 +896,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           media_urls: null,
           attachments: null,
           doi_metadata: null,
+          document_metadata: null,
+          poll_data: null,
+          audio_metadata: null,
+          call_metadata: null,
+          post_metadata: null,
+          profile_metadata: null,
+          workspace_invite_metadata: null,
+          reactions: null,
+          message_type: 'text',
+          e2ee_ciphertext: null,
+          e2ee_nonce: null,
         };
       };
 
@@ -903,8 +923,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
       // Also update last_message in workspace lists if this message was the last_message
       const updateLastMsg = (w: Workspace): Workspace => {
-        if (w.id !== targetWorkspaceId || !w.last_message) return w;
-        if (w.last_message.id !== messageId) return w;
+        if (!w.last_message || w.last_message.id !== messageId) return w;
         if (deleteForEveryone) {
           return {
             ...w,
@@ -915,10 +934,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               media_urls: null,
               attachments: null,
               doi_metadata: null,
+              document_metadata: null,
+              poll_data: null,
+              audio_metadata: null,
+              call_metadata: null,
+              post_metadata: null,
+              profile_metadata: null,
+              workspace_invite_metadata: null,
+              reactions: null,
+              message_type: 'text',
+              e2ee_ciphertext: null,
+              e2ee_nonce: null,
             },
           };
         } else {
-          const remaining = updatedMessagesByRoom[targetWorkspaceId] || [];
+          const remaining = (targetWorkspaceId && updatedMessagesByRoom[targetWorkspaceId]) || [];
           const prevMsg = remaining.length > 0 ? remaining[remaining.length - 1] : null;
           return {
             ...w,
@@ -1447,6 +1477,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       .on('broadcast', { event: 'message_updated' }, ({ payload }: any) => {
         if (!payload || payload.workspaceId !== workspaceId) return;
         if (payload.action === 'delete') {
+          AsyncStorage.removeItem(`e2ee_cache_${payload.messageId}`).catch(() => {});
           set((state) => {
             const isCurrentRoom = state.activeWorkspaceId === workspaceId;
             const updateItem = (m: WorkspaceMessage) =>
@@ -1467,6 +1498,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                     workspace_invite_metadata: null,
                     reactions: null,
                     message_type: 'text' as const,
+                    e2ee_ciphertext: null,
+                    e2ee_nonce: null,
                   }
                 : m;
             const updatedMsgs = payload.deleteForEveryone
@@ -1478,11 +1511,49 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               ? (payload.deleteForEveryone ? room.map(updateItem) : room.filter((m) => m.id !== payload.messageId))
               : undefined;
 
+            const updateWsLastMsg = (w: Workspace): Workspace => {
+              if (w.id !== workspaceId || !w.last_message || w.last_message.id !== payload.messageId) return w;
+              if (payload.deleteForEveryone) {
+                return {
+                  ...w,
+                  last_message: {
+                    ...w.last_message,
+                    content: '🚫 This message was deleted',
+                    is_deleted: true,
+                    media_urls: null,
+                    attachments: null,
+                    doi_metadata: null,
+                    document_metadata: null,
+                    poll_data: null,
+                    audio_metadata: null,
+                    call_metadata: null,
+                    post_metadata: null,
+                    profile_metadata: null,
+                    workspace_invite_metadata: null,
+                    reactions: null,
+                    message_type: 'text',
+                    e2ee_ciphertext: null,
+                    e2ee_nonce: null,
+                  },
+                };
+              } else {
+                const remaining = updatedRoom || [];
+                const prevMsg = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+                return {
+                  ...w,
+                  last_message: prevMsg,
+                };
+              }
+            };
+
             return {
               messages: isCurrentRoom ? updatedMsgs : state.messages,
               messagesByRoom: updatedRoom
                 ? { ...state.messagesByRoom, [workspaceId]: updatedRoom }
                 : state.messagesByRoom,
+              dms: state.dms.map(updateWsLastMsg),
+              communities: state.communities.map(updateWsLastMsg),
+              innerCircles: state.innerCircles.map(updateWsLastMsg),
             };
           });
         } else if (payload.action === 'edit') {

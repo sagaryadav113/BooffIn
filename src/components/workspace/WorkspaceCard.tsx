@@ -84,6 +84,16 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
         return;
       }
 
+      const isMsgDeleted = Boolean(
+        lm.is_deleted === true ||
+        lm.content === '🚫 This message was deleted'
+      );
+      if (isMsgDeleted) {
+        if (isMounted) setDecryptedSnippet(null);
+        AsyncStorage.removeItem(`e2ee_cache_${lm.id}`).catch(() => {});
+        return;
+      }
+
       // If message is not encrypted and already has real plaintext, nothing to decrypt
       if (lm.content && lm.content !== '🔒 Encrypted message' && !lm.content.startsWith('🔒 [')) {
         if (isMounted) setDecryptedSnippet(null);
@@ -135,6 +145,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   }, [
     workspace.last_message?.id,
     workspace.last_message?.content,
+    workspace.last_message?.is_deleted,
     workspace.last_message?.e2ee_ciphertext,
     currentUserId,
     workspace.id,
@@ -149,7 +160,11 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
         : workspace.description || 'Welcome to this workspace';
     }
     const lm = workspace.last_message;
-    if (lm.is_deleted) return '🚫 This message was deleted';
+    const isMsgDeleted = Boolean(
+      lm.is_deleted === true ||
+      lm.content === '🚫 This message was deleted'
+    );
+    if (isMsgDeleted) return '🚫 This message was deleted';
     if (lm.message_type === 'image' || (lm.media_urls && lm.media_urls.length > 0)) return '📷 Photo';
     if (lm.message_type === 'audio' || lm.message_type === 'voice_note') return '🎙️ Voice note';
     if (lm.message_type === 'document') return `📄 ${lm.document_metadata?.name || 'Document'}`;

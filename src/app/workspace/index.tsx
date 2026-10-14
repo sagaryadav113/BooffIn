@@ -523,7 +523,7 @@ export default function WorkspaceHubScreen() {
     const getInnerCircleSnippet = () => {
       const lm = item.last_message;
       if (lm) {
-        if (lm.is_deleted) return '🚫 This message was deleted';
+        if (lm.is_deleted || lm.content === '🚫 This message was deleted') return '🚫 This message was deleted';
         if (lm.message_type === 'image' || (lm.media_urls && lm.media_urls.length > 0)) return '📷 Photo';
         if (lm.message_type === 'audio' || lm.message_type === 'voice_note') return '🎙️ Voice note';
         if (lm.message_type === 'document') return `📄 ${lm.document_metadata?.name || 'Document'}`;

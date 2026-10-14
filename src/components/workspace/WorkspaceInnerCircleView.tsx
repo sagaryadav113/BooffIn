@@ -521,6 +521,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         const podKey = await derivePodSessionKey(workspace.id);
         const updates: Record<string, string> = {};
         for (const m of messages) {
+          const isDeletedMsg = Boolean(m.is_deleted === true || m.content === '🚫 This message was deleted');
+          if (isDeletedMsg) {
+            AsyncStorage.removeItem(`e2ee_cache_${m.id}`).catch(() => {});
+            if (decryptedTextMap[m.id]) {
+              setDecryptedTextMap((prev) => {
+                const next = { ...prev };
+                delete next[m.id];
+                return next;
+              });
+            }
+            continue;
+          }
           if (decryptedTextMap[m.id]) continue;
           const cipher = m.e2ee_ciphertext || m.attachments?.e2ee_ciphertext;
           const nonce = m.e2ee_nonce || m.attachments?.e2ee_nonce;
