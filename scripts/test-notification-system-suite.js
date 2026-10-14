@@ -46,6 +46,24 @@ function getNotificationDeepLink(notification) {
     };
   }
 
+  if (
+    notification.type === 'workspace_invitation' ||
+    notification.type === 'workspace_message' ||
+    notification.type === 'workspace_event' ||
+    notification.entityType === 'workspace'
+  ) {
+    const workspaceId = notification.entityId || notification.metadata?.workspace_id;
+    if (workspaceId) {
+      return {
+        pathname: '/workspace/[id]',
+        params: { id: workspaceId },
+      };
+    }
+    return {
+      pathname: '/workspace',
+    };
+  }
+
   return {
     pathname: '/profile/[id]',
     params: { id: notification.actor.id },
@@ -143,7 +161,9 @@ function filterNotificationList(notifications, filter) {
         n.type === 'like' ||
         n.type === 'repost' ||
         n.type === 'paper_discussion' ||
-        n.type === 'collaboration_request'
+        n.type === 'collaboration_request' ||
+        n.type === 'workspace_message' ||
+        n.type === 'workspace_invitation'
     );
   }
   if (filter === 'Updates') {
@@ -153,7 +173,10 @@ function filterNotificationList(notifications, filter) {
         n.type === 'topic_activity' ||
         n.type === 'trending' ||
         n.type === 'topic_update' ||
-        n.type === 'publisher_update'
+        n.type === 'publisher_update' ||
+        n.type === 'workspace_event' ||
+        n.type === 'workspace_block' ||
+        n.type === 'subscription_active'
     );
   }
   return list;
@@ -238,5 +261,22 @@ const incomingDup = { id: 'n1_dup', type: 'like', actor: { id: 'usr_1' }, target
 const { uniqueNotifications } = deduplicateNotificationList([incomingDup, ...baseNotifs]);
 assert.strictEqual(uniqueNotifications.length, 1);
 console.log('✅ TEST 5: Real-time incoming duplicate like notification correctly deduplicated');
+
+// Test 6: Workspace Notification Deep Link and Filtering
+const wsInviteNotif = {
+  id: 'notif_ws',
+  type: 'workspace_invitation',
+  actor: { id: 'usr_leader' },
+  entityType: 'workspace',
+  entityId: 'ws_789',
+};
+const wsLink = getNotificationDeepLink(wsInviteNotif);
+assert.strictEqual(wsLink.pathname, '/workspace/[id]');
+assert.strictEqual(wsLink.params.id, 'ws_789');
+
+const wsFiltered = filterNotificationList([wsInviteNotif], 'Discussions');
+assert.strictEqual(wsFiltered.length, 1);
+assert.strictEqual(wsFiltered[0].id, 'notif_ws');
+console.log('✅ TEST 6: Workspace invitation routes to /workspace/[id] and is included in Discussions filter');
 
 console.log('\n🎉 ALL NOTIFICATION SYSTEM SUITE TESTS PASSED SUCCESSFULLY!\n');

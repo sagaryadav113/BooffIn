@@ -7,6 +7,7 @@ import { colors, shadows } from '../theme';
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
+import { useWorkspaceStore } from '../store/useWorkspaceStore';
 
 import { DesktopLayoutShell } from '../components/desktop/DesktopLayoutShell';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -33,6 +34,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!isAuthenticated || !currentUser?.id) return;
     useNotificationStore.getState().loadUnreadCount();
+    useWorkspaceStore.getState().loadWorkspaces();
     const unsubscribe = useNotificationStore.getState().subscribeToRealtimeNotifications(currentUser.id);
     return () => {
       unsubscribe();

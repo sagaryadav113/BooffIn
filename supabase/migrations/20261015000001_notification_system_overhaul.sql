@@ -31,12 +31,17 @@ ALTER TABLE public.notifications ADD CONSTRAINT notifications_notification_type_
     'topic_update',
     'trending',
     'publisher_update',
+    'workspace_invitation',
+    'workspace_message',
+    'workspace_event',
+    'workspace_block',
+    'subscription_active',
     'system'
   ));
 
 ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_entity_type_check;
 ALTER TABLE public.notifications ADD CONSTRAINT notifications_entity_type_check
-  CHECK (entity_type IN ('post', 'comment', 'paper', 'profile', 'topic'));
+  CHECK (entity_type IN ('post', 'comment', 'paper', 'profile', 'topic', 'workspace'));
 
 -- ----------------------------------------------------------------------------
 -- 2. DEDUPLICATION INDEXES
@@ -414,3 +419,85 @@ CREATE POLICY "Users can manage their own push tokens"
   WITH CHECK (auth.uid() = user_id);
 
 CREATE INDEX IF NOT EXISTS idx_user_push_tokens_user ON public.user_push_tokens(user_id);
+
+-- ----------------------------------------------------------------------------
+-- 7. WORKSPACE INVITATION NOTIFICATION TRIGGER
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_notify_on_workspace_invitation()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_workspace_name TEXT;
+  v_creator_id UUID;
+  v_is_blocked BOOLEAN := false;
+BEGIN
+  -- Only trigger for invited status
+  IF NEW.status <> 'invited' THEN
+    RETURN NEW;
+  END IF;
+
+  -- Fetch workspace name and creator
+  SELECT name, creator_id INTO v_workspace_name, v_creator_id
+  FROM public.workspaces
+  WHERE id = NEW.workspace_id;
+
+  IF v_creator_id IS NULL OR v_creator_id = NEW.user_id THEN
+    RETURN NEW;
+  END IF;
+
+  -- Check blocking
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_blocks
+    WHERE (blocker_id = v_creator_id AND blocked_id = NEW.user_id)
+       OR (blocker_id = NEW.user_id AND blocked_id = v_creator_id)
+  ) INTO v_is_blocked;
+
+  IF v_is_blocked THEN
+    RETURN NEW;
+  END IF;
+
+  -- Insert notification
+  INSERT INTO public.notifications (
+    recipient_id,
+    actor_id,
+    notification_type,
+    entity_type,
+    entity_id,
+    message_snippet,
+    metadata
+  ) VALUES (
+    NEW.user_id,
+    v_creator_id,
+    'workspace_invitation',
+    'workspace',
+    NEW.workspace_id,
+    COALESCE(v_workspace_name, 'Workspace'),
+    jsonb_build_object('workspace_id', NEW.workspace_id, 'workspace_name', v_workspace_name)
+  )
+  ON CONFLICT DO NOTHING;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+DROP TRIGGER IF EXISTS trg_notify_workspace_invitation ON public.workspace_members;
+CREATE TRIGGER trg_notify_workspace_invitation
+  AFTER INSERT OR UPDATE OF status ON public.workspace_members
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fn_notify_on_workspace_invitation();
+
+CREATE OR REPLACE FUNCTION public.fn_cleanup_workspace_invitation_notifications()
+RETURNS TRIGGER AS $$
+BEGIN
+  DELETE FROM public.notifications
+  WHERE notification_type = 'workspace_invitation'
+    AND recipient_id = OLD.user_id
+    AND entity_id = OLD.workspace_id;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+DROP TRIGGER IF EXISTS trg_cleanup_workspace_invitation_notifications ON public.workspace_members;
+CREATE TRIGGER trg_cleanup_workspace_invitation_notifications
+  AFTER DELETE ON public.workspace_members
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fn_cleanup_workspace_invitation_notifications();

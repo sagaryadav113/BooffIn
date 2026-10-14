@@ -17,9 +17,14 @@ export type NotificationType =
   | 'paper_share'
   | 'topic_update'
   | 'publisher_update'
+  | 'workspace_invitation'
+  | 'workspace_message'
+  | 'workspace_event'
+  | 'workspace_block'
+  | 'subscription_active'
   | 'system';
 
-export type NotificationEntityType = 'post' | 'comment' | 'paper' | 'profile' | 'topic';
+export type NotificationEntityType = 'post' | 'comment' | 'paper' | 'profile' | 'topic' | 'workspace';
 
 export interface AppNotification {
   id: string;

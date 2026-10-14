@@ -63,6 +63,12 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
         return { icon: 'Tag', bg: colors.accentOrange };
       case 'trending':
         return { icon: 'Zap', bg: colors.accentOrange };
+      case 'workspace_invitation':
+        return { icon: 'Layers', bg: '#4F46E5' };
+      case 'workspace_message':
+        return { icon: 'MessageSquare', bg: '#0284C7' };
+      case 'workspace_event':
+        return { icon: 'Calendar', bg: '#D97706' };
       default:
         return { icon: 'FileText', bg: colors.textSecondary };
     }

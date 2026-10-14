@@ -68,6 +68,16 @@ export function formatNotificationContent(
       return snippet ? `mentioned you: "${snippet}"` : 'mentioned you in a discussion';
     case 'trending':
       return 'Your research is trending';
+    case 'workspace_invitation':
+      return 'invited you to join a workspace';
+    case 'workspace_message':
+      return snippet ? `sent a workspace message: "${snippet}"` : 'sent you a message in workspace';
+    case 'workspace_event':
+      return snippet ? `scheduled an event: "${snippet}"` : 'scheduled a new workspace event';
+    case 'workspace_block':
+      return 'workspace access updated';
+    case 'subscription_active':
+      return 'workspace subscription is now active';
     default:
       return 'shared an update';
   }
@@ -81,6 +91,24 @@ export function getNotificationDeepLink(notification: AppNotification): {
   params?: Record<string, string>;
 } {
   const targetCommentId = notification.targetCommentId || notification.metadata?.comment_id;
+
+  if (
+    notification.type === 'workspace_invitation' ||
+    notification.type === 'workspace_message' ||
+    notification.type === 'workspace_event' ||
+    notification.entityType === 'workspace'
+  ) {
+    const workspaceId = notification.entityId || notification.metadata?.workspace_id;
+    if (workspaceId) {
+      return {
+        pathname: '/workspace/[id]',
+        params: { id: workspaceId },
+      };
+    }
+    return {
+      pathname: '/workspace',
+    };
+  }
 
   if (notification.targetPostId || (notification.entityType === 'post' && notification.entityId)) {
     const postId = notification.targetPostId || notification.entityId || '';
@@ -239,7 +267,9 @@ export function filterNotificationList(
         n.type === 'like' ||
         n.type === 'repost' ||
         n.type === 'paper_discussion' ||
-        n.type === 'collaboration_request'
+        n.type === 'collaboration_request' ||
+        n.type === 'workspace_message' ||
+        n.type === 'workspace_invitation'
     );
   }
   if (filter === 'Updates') {
@@ -249,7 +279,10 @@ export function filterNotificationList(
         n.type === 'topic_activity' ||
         n.type === 'trending' ||
         n.type === 'topic_update' ||
-        n.type === 'publisher_update'
+        n.type === 'publisher_update' ||
+        n.type === 'workspace_event' ||
+        n.type === 'workspace_block' ||
+        n.type === 'subscription_active'
     );
   }
   return list;
@@ -383,6 +416,8 @@ export async function fetchNotifications(
         'repost',
         'paper_discussion',
         'collaboration_request',
+        'workspace_message',
+        'workspace_invitation',
       ]);
     } else if (filter === 'Updates') {
       query = query.in('notification_type', [
@@ -391,6 +426,9 @@ export async function fetchNotifications(
         'trending',
         'topic_update',
         'publisher_update',
+        'workspace_event',
+        'workspace_block',
+        'subscription_active',
       ]);
     }
 
