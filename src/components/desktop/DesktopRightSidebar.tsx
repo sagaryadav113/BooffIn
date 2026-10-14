@@ -37,6 +37,7 @@ export const DesktopRightSidebar: React.FC = () => {
   const fetchPapers = usePaperStore((s) => s.fetchPapers);
 
   const [analytics, setAnalytics] = useState<UserAnalyticsSummary | null>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [suggestedResearchers, setSuggestedResearchers] = useState<SuggestedResearcher[]>([]);
   const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
   const [hypedPapers, setHypedPapers] = useState<Paper[]>([]);
@@ -51,9 +52,17 @@ export const DesktopRightSidebar: React.FC = () => {
     }).catch(() => {});
 
     if (currentUser?.id) {
-      fetchUserAnalytics(currentUser.id, '28d').then(({ summary }) => {
-        if (summary) setAnalytics(summary);
-      });
+      setIsLoadingAnalytics(true);
+      fetchUserAnalytics(currentUser.id, '28d')
+        .then(({ summary }) => {
+          if (summary) setAnalytics(summary);
+        })
+        .finally(() => {
+          setIsLoadingAnalytics(false);
+        });
+    } else {
+      setAnalytics(null);
+      setIsLoadingAnalytics(false);
     }
 
     // Fetch real suggested researchers from Supabase profiles
@@ -115,7 +124,9 @@ export const DesktopRightSidebar: React.FC = () => {
   const sparklineData = analytics?.dailySeries && analytics.dailySeries.length > 0
     ? analytics.dailySeries.slice(-14)
     : [];
-  const maxViews = Math.max(...sparklineData.map((d) => d.views || 0), 1);
+  const maxViews = Math.max(...sparklineData.map((d) => (d.views || d.impressions || 0)), 1);
+  const totalImpressions = analytics?.totalImpressions ?? analytics?.totalViews ?? 0;
+  const hasAnyViews = totalImpressions > 0 && sparklineData.some((d) => (d.views || d.impressions || 0) > 0);
 
   return (
     <aside
@@ -141,52 +152,100 @@ export const DesktopRightSidebar: React.FC = () => {
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => router.push('/profile/analytics')}
+              onPress={() => {
+                if (currentUser?.id) {
+                  router.push('/profile/analytics');
+                } else {
+                  router.push('/(auth)/login');
+                }
+              }}
               style={styles.viewAnalyticsBtn}
             >
-              <Text style={styles.viewAnalyticsText}>View Analytics</Text>
+              <Text style={styles.viewAnalyticsText}>
+                {currentUser?.id ? 'View Analytics' : 'Sign In'}
+              </Text>
               <ArrowRight size={12} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.impactBody}>
-            <Text style={styles.impactStatNumber}>
-              {analytics?.totalViews ? `${analytics.totalViews}` : '3510'}
-            </Text>
-            <Text style={styles.impactStatLabel}>Impressions (last 28d)</Text>
-          </View>
+          {currentUser?.id ? (
+            <>
+              <View style={styles.impactBody}>
+                <Text style={styles.impactStatNumber}>
+                  {isLoadingAnalytics ? '...' : totalImpressions.toLocaleString()}
+                </Text>
+                <Text style={styles.impactStatLabel}>Impressions (last 28d)</Text>
+              </View>
 
-          {/* Daily Series Sparkline Visualization */}
-          {sparklineData.length > 0 ? (
-            <View style={styles.sparklineContainer}>
-              {sparklineData.map((dp, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.sparklineBar,
-                    {
-                      height: Math.max(((dp.views || 0) / maxViews) * 28, 4),
-                      backgroundColor: idx >= sparklineData.length - 4 ? '#064E3B' : '#CBD5E1',
-                    },
-                  ]}
-                />
-              ))}
-            </View>
+              {/* Daily Series Sparkline Visualization */}
+              {hasAnyViews ? (
+                <View style={styles.sparklineContainer}>
+                  {sparklineData.map((dp, idx) => {
+                    const views = dp.views || dp.impressions || 0;
+                    return (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.sparklineBar,
+                          {
+                            height: Math.max((views / maxViews) * 28, 4),
+                            backgroundColor: views > 0 ? '#064E3B' : '#CBD5E1',
+                          },
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.emptySparklineBox}>
+                  <View style={styles.sparklineContainer}>
+                    {Array.from({ length: 14 }).map((_, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.sparklineBar,
+                          {
+                            height: 4,
+                            backgroundColor: '#E2E8F0',
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.emptySparklineText}>
+                    {totalImpressions === 0
+                      ? 'No impressions yet in the last 28 days'
+                      : 'Live analytics sync daily'}
+                  </Text>
+                </View>
+              )}
+            </>
           ) : (
-            <View style={styles.sparklineContainer}>
-              {[6, 8, 5, 12, 9, 14, 8, 16, 12, 18, 22, 14, 26, 28].map((h, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.sparklineBar,
-                    {
-                      height: h,
-                      backgroundColor: idx >= 10 ? '#064E3B' : '#CBD5E1',
-                    },
-                  ]}
-                />
-              ))}
-            </View>
+            <>
+              <View style={styles.impactBody}>
+                <Text style={[styles.impactStatNumber, { fontSize: 18, color: '#1E293B' }]}>
+                  Track Your Reach
+                </Text>
+                <Text style={styles.impactStatLabel}>Sign in to view your research impressions and readership analytics</Text>
+              </View>
+
+              <View style={styles.emptySparklineBox}>
+                <View style={styles.sparklineContainer}>
+                  {Array.from({ length: 14 }).map((_, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.sparklineBar,
+                        {
+                          height: 4,
+                          backgroundColor: '#E2E8F0',
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+            </>
           )}
         </View>
 
@@ -400,6 +459,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 2,
     minHeight: 4,
+  },
+  emptySparklineBox: {
+    gap: 6,
+  },
+  emptySparklineText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
   },
   cardHeaderRow: {
     flexDirection: 'row',

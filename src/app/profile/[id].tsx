@@ -438,8 +438,11 @@ export default function OtherResearcherProfileScreen() {
 
   const handleShare = async () => {
     try {
+      const profileUrl = `https://www.letsbooffin.com/profile/${researcher.id || researcher.handle}`;
       await Share.share({
-        message: `Check out researcher ${researcher.fullName} (@${researcher.handle}) on BooffIn: Research finds it's people.`,
+        message: `Check out researcher ${researcher.fullName} (@${researcher.handle}) on BooffIn: ${profileUrl}`,
+        url: profileUrl,
+        title: `${researcher.fullName} on BooffIn`,
       });
     } catch {}
   };

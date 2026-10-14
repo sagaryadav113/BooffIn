@@ -108,8 +108,10 @@ export const CommentCard: React.FC<CommentCardProps> = ({
 
   const handleShare = async () => {
     try {
+      const shareUrl = comment.postId ? `https://www.letsbooffin.com/post/${comment.postId}` : 'https://www.letsbooffin.com';
       await Share.share({
-        message: `Scientific discussion by ${comment.author?.fullName || 'Researcher'} on BooffIn:\n"${comment.content}"`,
+        message: `Scientific discussion by ${comment.author?.fullName || 'Researcher'} on BooffIn:\n"${comment.content}"\n\n${shareUrl}`,
+        url: shareUrl,
       });
     } catch {}
   };

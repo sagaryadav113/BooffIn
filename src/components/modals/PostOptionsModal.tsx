@@ -56,7 +56,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    const postUrl = `https://booffin.app/post/${post.id}`;
+    const postUrl = `https://www.letsbooffin.com/post/${post.id}`;
     if (Clipboard?.setStringAsync) {
       await Clipboard.setStringAsync(postUrl);
     }

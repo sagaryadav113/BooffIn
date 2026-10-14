@@ -32,7 +32,8 @@ import { mapSupabasePost, populatePollVotes } from '../../api/socialService';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const postId = id || '';
+  const rawId = Array.isArray(id) ? id[0] : (id || '');
+  const postId = rawId ? rawId.trim().replace(/\/$/, '') : '';
 
   const getPostById = usePostStore((s) => s.getPostById);
   const getCommentsForPost = usePostStore((s) => s.getCommentsForPost);
@@ -196,6 +197,10 @@ export default function PostDetailScreen() {
     title?: string;
     content: string;
   }) => {
+    if (!currentUser?.id) {
+      router.push('/(auth)/login');
+      return;
+    }
     if (!content.trim() || isSubmitting || !activePost) return;
 
     let finalContent = content.trim();
@@ -220,6 +225,10 @@ export default function PostDetailScreen() {
   };
 
   const handleAddReply = async (parentId: string, replyText: string) => {
+    if (!currentUser?.id) {
+      router.push('/(auth)/login');
+      return;
+    }
     if (!replyText.trim() || !activePost) return;
     try {
       await addComment(activePost.id, replyText.trim(), parentId, currentUser.id);
@@ -232,7 +241,7 @@ export default function PostDetailScreen() {
   };
 
   const handleDeleteComment = (commentId: string) => {
-    if (!activePost) return;
+    if (!activePost || !currentUser?.id) return;
     if (Platform.OS === 'web') {
       const confirmed = window.confirm('Are you sure you want to delete this discussion?');
       if (confirmed) {
@@ -293,8 +302,20 @@ export default function PostDetailScreen() {
           onSubmitDiscussion={handleCreateDiscussion}
           onAddReply={handleAddReply}
           onDeleteComment={handleDeleteComment}
-          onLikeComment={(cId) => toggleLikeComment(cId, activePost.id, currentUser.id)}
-          onLikeReply={(_, replyId) => toggleLikeComment(replyId, activePost.id, currentUser.id)}
+          onLikeComment={(cId) => {
+            if (!currentUser?.id) {
+              router.push('/(auth)/login');
+              return;
+            }
+            toggleLikeComment(cId, activePost.id, currentUser.id);
+          }}
+          onLikeReply={(_, replyId) => {
+            if (!currentUser?.id) {
+              router.push('/(auth)/login');
+              return;
+            }
+            toggleLikeComment(replyId, activePost.id, currentUser.id);
+          }}
           isSubmittingComment={isSubmitting}
           onPostUpdated={(updated) => setPost(updated)}
         />
@@ -393,11 +414,23 @@ export default function PostDetailScreen() {
                   key={c.id}
                   comment={c}
                   onAddReply={handleAddReply}
-                  onLike={(cId) => toggleLikeComment(cId, activePost.id, currentUser.id)}
-                  onLikeReply={(_, replyId) => toggleLikeComment(replyId, activePost.id, currentUser.id)}
+                  onLike={(cId) => {
+                    if (!currentUser?.id) {
+                      router.push('/(auth)/login');
+                      return;
+                    }
+                    toggleLikeComment(cId, activePost.id, currentUser.id);
+                  }}
+                  onLikeReply={(_, replyId) => {
+                    if (!currentUser?.id) {
+                      router.push('/(auth)/login');
+                      return;
+                    }
+                    toggleLikeComment(replyId, activePost.id, currentUser.id);
+                  }}
                   onDelete={handleDeleteComment}
-                  currentUserId={currentUser.id}
-                  currentUser={currentUser}
+                  currentUserId={currentUser?.id}
+                  currentUser={currentUser || undefined}
                 />
               ))
             ) : (

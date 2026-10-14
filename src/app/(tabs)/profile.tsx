@@ -703,8 +703,11 @@ export default function CurrentUserProfileScreen() {
 
   const handleShareProfile = async () => {
     try {
+      const profileUrl = `https://www.letsbooffin.com/profile/${user.id || user.handle}`;
       await Share.share({
-        message: `${user.fullName} (@${user.handle}) on BooffIn - Academic Profile & Research Discussions`,
+        message: `${user.fullName} (@${user.handle}) on BooffIn: ${profileUrl}`,
+        url: profileUrl,
+        title: `${user.fullName} on BooffIn`,
       });
     } catch {}
   };

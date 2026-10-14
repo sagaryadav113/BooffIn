@@ -59,8 +59,8 @@
   },
   "scripts": {
     "start": "expo start",
-    "build": "expo export --platform web",
-    "export": "expo export --platform web",
+    "build": "expo export --platform web && node ./scripts/inject-seo-metadata.js",
+    "export": "expo export --platform web && node ./scripts/inject-seo-metadata.js",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",

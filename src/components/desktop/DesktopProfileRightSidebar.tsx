@@ -61,7 +61,9 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
     ? analytics.dailySeries.slice(-14)
     : [];
 
-  const maxViews = Math.max(...sparklineData.map((d) => d.views || 0), 1);
+  const maxViews = Math.max(...sparklineData.map((d) => (d.views || d.impressions || 0)), 1);
+  const totalImpressions = analytics?.totalImpressions ?? analytics?.totalViews ?? 0;
+  const hasAnyViews = totalImpressions > 0 && sparklineData.some((d) => (d.views || d.impressions || 0) > 0);
 
   return (
     <aside
@@ -103,29 +105,34 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
 
           <View style={styles.impactBody}>
             <Text style={styles.impactStatNumber}>
-              {analytics?.totalViews ? `${analytics.totalViews}` : '0'}
+              {isLoading ? '...' : totalImpressions.toLocaleString()}
             </Text>
-            <Text style={styles.impactStatLabel}>Views (last 28d)</Text>
+            <Text style={styles.impactStatLabel}>Impressions (last 28d)</Text>
           </View>
 
-          {sparklineData.length > 0 ? (
+          {hasAnyViews ? (
             <View style={styles.sparklineContainer}>
-              {sparklineData.map((dp, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.sparklineBar,
-                    {
-                      height: Math.max(((dp.views || 0) / maxViews) * 28, 4),
-                      backgroundColor: idx >= sparklineData.length - 4 ? '#064E3B' : '#CBD5E1',
-                    },
-                  ]}
-                />
-              ))}
+              {sparklineData.map((dp, idx) => {
+                const views = dp.views || dp.impressions || 0;
+                return (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.sparklineBar,
+                      {
+                        height: Math.max((views / maxViews) * 28, 4),
+                        backgroundColor: views > 0 ? '#064E3B' : '#E2E8F0',
+                      },
+                    ]}
+                  />
+                );
+              })}
             </View>
           ) : (
             <View style={styles.emptySparkline}>
-              <Text style={styles.emptySparklineText}>Analytics syncing</Text>
+              <Text style={styles.emptySparklineText}>
+                {totalImpressions === 0 ? 'No impressions recorded in the last 28 days' : 'Analytics syncing'}
+              </Text>
             </View>
           )}
         </View>

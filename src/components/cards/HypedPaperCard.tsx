@@ -107,13 +107,12 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    try {
+      const shareUrl = paper.canonicalUrl || `https://www.letsbooffin.com/paper/${paper.id || (paper as any).doi || ''}`;
       await Share.share({
-        message: `${paper.title}\n\nRead on BooffIn: ${paper.canonicalUrl || 'https://booffin.com'}`,
-        url: paper.canonicalUrl || paper.openAccessUrl,
+        message: `${paper.title}\n\nRead on BooffIn: ${shareUrl}`,
+        url: shareUrl,
         title: paper.title,
       });
-    } catch {}
   };
 
   // Real synchronized counts across card and article viewer

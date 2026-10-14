@@ -39,7 +39,7 @@ export const SharePostModal: React.FC<SharePostModalProps> = ({
 }) => {
   const [copiedType, setCopiedType] = useState<'link' | 'text' | 'image' | null>(null);
 
-  const postUrl = `https://booffin.app/post/${post.id}`;
+  const postUrl = `https://www.letsbooffin.com/post/${post.id}`;
   const hasImages = Boolean(post.images && post.images.length > 0);
 
   const showCopiedFeedback = (type: 'link' | 'text' | 'image') => {

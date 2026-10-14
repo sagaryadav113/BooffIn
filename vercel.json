@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npx expo export --platform web",
+  "buildCommand": "npx expo export --platform web && node scripts/inject-seo-metadata.js",
   "outputDirectory": "dist",
   "framework": null,
   "headers": [
@@ -24,6 +24,17 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/post/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|twitterbot|whatsapp|linkedinbot|telegrambot|slackbot|discordbot).*"
+        }
+      ],
+      "destination": "/api/og-post?id=:id"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"

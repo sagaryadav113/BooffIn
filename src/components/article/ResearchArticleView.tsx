@@ -98,7 +98,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
     try {
       await Share.share({
         title: article.title,
-        message: `${article.title}\n\nBy ${article.authors.join(', ')}\n\nRead on BooffIn: https://booffin.app/post/${post.id}`,
+        message: `${article.title}\n\nBy ${article.authors.join(', ')}\n\nRead on BooffIn: https://www.letsbooffin.com/post/${post.id}`,
       });
     } catch {}
   };

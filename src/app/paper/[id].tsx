@@ -468,8 +468,11 @@ export default function PaperDetailScreen() {
   const handleShare = async () => {
     if (!paper) return;
     try {
+      const shareUrl = `https://www.letsbooffin.com/paper/${paperId || paper.id || ''}`;
       await Share.share({
-        message: `${paper.title}\n${paper.canonicalUrl || paper.openAccessUrl}\nDiscussed on BooffIn: Where scientific research finds its people.`,
+        message: `${paper.title}\n\nRead and discuss on BooffIn: ${shareUrl}`,
+        url: shareUrl,
+        title: paper.title,
       });
     } catch {}
   };

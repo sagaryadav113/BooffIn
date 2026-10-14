@@ -116,7 +116,7 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
                 <View>
                   <Text style={styles.impactTitle}>RESEARCH IMPACT</Text>
                   <Text style={styles.impactCount}>
-                    {analytics?.totalViews ? `${analytics.totalViews}` : '0'} Views (last 28d)
+                    {(analytics?.totalImpressions ?? analytics?.totalViews ?? 0).toLocaleString()} Impressions (last 28d)
                   </Text>
                 </View>
               </View>

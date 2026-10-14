@@ -17,13 +17,14 @@ import {
   AtSign,
   Sparkles,
 } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { DiscussionType, UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
 import { DiscussionIcon } from '../core/DiscussionIcon';
 
 export interface DiscussionComposerProps {
-  currentUser: UserProfile;
+  currentUser?: UserProfile | null;
   onSubmit: (params: {
     type: DiscussionType;
     content: string;
@@ -67,6 +68,26 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
     setShowMentionBar(false);
     Keyboard.dismiss();
   };
+
+  if (!currentUser) {
+    return (
+      <View style={[styles.container, styles.guestContainer]}>
+        <View style={styles.guestContent}>
+          <Text style={styles.guestTitle}>Join the Scientific Discussion</Text>
+          <Text style={styles.guestSubtitle}>
+            Sign in to share your inquiries, insights, or methodologies with researchers.
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.guestSignInBtn}
+          onPress={() => router.push('/(auth)/login')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.guestSignInBtnText}>Sign In to Contribute</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -349,5 +370,47 @@ const styles = StyleSheet.create({
     ...typography.labelBold,
     color: colors.white,
     fontSize: 14,
+  },
+  guestContainer: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  guestContent: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  guestTitle: {
+    ...typography.contentTitle,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  guestSubtitle: {
+    ...typography.body,
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    maxWidth: 380,
+  },
+  guestSignInBtn: {
+    backgroundColor: '#064E3B',
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: radii.full,
+    shadowColor: '#064E3B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  guestSignInBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13.5,
   },
 });

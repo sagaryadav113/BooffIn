@@ -133,29 +133,37 @@ export default function Root({ children }: PropsWithChildren) {
         />
         <meta name="author" content="BooffIn Inc." />
         <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-        <link rel="canonical" href="https://letsbooffin.com" />
+        <link rel="canonical" href="https://www.letsbooffin.com" />
 
-        {/* Open Graph / Facebook */}
+        {/* Open Graph / Facebook / WhatsApp / LinkedIn */}
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://letsbooffin.com" />
+        <meta property="og:url" content="https://www.letsbooffin.com" />
         <meta property="og:title" content="BooffIn | Research Finds Its People" />
         <meta
           property="og:description"
-          content="Connect with researchers, share scientific insights, and explore the future of science on BooffIn."
+          content="Connect with researchers globally, share scientific insights, discuss breakthrough papers, and discover research on BooffIn."
         />
         <meta property="og:site_name" content="BooffIn" />
-        <meta property="og:image" content="https://letsbooffin.com/icon-512.png" />
+        <meta property="og:image" content="https://www.letsbooffin.com/og-preview.jpg" />
+        <meta property="og:image:secure_url" content="https://www.letsbooffin.com/og-preview.jpg" />
+        <meta property="og:image:type" content="image/jpeg" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="BooffIn - Research finds its people" />
         <meta property="og:locale" content="en_US" />
 
         {/* Twitter Cards */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:url" content="https://letsbooffin.com" />
+        <meta name="twitter:site" content="@letsbooffin" />
+        <meta name="twitter:creator" content="@letsbooffin" />
+        <meta name="twitter:url" content="https://www.letsbooffin.com" />
         <meta name="twitter:title" content="BooffIn | Research Finds Its People" />
         <meta
           name="twitter:description"
-          content="Connect with researchers, share scientific insights, and explore the future of science on BooffIn."
+          content="Connect with researchers globally, share scientific insights, discuss breakthrough papers, and discover research on BooffIn."
         />
-        <meta name="twitter:image" content="https://letsbooffin.com/icon-512.png" />
+        <meta name="twitter:image" content="https://www.letsbooffin.com/og-preview.jpg" />
+        <meta name="twitter:image:alt" content="BooffIn - Research finds its people" />
 
         {/* PWA Manifest & Icons */}
         <link rel="manifest" href="/manifest.json" />

@@ -9,6 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon.png",
+      "associatedDomains": [
+        "applinks:letsbooffin.com",
+        "applinks:www.letsbooffin.com"
+      ],
       "infoPlist": {
         "NSCameraUsageDescription": "BooffIn requires camera access for private peer-to-peer encrypted video discussions.",
         "NSMicrophoneUsageDescription": "BooffIn requires microphone access for private peer-to-peer encrypted voice calls."
@@ -27,7 +31,18 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "softwareKeyboardLayoutMode": "resize",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "www.letsbooffin.com", "pathPrefix": "/" },
+            { "scheme": "https", "host": "letsbooffin.com", "pathPrefix": "/" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "androidNavigationBar": {
       "visible": "always",
