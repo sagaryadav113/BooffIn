@@ -59,6 +59,8 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
     setTimeout(() => setCopiedDoi(false), 2000);
   };
 
+  if (!doiMeta) return null;
+
   if (!doiAutoPreviewEnabled) {
     return (
       <TouchableOpacity
@@ -75,6 +77,15 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
     );
   }
 
+  const hasCitationCount = Boolean(doiMeta.citationCount !== undefined && doiMeta.citationCount > 0);
+  const metaString = [
+    authorsText ? `${authorsText}${hasMoreAuthors ? ' et al.' : ''}` : '',
+    doiMeta.journal,
+    doiMeta.publicationYear ? String(doiMeta.publicationYear) : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <View style={styles.container}>
       {/* Header bar */}
@@ -85,36 +96,30 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
         </View>
 
         <View style={styles.headerRightBadges}>
-          {doiMeta.citationCount !== undefined && doiMeta.citationCount > 0 && (
+          {hasCitationCount ? (
             <View style={styles.citationBadge}>
               <Text style={styles.citationText}>{doiMeta.citationCount} Citations</Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
 
       {/* Paper Title */}
       <TouchableOpacity activeOpacity={0.8} onPress={handleOpenPaper}>
         <Text style={styles.title} numberOfLines={2}>
-          {doiMeta.title}
+          {doiMeta.title || 'Untitled Research'}
         </Text>
       </TouchableOpacity>
 
       {/* Authors & Journal */}
-      {(authorsText || doiMeta.journal || doiMeta.publicationYear) && (
+      {Boolean(metaString) ? (
         <Text style={styles.meta} numberOfLines={1}>
-          {[
-            authorsText ? `${authorsText}${hasMoreAuthors ? ' et al.' : ''}` : '',
-            doiMeta.journal,
-            doiMeta.publicationYear,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
+          {metaString}
         </Text>
-      )}
+      ) : null}
 
       {/* Interactive DOI identifier tag with copy */}
-      {doiMeta.doi && (
+      {Boolean(doiMeta.doi) ? (
         <TouchableOpacity activeOpacity={0.7} onPress={handleCopyDoi} style={styles.doiTagRow}>
           <Text style={styles.doiTag} numberOfLines={1}>
             doi.org/{doiMeta.doi}
@@ -125,7 +130,7 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
             <Copy size={11} color="#94A3B8" style={{ marginLeft: 4 }} />
           )}
         </TouchableOpacity>
-      )}
+      ) : null}
 
       {/* Actions Toolbar */}
       <View style={styles.actionsRow}>
@@ -153,7 +158,7 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
           </Text>
         </TouchableOpacity>
 
-        {onSave && (
+        {Boolean(onSave) ? (
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onSave}
@@ -168,7 +173,7 @@ export const WorkspaceDoiCard: React.FC<WorkspaceDoiCardProps> = ({
               {isSaved ? 'In Vault' : 'Save'}
             </Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </View>
   );

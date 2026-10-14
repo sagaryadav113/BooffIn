@@ -1486,7 +1486,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   // Render Single Message Item
   const renderMessageItem = ({ item, index }: { item: WorkspaceMessage; index: number }) => {
     const isMe = item.sender_id === currentUser?.id;
-    const isDeleted = Boolean(item.is_deleted);
+    const isDeleted = Boolean(item.is_deleted || item.content === '🚫 This message was deleted');
 
     const extractImageUrl = (m: WorkspaceMessage) => {
       // Exclude audio notes, voice notes, documents, polls, call logs
@@ -1592,7 +1592,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     const resolvedDoiMeta = item.doi_metadata || (item.attachments as any)?.doi_metadata || null;
     const resolvedPollData = item.poll_data || (item.attachments as any)?.poll_data || null;
 
-    const hasDoi = Boolean(resolvedDoiMeta);
+    const hasDoi = !isDeleted && Boolean(resolvedDoiMeta);
     const isDocument = !isDeleted && Boolean(resolvedDocMeta);
     const isWorkspaceInvite = !isDeleted && Boolean(resolvedInviteMeta);
     const isPost = !isDeleted && Boolean(resolvedPostMeta);
@@ -1837,7 +1837,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 )}
 
                 {/* DOI Paper Attachment */}
-                {resolvedDoiMeta && (
+                {!isDeleted && resolvedDoiMeta && (
                   <WorkspaceDoiCard doiMeta={resolvedDoiMeta} />
                 )}
 

@@ -1674,7 +1674,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             }
             renderItem={({ item, index }) => {
               const isMe = item.sender_id === currentUser?.id;
-              const isDeleted = Boolean(item.is_deleted);
+              const isDeleted = Boolean(item.is_deleted || item.content === '🚫 This message was deleted');
               const isFirstOfDateGroup =
                 index === 0 ||
                 getDateLabel(item.created_at) !== getDateLabel(filteredMessages[index - 1]?.created_at);
@@ -1854,7 +1854,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                           )}
 
                           {/* DOI Research Paper */}
-                          {item.doi_metadata && (
+                          {!isDeleted && item.doi_metadata && (
                             <View style={{ marginVertical: 4 }}>
                               <WorkspaceDoiCard doiMeta={item.doi_metadata} />
                             </View>

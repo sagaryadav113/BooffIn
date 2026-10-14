@@ -1960,7 +1960,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             renderItem={({ item, index }) => {
               const isMe = item.sender_id === currentUser?.id;
               const isPinnedThis = item.is_pinned || item.id === localPinnedMessageId;
-              const isDeleted = Boolean(item.is_deleted);
+              const isDeleted = Boolean(item.is_deleted || item.content === '🚫 This message was deleted');
               const isFirstOfDateGroup =
                 index === 0 ||
                 getDateLabel(item.created_at) !== getDateLabel(displayedMessages[index - 1]?.created_at);
@@ -2050,7 +2050,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   ? messages.find((m) => m.id === (item.reply_to_id || item.attachments?.reply_to_id))
                   : null);
 
-                  const hasMediaContent = isAudio || isDocument || Boolean(resolvedDoiMeta) || isPost || isProfile || isWorkspaceInvite || isPoll;
+                  const hasMediaContent = !isDeleted && (isAudio || isDocument || Boolean(resolvedDoiMeta) || isPost || isProfile || isWorkspaceInvite || isPoll);
 
                   return (
                     <View key={item.id} style={{ width: '100%' }}>

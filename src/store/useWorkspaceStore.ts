@@ -468,6 +468,36 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const currentUser = useAuthStore.getState().user;
       const res = await workspaceService.getMessages(workspaceId, 30, undefined, currentUser?.id);
 
+      const deletedIdsInRoom = new Set(
+        existingRoomMsgs
+          .filter((m) => m.is_deleted === true || m.content === '🚫 This message was deleted')
+          .map((m) => m.id)
+      );
+
+      const reconcileDeleted = (msgs: WorkspaceMessage[]): WorkspaceMessage[] =>
+        msgs.map((m) => {
+          if (deletedIdsInRoom.has(m.id)) {
+            return {
+              ...m,
+              content: '🚫 This message was deleted',
+              is_deleted: true,
+              media_urls: null,
+              attachments: null,
+              doi_metadata: null,
+              document_metadata: null,
+              poll_data: null,
+              audio_metadata: null,
+              call_metadata: null,
+              post_metadata: null,
+              profile_metadata: null,
+              workspace_invite_metadata: null,
+              reactions: null,
+              message_type: 'text' as const,
+            };
+          }
+          return m;
+        });
+
       // If another room was opened while this request was in flight, discard UI update for messages
       if (reqId !== currentMessagesRequestId || get().activeWorkspaceId !== workspaceId) {
         if (!res.error) {
@@ -475,10 +505,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           const filteredMessages = blockedIds.length > 0
             ? res.messages.filter((m) => !blockedIds.includes(m.sender_id))
             : res.messages;
+          const reconciledMessages = reconcileDeleted(filteredMessages);
           set((state) => ({
             messagesByRoom: {
               ...state.messagesByRoom,
-              [workspaceId]: filteredMessages,
+              [workspaceId]: reconciledMessages,
             },
             hasMoreOlderMessages: {
               ...state.hasMoreOlderMessages,
@@ -496,12 +527,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const filteredMessages = blockedIds.length > 0
           ? res.messages.filter((m) => !blockedIds.includes(m.sender_id))
           : res.messages;
+        const reconciledMessages = reconcileDeleted(filteredMessages);
 
         set((state) => ({
-          messages: filteredMessages,
+          messages: reconciledMessages,
           messagesByRoom: {
             ...state.messagesByRoom,
-            [workspaceId]: filteredMessages,
+            [workspaceId]: reconciledMessages,
           },
           hasMoreOlderMessages: {
             ...state.hasMoreOlderMessages,
@@ -1425,6 +1457,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                     is_deleted: true,
                     media_urls: null,
                     doi_metadata: null,
+                    attachments: null,
+                    document_metadata: null,
+                    poll_data: null,
+                    audio_metadata: null,
+                    call_metadata: null,
+                    post_metadata: null,
+                    profile_metadata: null,
+                    workspace_invite_metadata: null,
+                    reactions: null,
+                    message_type: 'text' as const,
                   }
                 : m;
             const updatedMsgs = payload.deleteForEveryone
@@ -1613,30 +1655,35 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             extractedReactions = newMsg.attachments.reactions;
           }
 
+          const isIncomingMsgDeleted = Boolean(
+            newMsg.is_deleted === true ||
+            newMsg.content === '🚫 This message was deleted'
+          );
+
           const messageObj: WorkspaceMessage = {
             id: newMsg.id,
             workspace_id: newMsg.workspace_id,
             sender_id: newMsg.sender_id,
-            content: newMsg.content,
-            message_type: detectedType,
-            doi_metadata: doiMeta,
-            document_metadata: docMeta,
-            workspace_invite_metadata: inviteMeta,
-            post_metadata: postMeta,
-            profile_metadata: profMeta,
-            call_metadata: callMeta,
-            audio_metadata: audioMeta,
-            poll_data: pollData,
-            attachments: newMsg.attachments || null,
-            reactions: extractedReactions,
-            is_edited: newMsg.is_edited || false,
-            is_deleted: newMsg.is_deleted || false,
-            e2ee_ciphertext: newMsg.e2ee_ciphertext || null,
-            e2ee_nonce: newMsg.e2ee_nonce || null,
-            media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
-            is_pinned: newMsg.is_pinned || false,
-            is_forwarded: newMsg.is_forwarded ?? (newMsg.attachments?.is_forwarded || false),
-            reply_to_id: newMsg.reply_to_id || newMsg.attachments?.reply_to_id || null,
+            content: isIncomingMsgDeleted ? '🚫 This message was deleted' : newMsg.content,
+            message_type: isIncomingMsgDeleted ? 'text' : detectedType,
+            doi_metadata: isIncomingMsgDeleted ? null : doiMeta,
+            document_metadata: isIncomingMsgDeleted ? null : docMeta,
+            workspace_invite_metadata: isIncomingMsgDeleted ? null : inviteMeta,
+            post_metadata: isIncomingMsgDeleted ? null : postMeta,
+            profile_metadata: isIncomingMsgDeleted ? null : profMeta,
+            call_metadata: isIncomingMsgDeleted ? null : callMeta,
+            audio_metadata: isIncomingMsgDeleted ? null : audioMeta,
+            poll_data: isIncomingMsgDeleted ? null : pollData,
+            attachments: isIncomingMsgDeleted ? null : (newMsg.attachments || null),
+            reactions: isIncomingMsgDeleted ? null : extractedReactions,
+            is_edited: isIncomingMsgDeleted ? false : (newMsg.is_edited || false),
+            is_deleted: isIncomingMsgDeleted ? true : false,
+            e2ee_ciphertext: isIncomingMsgDeleted ? null : (newMsg.e2ee_ciphertext || null),
+            e2ee_nonce: isIncomingMsgDeleted ? null : (newMsg.e2ee_nonce || null),
+            media_urls: isIncomingMsgDeleted ? null : (extractedMedia && extractedMedia.length > 0 ? extractedMedia : null),
+            is_pinned: isIncomingMsgDeleted ? false : (newMsg.is_pinned || false),
+            is_forwarded: isIncomingMsgDeleted ? false : (newMsg.is_forwarded ?? (newMsg.attachments?.is_forwarded || false)),
+            reply_to_id: isIncomingMsgDeleted ? null : (newMsg.reply_to_id || newMsg.attachments?.reply_to_id || null),
             reply_to_message:
               newMsg.reply_to_message ||
               newMsg.attachments?.reply_to_message ||

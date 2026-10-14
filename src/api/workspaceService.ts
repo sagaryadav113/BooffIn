@@ -36,6 +36,7 @@ export interface UserChatPreferences {
   deleted: string[];
   clearedAt: Record<string, string>;
   deletedMessages?: string[];
+  deletedForEveryoneMessages?: string[];
 }
 
 const memoryPrefsCache: Record<string, UserChatPreferences> = {};
@@ -63,6 +64,7 @@ async function getChatPreferences(userId: string): Promise<UserChatPreferences> 
         deleted: Array.isArray(parsed.deleted) ? parsed.deleted : [],
         clearedAt: parsed.clearedAt && typeof parsed.clearedAt === 'object' ? parsed.clearedAt : {},
         deletedMessages: Array.isArray(parsed.deletedMessages) ? parsed.deletedMessages : [],
+        deletedForEveryoneMessages: Array.isArray(parsed.deletedForEveryoneMessages) ? parsed.deletedForEveryoneMessages : [],
       };
       memoryPrefsCache[userId] = res;
       return res;
@@ -70,7 +72,7 @@ async function getChatPreferences(userId: string): Promise<UserChatPreferences> 
   } catch (err) {
     console.warn('[workspaceService] Failed to load chat preferences:', err);
   }
-  const empty: UserChatPreferences = { pinned: [], archived: [], muted: {}, deleted: [], clearedAt: {}, deletedMessages: [] };
+  const empty: UserChatPreferences = { pinned: [], archived: [], muted: {}, deleted: [], clearedAt: {}, deletedMessages: [], deletedForEveryoneMessages: [] };
   memoryPrefsCache[userId] = empty;
   return empty;
 }
@@ -1520,31 +1522,37 @@ export const workspaceService = {
           replyInfo = m.attachments.reply_to_message;
         }
 
+        const isMsgDeleted = Boolean(
+          m.is_deleted === true ||
+          m.content === '🚫 This message was deleted' ||
+          (prefs?.deletedForEveryoneMessages && prefs.deletedForEveryoneMessages.includes(m.id))
+        );
+
         return {
           id: m.id,
           workspace_id: m.workspace_id,
           sender_id: m.sender_id,
-          content: m.content,
-          message_type: detectedType,
-          doi_metadata: doiMeta,
-          document_metadata: docMeta,
-          workspace_invite_metadata: inviteMeta,
-          post_metadata: postMeta,
-          profile_metadata: profMeta,
-          call_metadata: callMeta,
-          audio_metadata: audioMeta,
-          poll_data: pollData,
-          attachments: m.attachments || null,
-          reactions: Object.keys(reactions).length > 0 ? reactions : null,
-          is_edited: m.is_edited || false,
-          is_deleted: m.is_deleted || false,
-          e2ee_ciphertext: m.e2ee_ciphertext || m.attachments?.e2ee_ciphertext || null,
-          e2ee_nonce: m.e2ee_nonce || m.attachments?.e2ee_nonce || null,
-          media_urls: extractedMedia && extractedMedia.length > 0 ? extractedMedia : null,
-          is_pinned: m.is_pinned || false,
-          is_forwarded: m.is_forwarded ?? (m.attachments?.is_forwarded || false),
-          reply_to_id: m.reply_to_id || null,
-          reply_to_message: replyInfo,
+          content: isMsgDeleted ? '🚫 This message was deleted' : m.content,
+          message_type: isMsgDeleted ? 'text' : detectedType,
+          doi_metadata: isMsgDeleted ? null : doiMeta,
+          document_metadata: isMsgDeleted ? null : docMeta,
+          workspace_invite_metadata: isMsgDeleted ? null : inviteMeta,
+          post_metadata: isMsgDeleted ? null : postMeta,
+          profile_metadata: isMsgDeleted ? null : profMeta,
+          call_metadata: isMsgDeleted ? null : callMeta,
+          audio_metadata: isMsgDeleted ? null : audioMeta,
+          poll_data: isMsgDeleted ? null : pollData,
+          attachments: isMsgDeleted ? null : (m.attachments || null),
+          reactions: isMsgDeleted ? null : (Object.keys(reactions).length > 0 ? reactions : null),
+          is_edited: isMsgDeleted ? false : (m.is_edited || false),
+          is_deleted: isMsgDeleted ? true : false,
+          e2ee_ciphertext: isMsgDeleted ? null : (m.e2ee_ciphertext || m.attachments?.e2ee_ciphertext || null),
+          e2ee_nonce: isMsgDeleted ? null : (m.e2ee_nonce || m.attachments?.e2ee_nonce || null),
+          media_urls: isMsgDeleted ? null : (extractedMedia && extractedMedia.length > 0 ? extractedMedia : null),
+          is_pinned: isMsgDeleted ? false : (m.is_pinned || false),
+          is_forwarded: isMsgDeleted ? false : (m.is_forwarded ?? (m.attachments?.is_forwarded || false)),
+          reply_to_id: isMsgDeleted ? null : (m.reply_to_id || null),
+          reply_to_message: isMsgDeleted ? null : replyInfo,
           created_at: m.created_at,
           updated_at: m.updated_at || m.created_at,
           sender: senderMap.get(m.sender_id),
@@ -2199,7 +2207,25 @@ export const workspaceService = {
     userId?: string
   ): Promise<{ success: boolean; error: string | null }> {
     try {
+      let effectiveUserId = userId;
+      if (!effectiveUserId) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        effectiveUserId = authUser?.id;
+      }
+
       if (deleteForEveryone) {
+        // Record in persistent preferences so it never restores across room switches or app restarts
+        if (effectiveUserId) {
+          try {
+            const prefs = await getChatPreferences(effectiveUserId);
+            const currentList = Array.isArray(prefs.deletedForEveryoneMessages) ? prefs.deletedForEveryoneMessages : [];
+            if (!currentList.includes(messageId)) {
+              prefs.deletedForEveryoneMessages = [...currentList, messageId];
+              await saveChatPreferences(effectiveUserId, prefs);
+            }
+          } catch {}
+        }
+
         const updatePayload: any = {
           content: '🚫 This message was deleted',
           is_deleted: true,
@@ -2209,41 +2235,41 @@ export const workspaceService = {
           updated_at: new Date().toISOString(),
         };
 
-        let { error } = await supabase
+        let { data: updatedRows, error } = await supabase
           .from('workspace_messages')
           .update(updatePayload)
-          .eq('id', messageId);
+          .eq('id', messageId)
+          .select('id');
 
         if (error && (error.message.includes('column') || error.message.includes('schema cache'))) {
-          // Schema fallback
+          // Schema fallback with core columns
           const retry = await supabase
             .from('workspace_messages')
             .update({
               content: '🚫 This message was deleted',
               is_deleted: true,
+              attachments: null,
               updated_at: new Date().toISOString(),
             })
-            .eq('id', messageId);
+            .eq('id', messageId)
+            .select('id');
+          updatedRows = retry.data;
           error = retry.error;
         }
 
-        if (error) {
-          // If update failed (e.g. workspace creator/owner deleting someone else's message), try delete row which is permitted for creators
+        // If update failed OR affected 0 rows (e.g. RLS policy restriction or workspace owner moderation), execute hard delete
+        if (error || !updatedRows || updatedRows.length === 0) {
           const hardDel = await supabase
             .from('workspace_messages')
             .delete()
-            .eq('id', messageId);
+            .eq('id', messageId)
+            .select('id');
           if (hardDel.error) {
-            return { success: false, error: error.message };
+            console.warn('[workspaceService] Hard delete error:', hardDel.error);
           }
         }
       } else {
         // Delete for Me: Save to user's chat preferences so it never shows up for this user
-        let effectiveUserId = userId;
-        if (!effectiveUserId) {
-          const { data: { user: authUser } } = await supabase.auth.getUser();
-          effectiveUserId = authUser?.id;
-        }
         if (effectiveUserId) {
           const prefs = await getChatPreferences(effectiveUserId);
           const currentList = Array.isArray(prefs.deletedMessages) ? prefs.deletedMessages : [];
