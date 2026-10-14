@@ -8,6 +8,7 @@ import {
   Share,
   Platform,
   ViewStyle,
+  Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -134,14 +135,16 @@ export const CommentCard: React.FC<CommentCardProps> = ({
   const badgeInfo = getTypeBadge();
   const IconComp: any = badgeInfo.icon;
 
-  // Format mentions with clickable blue text
+  // Format mentions and URLs with clickable blue text
   const renderFormattedContent = (text: string) => {
     const cleanedText = text.replace(/^\[(question|insight|methodology|discussion)\]\s*/i, '');
-    const parts = cleanedText.split(/(@[a-zA-Z0-9_]+)/g);
+    const tokenRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|@[a-zA-Z0-9_]{2,30})/gi;
+    const parts = cleanedText.split(tokenRegex);
 
     return (
       <Text style={styles.bodyText}>
         {parts.map((part, index) => {
+          if (!part) return null;
           if (part.startsWith('@')) {
             const handle = part.replace('@', '');
             return (
@@ -157,6 +160,30 @@ export const CommentCard: React.FC<CommentCardProps> = ({
               >
                 {part}
               </Text>
+            );
+          }
+          if (/^(https?:\/\/|www\.)/i.test(part)) {
+            const trailingMatch = part.match(/[.,;:!?)]+$/);
+            const trailingPunctuation = trailingMatch ? trailingMatch[0] : '';
+            const cleanUrl = trailingPunctuation ? part.slice(0, -trailingPunctuation.length) : part;
+            const targetUrl = cleanUrl.toLowerCase().startsWith('www.') ? `https://${cleanUrl}` : cleanUrl;
+            return (
+              <React.Fragment key={index}>
+                <Text
+                  style={styles.linkText}
+                  onPress={() => {
+                    try {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    } catch {}
+                    Linking.openURL(targetUrl).catch((err) => {
+                      console.warn('Failed to open URL:', targetUrl, err);
+                    });
+                  }}
+                >
+                  {cleanUrl}
+                </Text>
+                {trailingPunctuation ? <Text>{trailingPunctuation}</Text> : null}
+              </React.Fragment>
             );
           }
           return <Text key={index}>{part}</Text>;
@@ -462,6 +489,11 @@ const styles = StyleSheet.create({
   mentionText: {
     color: colors.accentBlue,
     fontWeight: '600',
+  },
+  linkText: {
+    color: colors.accentBlue,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   actionRow: {
     flexDirection: 'row',

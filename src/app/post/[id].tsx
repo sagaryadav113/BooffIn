@@ -350,6 +350,7 @@ export default function PostDetailScreen() {
           {/* Main Post Card */}
           <PostCard
             post={activePost}
+            isDetailView={true}
             onDeleted={() => {
               if (router.canGoBack()) {
                 router.back();

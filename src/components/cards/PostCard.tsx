@@ -10,9 +10,10 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import {
   Repeat2,
   MoreHorizontal,
@@ -48,6 +49,7 @@ interface PostCardProps {
   style?: ViewStyle;
   onDeleted?: () => void;
   onUpdated?: (updated: Post) => void;
+  isDetailView?: boolean;
 }
 
 export const PostCard: React.FC<PostCardProps> = React.memo(({
@@ -55,6 +57,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
   style,
   onDeleted,
   onUpdated,
+  isDetailView = false,
 }) => {
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -112,7 +115,20 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
   const showFollowButton =
     !isSelf && Boolean(post.author?.id) && (!isFollowing || hasToggledInSession);
 
+  const pathname = usePathname();
+  const isCurrentlyOnThisPost = Boolean(
+    isDetailView || (post.id && (pathname === `/post/${post.id}` || pathname.endsWith(`/post/${post.id}`)))
+  );
+  const isNavigatingRef = useRef(false);
+
   const handlePostPress = () => {
+    if (isCurrentlyOnThisPost) return;
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 800);
+
     router.push({
       pathname: '/post/[id]',
       params: { id: post.id },
@@ -121,9 +137,78 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
 
   const handleProfilePress = (e: any) => {
     e.stopPropagation();
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 800);
+
     router.push({
       pathname: '/profile/[id]',
       params: { id: post.author.id },
+    });
+  };
+
+  // Render text with clickable @mentions and interactive web URLs
+  const renderFormattedContent = (content: string) => {
+    const tokenRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|@[a-zA-Z0-9_]{2,30})/gi;
+    const parts = content.split(tokenRegex);
+
+    return parts.map((part, index) => {
+      if (!part) return null;
+
+      if (part.startsWith('@')) {
+        const handle = part.replace('@', '');
+        return (
+          <Text
+            key={index}
+            style={styles.mentionText}
+            onPress={(e) => {
+              e.stopPropagation();
+              if (isNavigatingRef.current) return;
+              isNavigatingRef.current = true;
+              setTimeout(() => {
+                isNavigatingRef.current = false;
+              }, 800);
+              router.push({
+                pathname: '/profile/[id]',
+                params: { id: handle },
+              });
+            }}
+          >
+            {part}
+          </Text>
+        );
+      }
+
+      if (/^(https?:\/\/|www\.)/i.test(part)) {
+        const trailingMatch = part.match(/[.,;:!?)]+$/);
+        const trailingPunctuation = trailingMatch ? trailingMatch[0] : '';
+        const cleanUrl = trailingPunctuation ? part.slice(0, -trailingPunctuation.length) : part;
+        const targetUrl = cleanUrl.toLowerCase().startsWith('www.') ? `https://${cleanUrl}` : cleanUrl;
+
+        return (
+          <React.Fragment key={index}>
+            <Text
+              style={styles.linkText}
+              onPress={(e) => {
+                e.stopPropagation();
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch {}
+                Linking.openURL(targetUrl).catch((err) => {
+                  console.warn('Failed to open URL:', targetUrl, err);
+                });
+              }}
+            >
+              {cleanUrl}
+            </Text>
+            {trailingPunctuation ? <Text>{trailingPunctuation}</Text> : null}
+          </React.Fragment>
+        );
+      }
+
+      return <Text key={index}>{part}</Text>;
     });
   };
 
@@ -184,9 +269,9 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
 
   return (
     <TouchableOpacity
-      activeOpacity={0.95}
+      activeOpacity={isCurrentlyOnThisPost ? 1 : 0.95}
       delayPressIn={50}
-      onPress={handlePostPress}
+      onPress={isCurrentlyOnThisPost ? undefined : handlePostPress}
       style={[styles.container, style]}
     >
       {/* Repost Attribution Header */}
@@ -294,8 +379,8 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
       {/* Research Article Preview Card */}
       {post.postType === 'article' && post.article ? (
         <TouchableOpacity
-          onPress={handlePostPress}
-          activeOpacity={0.88}
+          onPress={isCurrentlyOnThisPost ? undefined : handlePostPress}
+          activeOpacity={isCurrentlyOnThisPost ? 1 : 0.88}
           style={styles.articleCardPreview}
         >
           <View style={styles.articleBadgeRow}>
@@ -336,27 +421,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
         </TouchableOpacity>
       ) : post.content ? (
         <Text style={styles.postBody}>
-          {post.content.split(/(@[a-zA-Z0-9_]{2,30})/g).map((part, index) => {
-            if (part.startsWith('@')) {
-              const handle = part.replace('@', '');
-              return (
-                <Text
-                  key={index}
-                  style={styles.mentionText}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    router.push({
-                      pathname: '/profile/[id]',
-                      params: { id: handle },
-                    });
-                  }}
-                >
-                  {part}
-                </Text>
-              );
-            }
-            return <Text key={index}>{part}</Text>;
-          })}
+          {renderFormattedContent(post.content)}
         </Text>
       ) : null}
 
@@ -452,6 +517,12 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           onPress={(e) => {
             e.stopPropagation();
             if (post.quotedPost?.id) {
+              if (pathname === `/post/${post.quotedPost.id}`) return;
+              if (isNavigatingRef.current) return;
+              isNavigatingRef.current = true;
+              setTimeout(() => {
+                isNavigatingRef.current = false;
+              }, 800);
               router.push({
                 pathname: '/post/[id]',
                 params: { id: post.quotedPost.id },
@@ -484,7 +555,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
 
           {post.quotedPost.content ? (
             <Text style={styles.quotedContentText} numberOfLines={3}>
-              {post.quotedPost.content}
+              {renderFormattedContent(post.quotedPost.content)}
             </Text>
           ) : null}
 
@@ -788,6 +859,11 @@ const styles = StyleSheet.create({
   mentionText: {
     color: colors.accentBlue,
     fontWeight: '600',
+  },
+  linkText: {
+    color: colors.accentBlue,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   paperCardSpacing: {
     marginTop: spacing.sm,
