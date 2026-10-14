@@ -38,6 +38,7 @@ export interface CommentCardProps {
   currentUser?: UserProfile;
   isReply?: boolean;
   depth?: number;
+  highlighted?: boolean;
   style?: ViewStyle;
 }
 
@@ -52,6 +53,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
   currentUser,
   isReply = false,
   depth = 0,
+  highlighted = false,
   style,
 }) => {
   const [isInlineReplying, setIsInlineReplying] = useState(false);
@@ -199,6 +201,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
     <View
       style={[
         isRoot ? styles.rootCardContainer : styles.replyCardContainer,
+        highlighted && styles.highlightedCard,
         depth > 1 && { marginLeft: Math.min(depth - 1, 3) * 10 },
         style,
       ]}
@@ -576,5 +579,11 @@ const styles = StyleSheet.create({
   repliesList: {
     marginTop: spacing.xs,
     gap: spacing.xs,
+  },
+  highlightedCard: {
+    borderColor: '#3B82F6',
+    borderWidth: 1.5,
+    backgroundColor: '#F0F9FF',
+    borderRadius: radii.md,
   },
 });

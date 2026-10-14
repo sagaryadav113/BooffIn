@@ -80,11 +80,17 @@ export function getNotificationDeepLink(notification: AppNotification): {
   pathname: string;
   params?: Record<string, string>;
 } {
+  const targetCommentId = notification.targetCommentId || notification.metadata?.comment_id;
+
   if (notification.targetPostId || (notification.entityType === 'post' && notification.entityId)) {
     const postId = notification.targetPostId || notification.entityId || '';
+    const params: Record<string, string> = { id: postId };
+    if (targetCommentId) {
+      params.commentId = targetCommentId;
+    }
     return {
       pathname: '/post/[id]',
-      params: { id: postId },
+      params,
     };
   }
 
@@ -93,6 +99,17 @@ export function getNotificationDeepLink(notification: AppNotification): {
     return {
       pathname: '/paper/[id]',
       params: { id: paperId },
+    };
+  }
+
+  if (notification.type === 'collaboration_request') {
+    return {
+      pathname: '/profile/[id]',
+      params: {
+        id: notification.actor.id,
+        action: 'collaboration',
+        requestId: notification.entityId || notification.metadata?.request_id || '',
+      },
     };
   }
 
@@ -221,7 +238,8 @@ export function filterNotificationList(
         n.type === 'reply' ||
         n.type === 'like' ||
         n.type === 'repost' ||
-        n.type === 'paper_discussion'
+        n.type === 'paper_discussion' ||
+        n.type === 'collaboration_request'
     );
   }
   if (filter === 'Updates') {
@@ -235,6 +253,79 @@ export function filterNotificationList(
     );
   }
   return list;
+}
+
+/**
+ * Maps a raw Supabase notification query row into an AppNotification model
+ */
+export function mapNotificationRow(row: any): AppNotification {
+  const actor = mapSupabaseProfile(row.actor);
+  const metadata = row.metadata || {};
+  const type = row.notification_type as NotificationType;
+  const topicName = metadata.topic_name || (row.entity_type === 'topic' ? row.message_snippet : undefined);
+  
+  const content = formatNotificationContent(type, row.message_snippet, topicName);
+
+  return {
+    id: row.id,
+    type,
+    actor,
+    content,
+    entityType: row.entity_type as NotificationEntityType,
+    entityId: row.entity_id,
+    targetPostId: row.entity_type === 'post' ? row.entity_id : metadata.post_id,
+    targetPaperId: row.entity_type === 'paper' ? row.entity_id : metadata.paper_id,
+    targetTopicName: topicName,
+    targetCommentId: metadata.comment_id,
+    messageSnippet: row.message_snippet,
+    metadata: {
+      ...metadata,
+      raw_created_at: row.created_at,
+    },
+    createdAt: formatNotificationTime(row.created_at),
+    isRead: Boolean(row.read_status),
+  };
+}
+
+/**
+ * Fetch a single notification by ID (used for real-time incremental insertions)
+ */
+export async function fetchNotificationById(notificationId: string): Promise<AppNotification | null> {
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select(
+        `
+        id,
+        recipient_id,
+        actor_id,
+        notification_type,
+        entity_type,
+        entity_id,
+        message_snippet,
+        metadata,
+        read_status,
+        created_at,
+        actor:profiles!actor_id (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        )
+      `
+      )
+      .eq('id', notificationId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapNotificationRow(data);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -285,7 +376,14 @@ export async function fetchNotifications(
     } else if (filter === 'Follows') {
       query = query.eq('notification_type', 'follow');
     } else if (filter === 'Discussions') {
-      query = query.in('notification_type', ['comment', 'reply', 'paper_discussion']);
+      query = query.in('notification_type', [
+        'comment',
+        'reply',
+        'like',
+        'repost',
+        'paper_discussion',
+        'collaboration_request',
+      ]);
     } else if (filter === 'Updates') {
       query = query.in('notification_type', [
         'researcher_post',
@@ -307,34 +405,7 @@ export async function fetchNotifications(
       return { data: [], hasMore: false, error: error?.message || null };
     }
 
-    const mappedNotifications: AppNotification[] = data.map((row: any) => {
-      const actor = mapSupabaseProfile(row.actor);
-      const metadata = row.metadata || {};
-      const type = row.notification_type as NotificationType;
-      const topicName = metadata.topic_name || (row.entity_type === 'topic' ? row.message_snippet : undefined);
-      
-      const content = formatNotificationContent(type, row.message_snippet, topicName);
-
-      return {
-        id: row.id,
-        type,
-        actor,
-        content,
-        entityType: row.entity_type as NotificationEntityType,
-        entityId: row.entity_id,
-        targetPostId: row.entity_type === 'post' ? row.entity_id : metadata.post_id,
-        targetPaperId: row.entity_type === 'paper' ? row.entity_id : metadata.paper_id,
-        targetTopicName: topicName,
-        targetCommentId: metadata.comment_id,
-        messageSnippet: row.message_snippet,
-        metadata: {
-          ...metadata,
-          raw_created_at: row.created_at,
-        },
-        createdAt: formatNotificationTime(row.created_at),
-        isRead: Boolean(row.read_status),
-      };
-    });
+    const mappedNotifications: AppNotification[] = data.map(mapNotificationRow);
 
     // 3. Robust deduplication of trigger-duplicated rows
     const { uniqueNotifications, duplicateIds } = deduplicateNotificationList(mappedNotifications);

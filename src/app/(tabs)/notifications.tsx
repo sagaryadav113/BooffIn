@@ -29,19 +29,16 @@ export default function NotificationsScreen() {
   const setActiveFilter = useNotificationStore((s) => s.setActiveFilter);
   const markAllAsRead = useNotificationStore((s) => s.markAllAsRead);
   const loadNotifications = useNotificationStore((s) => s.loadNotifications);
-  const subscribeToRealtimeNotifications = useNotificationStore((s) => s.subscribeToRealtimeNotifications);
+  const loadMore = useNotificationStore((s) => s.loadMore);
+  const hasMore = useNotificationStore((s) => s.hasMore);
   const isLoading = useNotificationStore((s) => s.isLoading);
   const isRefreshing = useNotificationStore((s) => s.isRefreshing);
+  const isLoadingMore = useNotificationStore((s) => s.isLoadingMore);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
-  const currentUser = useAuthStore((s) => s.user);
 
   useEffect(() => {
     loadNotifications();
-    const unsubscribe = subscribeToRealtimeNotifications(currentUser?.id);
-    return () => {
-      unsubscribe();
-    };
-  }, [loadNotifications, subscribeToRealtimeNotifications, currentUser?.id]);
+  }, [loadNotifications, activeFilter]);
 
   const handleRefresh = useCallback(async () => {
     try {
@@ -49,6 +46,12 @@ export default function NotificationsScreen() {
     } catch {}
     await loadNotifications(true);
   }, [loadNotifications]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!isLoading && !isRefreshing && !isLoadingMore && hasMore) {
+      loadMore();
+    }
+  }, [isLoading, isRefreshing, isLoadingMore, hasMore, loadMore]);
 
   const filteredNotifications = useMemo(() => {
     return filterNotificationList(notifications, activeFilter);
@@ -135,6 +138,8 @@ export default function NotificationsScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <NotificationRow notification={item} />}
         contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.3}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -142,6 +147,13 @@ export default function NotificationsScreen() {
             tintColor={colors.black}
             colors={[colors.black]}
           />
+        }
+        ListFooterComponent={
+          isLoadingMore ? (
+            <View style={styles.footerLoader}>
+              <LoadingState message="Loading more notifications..." />
+            </View>
+          ) : null
         }
         ListEmptyComponent={
           isLoading && notifications.length === 0 ? (
@@ -187,5 +199,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: 6,
     backgroundColor: colors.backgroundSecondary,
+  },
+  footerLoader: {
+    paddingVertical: spacing.md,
   },
 });

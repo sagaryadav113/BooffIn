@@ -31,8 +31,9 @@ import { supabase } from '../../api/client';
 import { mapSupabasePost, populatePollVotes } from '../../api/socialService';
 
 export default function PostDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, commentId } = useLocalSearchParams<{ id: string; commentId?: string }>();
   const rawId = Array.isArray(id) ? id[0] : (id || '');
+  const targetCommentId = Array.isArray(commentId) ? commentId[0] : commentId;
   const postId = rawId ? rawId.trim().replace(/\/$/, '') : '';
 
   const getPostById = usePostStore((s) => s.getPostById);
@@ -414,6 +415,9 @@ export default function PostDetailScreen() {
                 <CommentCard
                   key={c.id}
                   comment={c}
+                  highlighted={Boolean(
+                    targetCommentId && (c.id === targetCommentId || c.replies?.some((r) => r.id === targetCommentId))
+                  )}
                   onAddReply={handleAddReply}
                   onLike={(cId) => {
                     if (!currentUser?.id) {

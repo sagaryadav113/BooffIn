@@ -1,7 +1,9 @@
 import { create } from 'zustand';
+import * as Haptics from 'expo-haptics';
 import { AppNotification, NotificationFilter } from '../types/notification';
 import {
   fetchNotifications,
+  fetchNotificationById,
   fetchUnreadCount,
   markNotificationAsRead as apiMarkAsRead,
   markAllNotificationsAsRead as apiMarkAllAsRead,
@@ -17,10 +19,14 @@ interface NotificationState {
   unreadCount: number;
   isLoading: boolean;
   isRefreshing: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  page: number;
   error: string | null;
 
   // Actions
   loadNotifications: (refresh?: boolean) => Promise<void>;
+  loadMore: () => Promise<void>;
   loadUnreadCount: () => Promise<void>;
   setActiveFilter: (filter: NotificationFilter) => void;
   markAsRead: (id: string) => Promise<void>;
@@ -35,6 +41,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   unreadCount: 0,
   isLoading: false,
   isRefreshing: false,
+  isLoadingMore: false,
+  hasMore: true,
+  page: 1,
   error: null,
 
   loadNotifications: async (refresh = false) => {
@@ -46,13 +55,20 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }
 
     try {
-      const { data, error } = await fetchNotifications(get().activeFilter, 1, 50, currentUserId);
+      const { data, hasMore, error } = await fetchNotifications(get().activeFilter, 1, 40, currentUserId);
       if (error) {
         set({ error, isLoading: false, isRefreshing: false });
       } else {
         const { uniqueNotifications } = deduplicateNotificationList(data);
         const unread = uniqueNotifications.filter((n) => !n.isRead).length;
-        set({ notifications: uniqueNotifications, unreadCount: unread, isLoading: false, isRefreshing: false });
+        set({
+          notifications: uniqueNotifications,
+          unreadCount: unread,
+          page: 1,
+          hasMore,
+          isLoading: false,
+          isRefreshing: false,
+        });
       }
     } catch (err: any) {
       set({
@@ -60,6 +76,37 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         isLoading: false,
         isRefreshing: false,
       });
+    }
+  },
+
+  loadMore: async () => {
+    const { isLoading, isLoadingMore, hasMore, page, notifications, activeFilter } = get();
+    if (isLoading || isLoadingMore || !hasMore) return;
+
+    const currentUserId = useAuthStore.getState().user?.id;
+    const nextPage = page + 1;
+    set({ isLoadingMore: true });
+
+    try {
+      const { data, hasMore: nextHasMore, error } = await fetchNotifications(activeFilter, nextPage, 40, currentUserId);
+      if (error) {
+        set({ isLoadingMore: false });
+        return;
+      }
+
+      const combined = [...notifications, ...data];
+      const { uniqueNotifications } = deduplicateNotificationList(combined);
+      const unread = uniqueNotifications.filter((n) => !n.isRead).length;
+
+      set({
+        notifications: uniqueNotifications,
+        unreadCount: unread,
+        page: nextPage,
+        hasMore: nextHasMore,
+        isLoadingMore: false,
+      });
+    } catch {
+      set({ isLoadingMore: false });
     }
   },
 
@@ -74,7 +121,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   setActiveFilter: (filter) => {
-    set({ activeFilter: filter });
+    set({ activeFilter: filter, page: 1, hasMore: true });
     get().loadNotifications();
   },
 
@@ -134,8 +181,51 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
           table: 'notifications',
           filter: `recipient_id=eq.${targetUserId}`,
         },
-        () => {
-          get().loadNotifications(true);
+        async (payload: any) => {
+          const eventType = payload.eventType;
+
+          if (eventType === 'INSERT' && payload.new?.id) {
+            // 1. Optimistically bump unread count immediately
+            set((state) => ({ unreadCount: state.unreadCount + 1 }));
+
+            // 2. Subtle haptic notification if supported
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch {}
+
+            // 3. Fetch enriched notification record with actor profile
+            const fullNotification = await fetchNotificationById(payload.new.id);
+            if (fullNotification) {
+              set((state) => {
+                const alreadyExists = state.notifications.some((n) => n.id === fullNotification.id);
+                if (alreadyExists) return state;
+                const updatedList = [fullNotification, ...state.notifications];
+                const { uniqueNotifications } = deduplicateNotificationList(updatedList);
+                return {
+                  notifications: uniqueNotifications,
+                  unreadCount: uniqueNotifications.filter((n) => !n.isRead).length,
+                };
+              });
+            }
+          } else if (eventType === 'UPDATE' && payload.new?.id) {
+            set((state) => {
+              const updated = state.notifications.map((n) =>
+                n.id === payload.new.id ? { ...n, isRead: Boolean(payload.new.read_status) } : n
+              );
+              return {
+                notifications: updated,
+                unreadCount: updated.filter((n) => !n.isRead).length,
+              };
+            });
+          } else if (eventType === 'DELETE' && payload.old?.id) {
+            set((state) => {
+              const remaining = state.notifications.filter((n) => n.id !== payload.old.id);
+              return {
+                notifications: remaining,
+                unreadCount: remaining.filter((n) => !n.isRead).length,
+              };
+            });
+          }
         }
       )
       .subscribe();

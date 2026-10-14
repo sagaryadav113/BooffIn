@@ -6,6 +6,7 @@ import { SafeAreaProvider, SafeAreaInsetsContext, EdgeInsets } from 'react-nativ
 import { colors, shadows } from '../theme';
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary';
 import { useAuthStore } from '../store/useAuthStore';
+import { useNotificationStore } from '../store/useNotificationStore';
 
 import { DesktopLayoutShell } from '../components/desktop/DesktopLayoutShell';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -27,6 +28,16 @@ export default function RootLayout() {
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  // Global Realtime Notifications & Badge Synchronization
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser?.id) return;
+    useNotificationStore.getState().loadUnreadCount();
+    const unsubscribe = useNotificationStore.getState().subscribeToRealtimeNotifications(currentUser.id);
+    return () => {
+      unsubscribe();
+    };
+  }, [isAuthenticated, currentUser?.id]);
 
   // Global Auth Guard: Restrict unauthenticated users from entering protected app routes via browser URLs
   useEffect(() => {

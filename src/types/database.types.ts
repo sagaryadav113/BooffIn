@@ -16,6 +16,7 @@ export type NotificationTypeEnum =
   | 'reply'
   | 'repost'
   | 'paper_discussion'
+  | 'collaboration_request'
   | 'researcher_post'
   | 'topic_activity'
   | 'mention'

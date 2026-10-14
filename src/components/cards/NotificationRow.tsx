@@ -46,8 +46,11 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
         return { icon: 'Heart', bg: colors.accentRed };
       case 'comment':
       case 'reply':
-      case 'mention':
         return { icon: 'Discussion', bg: colors.accentBlue };
+      case 'mention':
+        return { icon: 'AtSign', bg: '#2563EB' };
+      case 'collaboration_request':
+        return { icon: 'Users', bg: '#0D9488' };
       case 'repost':
         return { icon: 'Repeat2', bg: colors.accentGreen };
       case 'follow':
@@ -58,8 +61,6 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
         return { icon: 'Sparkles', bg: colors.accentGreen };
       case 'topic_activity':
         return { icon: 'Tag', bg: colors.accentOrange };
-      case 'mention':
-        return { icon: 'MessageCircle', bg: colors.accentBlue };
       case 'trending':
         return { icon: 'Zap', bg: colors.accentOrange };
       default:
