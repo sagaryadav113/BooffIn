@@ -1,0 +1,15 @@
+{
+  "active": "personal",
+  "accounts": {
+    "booffin": {
+      "owner": "booffin",
+      "projectId": "4663bcdc-7aca-485c-b1db-e30777aea8a2",
+      "description": "Official Booffin Organization account"
+    },
+    "personal": {
+      "owner": "sagaryadav_11",
+      "projectId": "eada90d5-a216-4b7b-909d-dc780ce350c7",
+      "description": "Personal account (sagaryadav_11) for testing and free EAS builds"
+    }
+  }
+}

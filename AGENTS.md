@@ -39,3 +39,15 @@ Docs: https://docs.expo.dev/eas/index.md
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+## EAS Account Switching
+The project has dual EAS account configuration managed via `eas-accounts.json`:
+1. **Primary Organization Account**:
+   - Owner: `"booffin"`
+   - Project ID: `"4663bcdc-7aca-485c-b1db-e30777aea8a2"`
+2. **Personal Backup Account (for free builds)**:
+   - Owner: `"sagaryadav_11"`
+- To switch back to `booffin`: run `node scripts/switch-eas-account.js booffin` or `npm run eas:switch-booffin`
+- To switch to personal: run `node scripts/switch-eas-account.js personal` or `npm run eas:switch-personal`
+Whenever the user asks to switch between accounts, use these scripts to keep `app.json` and `eas-accounts.json` in sync.
+

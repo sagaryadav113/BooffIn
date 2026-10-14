@@ -66,6 +66,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "eas:switch-booffin": "node ./scripts/switch-eas-account.js booffin",
+    "eas:switch-personal": "node ./scripts/switch-eas-account.js personal",
     "electron:start": "electron electron/main.js",
     "electron:build": "npm run export && electron-builder --win"
   },

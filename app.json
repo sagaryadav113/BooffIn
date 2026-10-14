@@ -37,10 +37,21 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "www.letsbooffin.com", "pathPrefix": "/" },
-            { "scheme": "https", "host": "letsbooffin.com", "pathPrefix": "/" }
+            {
+              "scheme": "https",
+              "host": "www.letsbooffin.com",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "letsbooffin.com",
+              "pathPrefix": "/"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -80,9 +91,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "4663bcdc-7aca-485c-b1db-e30777aea8a2"
+        "projectId": "eada90d5-a216-4b7b-909d-dc780ce350c7"
       }
     },
-    "owner": "booffin"
+    "owner": "sagaryadav_11"
   }
 }
