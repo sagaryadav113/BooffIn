@@ -19,6 +19,7 @@ export interface PopoverProps {
     x?: number;
     y?: number;
     top?: number;
+    bottom?: number;
     left?: number;
     width?: number;
     height?: number;
@@ -45,7 +46,7 @@ export const Popover: React.FC<PopoverProps> = ({
   children,
   style,
 }) => {
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -60,15 +61,17 @@ export const Popover: React.FC<PopoverProps> = ({
         resolvedPosition = y > windowHeight * 0.55 ? 'top' : 'bottom';
       }
 
-      let top = 0;
+      let top: number | undefined = undefined;
+      let bottom: number | undefined = undefined;
+
       if (resolvedPosition === 'top') {
-        top = y - estimatedHeight - offset;
+        // Anchor the bottom of the popover directly above the target (offset pixels above y)
+        bottom = Math.max(12, windowHeight - y + offset);
       } else {
         top = y + height + offset;
+        // Ensure top stays on-screen
+        top = Math.max(12, Math.min(top, windowHeight - estimatedHeight - 12));
       }
-
-      // Ensure top stays on-screen
-      top = Math.max(12, Math.min(top, windowHeight - estimatedHeight - 12));
 
       // 2. Determine horizontal placement
       let left = 0;
@@ -83,12 +86,14 @@ export const Popover: React.FC<PopoverProps> = ({
       // Ensure left stays on-screen
       left = Math.max(12, Math.min(left, windowWidth - estimatedWidth - 12));
 
-      setCoords({ top, left });
+      setCoords({ top, bottom, left });
     };
 
     if (anchorCoords) {
       if (anchorCoords.top !== undefined && anchorCoords.left !== undefined) {
         setCoords({ top: anchorCoords.top, left: anchorCoords.left });
+      } else if (anchorCoords.bottom !== undefined && anchorCoords.left !== undefined) {
+        setCoords({ bottom: anchorCoords.bottom, left: anchorCoords.left });
       } else {
         calculatePosition(
           anchorCoords.x ?? 0,
@@ -125,7 +130,11 @@ export const Popover: React.FC<PopoverProps> = ({
               style={[
                 styles.popoverCard,
                 { width: estimatedWidth },
-                coords ? { top: coords.top, left: coords.left } : styles.fallback,
+                coords?.bottom !== undefined
+                  ? { bottom: coords.bottom, left: coords.left }
+                  : coords?.top !== undefined
+                  ? { top: coords.top, left: coords.left }
+                  : styles.fallback,
                 style,
               ]}
             >
