@@ -518,6 +518,32 @@ export default function WorkspaceHubScreen() {
   const renderInnerCircleItem = ({ item }: { item: Workspace }) => {
     const unreadCount = item.unread_count || 0;
 
+    const getInnerCircleSnippet = () => {
+      const lm = item.last_message;
+      if (lm) {
+        if (lm.is_deleted) return '🚫 This message was deleted';
+        if (lm.message_type === 'image' || (lm.media_urls && lm.media_urls.length > 0)) return '📷 Photo';
+        if (lm.message_type === 'audio' || lm.message_type === 'voice_note') return '🎙️ Voice note';
+        if (lm.message_type === 'document') return `📄 ${lm.document_metadata?.name || 'Document'}`;
+        if (lm.message_type === 'paper_doi' || lm.doi_metadata) return `🔬 ${lm.doi_metadata?.title || 'Research paper'}`;
+        if (lm.message_type === 'poll') return `📊 Poll: ${lm.content}`;
+        if (lm.message_type === 'post') return lm.content ? `📑 ${lm.content}` : '📑 Shared post';
+        if (lm.message_type === 'profile') return '👤 Shared researcher profile';
+        if (lm.message_type === 'call_log') return lm.content;
+        if (lm.content && lm.content !== '🔒 Encrypted message' && !lm.content.startsWith('🔒 [')) {
+          return lm.content;
+        }
+        return 'Message';
+      }
+      return item.description || 'Private research group';
+    };
+
+    const timeFormatted = item.last_message?.created_at
+      ? new Date(item.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : item.updated_at
+      ? new Date(item.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
+
     return (
       <TouchableOpacity
         activeOpacity={0.7}
@@ -531,17 +557,17 @@ export default function WorkspaceHubScreen() {
             <Text style={styles.innerCircleTitle} numberOfLines={1}>
               {item.name}
             </Text>
-            <Text style={styles.innerCircleTime}>
-              {item.updated_at ? new Date(item.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:34 PM'}
-            </Text>
+            {timeFormatted ? (
+              <Text style={styles.innerCircleTime}>
+                {timeFormatted}
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.innerCircleSnippetRow}>
-              {item.last_message?.content && item.last_message.content !== '🔒 Encrypted message' && !item.last_message.content.startsWith('🔒 [')
-                ? item.last_message.content
-                : item.last_message
-                ? 'Message'
-                : item.description || 'Alex: What are we doing for the project review?'}
+            <Text style={styles.innerCircleSnippet} numberOfLines={1}>
+              {getInnerCircleSnippet()}
+            </Text>
             {unreadCount > 0 && (
               <View style={styles.unreadPill}>
                 <Text style={styles.unreadPillText}>
@@ -1204,13 +1230,14 @@ const styles = StyleSheet.create({
   },
   innerCircleTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0F172A',
     flex: 1,
   },
   innerCircleTime: {
     fontSize: 12,
     color: '#94A3B8',
+    fontWeight: '400',
   },
   innerCircleSnippetRow: {
     flexDirection: 'row',
@@ -1219,7 +1246,9 @@ const styles = StyleSheet.create({
   },
   innerCircleSnippet: {
     fontSize: 13,
+    fontWeight: '400',
     color: '#64748B',
+    lineHeight: 18,
     flex: 1,
     marginRight: 8,
   },

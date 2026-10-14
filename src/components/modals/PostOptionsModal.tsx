@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
   Platform,
   Alert,
 } from 'react-native';
@@ -15,18 +9,18 @@ import {
   Trash2,
   Link as LinkIcon,
   Flag,
-  Copy,
   UserX,
+  Bookmark,
+  BookmarkCheck,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { Post } from '../../types';
-import { colors, radii, spacing, fontSizes, shadows } from '../../theme';
-import { SaveIcon } from '../core/SaveIcon';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { blockUser } from '../../api/moderationService';
 import { ContentReportModal } from './ContentReportModal';
+import { Popover, PopoverItem, PopoverDivider } from '../core/Popover';
 
 export interface PostOptionsModalProps {
   visible: boolean;
@@ -35,6 +29,7 @@ export interface PostOptionsModalProps {
   onEditPress: () => void;
   onSharePress: () => void;
   onDeleteSuccess?: () => void;
+  anchorRef?: React.RefObject<any>;
 }
 
 export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
@@ -44,6 +39,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
   onEditPress,
   onSharePress,
   onDeleteSuccess,
+  anchorRef,
 }) => {
   const currentUser = useAuthStore((s) => s.user);
   const deletePost = usePostStore((s) => s.deletePost);
@@ -138,342 +134,131 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
     onSharePress();
   };
 
+  const handleBlockAuthor = () => {
+    onClose();
+    const executeBlock = async () => {
+      const res = await blockUser(post.author.id);
+      if (res.success) {
+        usePostStore.setState((state) => ({
+          posts: state.posts.filter((p) => p.author.id !== post.author.id),
+        }));
+        if (Platform.OS === 'web') {
+          window.alert(`${post.author.fullName || 'Researcher'} has been blocked.`);
+        } else {
+          Alert.alert('Blocked', `${post.author.fullName || 'Researcher'} has been blocked.`);
+        }
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert(res.error || 'Failed to block user.');
+        } else {
+          Alert.alert('Error', res.error || 'Failed to block user.');
+        }
+      }
+    };
+
+    const promptText = `Are you sure you want to block ${post.author.fullName || '@' + post.author.handle}? They will not be able to follow you, view your posts, or interact with your research notes.`;
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(promptText)) {
+        executeBlock();
+      }
+    } else {
+      Alert.alert(
+        'Block Researcher',
+        promptText,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Block', style: 'destructive', onPress: executeBlock },
+        ],
+        { cancelable: true }
+      );
+    }
+  };
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop} />
-      </TouchableWithoutFeedback>
+    <>
+      <Popover
+        visible={visible && !reportModalVisible}
+        onClose={onClose}
+        anchorRef={anchorRef}
+        align="end"
+        position="bottom"
+        estimatedWidth={210}
+        estimatedHeight={isAuthor ? 175 : 210}
+      >
+        <PopoverItem
+          icon={<LinkIcon size={16} color="#475569" />}
+          label="Copy link"
+          onPress={handleCopyLink}
+        />
+        <PopoverItem
+          icon={post.isSaved ? <BookmarkCheck size={16} color="#059669" /> : <Bookmark size={16} color="#475569" />}
+          label={post.isSaved ? 'Saved to library' : 'Save post'}
+          active={Boolean(post.isSaved)}
+          activeColor="#059669"
+          onPress={handleSaveToggle}
+        />
+        <PopoverItem
+          icon={<Share2 size={16} color="#475569" />}
+          label="Share via..."
+          onPress={handleShare}
+        />
 
-      <View style={styles.sheetWrapper} pointerEvents="box-none">
-        <View style={styles.sheetContainer}>
-          <View style={styles.dragHandle} />
-
-          {/* Actions List */}
-          <View style={styles.menuList}>
-            {isAuthor ? (
-              <>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleEdit}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: colors.accentBlue + '15' }]}>
-                    <Edit3 size={18} color={colors.accentBlue} />
-                  </View>
-                  <View style={styles.itemTextContainer}>
-                    <Text style={styles.itemTitle}>Edit Post</Text>
-                    <Text style={styles.itemSubtitle}>
-                      Modify text content and topic tags
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleShare}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: colors.accentGreen + '15' }]}>
-                    <Share2 size={18} color={colors.accentGreen} />
-                  </View>
-                  <View style={styles.itemTextContainer}>
-                    <Text style={styles.itemTitle}>Share Post</Text>
-                    <Text style={styles.itemSubtitle}>
-                      Share via link, images, or social sheet
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleCopyLink}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: colors.surfaceHover }]}>
-                    <LinkIcon size={18} color={colors.textPrimary} />
-                  </View>
-                  <View style={styles.itemTextContainer}>
-                    <Text style={styles.itemTitle}>Copy Link</Text>
-                    <Text style={styles.itemSubtitle}>
-                      Copy direct link to clipboard
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <View style={styles.separator} />
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleDeletePress}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: colors.accentRed + '15' }]}>
-                    <Trash2 size={18} color={colors.accentRed} />
-                  </View>
-                  <View style={styles.itemTextContainer}>
-                    <Text style={[styles.itemTitle, { color: colors.accentRed }]}>
-                      Delete Post
-                    </Text>
-                    <Text style={styles.itemSubtitle}>
-                      Permanently remove this publication
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleShare}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: colors.accentBlue + '15' }]}>
-                    <Share2 size={18} color={colors.accentBlue} />
-                  </View>
-                  <View style={styles.itemTextContainer}>
-                    <Text style={styles.itemTitle}>Share Post</Text>
-                    <Text style={styles.itemSubtitle}>
-                      Share via link, images, or native sheet
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleSaveToggle}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: colors.accentGreen + '15' }]}>
-                    <SaveIcon
-                      size={18}
-                      isSaved={Boolean(post.isSaved)}
-                      color={colors.accentGreen}
-                      ribbonColor={colors.accentGreen}
-                    />
-                  </View>
-                  <View style={styles.itemTextContainer}>
-                    <Text style={styles.itemTitle}>
-                      {post.isSaved ? 'Remove from Saved' : 'Save Post'}
-                    </Text>
-                    <Text style={styles.itemSubtitle}>
-                      {post.isSaved
-                        ? 'Remove from your saved research list'
-                        : 'Save to your research library'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleCopyLink}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: colors.surfaceHover }]}>
-                    <Copy size={18} color={colors.textPrimary} />
-                  </View>
-                  <View style={styles.itemTextContainer}>
-                    <Text style={styles.itemTitle}>Copy Link</Text>
-                    <Text style={styles.itemSubtitle}>
-                      Copy link to clipboard
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <View style={styles.separator} />
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => {
-                    try {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    } catch {}
-                    setReportModalVisible(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: colors.surfaceHover }]}>
-                    <Flag size={18} color={colors.textSecondary} />
-                  </View>
-                  <View style={styles.itemTextContainer}>
-                    <Text style={styles.itemTitle}>Report Post</Text>
-                    <Text style={styles.itemSubtitle}>
-                      Flag inappropriate or non-academic content
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => {
-                    onClose();
-                    const executeBlock = async () => {
-                      const res = await blockUser(post.author.id);
-                      if (res.success) {
-                        usePostStore.setState((state) => ({
-                          posts: state.posts.filter((p) => p.author.id !== post.author.id),
-                        }));
-                        if (Platform.OS === 'web') {
-                          window.alert(`${post.author.fullName || 'Researcher'} has been blocked.`);
-                        } else {
-                          Alert.alert('Blocked', `${post.author.fullName || 'Researcher'} has been blocked.`);
-                        }
-                      } else {
-                        if (Platform.OS === 'web') {
-                          window.alert(res.error || 'Failed to block user.');
-                        } else {
-                          Alert.alert('Error', res.error || 'Failed to block user.');
-                        }
-                      }
-                    };
-
-                    const promptText = `Are you sure you want to block ${post.author.fullName || '@' + post.author.handle}? They will not be able to follow you, view your posts, or interact with your research notes.`;
-
-                    if (Platform.OS === 'web') {
-                      if (window.confirm(promptText)) {
-                        executeBlock();
-                      }
-                    } else {
-                      Alert.alert(
-                        'Block Researcher',
-                        promptText,
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Block', style: 'destructive', onPress: executeBlock },
-                        ],
-                        { cancelable: true }
-                      );
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: colors.accentRed + '15' }]}>
-                    <UserX size={18} color={colors.accentRed} />
-                  </View>
-                  <View style={styles.itemTextContainer}>
-                    <Text style={[styles.itemTitle, { color: colors.accentRed }]}>
-                      Block Researcher
-                    </Text>
-                    <Text style={styles.itemSubtitle}>
-                      Prevent interactions and hide research updates
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-
-          {/* Cancel Button */}
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={onClose}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+        {isAuthor ? (
+          <>
+            <PopoverDivider />
+            <PopoverItem
+              icon={<Edit3 size={16} color="#2563EB" />}
+              label="Edit post"
+              onPress={handleEdit}
+            />
+            <PopoverDivider />
+            <PopoverItem
+              icon={<Trash2 size={16} color="#EF4444" />}
+              label="Delete post"
+              destructive
+              onPress={handleDeletePress}
+            />
+          </>
+        ) : (
+          <>
+            <PopoverDivider />
+            <PopoverItem
+              icon={<Flag size={16} color="#475569" />}
+              label="Report post"
+              onPress={() => {
+                setReportModalVisible(true);
+              }}
+            />
+            <PopoverItem
+              icon={<UserX size={16} color="#EF4444" />}
+              label="Block researcher"
+              destructive
+              onPress={handleBlockAuthor}
+            />
+          </>
+        )}
+      </Popover>
 
       {/* Structured Content Report Modal */}
-      <ContentReportModal
-        visible={reportModalVisible}
-        onClose={() => {
-          setReportModalVisible(false);
-          onClose();
-        }}
-        reportedType="post"
-        reportedId={post.id}
-        targetTitle={post.content}
-        targetAuthorName={post.author.handle || post.author.fullName}
-        targetAuthorId={post.author.id}
-        onReportSuccess={() => {
-          setReportModalVisible(false);
-          onClose();
-        }}
-      />
-    </Modal>
+      {reportModalVisible && (
+        <ContentReportModal
+          visible={reportModalVisible}
+          onClose={() => {
+            setReportModalVisible(false);
+            onClose();
+          }}
+          reportedType="post"
+          reportedId={post.id}
+          targetTitle={post.content}
+          targetAuthorName={post.author.handle || post.author.fullName}
+          targetAuthorId={post.author.id}
+          onReportSuccess={() => {
+            setReportModalVisible(false);
+            onClose();
+          }}
+        />
+      )}
+    </>
   );
 };
-
-const styles = StyleSheet.create({
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-  },
-  sheetWrapper: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    backgroundColor: colors.cardBackground,
-    borderTopLeftRadius: radii.xl,
-    borderTopRightRadius: radii.xl,
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? spacing.xxl : spacing.lg,
-    ...shadows.floating,
-  },
-  dragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: radii.full,
-    backgroundColor: colors.borderDark,
-    alignSelf: 'center',
-    marginBottom: spacing.md,
-  },
-  menuList: {
-    paddingVertical: spacing.xs,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  iconContainer: {
-    width: 38,
-    height: 38,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  itemTextContainer: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: fontSizes.body,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  itemSubtitle: {
-    fontSize: fontSizes.micro,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: colors.borderLight,
-    marginVertical: spacing.xs,
-  },
-  cancelButton: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surfaceHover,
-    borderRadius: radii.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButtonText: {
-    fontSize: fontSizes.body,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-});

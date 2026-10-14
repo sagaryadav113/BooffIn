@@ -309,13 +309,13 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0F172A',
   },
   timeText: {
     fontSize: 12,
     color: '#94A3B8',
-    fontWeight: '500',
+    fontWeight: '400',
   },
   previewRow: {
     flexDirection: 'row',
@@ -324,13 +324,15 @@ const styles = StyleSheet.create({
   },
   snippetText: {
     fontSize: 13,
+    fontWeight: '400',
     color: '#64748B',
+    lineHeight: 18,
     flex: 1,
     marginRight: 8,
   },
   unreadSnippetText: {
-    fontWeight: '600',
-    color: '#0F172A',
+    fontWeight: '400',
+    color: '#475569',
   },
   statusIcons: {
     flexDirection: 'row',

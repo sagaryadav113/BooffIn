@@ -26,6 +26,7 @@ export interface CreatePostParams {
   topics: string[];
   visibility?: 'public' | 'followers';
   authorId?: string;
+  quotedPost?: Post;
 }
 
 interface PostState {
@@ -46,6 +47,7 @@ interface PostState {
   setActiveTab: (tab: string, currentUserId?: string) => void;
   toggleLikePost: (postId: string, currentUserId?: string) => Promise<void>;
   toggleRepost: (postId: string, currentUserId?: string) => Promise<void>;
+  repostWithThoughts: (originalPost: Post, thoughts: string, currentUserId?: string) => Promise<Post | null>;
   toggleSavePost: (postId: string, currentUserId?: string) => Promise<void>;
   votePoll: (postId: string, optionId: string, currentUserId?: string) => Promise<boolean>;
   createPost: (params: CreatePostParams, currentUserId?: string) => Promise<Post | null>;
@@ -253,6 +255,42 @@ export const usePostStore = create<PostState>((set, get) => ({
     }
   },
 
+  repostWithThoughts: async (originalPost, thoughts, currentUserId) => {
+    const activeUser = useAuthStore.getState().user;
+    const authorId = currentUserId || activeUser?.id;
+
+    // 1. Optimistically increment repost count on original post
+    set((state) => ({
+      posts: state.posts.map((p) =>
+        p.id === originalPost.id
+          ? {
+              ...p,
+              isReposted: true,
+              repostsCount: (p.repostsCount || 0) + 1,
+            }
+          : p
+      ),
+    }));
+
+    // 2. Create quote post with thoughts and embedded original post at the top of feed
+    const newPost = await get().createPost(
+      {
+        content: thoughts.trim(),
+        postType: 'discussion',
+        quotedPost: originalPost,
+        topics: originalPost.topics || [],
+        visibility: 'public',
+        authorId,
+      },
+      authorId
+    );
+
+    // 3. Register repost in backend
+    apiToggleRepost(originalPost.id, false, authorId).catch(() => {});
+
+    return newPost;
+  },
+
   toggleSavePost: async (postId, currentUserId) => {
     const post = get().posts.find((p) => p.id === postId);
     if (!post) return;
@@ -369,6 +407,7 @@ export const usePostStore = create<PostState>((set, get) => ({
       images: params.images,
       poll: params.poll,
       article: params.article,
+      quotedPost: params.quotedPost,
       topics: params.topics,
       visibility: params.visibility || 'public',
       likesCount: 0,
@@ -393,6 +432,7 @@ export const usePostStore = create<PostState>((set, get) => ({
       mediaUrls: params.images,
       poll: params.poll,
       article: params.article,
+      quotedPost: params.quotedPost,
       topics: params.topics,
       visibility: params.visibility || 'public',
       authorId,

@@ -20,9 +20,10 @@ export * from './core/DiscussionIcon';
 export * from './core/DiscussionButton';
 export * from './core/LikeIcon';
 export * from './core/LikeButton';
-export * from './core/SaveIcon';
 export * from './core/SaveButton';
+export * from './core/SaveIcon';
 export * from './core/ReadBookIcon';
+export * from './core/Popover';
 export * from './profile/ProfileAnalyticsBar';
 export * from './profile/ProfileAnalyticsModal';
 export * from './profile/AnalyticsChart';
@@ -71,6 +72,7 @@ export * from './modals/PostOptionsModal';
 export * from './modals/EditPostModal';
 export * from './modals/SharePostModal';
 export * from './modals/LikesListModal';
+export * from './modals/QuotePostModal';
 export * from './post/PostImpactModal';
 
 // Composer Components

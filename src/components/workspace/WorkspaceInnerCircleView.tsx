@@ -114,6 +114,7 @@ import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
 import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
 import { PaperSearchModal } from '../chat/PaperSearchModal';
 import { Paper } from '../../types';
+import { Popover, PopoverItem, PopoverDivider } from '../core/Popover';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
 import { useChatThemeStore } from '../../store/useChatThemeStore';
@@ -729,6 +730,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
   // Step 3: Attachment & Rich Card Modals
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const attachBtnRef = useRef<View>(null);
   const [showDocumentPickerModal, setShowDocumentPickerModal] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
@@ -2558,13 +2560,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     maxLength={2000}
                   />
 
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => setShowAttachMenu(true)}
-                    style={styles.mediaIconBtn}
-                  >
-                    <Paperclip size={19} color="#64748B" />
-                  </TouchableOpacity>
+                  <View ref={attachBtnRef} collapsable={false}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setShowAttachMenu(true)}
+                      style={styles.mediaIconBtn}
+                    >
+                      <Paperclip size={19} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {!inputText.trim() && !attachedDoi ? (
@@ -3069,103 +3073,58 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       {/* ------------------------------------------------------------- */}
       {/* MODAL: Attach to Message Bottom Sheet (Screenshot 2)          */}
       {/* ------------------------------------------------------------- */}
-      <Modal
+      {/* ------------------------------------------------------------- */}
+      {/* POPOVER: Attach to Message (Floating above paperclip)          */}
+      {/* ------------------------------------------------------------- */}
+      <Popover
         visible={showAttachMenu}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAttachMenu(false)}
+        onClose={() => setShowAttachMenu(false)}
+        anchorRef={attachBtnRef}
+        position="top"
+        align="end"
+        estimatedWidth={240}
+        estimatedHeight={200}
       >
-        <TouchableOpacity
-          style={styles.optionsOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAttachMenu(false)}
-        >
-          <View style={styles.optionsSheet}>
-            <View style={styles.optionsHandleBar} />
-            <Text style={styles.optionsSheetTitle}>Attach to Message</Text>
-
-            {/* 1. PDF Manuscript / Document */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowDocumentPickerModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#FEF2F2' }]}>
-                <FileUp size={20} color="#DC2626" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>PDF Manuscript / Document</Text>
-                <Text style={styles.attachItemSubtitle}>Share preprint PDFs, datasets, and protocols</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 3. Researcher Profile */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowProfilePickerModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#F0FDF4' }]}>
-                <User size={20} color="#164E3F" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>Researcher Profile</Text>
-                <Text style={styles.attachItemSubtitle}>Share a researcher contact card with ORCID badge</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 4. Create Poll / Voting */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowPollModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                <Vote size={20} color="#164E3F" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>Create Poll / Voting</Text>
-                <Text style={styles.attachItemSubtitle}>Ask collaborators to vote on questions or proposals</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 5. Photo / Gallery */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                handlePickImage();
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#FDF2F8' }]}>
-                <ImageIcon size={20} color="#DB2777" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>Photo / Gallery</Text>
-                <Text style={styles.attachItemSubtitle}>Share figures, data plots, and lab images</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowAttachMenu(false)}
-              style={styles.optionsCancelBtn}
-            >
-              <Text style={styles.optionsCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        <PopoverItem
+          icon={<FileUp size={16} color="#DC2626" />}
+          label="PDF / Research Paper"
+          subtitle="Preprints, datasets & DOIs"
+          onPress={() => {
+            setShowAttachMenu(false);
+            setShowDocumentPickerModal(true);
+          }}
+        />
+        <PopoverDivider />
+        <PopoverItem
+          icon={<User size={16} color="#164E3F" />}
+          label="Researcher Profile"
+          subtitle="Share contact card & ORCID"
+          onPress={() => {
+            setShowAttachMenu(false);
+            setShowProfilePickerModal(true);
+          }}
+        />
+        <PopoverDivider />
+        <PopoverItem
+          icon={<Vote size={16} color="#0D9488" />}
+          label="Create Poll / Vote"
+          subtitle="Collaborative inquiry"
+          onPress={() => {
+            setShowAttachMenu(false);
+            setShowPollModal(true);
+          }}
+        />
+        <PopoverDivider />
+        <PopoverItem
+          icon={<ImageIcon size={16} color="#DB2777" />}
+          label="Photo / Figure"
+          subtitle="Figures & lab plots"
+          onPress={() => {
+            setShowAttachMenu(false);
+            handlePickImage();
+          }}
+        />
+      </Popover>
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: 3-Dots More Options Bottom Sheet (Screenshot 4)        */}

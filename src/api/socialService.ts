@@ -263,6 +263,100 @@ export function extractArticleAndCleanContent(rawContent?: string | null): {
   return { cleanContent: rawContent };
 }
 
+export function encodeQuotedPostIntoContent(
+  content: string,
+  quotedPost?: Post
+): string {
+  if (!quotedPost) return content;
+  const quotePayload = {
+    id: quotedPost.id,
+    content: quotedPost.content,
+    postType: quotedPost.postType,
+    author: {
+      id: quotedPost.author.id,
+      fullName: quotedPost.author.fullName,
+      handle: quotedPost.author.handle,
+      avatarUrl: quotedPost.author.avatarUrl,
+      academicTitle: quotedPost.author.academicTitle,
+      institution: quotedPost.author.institution,
+    },
+    createdAt: quotedPost.createdAt,
+    paper: quotedPost.paper
+      ? {
+          id: quotedPost.paper.id,
+          title: quotedPost.paper.title,
+          doi: quotedPost.paper.doi,
+          journal: quotedPost.paper.journal,
+        }
+      : undefined,
+    images: quotedPost.images,
+  };
+  const marker = `\n\n<!--QUOTED_POST_DATA:${JSON.stringify(quotePayload)}-->`;
+  return `${content.trim()}${marker}`;
+}
+
+export function extractQuotedPostAndCleanContent(rawContent?: string | null): {
+  cleanContent: string;
+  quotedPost?: Post;
+} {
+  if (!rawContent) return { cleanContent: '' };
+  const quoteRegex = /(?:\n\n)?<!--QUOTED_POST_DATA:(.*?)-->/s;
+  const match = rawContent.match(quoteRegex);
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      const cleanContent = rawContent.replace(match[0], '').trim();
+      const quotedPost: Post = {
+        id: parsed.id,
+        author: {
+          id: parsed.author?.id || 'unknown',
+          fullName: parsed.author?.fullName || 'Researcher',
+          handle: parsed.author?.handle || 'researcher',
+          avatarUrl: parsed.author?.avatarUrl,
+          academicTitle: parsed.author?.academicTitle || 'Researcher',
+          institution: parsed.author?.institution || 'Independent',
+          bio: '',
+          orcidVerified: false,
+          followersCount: 0,
+          followingCount: 0,
+          postsCount: 0,
+          savedCount: 0,
+          joinedDate: 'Recently',
+        },
+        postType: parsed.postType || 'discussion',
+        content: parsed.content || '',
+        paper: parsed.paper
+          ? ({
+              id: parsed.paper.id,
+              title: parsed.paper.title,
+              doi: parsed.paper.doi,
+              journal: parsed.paper.journal,
+              abstract: '',
+              authors: [],
+              citationCount: 0,
+              discussionCount: 0,
+              likesCount: 0,
+              savesCount: 0,
+              topics: [],
+            } as any)
+          : undefined,
+        images: parsed.images || [],
+        topics: [],
+        visibility: 'public',
+        likesCount: 0,
+        commentsCount: 0,
+        repostsCount: 0,
+        savesCount: 0,
+        createdAt: parsed.createdAt || 'Recent',
+      };
+      return { cleanContent, quotedPost };
+    } catch (e) {
+      console.warn('[socialService] Failed to parse quoted post metadata from content:', e);
+    }
+  }
+  return { cleanContent: rawContent };
+}
+
 // Helper to query and populate poll vote totals and current user's voted option
 export async function populatePollVotes(
   posts: Post[],
@@ -368,7 +462,8 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
     : Boolean(row.is_saved);
 
   const { cleanContent: contentWithoutPoll, poll } = extractPollAndCleanContent(row.content || '');
-  const { cleanContent, article } = extractArticleAndCleanContent(contentWithoutPoll);
+  const { cleanContent: contentWithoutArticle, article } = extractArticleAndCleanContent(contentWithoutPoll);
+  const { cleanContent, quotedPost } = extractQuotedPostAndCleanContent(contentWithoutArticle);
 
   return {
     id: row.id,
@@ -379,6 +474,7 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
     images: Array.isArray(row.media_urls) ? row.media_urls : [],
     poll,
     article,
+    quotedPost,
     topics: topics.length > 0 ? topics : [],
     visibility: row.visibility || 'public',
     likesCount: row.likes_count || 0,
@@ -645,6 +741,7 @@ export interface CreatePostPayload {
   visibility?: 'public' | 'followers';
   authorId?: string;
   mediaUrls?: string[];
+  quotedPost?: Post;
 }
 
 export async function createPost(
@@ -715,6 +812,9 @@ export async function createPost(
     let rawContentWithPoll = encodePollIntoContent(content, poll);
     if (payload.article) {
       rawContentWithPoll = encodeArticleIntoContent(rawContentWithPoll, payload.article);
+    }
+    if (payload.quotedPost) {
+      rawContentWithPoll = encodeQuotedPostIntoContent(rawContentWithPoll, payload.quotedPost);
     }
 
     const { data: postRow, error: postError } = await supabase
@@ -793,6 +893,8 @@ export async function createPost(
       paper,
       images: mediaUrls,
       poll,
+      article: payload.article,
+      quotedPost: payload.quotedPost,
       topics,
       visibility,
       likesCount: 0,

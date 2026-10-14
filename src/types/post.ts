@@ -92,5 +92,6 @@ export interface Post {
   rawCreatedAt?: string;
   repostedBy?: UserProfile;
   repostedAt?: string;
+  quotedPost?: Post;
 }
 

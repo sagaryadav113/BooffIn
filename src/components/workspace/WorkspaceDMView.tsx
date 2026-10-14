@@ -93,6 +93,7 @@ import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
 import { PaperSearchModal } from '../chat/PaperSearchModal';
 import { Paper } from '../../types';
 import { ChatPostCard } from '../chat/ChatPostCard';
+import { Popover, PopoverItem, PopoverDivider } from '../core/Popover';
 import { ChatProfileCard } from '../chat/ChatProfileCard';
 import { ChatWorkspaceInviteCard } from '../chat/ChatWorkspaceInviteCard';
 import { ChatDocumentCard } from '../chat/ChatDocumentCard';
@@ -385,6 +386,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   // Attachments Menu State
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const attachBtnRef = useRef<View>(null);
 
   // DOI State
   const [showDoiModal, setShowDoiModal] = useState(false);
@@ -2610,13 +2612,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             />
 
             {/* 2. Paperclip Attachment */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowAttachMenu(true)}
-              style={styles.mediaIconBtn}
-            >
-              <Paperclip size={19} color="#64748B" />
-            </TouchableOpacity>
+            <View ref={attachBtnRef} collapsable={false}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setShowAttachMenu(true)}
+                style={styles.mediaIconBtn}
+              >
+                <Paperclip size={19} color="#64748B" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Voice Note Mic Button or Detached Send Button */}
@@ -2894,107 +2898,57 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       </Modal>
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Attachment Menu (Updated with Phase 3 Sharing Options) */}
+      {/* POPOVER: Attachment Menu (Floating above paperclip) */}
       {/* ------------------------------------------------------------- */}
-      <Modal
+      <Popover
         visible={showAttachMenu}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAttachMenu(false)}
+        onClose={() => setShowAttachMenu(false)}
+        anchorRef={attachBtnRef}
+        position="top"
+        align="end"
+        estimatedWidth={240}
+        estimatedHeight={200}
       >
-        <TouchableOpacity
-          style={styles.optionsOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAttachMenu(false)}
-        >
-          <View style={styles.optionsSheet}>
-            <View style={styles.optionsHandleBar} />
-            <Text style={styles.optionsSheetTitle}>Attach to Message</Text>
-
-            {/* 1. Attach PDF Manuscript / Document (Phase 3) */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowDoiModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#FEF2F2' }]}>
-                <FileUp size={20} color="#DC2626" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>PDF Manuscript / Document</Text>
-                <Text style={styles.attachItemSubtitle}>Search and share preprint PDFs, datasets, and papers</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 3. Share Researcher Profile (Phase 3) */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowProfilePickerModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#F0FDF4' }]}>
-                <User size={20} color="#164E3F" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>Researcher Profile</Text>
-                <Text style={styles.attachItemSubtitle}>Share a researcher contact card with ORCID badge</Text>
-              </View>
-            </TouchableOpacity>
-
-
-
-            {/* 6. Create Poll / Voting */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                setShowPollModal(true);
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                <Vote size={20} color="#164E3F" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>Create Poll / Voting</Text>
-                <Text style={styles.attachItemSubtitle}>Ask collaborators to vote on questions or proposals</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* 7. Photo / Gallery */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                setShowAttachMenu(false);
-                handlePickImage();
-              }}
-              style={styles.optionsItemRow}
-            >
-              <View style={[styles.attachIconWrap, { backgroundColor: '#FDF2F8' }]}>
-                <ImageIcon size={20} color="#DB2777" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.attachItemTitle}>Photo / Gallery</Text>
-                <Text style={styles.attachItemSubtitle}>Share figures, data plots, and lab images</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowAttachMenu(false)}
-              style={styles.optionsCancelBtn}
-            >
-              <Text style={styles.optionsCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        <PopoverItem
+          icon={<FileUp size={16} color="#DC2626" />}
+          label="PDF / Research Paper"
+          subtitle="Preprints, datasets & DOIs"
+          onPress={() => {
+            setShowAttachMenu(false);
+            setShowDoiModal(true);
+          }}
+        />
+        <PopoverDivider />
+        <PopoverItem
+          icon={<User size={16} color="#164E3F" />}
+          label="Researcher Profile"
+          subtitle="Share contact card & ORCID"
+          onPress={() => {
+            setShowAttachMenu(false);
+            setShowProfilePickerModal(true);
+          }}
+        />
+        <PopoverDivider />
+        <PopoverItem
+          icon={<Vote size={16} color="#0D9488" />}
+          label="Create Poll / Vote"
+          subtitle="Collaborative inquiry"
+          onPress={() => {
+            setShowAttachMenu(false);
+            setShowPollModal(true);
+          }}
+        />
+        <PopoverDivider />
+        <PopoverItem
+          icon={<ImageIcon size={16} color="#DB2777" />}
+          label="Photo / Figure"
+          subtitle="Figures & lab plots"
+          onPress={() => {
+            setShowAttachMenu(false);
+            handlePickImage();
+          }}
+        />
+      </Popover>
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: Message Long-Press Context Menu & Emoji Reaction Bar */}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,14 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { ArrowRight, ExternalLink, X } from 'lucide-react-native';
+import { ArrowRight, ExternalLink, X, Quote, Copy, Check, GraduationCap } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { Paper } from '../../types';
 import { colors, radii, spacing, typography, layout } from '../../theme';
 import { Badge } from '../core/Badge';
 import { SaveButton } from '../core/SaveButton';
+import { Popover, PopoverItem, PopoverDivider } from '../core/Popover';
 import { usePaperStore } from '../../store/usePaperStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -35,6 +37,10 @@ export const PaperCard: React.FC<PaperCardProps> = ({
   compact = false,
   fromPostId,
 }) => {
+  const [isCitePopoverOpen, setIsCitePopoverOpen] = useState(false);
+  const [copiedType, setCopiedType] = useState<'apa' | 'bibtex' | null>(null);
+  const citeBtnRef = useRef<View>(null);
+
   const isSavedInStore = usePaperStore(
     (s) =>
       s.savedPaperIds.has(paper.id) ||
@@ -43,6 +49,52 @@ export const PaperCard: React.FC<PaperCardProps> = ({
   const isSaved = Boolean(isSavedInStore || paper.isSaved);
   const toggleSavePaper = usePaperStore((s) => s.toggleSavePaper);
   const currentUser = useAuthStore((s) => s.user);
+
+  const handleCopyCitation = async (type: 'apa' | 'bibtex') => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+
+    let citationText = '';
+    const authorNames = Array.isArray(paper.authors)
+      ? paper.authors.map((a) => (typeof a === 'string' ? a : a?.name || 'Anonymous'))
+      : [];
+    const authorText = authorNames.length > 0
+      ? (authorNames.length > 2 ? `${authorNames[0]} et al.` : authorNames.join(' & '))
+      : 'Anonymous';
+    const year = paper.publicationYear || (paper as any).year || 2024;
+    const journal = paper.journal ? `${paper.journal}. ` : '';
+    const doiStr = paper.doi ? `https://doi.org/${paper.doi}` : '';
+
+    if (type === 'apa') {
+      citationText = `${authorText} (${year}). ${paper.title}. ${journal}${doiStr}`.trim();
+    } else {
+      const firstAuthorLast = (authorNames[0] ? authorNames[0].split(' ').pop() : 'paper') || 'paper';
+      const cleanKey = `${firstAuthorLast.toLowerCase().replace(/[^a-z0-9]/g, '')}${year}`;
+      const authorsStr = authorNames.length > 0 ? authorNames.join(' and ') : 'Anonymous';
+      citationText = `@article{${cleanKey},
+  title={${paper.title || ''}},
+  author={${authorsStr}},
+  journal={${paper.journal || ''}},
+  year={${year}}${paper.doi ? `,\n  doi={${paper.doi}}` : ''}
+}`;
+    }
+
+    if (Clipboard?.setStringAsync) {
+      await Clipboard.setStringAsync(citationText);
+    }
+    setCopiedType(type);
+    setTimeout(() => {
+      setCopiedType(null);
+      setIsCitePopoverOpen(false);
+    }, 600);
+  };
+
+  const handleOpenGoogleScholar = () => {
+    setIsCitePopoverOpen(false);
+    const query = encodeURIComponent(paper.title || paper.doi || '');
+    Linking.openURL(`https://scholar.google.com/scholar?q=${query}`);
+  };
 
   const handleSave = (e?: any) => {
     e?.stopPropagation?.();
@@ -186,6 +238,25 @@ export const PaperCard: React.FC<PaperCardProps> = ({
             </View>
 
             <View style={styles.actionsRow}>
+              {/* Cite Popover Button */}
+              <View ref={citeBtnRef} collapsable={false}>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    try {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    } catch {}
+                    setIsCitePopoverOpen(true);
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                  style={styles.citeButton}
+                  activeOpacity={0.7}
+                >
+                  <Quote size={12} color="#0D9488" strokeWidth={2.4} />
+                  <Text style={styles.citeButtonText}>Cite</Text>
+                </TouchableOpacity>
+              </View>
+
               <SaveButton
                 isSaved={isSaved}
                 onPress={handleSave}
@@ -207,6 +278,42 @@ export const PaperCard: React.FC<PaperCardProps> = ({
           </View>
         </View>
       </View>
+
+      {/* Cite Popover */}
+      <Popover
+        visible={isCitePopoverOpen}
+        onClose={() => setIsCitePopoverOpen(false)}
+        anchorRef={citeBtnRef}
+        position="top"
+        align="end"
+        estimatedWidth={215}
+        estimatedHeight={140}
+      >
+        <PopoverItem
+          icon={copiedType === 'apa' ? <Check size={16} color="#059669" /> : <Copy size={16} color="#475569" />}
+          label={copiedType === 'apa' ? 'Copied APA Citation!' : 'Copy APA Citation'}
+          subtitle="American Psychological Assn"
+          active={copiedType === 'apa'}
+          activeColor="#059669"
+          onPress={() => handleCopyCitation('apa')}
+        />
+        <PopoverDivider />
+        <PopoverItem
+          icon={copiedType === 'bibtex' ? <Check size={16} color="#059669" /> : <Copy size={16} color="#475569" />}
+          label={copiedType === 'bibtex' ? 'Copied BibTeX!' : 'Copy BibTeX'}
+          subtitle="LaTeX / Overleaf format"
+          active={copiedType === 'bibtex'}
+          activeColor="#059669"
+          onPress={() => handleCopyCitation('bibtex')}
+        />
+        <PopoverDivider />
+        <PopoverItem
+          icon={<GraduationCap size={16} color="#2563EB" />}
+          label="Google Scholar"
+          subtitle="Search citations & metrics"
+          onPress={handleOpenGoogleScholar}
+        />
+      </Popover>
     </TouchableOpacity>
   );
 };
@@ -334,6 +441,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm + 2,
+  },
+  citeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
+    backgroundColor: '#F0FDFA',
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
+  },
+  citeButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0F766E',
   },
   saveBtn: {
     paddingHorizontal: 2,

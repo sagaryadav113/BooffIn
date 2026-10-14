@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   ViewStyle,
   Platform,
   ActivityIndicator,
+  Modal,
+  TouchableWithoutFeedback,
+  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -17,6 +20,7 @@ import {
   BookOpen,
   ArrowRight,
   UserPlus,
+  PenLine,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Post } from '../../types';
@@ -34,6 +38,8 @@ import { EditPostModal } from '../modals/EditPostModal';
 import { SharePostModal } from '../modals/SharePostModal';
 import { SharePostToWorkspaceModal } from '../modals/SharePostToWorkspaceModal';
 import { LikesListModal } from '../modals/LikesListModal';
+import { QuotePostModal } from '../modals/QuotePostModal';
+import { Popover, PopoverItem, PopoverDivider } from '../core/Popover';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -55,6 +61,11 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isShareToWorkspaceOpen, setIsShareToWorkspaceOpen] = useState(false);
   const [isLikesModalOpen, setIsLikesModalOpen] = useState(false);
+  const [isRepostMenuOpen, setIsRepostMenuOpen] = useState(false);
+  const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
+  const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
+  const reshareBtnRef = useRef<View>(null);
+  const moreBtnRef = useRef<View>(null);
 
   const toggleLike = usePostStore((s) => s.toggleLikePost);
   const toggleRepost = usePostStore((s) => s.toggleRepost);
@@ -124,12 +135,39 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
     toggleLike(post.id, currentUser?.id);
   };
 
-  const handleRepost = (e: any) => {
-    e.stopPropagation();
+  const handleRepostButtonClick = (e?: any) => {
+    if (e?.stopPropagation) e.stopPropagation();
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
+
+    if (reshareBtnRef.current && (reshareBtnRef.current as any).measureInWindow) {
+      (reshareBtnRef.current as any).measureInWindow((x: number, y: number, width: number) => {
+        const windowWidth = Dimensions.get('window').width;
+        const menuWidth = 205;
+        const left = Math.max(12, Math.min(x - menuWidth / 2 + (width || 20) / 2, windowWidth - menuWidth - 12));
+        const top = Math.max(10, y - 94);
+        setMenuCoords({ top, left });
+        setIsRepostMenuOpen(true);
+      });
+    } else {
+      setIsRepostMenuOpen(true);
+    }
+  };
+
+  const handleDirectRepost = (e?: any) => {
+    if (e?.stopPropagation) e.stopPropagation();
+    setIsRepostMenuOpen(false);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
     toggleRepost(post.id, currentUser?.id);
+  };
+
+  const handleOpenQuoteModal = (e?: any) => {
+    if (e?.stopPropagation) e.stopPropagation();
+    setIsRepostMenuOpen(false);
+    setIsQuoteModalOpen(true);
   };
 
   const handleSave = (e: any) => {
@@ -235,19 +273,21 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            style={styles.moreButton}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            onPress={(e) => {
-              e.stopPropagation();
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-              setIsOptionsOpen(true);
-            }}
-          >
-            <MoreHorizontal size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
+          <View ref={moreBtnRef} collapsable={false}>
+            <TouchableOpacity
+              style={styles.moreButton}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              onPress={(e) => {
+                e.stopPropagation();
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch {}
+                setIsOptionsOpen(true);
+              }}
+            >
+              <MoreHorizontal size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -405,6 +445,70 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
         />
       )}
 
+      {/* Embedded Quoted Post (Twitter-Style Quote Card) */}
+      {post.quotedPost && (
+        <TouchableOpacity
+          activeOpacity={0.88}
+          onPress={(e) => {
+            e.stopPropagation();
+            if (post.quotedPost?.id) {
+              router.push({
+                pathname: '/post/[id]',
+                params: { id: post.quotedPost.id },
+              });
+            }
+          }}
+          style={styles.quotedPostCard}
+        >
+          <View style={styles.quotedPostHeader}>
+            <Avatar
+              uri={post.quotedPost.author?.avatarUrl || undefined}
+              name={post.quotedPost.author?.fullName || post.quotedPost.author?.handle || 'Researcher'}
+              size="xs"
+            />
+            <Text style={styles.quotedAuthorName} numberOfLines={1}>
+              {post.quotedPost.author?.fullName || 'Researcher'}
+            </Text>
+            {post.quotedPost.author?.handle ? (
+              <Text style={styles.quotedAuthorHandle} numberOfLines={1}>
+                @{post.quotedPost.author.handle}
+              </Text>
+            ) : null}
+            {post.quotedPost.createdAt ? (
+              <>
+                <Text style={styles.quotedDot}>·</Text>
+                <Text style={styles.quotedTime}>{post.quotedPost.createdAt}</Text>
+              </>
+            ) : null}
+          </View>
+
+          {post.quotedPost.content ? (
+            <Text style={styles.quotedContentText} numberOfLines={3}>
+              {post.quotedPost.content}
+            </Text>
+          ) : null}
+
+          {post.quotedPost.paper && (
+            <View style={styles.quotedPaperPill}>
+              <Text style={styles.quotedPaperIcon}>🔬</Text>
+              <Text style={styles.quotedPaperTitle} numberOfLines={1}>
+                {post.quotedPost.paper.title}
+              </Text>
+            </View>
+          )}
+
+          {post.quotedPost.images && post.quotedPost.images.length > 0 && (
+            <View style={styles.quotedImageWrap}>
+              <Image
+                source={{ uri: post.quotedPost.images[0] }}
+                style={styles.quotedImage}
+                contentFit="cover"
+              />
+            </View>
+          )}
+        </TouchableOpacity>
+      )}
+
       {/* Topic Chips */}
       {Array.isArray(post.topics) && post.topics.filter((t) => typeof t === 'string' && t.trim().length > 0).length > 0 ? (
         <View style={styles.topicChipsRow}>
@@ -449,14 +553,16 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           style={styles.actionItem}
         />
 
-        {/* Re-share (Animated Paper Plane & Orbit) */}
-        <ReshareButton
-          isReposted={Boolean(post.isReposted)}
-          repostsCount={post.repostsCount}
-          onPress={() => toggleRepost(post.id, currentUser?.id)}
-          size={19}
-          style={styles.actionItem}
-        />
+        {/* Re-share (Animated Paper Plane & Orbit) with Popover */}
+        <View ref={reshareBtnRef} collapsable={false}>
+          <ReshareButton
+            isReposted={Boolean(post.isReposted)}
+            repostsCount={post.repostsCount}
+            onPress={handleRepostButtonClick}
+            size={19}
+            style={styles.actionItem}
+          />
+        </View>
 
         {/* Bookmark / Save (Animated Dual Papercraft & Ribbon Stamp) */}
         <SaveButton
@@ -467,12 +573,48 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
         />
       </View>
 
-      {/* Post Options Menu Modal */}
+      {/* Repost Hovering Popover Menu (Twitter-style: Repost vs Repost with thoughts) */}
+      <Popover
+        visible={isRepostMenuOpen}
+        onClose={() => setIsRepostMenuOpen(false)}
+        anchorRef={reshareBtnRef}
+        anchorCoords={menuCoords}
+        position="top"
+        align="center"
+        estimatedWidth={210}
+        estimatedHeight={95}
+      >
+        <PopoverItem
+          icon={<Repeat2 size={16} color={post.isReposted ? '#10B981' : '#334155'} />}
+          label={post.isReposted ? 'Undo Repost' : 'Repost'}
+          active={Boolean(post.isReposted)}
+          activeColor="#10B981"
+          onPress={handleDirectRepost}
+        />
+        <PopoverDivider />
+        <PopoverItem
+          icon={<PenLine size={16} color="#334155" />}
+          label="Repost with thoughts"
+          onPress={handleOpenQuoteModal}
+        />
+      </Popover>
+
+      {/* Quote Post Modal (Twitter-style "Repost with thoughts" composer) */}
+      {isQuoteModalOpen && (
+        <QuotePostModal
+          visible={isQuoteModalOpen}
+          onClose={() => setIsQuoteModalOpen(false)}
+          post={post}
+        />
+      )}
+
+      {/* Post Options Menu Popover */}
       {isOptionsOpen && (
         <PostOptionsModal
           visible={isOptionsOpen}
           onClose={() => setIsOptionsOpen(false)}
           post={post}
+          anchorRef={moreBtnRef}
           onEditPress={() => setIsEditOpen(true)}
           onSharePress={() => setIsShareOpen(true)}
           onDeleteSuccess={onDeleted}
@@ -882,5 +1024,117 @@ const styles = StyleSheet.create({
     ...typography.captionBold,
     fontSize: 12,
     color: colors.accentBlue,
+  },
+  quotedPostCard: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  quotedPostHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  quotedAuthorName: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+    maxWidth: 150,
+  },
+  quotedAuthorHandle: {
+    fontSize: 12.5,
+    color: '#64748B',
+    maxWidth: 120,
+  },
+  quotedDot: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  quotedTime: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  quotedContentText: {
+    fontSize: 13.5,
+    color: '#334155',
+    lineHeight: 19,
+    marginBottom: 4,
+  },
+  quotedPaperPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginTop: 4,
+  },
+  quotedPaperIcon: {
+    fontSize: 13,
+  },
+  quotedPaperTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0F172A',
+    flex: 1,
+  },
+  quotedImageWrap: {
+    marginTop: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
+    height: 120,
+    backgroundColor: '#E2E8F0',
+  },
+  quotedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  repostModalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  repostHoverMenu: {
+    position: 'absolute',
+    width: 205,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 12,
+    zIndex: 9999,
+  },
+  repostHoverMenuFallback: {
+    bottom: 80,
+    alignSelf: 'center',
+  },
+  repostMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  repostMenuText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  repostMenuDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 2,
   },
 });
