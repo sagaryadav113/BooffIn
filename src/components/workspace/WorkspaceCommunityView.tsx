@@ -994,10 +994,58 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     setEditInputText('');
   };
 
-  const handleDeleteMessage = async () => {
+  const handleDeleteAction = () => {
     if (!selectedMessage) return;
+    const msg = selectedMessage;
     setShowMessageActionMenu(false);
-    await deleteMessage(selectedMessage.id);
+    setSelectedMessage(null);
+
+    const isMyMsg = msg.sender_id === currentUser?.id;
+    const isOwner = workspace.owner_id === currentUser?.id;
+    const canDeleteForEveryone = isMyMsg || isOwner;
+
+    if (Platform.OS === 'web') {
+      const confirmDelete = window.confirm(
+        canDeleteForEveryone
+          ? 'Delete this message for everyone?'
+          : 'Delete this message for yourself?'
+      );
+      if (confirmDelete) {
+        deleteMessage(msg.id, canDeleteForEveryone);
+      }
+    } else {
+      if (canDeleteForEveryone) {
+        Alert.alert(
+          'Delete Message',
+          'Choose how you want to delete this message:',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete for Me',
+              onPress: () => deleteMessage(msg.id, false),
+            },
+            {
+              text: 'Delete for Everyone',
+              style: 'destructive',
+              onPress: () => deleteMessage(msg.id, true),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Delete Message',
+          'Delete this message from your chat history?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete for Me',
+              style: 'destructive',
+              onPress: () => deleteMessage(msg.id, false),
+            },
+          ]
+        );
+      }
+    }
   };
 
   const handleOpenForward = () => {
@@ -2393,16 +2441,18 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
               </TouchableOpacity>
             )}
 
-            {(selectedMessage?.sender_id === currentUser?.id || workspace.owner_id === currentUser?.id) && (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={handleDeleteMessage}
-                style={[styles.actionSheetRow, { borderBottomWidth: 0 }]}
-              >
-                <Trash2 size={18} color="#DC2626" />
-                <Text style={[styles.actionSheetText, { color: '#DC2626' }]}>Delete Message</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleDeleteAction}
+              style={[styles.actionSheetRow, { borderBottomWidth: 0 }]}
+            >
+              <Trash2 size={18} color="#DC2626" />
+              <Text style={[styles.actionSheetText, { color: '#DC2626' }]}>
+                {selectedMessage?.sender_id === currentUser?.id || workspace.owner_id === currentUser?.id
+                  ? 'Delete Message'
+                  : 'Delete for Me'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>

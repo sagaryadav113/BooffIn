@@ -825,28 +825,84 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   deleteMessage: async (messageId, deleteForEveryone = true) => {
-    let targetWorkspaceId: string | null = null;
-    // Optimistic update
-    set((state) => ({
-      messages: deleteForEveryone
-        ? state.messages.map((m) => {
-            if (m.id === messageId) {
-              targetWorkspaceId = m.workspace_id;
-              return {
-                ...m,
-                content: '🚫 This message was deleted',
-                is_deleted: true,
-                media_urls: null,
-                doi_metadata: null,
-              };
-            }
-            return m;
-          })
-        : state.messages.filter((m) => {
-            if (m.id === messageId) targetWorkspaceId = m.workspace_id;
-            return m.id !== messageId;
-          }),
-    }));
+    const state = get();
+    const currentUser = useAuthStore.getState().user;
+
+    // Resolve targetWorkspaceId
+    let targetWorkspaceId: string | null = state.activeWorkspaceId || null;
+    const foundInActive = state.messages.find((m) => m.id === messageId);
+    if (foundInActive) {
+      targetWorkspaceId = foundInActive.workspace_id;
+    } else {
+      for (const [wId, msgs] of Object.entries(state.messagesByRoom)) {
+        if (msgs.some((m) => m.id === messageId)) {
+          targetWorkspaceId = wId;
+          break;
+        }
+      }
+    }
+
+    // Optimistic update for both messages and messagesByRoom
+    set((s) => {
+      const isCurrentRoom = !targetWorkspaceId || s.activeWorkspaceId === targetWorkspaceId;
+
+      const updateDeletedItem = (m: WorkspaceMessage): WorkspaceMessage => {
+        if (m.id !== messageId) return m;
+        return {
+          ...m,
+          content: '🚫 This message was deleted',
+          is_deleted: true,
+          media_urls: null,
+          attachments: null,
+          doi_metadata: null,
+        };
+      };
+
+      const newMessages = deleteForEveryone
+        ? s.messages.map(updateDeletedItem)
+        : s.messages.filter((m) => m.id !== messageId);
+
+      const updatedMessagesByRoom = { ...s.messagesByRoom };
+      if (targetWorkspaceId && updatedMessagesByRoom[targetWorkspaceId]) {
+        updatedMessagesByRoom[targetWorkspaceId] = deleteForEveryone
+          ? updatedMessagesByRoom[targetWorkspaceId].map(updateDeletedItem)
+          : updatedMessagesByRoom[targetWorkspaceId].filter((m) => m.id !== messageId);
+      }
+
+      // Also update last_message in workspace lists if this message was the last_message
+      const updateLastMsg = (w: Workspace): Workspace => {
+        if (w.id !== targetWorkspaceId || !w.last_message) return w;
+        if (w.last_message.id !== messageId) return w;
+        if (deleteForEveryone) {
+          return {
+            ...w,
+            last_message: {
+              ...w.last_message,
+              content: '🚫 This message was deleted',
+              is_deleted: true,
+              media_urls: null,
+              attachments: null,
+              doi_metadata: null,
+            },
+          };
+        } else {
+          const remaining = updatedMessagesByRoom[targetWorkspaceId] || [];
+          const prevMsg = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+          return {
+            ...w,
+            last_message: prevMsg,
+          };
+        }
+      };
+
+      return {
+        messages: isCurrentRoom ? newMessages : s.messages,
+        messagesByRoom: updatedMessagesByRoom,
+        dms: s.dms.map(updateLastMsg),
+        communities: s.communities.map(updateLastMsg),
+        innerCircles: s.innerCircles.map(updateLastMsg),
+      };
+    });
 
     if (targetWorkspaceId && deleteForEveryone) {
       const channel = activeWorkspaceChannels.get(targetWorkspaceId);
@@ -865,7 +921,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     try {
-      const res = await workspaceService.deleteMessage(messageId, deleteForEveryone);
+      const res = await workspaceService.deleteMessage(messageId, deleteForEveryone, currentUser?.id);
       return res;
     } catch (err: any) {
       return { success: false, error: err.message };

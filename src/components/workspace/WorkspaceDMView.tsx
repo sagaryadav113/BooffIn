@@ -811,18 +811,20 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     setSelectedMessage(null);
 
     const isMyMsg = msg.sender_id === currentUser?.id;
+    const isOwner = workspace.owner_id === currentUser?.id;
+    const canDeleteForEveryone = isMyMsg || isOwner;
 
     if (Platform.OS === 'web') {
       const confirmDelete = window.confirm(
-        isMyMsg
+        canDeleteForEveryone
           ? 'Delete this message for everyone?'
           : 'Delete this message for yourself?'
       );
       if (confirmDelete) {
-        deleteMessage(msg.id, isMyMsg);
+        deleteMessage(msg.id, canDeleteForEveryone);
       }
     } else {
-      if (isMyMsg) {
+      if (canDeleteForEveryone) {
         Alert.alert(
           'Delete Message',
           'Choose how you want to delete this message:',

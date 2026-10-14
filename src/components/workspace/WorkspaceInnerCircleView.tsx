@@ -1431,14 +1431,58 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   };
 
   // Delete Message Handlers
-  const handleDeleteMessage = async (deleteForEveryone = true) => {
+  const handleDeleteAction = () => {
     if (!selectedMessage) return;
-    const msgId = selectedMessage.id;
+    const msg = selectedMessage;
     setShowMessageActionMenu(false);
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    } catch {}
-    await deleteMessage(msgId, deleteForEveryone);
+    setSelectedMessage(null);
+
+    const isMyMsg = msg.sender_id === currentUser?.id;
+    const isOwner = workspace.owner_id === currentUser?.id;
+    const canDeleteForEveryone = isMyMsg || isOwner;
+
+    if (Platform.OS === 'web') {
+      const confirmDelete = window.confirm(
+        canDeleteForEveryone
+          ? 'Delete this message for everyone?'
+          : 'Delete this message for yourself?'
+      );
+      if (confirmDelete) {
+        deleteMessage(msg.id, canDeleteForEveryone);
+      }
+    } else {
+      if (canDeleteForEveryone) {
+        Alert.alert(
+          'Delete Message',
+          'Choose how you want to delete this message:',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete for Me',
+              onPress: () => deleteMessage(msg.id, false),
+            },
+            {
+              text: 'Delete for Everyone',
+              style: 'destructive',
+              onPress: () => deleteMessage(msg.id, true),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Delete Message',
+          'Delete this message from your chat history?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete for Me',
+              style: 'destructive',
+              onPress: () => deleteMessage(msg.id, false),
+            },
+          ]
+        );
+      }
+    }
   };
 
   // Bookmark Message
@@ -2680,11 +2724,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => handleDeleteMessage(selectedMessage?.sender_id === currentUser?.id)}
+              onPress={handleDeleteAction}
               style={styles.actionMenuRow}
             >
               <Trash2 size={18} color="#EF4444" />
-              <Text style={[styles.actionMenuRowText, { color: '#EF4444' }]}>Delete Message</Text>
+              <Text style={[styles.actionMenuRowText, { color: '#EF4444' }]}>
+                {selectedMessage?.sender_id === currentUser?.id || workspace.owner_id === currentUser?.id
+                  ? 'Delete Message'
+                  : 'Delete for Me'}
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

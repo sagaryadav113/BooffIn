@@ -35,6 +35,7 @@ export interface UserChatPreferences {
   muted: Record<string, { isMuted: boolean; until?: string | null }>;
   deleted: string[];
   clearedAt: Record<string, string>;
+  deletedMessages?: string[];
 }
 
 const memoryPrefsCache: Record<string, UserChatPreferences> = {};
@@ -61,6 +62,7 @@ async function getChatPreferences(userId: string): Promise<UserChatPreferences> 
         muted: parsed.muted && typeof parsed.muted === 'object' ? parsed.muted : {},
         deleted: Array.isArray(parsed.deleted) ? parsed.deleted : [],
         clearedAt: parsed.clearedAt && typeof parsed.clearedAt === 'object' ? parsed.clearedAt : {},
+        deletedMessages: Array.isArray(parsed.deletedMessages) ? parsed.deletedMessages : [],
       };
       memoryPrefsCache[userId] = res;
       return res;
@@ -68,7 +70,7 @@ async function getChatPreferences(userId: string): Promise<UserChatPreferences> 
   } catch (err) {
     console.warn('[workspaceService] Failed to load chat preferences:', err);
   }
-  const empty: UserChatPreferences = { pinned: [], archived: [], muted: {}, deleted: [], clearedAt: {} };
+  const empty: UserChatPreferences = { pinned: [], archived: [], muted: {}, deleted: [], clearedAt: {}, deletedMessages: [] };
   memoryPrefsCache[userId] = empty;
   return empty;
 }
@@ -273,7 +275,9 @@ export const workspaceService = {
             .order('created_at', { ascending: false });
 
           if (!msgErr && Array.isArray(recentMsgRows)) {
+            const deletedMsgSet = new Set(prefs?.deletedMessages || []);
             recentMsgRows.forEach((m: any) => {
+              if (deletedMsgSet.has(m.id)) return;
               if (!latestMsgMap.has(m.workspace_id)) {
                 latestMsgMap.set(m.workspace_id, m);
               }
@@ -1550,6 +1554,12 @@ export const workspaceService = {
       // Reverse so oldest in the page is first
       let orderedMessages = messages.reverse();
 
+      // Filter out messages deleted "for me" by this user
+      if (prefs?.deletedMessages && prefs.deletedMessages.length > 0) {
+        const deletedMsgSet = new Set(prefs.deletedMessages);
+        orderedMessages = orderedMessages.filter((m) => !deletedMsgSet.has(m.id));
+      }
+
       // Check if user cleared history for this workspace
       if (clearedIso) {
         const clearedTime = new Date(clearedIso).getTime();
@@ -2181,35 +2191,67 @@ export const workspaceService = {
   },
 
   /**
-   * Delete a message (soft delete for everyone, or remove)
+   * Delete a message (soft delete for everyone, or hide for current user)
    */
   async deleteMessage(
     messageId: string,
-    deleteForEveryone: boolean = true
+    deleteForEveryone: boolean = true,
+    userId?: string
   ): Promise<{ success: boolean; error: string | null }> {
     try {
       if (deleteForEveryone) {
-        const { error } = await supabase
+        const updatePayload: any = {
+          content: '🚫 This message was deleted',
+          is_deleted: true,
+          media_urls: null,
+          attachments: null,
+          doi_metadata: null,
+          updated_at: new Date().toISOString(),
+        };
+
+        let { error } = await supabase
           .from('workspace_messages')
-          .update({
-            content: '🚫 This message was deleted',
-            is_deleted: true,
-            media_urls: null,
-            attachments: [],
-            doi_metadata: null,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatePayload)
           .eq('id', messageId);
 
-        if (error) return { success: false, error: error.message };
+        if (error && (error.message.includes('column') || error.message.includes('schema cache'))) {
+          // Schema fallback
+          const retry = await supabase
+            .from('workspace_messages')
+            .update({
+              content: '🚫 This message was deleted',
+              is_deleted: true,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', messageId);
+          error = retry.error;
+        }
+
+        if (error) {
+          // If update failed (e.g. workspace creator/owner deleting someone else's message), try delete row which is permitted for creators
+          const hardDel = await supabase
+            .from('workspace_messages')
+            .delete()
+            .eq('id', messageId);
+          if (hardDel.error) {
+            return { success: false, error: error.message };
+          }
+        }
       } else {
-        // Delete row
-        const { error } = await supabase
-          .from('workspace_messages')
-          .delete()
-          .eq('id', messageId);
-
-        if (error) return { success: false, error: error.message };
+        // Delete for Me: Save to user's chat preferences so it never shows up for this user
+        let effectiveUserId = userId;
+        if (!effectiveUserId) {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          effectiveUserId = authUser?.id;
+        }
+        if (effectiveUserId) {
+          const prefs = await getChatPreferences(effectiveUserId);
+          const currentList = Array.isArray(prefs.deletedMessages) ? prefs.deletedMessages : [];
+          if (!currentList.includes(messageId)) {
+            prefs.deletedMessages = [...currentList, messageId];
+            await saveChatPreferences(effectiveUserId, prefs);
+          }
+        }
       }
       return { success: true, error: null };
     } catch (err: any) {
