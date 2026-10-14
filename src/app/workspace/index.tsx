@@ -524,9 +524,42 @@ export default function WorkspaceHubScreen() {
       const lm = item.last_message;
       if (lm) {
         if (lm.is_deleted || lm.content === '🚫 This message was deleted') return '🚫 This message was deleted';
-        if (lm.message_type === 'image' || (lm.media_urls && lm.media_urls.length > 0)) return '📷 Photo';
-        if (lm.message_type === 'audio' || lm.message_type === 'voice_note') return '🎙️ Voice note';
-        if (lm.message_type === 'document') return `📄 ${lm.document_metadata?.name || 'Document'}`;
+
+        const isAudio = Boolean(
+          lm.message_type === 'audio' ||
+          lm.message_type === 'voice_note' ||
+          lm.audio_metadata ||
+          (lm.attachments as any)?.audio_metadata ||
+          (typeof lm.content === 'string' && lm.content.startsWith('🎙️')) ||
+          (lm.media_urls && lm.media_urls.some((u: string) => {
+            const lower = (u || '').toLowerCase();
+            return (
+              lower.endsWith('.webm') ||
+              lower.endsWith('.mp3') ||
+              lower.endsWith('.m4a') ||
+              lower.endsWith('.wav') ||
+              lower.endsWith('.ogg') ||
+              lower.includes('/audio/') ||
+              lower.includes('/voice-notes/')
+            );
+          }))
+        );
+        if (isAudio) return '🎙️ Voice note';
+
+        const isDoc = Boolean(
+          lm.message_type === 'document' ||
+          lm.document_metadata ||
+          (lm.attachments as any)?.document_metadata
+        );
+        if (isDoc) return `📄 ${lm.document_metadata?.name || (lm.attachments as any)?.document_metadata?.name || 'Document'}`;
+
+        const isImg = Boolean(
+          lm.message_type === 'image' ||
+          (typeof lm.content === 'string' && lm.content === '📷 Shared photo') ||
+          (lm.media_urls && lm.media_urls.length > 0 && !isAudio && !isDoc)
+        );
+        if (isImg) return '📷 Photo';
+
         if (lm.message_type === 'paper_doi' || lm.doi_metadata) return `🔬 ${lm.doi_metadata?.title || 'Research paper'}`;
         if (lm.message_type === 'poll') return `📊 Poll: ${lm.content}`;
         if (lm.message_type === 'post') return lm.content ? `📑 ${lm.content}` : '📑 Shared post';

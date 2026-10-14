@@ -284,6 +284,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         (target.sender_id === currentUser?.id ? 'You' : partner?.fullName) ||
         'Researcher',
       content:
+        (target.message_type === 'audio' || target.message_type === 'voice_note' || target.audio_metadata ? '🎙️ Voice note' : '') ||
         target.content ||
         (target.doi_metadata ? '📄 Shared research paper' : '') ||
         (target.document_metadata ? '📄 Document' : '') ||
@@ -1748,7 +1749,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 (replyParent.sender_id === currentUser?.id ? 'You' : partner?.fullName) ||
                 'Researcher';
 
+              const isAudioReply = replyParent.message_type === 'audio' || replyParent.message_type === 'voice_note' || Boolean(replyParent.audio_metadata);
               const replySnippet =
+                (isAudioReply ? '🎙️ Voice note' : '') ||
                 replyParent.content ||
                 (replyParent.doi_metadata ? '📄 Shared paper' : '') ||
                 (replyParent.document_metadata ? '📄 Document' : '') ||
@@ -2528,7 +2531,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               </Text>
             </View>
             <Text style={styles.replyingSnippetText} numberOfLines={1}>
-              {replyingTo.content || (replyingTo.doi_metadata ? '📄 Shared paper' : '📷 Photo')}
+              {replyingTo.content || (replyingTo.doi_metadata ? '📄 Shared paper' : (replyingTo.message_type === 'audio' || replyingTo.message_type === 'voice_note' || replyingTo.audio_metadata ? '🎙️ Voice note' : '📷 Photo'))}
             </Text>
           </View>
           <TouchableOpacity
@@ -3223,7 +3226,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <View style={styles.forwardPreviewSnippet}>
               <Text style={styles.forwardPreviewLabel}>FORWARDING CONTENT</Text>
               <Text style={styles.forwardPreviewText} numberOfLines={2}>
-                {forwardingMessage?.content || (forwardingMessage?.doi_metadata ? '📄 Research Paper' : '📷 Photo')}
+                {forwardingMessage?.content || (forwardingMessage?.doi_metadata ? '📄 Research Paper' : (forwardingMessage?.message_type === 'audio' || forwardingMessage?.message_type === 'voice_note' || forwardingMessage?.audio_metadata ? '🎙️ Voice note' : '📷 Photo'))}
               </Text>
             </View>
 

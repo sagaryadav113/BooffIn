@@ -468,6 +468,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         (target as any).sender_name ||
         (target.sender_id === currentUser?.id ? 'You' : target.sender?.fullName || target.sender?.handle || 'Researcher'),
       content:
+        (target.message_type === 'audio' || target.message_type === 'voice_note' || target.audio_metadata ? '🎙️ Voice note' : '') ||
         target.content ||
         (target.doi_metadata ? '📄 Shared research paper' : '') ||
         (target.document_metadata ? '📄 Document' : '') ||
@@ -2138,7 +2139,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                             {(replyParent as any).sender_name || replyParent.sender?.fullName || replyParent.sender?.handle || (replyParent.sender_id === currentUser?.id ? 'You' : 'Researcher')}
                           </Text>
                           <Text style={[styles.quotedReplySnippet, isMe ? styles.quotedSnippetMe : styles.quotedSnippetOther]} numberOfLines={2}>
-                            {replyParent.content || (replyParent.doi_metadata ? '📄 Shared research paper' : (replyParent.message_type === 'image' ? '📷 Photo' : 'Shared attachment'))}
+                            {replyParent.content || (replyParent.doi_metadata ? '📄 Shared research paper' : (replyParent.message_type === 'audio' || replyParent.message_type === 'voice_note' || replyParent.audio_metadata ? '🎙️ Voice note' : (replyParent.message_type === 'image' ? '📷 Photo' : 'Shared attachment')))}
                           </Text>
                         </View>
                       </View>

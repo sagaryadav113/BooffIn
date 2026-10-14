@@ -393,7 +393,6 @@ export const workspaceService = {
               reply_to_id: null,
             };
           } else {
-            const isImg = (extractedMedia && extractedMedia.length > 0) || lastMsg.message_type === 'image';
             const docMeta = lastMsg.document_metadata || lastMsg.attachments?.document_metadata || null;
             const doiMeta = lastMsg.doi_metadata || lastMsg.attachments?.doi_metadata || null;
             const postMeta = lastMsg.post_metadata || lastMsg.attachments?.post_metadata || null;
@@ -401,6 +400,47 @@ export const workspaceService = {
             const callMeta = lastMsg.call_metadata || lastMsg.attachments?.call_metadata || null;
             const audioMeta = lastMsg.audio_metadata || lastMsg.attachments?.audio_metadata || null;
             const inviteMeta = lastMsg.workspace_invite_metadata || lastMsg.attachments?.workspace_invite_metadata || null;
+
+            const isAudioMsg = Boolean(
+              lastMsg.message_type === 'audio' ||
+              lastMsg.message_type === 'voice_note' ||
+              audioMeta ||
+              (typeof lastMsg.content === 'string' && lastMsg.content.startsWith('🎙️')) ||
+              (extractedMedia && extractedMedia.some((u: string) => {
+                const lower = (u || '').toLowerCase();
+                return (
+                  lower.endsWith('.webm') ||
+                  lower.endsWith('.mp3') ||
+                  lower.endsWith('.m4a') ||
+                  lower.endsWith('.wav') ||
+                  lower.endsWith('.ogg') ||
+                  lower.includes('/audio/') ||
+                  lower.includes('/voice-notes/')
+                );
+              }))
+            );
+
+            const isDocMsg = Boolean(
+              lastMsg.message_type === 'document' ||
+              docMeta
+            );
+
+            const isImg = !isAudioMsg && !isDocMsg && Boolean(
+              lastMsg.message_type === 'image' ||
+              (typeof lastMsg.content === 'string' && lastMsg.content === '📷 Shared photo') ||
+              (extractedMedia && extractedMedia.length > 0)
+            );
+
+            let resolvedMsgType: any = lastMsg.message_type;
+            if (isAudioMsg) resolvedMsgType = 'audio';
+            else if (isDocMsg) resolvedMsgType = 'document';
+            else if (isImg) resolvedMsgType = 'image';
+            else if (doiMeta) resolvedMsgType = 'paper_doi';
+            else if (postMeta) resolvedMsgType = 'post';
+            else if (profMeta) resolvedMsgType = 'profile';
+            else if (callMeta) resolvedMsgType = 'call_log';
+            else if (inviteMeta) resolvedMsgType = 'workspace_invite';
+            else if (!resolvedMsgType) resolvedMsgType = 'text';
 
             const cipher = lastMsg.e2ee_ciphertext || lastMsg.attachments?.e2ee_ciphertext || null;
             const nonce = lastMsg.e2ee_nonce || lastMsg.attachments?.e2ee_nonce || null;
@@ -442,7 +482,7 @@ export const workspaceService = {
               workspace_id: lastMsg.workspace_id,
               sender_id: lastMsg.sender_id,
               content: displayContent,
-              message_type: isImg ? 'image' : (lastMsg.message_type || (doiMeta ? 'paper_doi' : 'text')),
+              message_type: resolvedMsgType,
               doi_metadata: doiMeta,
               document_metadata: docMeta,
               post_metadata: postMeta,
@@ -1525,11 +1565,40 @@ export const workspaceService = {
           pollData.totalVotes = total;
         }
 
-        const isImgType = Boolean(extractedMedia && extractedMedia.length > 0) || m.message_type === 'image';
+        const isAudioType = Boolean(
+          m.message_type === 'audio' ||
+          m.message_type === 'voice_note' ||
+          audioMeta ||
+          (typeof m.content === 'string' && m.content.startsWith('🎙️')) ||
+          (extractedMedia && extractedMedia.some((u: string) => {
+            const lower = (u || '').toLowerCase();
+            return (
+              lower.endsWith('.webm') ||
+              lower.endsWith('.mp3') ||
+              lower.endsWith('.m4a') ||
+              lower.endsWith('.wav') ||
+              lower.endsWith('.ogg') ||
+              lower.includes('/audio/') ||
+              lower.includes('/voice-notes/')
+            );
+          }))
+        );
+
+        const isDocType = Boolean(
+          m.message_type === 'document' ||
+          docMeta
+        );
+
+        const isImgType = !isAudioType && !isDocType && (
+          Boolean(extractedMedia && extractedMedia.length > 0) ||
+          m.message_type === 'image' ||
+          (typeof m.content === 'string' && m.content === '📷 Shared photo')
+        );
 
         let detectedType = m.message_type;
-        if (isImgType) detectedType = 'image';
-        else if (docMeta) detectedType = 'document';
+        if (isAudioType) detectedType = 'audio';
+        else if (isDocType) detectedType = 'document';
+        else if (isImgType) detectedType = 'image';
         else if (inviteMeta) detectedType = 'workspace_invite';
         else if (postMeta) detectedType = 'post';
         else if (profMeta) detectedType = 'profile';

@@ -375,6 +375,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         (target as any).sender_name ||
         (target.sender_id === currentUser?.id ? 'You' : target.sender?.fullName || target.sender?.handle || 'Researcher'),
       content:
+        (target.message_type === 'audio' || target.message_type === 'voice_note' || target.audio_metadata ? '🎙️ Voice note' : '') ||
         target.content ||
         (target.doi_metadata ? '📄 Shared research paper' : '') ||
         (target.document_metadata ? '📄 Document' : '') ||
@@ -1809,7 +1810,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                             {(replyTarget as any).sender_name || (replyTarget.sender_id === currentUser?.id ? 'You' : replyTarget.sender?.fullName || replyTarget.sender?.handle || 'Researcher')}
                           </Text>
                           <Text style={styles.replyQuoteContent} numberOfLines={2}>
-                            {replyTarget.content || (replyTarget.doi_metadata ? '📄 Shared research paper' : (replyTarget.message_type === 'image' ? '📷 Photo' : 'Attachment'))}
+                            {replyTarget.content || (replyTarget.doi_metadata ? '📄 Shared research paper' : (replyTarget.message_type === 'audio' || replyTarget.message_type === 'voice_note' || replyTarget.audio_metadata ? '🎙️ Voice note' : (replyTarget.message_type === 'image' ? '📷 Photo' : 'Attachment')))}
                           </Text>
                         </View>
                       )}
