@@ -71,6 +71,7 @@ import {
   LogOut,
   Eye,
   ChevronDown,
+  EyeOff,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -343,6 +344,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const [replyingTo, setReplyingTo] = useState<WorkspaceMessage | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<WorkspaceMessage | null>(null);
   const [showMessageActionMenu, setShowMessageActionMenu] = useState(false);
+  const [messageActionAnchor, setMessageActionAnchor] = useState<{ x?: number; y?: number; width?: number; height?: number } | null>(null);
+  const [deleteTargetMessage, setDeleteTargetMessage] = useState<WorkspaceMessage | null>(null);
 
   // Edit Message Modal
   const [editingMessage, setEditingMessage] = useState<WorkspaceMessage | null>(null);
@@ -944,13 +947,27 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   };
 
   // Message Action Sheet & Reactions
-  const handleLongPressMessage = (msg: WorkspaceMessage) => {
+  const handleOpenMessageMenu = (msg: WorkspaceMessage, coords?: { x: number; y: number }) => {
     if (msg.is_deleted) return;
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
     setSelectedMessage(msg);
+    if (coords && coords.x !== undefined && coords.y !== undefined) {
+      setMessageActionAnchor({
+        x: coords.x,
+        y: coords.y,
+        width: 24,
+        height: 24,
+      });
+    } else {
+      setMessageActionAnchor(null);
+    }
     setShowMessageActionMenu(true);
+  };
+
+  const handleLongPressMessage = (msg: WorkspaceMessage) => {
+    handleOpenMessageMenu(msg);
   };
 
   const handleToggleReaction = async (msgId: string, emoji: string) => {
@@ -994,58 +1011,11 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     setEditInputText('');
   };
 
-  const handleDeleteAction = () => {
-    if (!selectedMessage) return;
-    const msg = selectedMessage;
+  const handleDeleteAction = (msgToDel?: WorkspaceMessage) => {
+    const msg = msgToDel || selectedMessage;
+    if (!msg) return;
     setShowMessageActionMenu(false);
-    setSelectedMessage(null);
-
-    const isMyMsg = msg.sender_id === currentUser?.id;
-    const isOwner = workspace.owner_id === currentUser?.id;
-    const canDeleteForEveryone = isMyMsg || isOwner;
-
-    if (Platform.OS === 'web') {
-      const confirmDelete = window.confirm(
-        canDeleteForEveryone
-          ? 'Delete this message for everyone?'
-          : 'Delete this message for yourself?'
-      );
-      if (confirmDelete) {
-        deleteMessage(msg.id, canDeleteForEveryone);
-      }
-    } else {
-      if (canDeleteForEveryone) {
-        Alert.alert(
-          'Delete Message',
-          'Choose how you want to delete this message:',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete for Me',
-              onPress: () => deleteMessage(msg.id, false),
-            },
-            {
-              text: 'Delete for Everyone',
-              style: 'destructive',
-              onPress: () => deleteMessage(msg.id, true),
-            },
-          ]
-        );
-      } else {
-        Alert.alert(
-          'Delete Message',
-          'Delete this message from your chat history?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete for Me',
-              style: 'destructive',
-              onPress: () => deleteMessage(msg.id, false),
-            },
-          ]
-        );
-      }
-    }
+    setDeleteTargetMessage(msg);
   };
 
   const handleOpenForward = () => {
@@ -1795,7 +1765,17 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                         <View style={[styles.bubbleWrapper, hasMediaContent && styles.bubbleWithMedia]}>
                           <TouchableOpacity
                             activeOpacity={0.9}
-                            onLongPress={() => handleLongPressMessage(item)}
+                            onLongPress={(e) => {
+                              const { pageX, pageY } = e.nativeEvent;
+                              handleOpenMessageMenu(item, { x: pageX, y: pageY });
+                            }}
+                            onPress={(e) => {
+                              if (Platform.OS === 'web') {
+                                const { pageX, pageY } = e.nativeEvent;
+                                handleOpenMessageMenu(item, { x: pageX, y: pageY });
+                              }
+                            }}
+                            delayLongPress={280}
                             style={[
                               styles.messageBubble,
                               isMe
@@ -2373,85 +2353,174 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
 
 
-      {/* Message Long-Press Action Sheet Modal */}
-      <Modal
+      {/* POPOVER: Message Context Menu & Emoji Reaction Bar (Hovering Card) */}
+      <Popover
         visible={showMessageActionMenu}
+        onClose={() => {
+          setShowMessageActionMenu(false);
+          setSelectedMessage(null);
+        }}
+        anchorCoords={messageActionAnchor}
+        position="auto"
+        align={selectedMessage?.sender_id === currentUser?.id ? 'end' : 'start'}
+        estimatedWidth={240}
+        estimatedHeight={240}
+        style={styles.messagePopoverCard}
+      >
+        {/* Top Quick Emoji Reactions Bar */}
+        <View style={styles.popoverEmojiReactionsRow}>
+          {['❤️', '👍', '💡', '🔥', '👏', '🔬'].map((emoji) => (
+            <TouchableOpacity
+              key={emoji}
+              activeOpacity={0.7}
+              onPress={() => selectedMessage && handleToggleReaction(selectedMessage.id, emoji)}
+              style={styles.popoverEmojiReactionBtn}
+            >
+              <Text style={styles.popoverEmojiReactionText}>{emoji}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <PopoverDivider />
+
+        {/* 1. Reply */}
+        <PopoverItem
+          icon={<Reply size={16} color="#164E3F" />}
+          label="Reply"
+          onPress={handleStartReply}
+        />
+
+        {/* 2. Copy Text */}
+        {selectedMessage?.content && !selectedMessage.is_deleted && (
+          <>
+            <PopoverDivider />
+            <PopoverItem
+              icon={<Copy size={16} color="#0F172A" />}
+              label="Copy Text"
+              onPress={handleCopyMessage}
+            />
+          </>
+        )}
+
+        {/* 3. Forward */}
+        <PopoverDivider />
+        <PopoverItem
+          icon={<CornerUpRight size={16} color="#0F172A" />}
+          label="Forward"
+          onPress={handleOpenForward}
+        />
+
+        {/* 4. Edit (Only for own messages) */}
+        {selectedMessage?.sender_id === currentUser?.id && !selectedMessage?.is_deleted && (
+          <>
+            <PopoverDivider />
+            <PopoverItem
+              icon={<Pencil size={16} color="#0F172A" />}
+              label="Edit Message"
+              onPress={handleOpenEdit}
+            />
+          </>
+        )}
+
+        {/* 5. Delete Message */}
+        <PopoverDivider />
+        <PopoverItem
+          icon={<Trash2 size={16} color="#DC2626" />}
+          label={
+            selectedMessage?.sender_id === currentUser?.id || workspace.owner_id === currentUser?.id
+              ? 'Delete Message'
+              : 'Delete for Me'
+          }
+          destructive
+          onPress={() => handleDeleteAction(selectedMessage || undefined)}
+        />
+      </Popover>
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Delete Message Confirmation (Delete for Me vs Everyone) */}
+      {/* ------------------------------------------------------------- */}
+      <Modal
+        visible={Boolean(deleteTargetMessage)}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowMessageActionMenu(false)}
+        onRequestClose={() => setDeleteTargetMessage(null)}
       >
         <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShowMessageActionMenu(false)}
           style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setDeleteTargetMessage(null)}
         >
-          <View style={styles.actionSheetCard}>
-            {/* Quick Emoji Reaction Strip */}
-            <View style={styles.reactionStrip}>
-              {['❤️', '👍', '💡', '🔥', '👏', '🔬'].map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  activeOpacity={0.7}
-                  onPress={() => selectedMessage && handleToggleReaction(selectedMessage.id, emoji)}
-                  style={styles.reactionEmojiBtn}
-                >
-                  <Text style={styles.reactionEmojiText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
+          <View
+            style={styles.deleteModalCard}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.deleteModalHeader}>
+              <View style={styles.deleteModalIconWrap}>
+                <Trash2 size={24} color="#DC2626" />
+              </View>
+              <Text style={styles.deleteModalTitle}>Delete Message</Text>
+              <Text style={styles.deleteModalSubtitle}>
+                Choose how you would like to delete this message:
+              </Text>
             </View>
 
-            <View style={styles.actionSheetDivider} />
-
-            {/* Actions List */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleStartReply}
-              style={styles.actionSheetRow}
-            >
-              <Reply size={18} color="#0F172A" />
-              <Text style={styles.actionSheetText}>Reply</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleCopyMessage}
-              style={styles.actionSheetRow}
-            >
-              <Copy size={18} color="#0F172A" />
-              <Text style={styles.actionSheetText}>Copy Text</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleOpenForward}
-              style={styles.actionSheetRow}
-            >
-              <CornerUpRight size={18} color="#0F172A" />
-              <Text style={styles.actionSheetText}>Forward</Text>
-            </TouchableOpacity>
-
-            {selectedMessage?.sender_id === currentUser?.id && !selectedMessage?.is_deleted && (
+            <View style={styles.deleteModalOptions}>
+              {/* Option 1: Delete for Me */}
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={handleOpenEdit}
-                style={styles.actionSheetRow}
+                style={styles.deleteOptionBtn}
+                onPress={() => {
+                  if (deleteTargetMessage) {
+                    deleteMessage(deleteTargetMessage.id, false);
+                    setDeleteTargetMessage(null);
+                  }
+                }}
               >
-                <Pencil size={18} color="#0F172A" />
-                <Text style={styles.actionSheetText}>Edit Message</Text>
+                <View style={[styles.deleteOptionIconWrap, { backgroundColor: '#F1F5F9' }]}>
+                  <EyeOff size={18} color="#475569" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.deleteOptionTitle}>Delete for Me</Text>
+                  <Text style={styles.deleteOptionDesc}>
+                    Removes this message from your chat history only
+                  </Text>
+                </View>
               </TouchableOpacity>
-            )}
+
+              {/* Option 2: Delete for Everyone (if sender or workspace owner) */}
+              {(deleteTargetMessage?.sender_id === currentUser?.id ||
+                workspace.owner_id === currentUser?.id) && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={[styles.deleteOptionBtn, styles.deleteForEveryoneBtn]}
+                  onPress={() => {
+                    if (deleteTargetMessage) {
+                      deleteMessage(deleteTargetMessage.id, true);
+                      setDeleteTargetMessage(null);
+                    }
+                  }}
+                >
+                  <View style={[styles.deleteOptionIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                    <Trash2 size={18} color="#DC2626" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.deleteOptionTitle, { color: '#DC2626' }]}>
+                      Delete for Everyone
+                    </Text>
+                    <Text style={styles.deleteOptionDesc}>
+                      Deletes this message for all participants in this chat
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={handleDeleteAction}
-              style={[styles.actionSheetRow, { borderBottomWidth: 0 }]}
+              style={styles.deleteModalCancelBtn}
+              onPress={() => setDeleteTargetMessage(null)}
             >
-              <Trash2 size={18} color="#DC2626" />
-              <Text style={[styles.actionSheetText, { color: '#DC2626' }]}>
-                {selectedMessage?.sender_id === currentUser?.id || workspace.owner_id === currentUser?.id
-                  ? 'Delete Message'
-                  : 'Delete for Me'}
-              </Text>
+              <Text style={styles.deleteModalCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -4306,6 +4375,118 @@ const styles = StyleSheet.create({
   },
   attachGridLabel: {
     fontSize: 11.5,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  /* Hovering Message Popover Menu */
+  messagePopoverCard: {
+    paddingVertical: 4,
+    minWidth: 230,
+    maxWidth: 270,
+  },
+  popoverEmojiReactionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    marginHorizontal: 8,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  popoverEmojiReactionBtn: {
+    padding: 4,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  popoverEmojiReactionText: {
+    fontSize: 20,
+  },
+  /* Delete Confirmation Modal */
+  deleteModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  deleteModalHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  deleteModalIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  deleteModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  deleteModalSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  deleteModalOptions: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  deleteOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    gap: 12,
+  },
+  deleteForEveryoneBtn: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+  },
+  deleteOptionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  deleteOptionDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    lineHeight: 15,
+  },
+  deleteModalCancelBtn: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  deleteModalCancelText: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#475569',
   },
