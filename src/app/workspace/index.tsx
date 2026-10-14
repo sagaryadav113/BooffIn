@@ -13,7 +13,7 @@ import {
   Image,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   MessageSquare,
@@ -61,6 +61,8 @@ export type WorkspaceTabType = 'dm' | 'community' | 'inner_circle' | 'settings';
 export default function WorkspaceHubScreen() {
   const { isDesktop } = useResponsiveLayout();
   const currentUser = useAuthStore((s) => s.user);
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom || 0;
 
   // Workspace Store Data
   const dms = useWorkspaceStore((s) => s.dms);
@@ -581,9 +583,17 @@ export default function WorkspaceHubScreen() {
     );
   };
 
-  // Bottom Navigation Bar (Strictly 3 Tabs)
+  // Bottom Navigation Bar (4 Tabs: DM, Community, Inner Circle, Settings)
   const renderBottomNav = () => (
-    <View style={styles.bottomTabBar}>
+    <View
+      style={[
+        styles.bottomTabBar,
+        {
+          height: 56 + (bottomInset > 0 ? bottomInset : 0),
+          paddingBottom: bottomInset > 0 ? bottomInset : 4,
+        },
+      ]}
+    >
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => setActiveTab('dm')}
@@ -942,7 +952,7 @@ export default function WorkspaceHubScreen() {
                       tintColor="#164E3F"
                     />
                   }
-                  contentContainerStyle={styles.listContent}
+                  contentContainerStyle={[styles.listContent, { paddingBottom: 76 + bottomInset }]}
                   ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                       <MessageSquare size={44} color="#CBD5E1" />

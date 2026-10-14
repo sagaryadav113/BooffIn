@@ -12,6 +12,7 @@ import {
   Linking,
   Modal,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Settings,
   Shield,
@@ -59,6 +60,8 @@ import {
 } from '../../constants/legalPolicies';
 
 export const WorkspaceSettingsView: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom || 0;
   const currentUser = useAuthStore((s) => s.user);
   const { settings, updateSetting, resetSettings, isLoading } = useWorkspaceSettingsStore();
   const communities = useWorkspaceStore((s) => s.communities);
@@ -176,7 +179,7 @@ export const WorkspaceSettingsView: React.FC = () => {
     <View style={styles.container}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 90 + bottomInset }]}
         showsVerticalScrollIndicator={false}
       >
       {/* Header Banner */}
