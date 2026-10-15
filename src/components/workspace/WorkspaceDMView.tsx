@@ -696,9 +696,25 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
   const effectiveOtherLastReadAt = storeOtherLastRead || otherLastReadAt || workspace.other_last_read_at;
 
-  // Filtered messages based on in-chat search & filter pills
+  // Filtered messages based on in-chat search, filter pills, and disappearing message timers
   const displayedMessages = useMemo(() => {
+    const effectiveTimer = currentDm.settings?.ephemeral_timer || workspace.settings?.ephemeral_timer;
+    const now = Date.now();
+
     return messages.filter((m) => {
+      // 0. Ephemeral / Disappearing message expiration filter
+      if (effectiveTimer && effectiveTimer !== 'off') {
+        let maxAgeMs = 24 * 60 * 60 * 1000;
+        if (effectiveTimer === '24h') maxAgeMs = 24 * 60 * 60 * 1000;
+        else if (effectiveTimer === '7d') maxAgeMs = 7 * 24 * 60 * 60 * 1000;
+        else if (effectiveTimer === '30d') maxAgeMs = 30 * 24 * 60 * 60 * 1000;
+        else if (effectiveTimer === '90d') maxAgeMs = 90 * 24 * 60 * 60 * 1000;
+
+        if (now - new Date(m.created_at).getTime() >= maxAgeMs) {
+          return false;
+        }
+      }
+
       // 1. Text Search query
       if (chatSearchQuery.trim()) {
         const q = chatSearchQuery.toLowerCase();
@@ -745,7 +761,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
       return true;
     });
-  }, [messages, chatSearchQuery, activeChatFilter]);
+  }, [messages, chatSearchQuery, activeChatFilter, currentDm.settings?.ephemeral_timer, workspace.settings?.ephemeral_timer]);
 
   // --- Handlers: Reactions ---
   const handleToggleReaction = async (messageId: string, emoji: string) => {

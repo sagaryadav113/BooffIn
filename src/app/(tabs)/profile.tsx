@@ -104,7 +104,7 @@ export default function CurrentUserProfileScreen() {
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Saved' | 'Scholars' | 'Cited' | 'Activity'>(() => {
     if (params.tab) {
       const lower = params.tab.toLowerCase();
-      if (lower === 'articles' || lower === 'article' || lower === 'hyped' || lower === 'shared' || lower === 'posts' || lower === 'post') {
+      if (lower === 'articles' || lower === 'article' || lower === 'hyped' || lower === 'likes' || lower === 'liked' || lower === 'shared' || lower === 'posts' || lower === 'post') {
         return 'Posts';
       }
       if (lower === 'saved') return 'Saved';
@@ -136,7 +136,7 @@ export default function CurrentUserProfileScreen() {
       if (lower === 'articles' || lower === 'article') {
         setActiveSubTab('Posts');
         setPostsSubFilter('Articles');
-      } else if (lower === 'hyped') {
+      } else if (lower === 'hyped' || lower === 'likes' || lower === 'liked') {
         setActiveSubTab('Posts');
         setPostsSubFilter('Hyped');
       } else if (lower === 'shared') {
@@ -162,7 +162,10 @@ export default function CurrentUserProfileScreen() {
       if (sfLower === 'articles' || sfLower === 'article') {
         setActiveSubTab('Posts');
         setPostsSubFilter('Articles');
-      } else if (sfLower === 'hyped') {
+      } else if (sfLower === 'hyped' || sfLower === 'likes' || sfLower === 'liked') {
+        setActiveSubTab('Posts');
+        setPostsSubFilter('Hyped');
+      } else if (sfLower === 'shared') {
         setActiveSubTab('Posts');
         setPostsSubFilter('Hyped');
       } else if (sfLower === 'shared') {

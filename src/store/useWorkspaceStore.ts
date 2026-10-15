@@ -24,6 +24,7 @@ import { useAuthStore } from './useAuthStore';
 import { supabase } from '../api/client';
 import { fetchUserProfile } from '../api/authService';
 import { getBlockedUserIds } from '../api/moderationService';
+import { useWorkspaceSettingsStore } from './useWorkspaceSettingsStore';
 
 export type WorkspaceHubTab = 'all' | 'dms' | 'communities' | 'inner_circles';
 
@@ -1022,9 +1023,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const now = new Date().toISOString();
     await workspaceService.markWorkspaceAsRead(workspaceId, currentUser.id);
 
-    // Broadcast instant read receipt so sender's ticks immediately turn green
+    // Broadcast instant read receipt only if user enabled Send Read Receipts in settings
+    const readReceiptsEnabled = useWorkspaceSettingsStore.getState().settings.readReceiptsEnabled;
     const channel = activeWorkspaceChannels.get(workspaceId);
-    if (channel) {
+    if (channel && readReceiptsEnabled) {
       channel.send({
         type: 'broadcast',
         event: 'read_receipt',

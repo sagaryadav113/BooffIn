@@ -13,8 +13,12 @@ export default function ContentSettingsScreen() {
   const { user } = useAuthStore();
 
   const navigateToProfileTab = (tabName: string) => {
-    if (user?.id) {
-      router.push(`/profile/${user.id}` as any);
+    if (tabName === 'likes') {
+      router.push({ pathname: '/(tabs)/profile', params: { tab: 'hyped', subFilter: 'hyped' } } as any);
+    } else if (tabName === 'saved') {
+      router.push({ pathname: '/(tabs)/profile', params: { tab: 'saved' } } as any);
+    } else {
+      router.push({ pathname: '/(tabs)/profile', params: { tab: 'posts' } } as any);
     }
   };
 

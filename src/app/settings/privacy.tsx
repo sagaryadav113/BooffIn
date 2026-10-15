@@ -10,6 +10,7 @@ import { SettingsSectionHeader } from '../../components/settings/SettingsSection
 import { SelectModal, SelectOption } from '../../components/settings/SelectModal';
 import { Divider } from '../../components/core/Divider';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
 
 const PROFILE_VISIBILITY_OPTIONS: SelectOption[] = [
   {
@@ -263,7 +264,10 @@ export default function PrivacySettingsScreen() {
         subtitle="Choose who can send you direct private messages."
         options={MESSAGE_PERMISSION_OPTIONS}
         selectedValue={settings.allowDirectMessages}
-        onSelect={(val) => updateSetting('allowDirectMessages', val)}
+        onSelect={(val) => {
+          updateSetting('allowDirectMessages', val);
+          useWorkspaceSettingsStore.getState().updateSetting('mutualFollowDMsOnly', val !== 'everyone');
+        }}
       />
 
       <SelectModal

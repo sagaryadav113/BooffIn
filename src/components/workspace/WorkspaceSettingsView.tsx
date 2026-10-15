@@ -49,6 +49,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { colors, radii, spacing, typography } from '../../theme';
 import { WorkspaceSettings } from '../../types/workspaceSettings';
 import {
@@ -106,7 +107,13 @@ export const WorkspaceSettingsView: React.FC = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    updateSetting(key, !currentValue, currentUser?.id);
+    const nextVal = !currentValue;
+    updateSetting(key, nextVal, currentUser?.id);
+
+    // Keep General Privacy DM permission synchronized
+    if (key === 'mutualFollowDMsOnly') {
+      useSettingsStore.getState().updateSetting('allowDirectMessages', nextVal ? 'connections' : 'everyone');
+    }
   };
 
   const handleSegmentChange = <K extends keyof WorkspaceSettings>(

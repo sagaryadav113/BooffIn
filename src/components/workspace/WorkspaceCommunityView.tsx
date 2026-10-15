@@ -533,6 +533,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
   const handleTextChange = (text: string) => {
     setInputText(text);
+    if (!settings.typingIndicatorsEnabled) return;
     if (workspace.id) {
       sendTypingIndicator(workspace.id, text.trim().length > 0);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);

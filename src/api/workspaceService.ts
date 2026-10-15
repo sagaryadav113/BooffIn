@@ -738,6 +738,48 @@ export const workspaceService = {
         };
       }
 
+      // Privacy Boundary: Verify recipient's direct message permissions
+      const { data: recipientSettings } = await supabase
+        .from('user_settings')
+        .select('allow_direct_messages')
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+
+      const allowDMs = recipientSettings?.allow_direct_messages ?? 'connections';
+      if (allowDMs === 'none') {
+        return {
+          workspaceId: null,
+          error: 'This researcher does not accept direct messages.',
+        };
+      }
+
+      if (allowDMs === 'connections') {
+        const [f1, f2] = await Promise.all([
+          supabase
+            .from('follows')
+            .select('id')
+            .eq('follower_id', currentUser.id)
+            .eq('following_id', targetUserId)
+            .maybeSingle(),
+          supabase
+            .from('follows')
+            .select('id')
+            .eq('follower_id', targetUserId)
+            .eq('following_id', currentUser.id)
+            .maybeSingle(),
+        ]);
+
+        const isMutual = Boolean(f1.data && f2.data);
+        if (!isMutual) {
+          return {
+            workspaceId: null,
+            error:
+              'Direct messaging requires a mutual follow between researchers. Both researchers must follow each other to start a conversation.',
+            requiresMutualFollow: true,
+          };
+        }
+      }
+
       // 1. Try atomic database RPC with p_target_user_id
       let { data, error } = await supabase.rpc('get_or_create_dm_workspace', {
         p_target_user_id: targetUserId,
@@ -1024,6 +1066,15 @@ export const workspaceService = {
       } = await supabase.auth.getUser();
       if (!user) return { workspace: null, error: 'User not authenticated' };
 
+      // Read creator's innerCircleAdminOnlyInvites preference
+      const { data: creatorProf } = await supabase
+        .from('profiles')
+        .select('workspace_settings')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const adminOnlyInvites = creatorProf?.workspace_settings?.innerCircleAdminOnlyInvites ?? true;
+
       // 1. Insert Inner Circle workspace (max_members = 25, is_private = true)
       let wsPayload: any = {
         type: 'inner_circle',
@@ -1039,6 +1090,9 @@ export const workspaceService = {
         subscription_price_inr: 0,
         pricing_tier: null,
         price_inr: 0,
+        settings: {
+          only_admins_invite: adminOnlyInvites,
+        },
       };
 
       let { data: ws, error: wsErr } = await supabase
@@ -1058,6 +1112,9 @@ export const workspaceService = {
           max_members: 25,
           e2ee_enabled: params.e2ee_enabled ?? true,
           price_inr: 0,
+          settings: {
+            only_admins_invite: adminOnlyInvites,
+          },
         };
         const retry = await supabase.from('workspaces').insert(fallbackPayload).select().single();
         ws = retry.data;

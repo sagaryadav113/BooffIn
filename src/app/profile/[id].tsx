@@ -35,6 +35,7 @@ import {
 } from 'lucide-react-native';
 import { blockUser, unblockUser } from '../../api/moderationService';
 import { workspaceService } from '../../api/workspaceService';
+import { supabase } from '../../api/client';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
@@ -97,6 +98,7 @@ export default function OtherResearcherProfileScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'Posts' | 'Scholars' | 'Activity'>('Posts');
   const [postsSubFilter, setPostsSubFilter] = useState<'All' | 'Hyped' | 'Articles' | 'Shared'>('All');
+  const [showLikesOnProfile, setShowLikesOnProfile] = useState(true);
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
@@ -207,6 +209,18 @@ export default function OtherResearcherProfileScreen() {
         }
       }
       setResearcher(prof);
+      if (prof?.id) {
+        try {
+          const { data: priv } = await supabase
+            .from('user_settings')
+            .select('show_likes_on_profile')
+            .eq('user_id', prof.id)
+            .maybeSingle();
+          if (priv && priv.show_likes_on_profile !== undefined) {
+            setShowLikesOnProfile(Boolean(priv.show_likes_on_profile));
+          }
+        } catch {}
+      }
       if (prof?.id && !prof.isPrivateRestricted) {
         loadResearcherPosts(prof.id);
       }
@@ -228,7 +242,19 @@ export default function OtherResearcherProfileScreen() {
       if (!prof) {
         prof = await fetchUserProfileByUsername(cleanId, currentUser?.id);
       }
-      if (prof) setResearcher(prof);
+      if (prof) {
+        setResearcher(prof);
+        try {
+          const { data: priv } = await supabase
+            .from('user_settings')
+            .select('show_likes_on_profile')
+            .eq('user_id', prof.id)
+            .maybeSingle();
+          if (priv && priv.show_likes_on_profile !== undefined) {
+            setShowLikesOnProfile(Boolean(priv.show_likes_on_profile));
+          }
+        } catch {}
+      }
       return prof;
     };
     const refreshedProf = await refreshProfile();
@@ -275,10 +301,27 @@ export default function OtherResearcherProfileScreen() {
     return false;
   };
 
+  // Fallback if Hyped filter is hidden by privacy setting
+  useEffect(() => {
+    if (!isOwnProfile && !showLikesOnProfile && postsSubFilter === 'Hyped') {
+      setPostsSubFilter('All');
+    }
+  }, [isOwnProfile, showLikesOnProfile, postsSubFilter]);
+
+  const availableFilters = useMemo(() => {
+    if (isOwnProfile || showLikesOnProfile) {
+      return ['All', 'Hyped', 'Articles', 'Shared'] as const;
+    }
+    return ['All', 'Articles', 'Shared'] as const;
+  }, [isOwnProfile, showLikesOnProfile]);
+
   // Compute posts filtered by sub-section ("All", "Hyped", "Articles", "Shared")
   const displayFilteredPosts = useMemo(() => {
     if (!posts || posts.length === 0) return [];
     if (postsSubFilter === 'Hyped') {
+      if (!isOwnProfile && !showLikesOnProfile) {
+        return posts;
+      }
       // Only authored posts ranked by engagement (excluding shared papers/reposts)
       const authored = posts.filter((p) => !isSharedPost(p));
       return authored.sort((a, b) => {
@@ -307,7 +350,7 @@ export default function OtherResearcherProfileScreen() {
       return posts.filter((p) => isSharedPost(p));
     }
     return posts;
-  }, [posts, postsSubFilter, researcher?.id]);
+  }, [posts, postsSubFilter, researcher?.id, isOwnProfile, showLikesOnProfile]);
 
   const postCounts = useMemo(() => {
     return {
@@ -857,7 +900,7 @@ export default function OtherResearcherProfileScreen() {
               <View style={styles.postsList}>
                 {/* Filter Chips: All | Hyped | Articles | Shared */}
                 <View style={styles.filterRow}>
-                  {(['All', 'Hyped', 'Articles', 'Shared'] as const).map((filter) => {
+                  {availableFilters.map((filter) => {
                     const count =
                       filter === 'All'
                         ? postCounts.all

@@ -75,6 +75,23 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // Check creator or admin authority & workspace invitation setting
+  const isCreatorOrAdmin = useMemo(() => {
+    if (!currentUser?.id) return false;
+    return (
+      workspace.owner_id === currentUser.id ||
+      workspace.creator_id === currentUser.id ||
+      workspace.my_role === 'owner' ||
+      workspace.my_role === 'admin' ||
+      (existingMembers || []).some(
+        (m) => m.user_id === currentUser.id && (m.role === 'owner' || m.role === 'admin')
+      )
+    );
+  }, [currentUser?.id, workspace, existingMembers]);
+
+  const onlyAdminsInvite = workspace.settings?.only_admins_invite ?? (workspace.type === 'inner_circle');
+  const canAddMembers = !onlyAdminsInvite || isCreatorOrAdmin;
+
   // Load followers and following on modal open
   useEffect(() => {
     if (!visible || !currentUser?.id) return;
@@ -166,18 +183,12 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
   const handleConfirmAdd = async () => {
     if (selectedIds.size === 0 || !currentUser?.id) return;
 
-    // Check creator or admin authority
-    const isCreatorOrAdmin =
-      workspace.owner_id === currentUser.id ||
-      workspace.creator_id === currentUser.id ||
-      workspace.my_role === 'owner' ||
-      workspace.my_role === 'admin' ||
-      (existingMembers || []).some(
-        (m) => m.user_id === currentUser.id && (m.role === 'owner' || m.role === 'admin')
+    // Check creator or admin authority & invitation settings
+    if (!canAddMembers) {
+      Alert.alert(
+        'Permission Denied',
+        'Only the group creator and designated admins can add or invite new members to this workspace.'
       );
-
-    if (!isCreatorOrAdmin) {
-      Alert.alert('Permission Denied', 'Only the group creator and designated admins can add new members.');
       return;
     }
 
@@ -395,6 +406,15 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
             </View>
           ) : null}
 
+          {!canAddMembers ? (
+            <View style={styles.adminOnlyBanner}>
+              <Shield size={16} color="#B45309" />
+              <Text style={styles.adminOnlyBannerText}>
+                Admin-Only Invitations are active. Only workspace creators and admins can add or invite members.
+              </Text>
+            </View>
+          ) : null}
+
           {/* Search Bar at Top */}
           <View style={styles.searchBar}>
             <Search size={15} color="#94A3B8" style={styles.searchIcon} />
@@ -501,11 +521,11 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
 
             <TouchableOpacity
               activeOpacity={0.85}
-              disabled={selectedCounts.total === 0 || isSubmitting}
+              disabled={selectedCounts.total === 0 || isSubmitting || !canAddMembers}
               onPress={handleConfirmAdd}
               style={[
                 styles.addSubmitBtn,
-                (selectedCounts.total === 0 || isSubmitting) && styles.addSubmitBtnDisabled,
+                (selectedCounts.total === 0 || isSubmitting || !canAddMembers) && styles.addSubmitBtnDisabled,
               ]}
             >
               {isSubmitting ? (
@@ -621,6 +641,26 @@ const styles = StyleSheet.create({
     color: '#065F46',
     fontWeight: '600',
     flex: 1,
+  },
+  adminOnlyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: '#FEF3C7',
+    borderLeftWidth: 3,
+    borderLeftColor: '#D97706',
+    borderRadius: 8,
+  },
+  adminOnlyBannerText: {
+    fontSize: 12.5,
+    color: '#92400E',
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 16,
   },
   searchBar: {
     flexDirection: 'row',

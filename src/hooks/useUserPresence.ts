@@ -8,12 +8,18 @@ import { Platform } from 'react-native';
 import { supabase } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePresenceStore } from '../store/usePresenceStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useWorkspaceSettingsStore } from '../store/useWorkspaceSettingsStore';
 
 export const PRESENCE_CHANNEL_NAME = 'booffin-live-presence';
 
 export function useUserPresence() {
   const user = useAuthStore((s) => s.user);
   const setOnlineUsers = usePresenceStore((s) => s.setOnlineUsers);
+  const showActivityStatus = useSettingsStore((s) => s.settings.showActivityStatus);
+  const onlinePresenceEnabled = useWorkspaceSettingsStore((s) => s.settings.onlinePresenceEnabled);
+
+  const shouldBroadcast = Boolean(user?.id && showActivityStatus && onlinePresenceEnabled);
 
   useEffect(() => {
     let presenceChannel: any = null;
@@ -54,12 +60,16 @@ export function useUserPresence() {
 
       presenceChannel.subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {
-          await presenceChannel.track({
-            user_id: user?.id || null,
-            handle: user?.handle || 'anonymous',
-            online_at: new Date().toISOString(),
-            platform: Platform.OS,
-          });
+          if (shouldBroadcast) {
+            await presenceChannel.track({
+              user_id: user?.id || null,
+              handle: user?.handle || 'anonymous',
+              online_at: new Date().toISOString(),
+              platform: Platform.OS,
+            }).catch(() => {});
+          } else {
+            await presenceChannel.untrack().catch(() => {});
+          }
           syncOnlineState();
         }
       });
@@ -72,5 +82,6 @@ export function useUserPresence() {
         supabase.removeChannel(presenceChannel);
       }
     };
-  }, [user?.id, setOnlineUsers]);
+  }, [user?.id, shouldBroadcast, setOnlineUsers]);
 }
+

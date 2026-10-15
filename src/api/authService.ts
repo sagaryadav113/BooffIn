@@ -752,6 +752,20 @@ export async function persistUserProfile(
     if (updates.hasCustomBanner !== undefined) dbPayload.has_custom_banner = updates.hasCustomBanner;
     if (updates.websiteUrl !== undefined) dbPayload.website_url = updates.websiteUrl;
     if (updates.location !== undefined) dbPayload.location = updates.location;
+    if (updates.department !== undefined) dbPayload.department = updates.department.trim() || null;
+    if (updates.labGroup !== undefined) dbPayload.lab_group = updates.labGroup.trim() || null;
+    if (updates.primaryField !== undefined) dbPayload.primary_field = updates.primaryField.trim() || null;
+    if (updates.secondaryFields !== undefined) {
+      dbPayload.secondary_fields = Array.isArray(updates.secondaryFields) ? updates.secondaryFields : [];
+    }
+    if (updates.degreeProgram !== undefined) dbPayload.degree_program = updates.degreeProgram.trim() || null;
+    if (updates.graduationYear !== undefined) {
+      dbPayload.graduation_year = updates.graduationYear ? Number(updates.graduationYear) : null;
+    }
+    if (updates.googleScholarUrl !== undefined) dbPayload.google_scholar_url = updates.googleScholarUrl.trim() || null;
+    if (updates.researchgateUrl !== undefined) dbPayload.researchgate_url = updates.researchgateUrl.trim() || null;
+    if (updates.linkedinUrl !== undefined) dbPayload.linkedin_url = updates.linkedinUrl.trim() || null;
+    if (updates.scopusId !== undefined) dbPayload.scopus_id = updates.scopusId.trim() || null;
 
     const { error } = await supabase
       .from('profiles')

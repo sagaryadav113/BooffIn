@@ -401,12 +401,17 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [isInputFocused, setIsInputFocused] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isSomeoneTyping = Boolean(typingInThisRoom && Object.keys(typingInThisRoom).length > 0);
+  const isSomeoneTyping = Boolean(
+    settings.typingIndicatorsEnabled &&
+      typingInThisRoom &&
+      Object.keys(typingInThisRoom).length > 0
+  );
   const typingUserNames = isSomeoneTyping
     ? Object.values(typingInThisRoom).map((u) => u.username).join(', ')
     : null;
 
   const handleUserTyping = (text: string) => {
+    if (!settings.typingIndicatorsEnabled) return;
     if (text.length > 0) {
       sendTypingIndicator(workspace.id, true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);

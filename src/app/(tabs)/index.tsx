@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo, useState } from 'react';
+import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import {
   StyleSheet,
   StatusBar,
@@ -27,6 +27,7 @@ import {
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 import { DesktopWritePostCard } from '../../components/desktop/DesktopWritePostCard';
 import { Post } from '../../types';
@@ -83,6 +84,18 @@ export default function HomeScreen() {
       setShowRecommendations(false);
     }
   }, [currentUser?.id, userInterests]);
+
+  const defaultTab = useSettingsStore((s) => s.settings.defaultTab);
+  const hasAppliedDefaultTabRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasAppliedDefaultTabRef.current && defaultTab) {
+      hasAppliedDefaultTabRef.current = true;
+      if (defaultTab !== activeTab) {
+        setActiveTab(defaultTab, currentUser?.id);
+      }
+    }
+  }, [defaultTab, currentUser?.id, setActiveTab, activeTab]);
 
   useEffect(() => {
     fetchFeed(activeTab, currentUser?.id);
