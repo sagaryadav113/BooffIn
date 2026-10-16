@@ -15,7 +15,6 @@ import {
   WorkspaceRoleOpportunity,
   WorkspaceSavedItem,
   WorkspaceSubscriptionTier,
-  WorkspaceType,
   WorkspaceMessageType,
   WorkspaceAudioMetadata,
   WorkspacePostMetadata,
@@ -24,11 +23,10 @@ import {
   WorkspaceDocumentMetadata,
   WorkspaceCallMetadata,
   DoiMetadata,
-  WorkspaceSummaryStats,
   WorkspacePollData,
 } from '../types/workspace';
 import { resolvePaper } from './paperResolver';
-import { deriveSharedSessionKey, derivePodSessionKey, encryptTextMessage, decryptTextMessage } from '../utils/e2eeCrypto';
+import { deriveSharedSessionKey, derivePodSessionKey, decryptTextMessage } from '../utils/e2eeCrypto';
 
 // Fast in-memory sender profile cache to avoid redundant network RPCs
 const senderProfileCache = new Map<string, { profile: any; timestamp: number }>();
@@ -1027,7 +1025,7 @@ export const workspaceService = {
       }
 
       // 2. Insert creator as owner
-      const membersToInsert: Array<{ workspace_id: string; user_id: string; role: string; status: string }> = [
+      const membersToInsert: { workspace_id: string; user_id: string; role: string; status: string }[] = [
         {
           workspace_id: ws.id,
           user_id: user.id,
@@ -1141,7 +1139,7 @@ export const workspaceService = {
       }
 
       // 2. Insert creator as owner
-      const membersToInsert: Array<{ workspace_id: string; user_id: string; role: string; status: string }> = [
+      const membersToInsert: { workspace_id: string; user_id: string; role: string; status: string }[] = [
         {
           workspace_id: ws.id,
           user_id: user.id,
@@ -2650,9 +2648,11 @@ export const workspaceService = {
       // Merge local and DB events (deduplicate by id or title+start_time)
       const eventMap = new Map<string, WorkspaceEvent>();
 
-      // Add local events first
+      // Add local events first (filtering out demo seed events)
       for (const ev of localEvents) {
-        eventMap.set(ev.id, ev);
+        if (!ev.id.startsWith('task_seed_') && !ev.id.startsWith('demo_')) {
+          eventMap.set(ev.id, ev);
+        }
       }
 
       // Add / enrich with DB events
@@ -2688,6 +2688,9 @@ export const workspaceService = {
         }
 
         for (const e of dbEvents) {
+          if (e.id.startsWith('task_seed_') || e.id.startsWith('demo_')) {
+            continue;
+          }
           const mapped: WorkspaceEvent = {
             id: e.id,
             workspace_id: e.workspace_id,
@@ -2887,72 +2890,10 @@ export const workspaceService = {
         console.warn('[workspaceService] local tasks cache read error:', cacheErr);
       }
 
-      // If local cache is empty, seed with initial sample research tasks for a warm experience
-      if (!localTasks || localTasks.length === 0) {
-        const now = new Date();
-        const tomorrow = new Date(now.getTime() + 86400000).toISOString().split('T')[0];
-        const nextWeek = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0];
-        const seedTasks: WorkspaceTask[] = [
-          {
-            id: `task_seed_1_${workspaceId.slice(0, 6)}`,
-            workspace_id: workspaceId,
-            creator_id: 'system',
-            title: 'Formulate research hypothesis & methodology',
-            description: 'Define experimental variables, benchmark metrics, and theoretical foundation.',
-            status: 'done',
-            priority: 'high',
-            color: 'green',
-            due_date: new Date(now.getTime() - 86400000).toISOString().split('T')[0],
-            tags: ['Methodology', 'Theory'],
-            sync_with_calendar: true,
-            created_at: new Date(now.getTime() - 2 * 86400000).toISOString(),
-          },
-          {
-            id: `task_seed_2_${workspaceId.slice(0, 6)}`,
-            workspace_id: workspaceId,
-            creator_id: 'system',
-            title: 'Run baseline benchmark & statistical analysis',
-            description: 'Execute quantitative simulations against established SOTA reference datasets.',
-            status: 'in_progress',
-            priority: 'urgent',
-            color: 'pink',
-            due_date: tomorrow,
-            due_time: '14:30',
-            tags: ['Analysis', 'Experiments'],
-            sync_with_calendar: true,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: `task_seed_3_${workspaceId.slice(0, 6)}`,
-            workspace_id: workspaceId,
-            creator_id: 'system',
-            title: 'Draft manuscript figures & results narrative',
-            description: 'Synthesize ablation studies and prepare high-res vector figures for peer review.',
-            status: 'review',
-            priority: 'high',
-            color: 'purple',
-            due_date: nextWeek,
-            tags: ['Writing', 'Figures'],
-            sync_with_calendar: true,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: `task_seed_4_${workspaceId.slice(0, 6)}`,
-            workspace_id: workspaceId,
-            creator_id: 'system',
-            title: 'Final preprint submission & repository release',
-            description: 'Complete author affiliations, archive open-source artifacts, and upload preprint.',
-            status: 'todo',
-            priority: 'medium',
-            color: 'blue',
-            due_date: new Date(now.getTime() + 14 * 86400000).toISOString().split('T')[0],
-            tags: ['Submission', 'Preprint'],
-            sync_with_calendar: true,
-            created_at: new Date().toISOString(),
-          },
-        ];
-        localTasks = seedTasks;
-        await AsyncStorage.setItem(localKey, JSON.stringify(localTasks));
+      if (!localTasks) {
+        localTasks = [];
+      } else {
+        localTasks = localTasks.filter((t) => !t.id.startsWith('task_seed_'));
       }
 
       // Attempt to load from Supabase if table exists
@@ -3428,7 +3369,7 @@ export const workspaceService = {
       } else {
         const userA = inviterId < targetUserId ? inviterId : targetUserId;
         const userB = inviterId > targetUserId ? inviterId : targetUserId;
-        const { data: newWs, error: insertErr } = await supabase
+        const { data: newWs } = await supabase
           .from('workspaces')
           .insert({
             type: 'dm',
@@ -3499,7 +3440,7 @@ export const workspaceService = {
    * Fetch followers and followings for member picker with mutual relation flag
    */
   async getFollowersAndFollowing(userId: string): Promise<{
-    researchers: Array<{
+    researchers: {
       id: string;
       fullName: string;
       handle: string;
@@ -3509,7 +3450,7 @@ export const workspaceService = {
       isMutual: boolean;
       isFollowing: boolean;
       isFollower: boolean;
-    }>;
+    }[];
     error: string | null;
   }> {
     try {

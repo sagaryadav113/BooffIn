@@ -49,7 +49,7 @@ if (!fs.existsSync(managerPath)) {
   process.exit(1);
 }
 const managerContent = fs.readFileSync(managerPath, 'utf8');
-if (!managerContent.includes('BooffIn manager') ||
+if (!managerContent.toLowerCase().includes('booffin manager') ||
     !managerContent.includes('desktopBoardContainer') ||
     !managerContent.includes('mobileBoardWrapper') ||
     !managerContent.includes('onOpenCalendar')) {
@@ -70,15 +70,21 @@ if (!managerContent.includes('AnimatedTaskCard') ||
 }
 console.log('✅ [5/7] Smooth floating card animation (In Progress -> Peer Review) and modern progress bar verified');
 
-// 6. Verify 5-color pastel sticky card palette & warning triangle markers
-if (!managerContent.includes('CARD_COLOR_THEMES') ||
-    !managerContent.includes('warningCornerMarker') ||
-    !managerContent.includes('colorPickerRow') ||
-    !managerContent.includes('AlertTriangle')) {
-  console.error('❌ Missing CARD_COLOR_THEMES, warningCornerMarker, or colorPickerRow in WorkspaceBooffInManagerView');
+// 6. Verify minimalist design, clean accent striping & zero emojis
+const forbiddenSymbols = ['Zap', 'Clock', 'CheckCircle2', 'Flame', 'AlertTriangle', 'Sparkles', '⚡', '🕒', '👀', '✔️', '✅', '🔥', '⚠️', '✨'];
+const hasForbiddenSymbol = forbiddenSymbols.find(sym => managerContent.includes(sym));
+if (hasForbiddenSymbol) {
+  console.error(`❌ Found forbidden emoji/symbol '${hasForbiddenSymbol}' in WorkspaceBooffInManagerView`);
   process.exit(1);
 }
-console.log('✅ [6/7] 5-color pastel sticky-note card themes (Blue, Purple, Pink, Peach, Green) and warning triangle markers verified');
+
+if (!managerContent.includes('MINIMAL_CARD_COLORS') ||
+    !managerContent.includes('colorPickerRow') ||
+    !managerContent.includes('cardLeftAccent')) {
+  console.error('❌ Missing MINIMAL_CARD_COLORS, colorPickerRow, or cardLeftAccent in WorkspaceBooffInManagerView');
+  process.exit(1);
+}
+console.log('✅ [6/7] Minimalist design verified: clean typography, subtle accent stripes, and ZERO emojis/symbols');
 
 // 7. Verify WorkspaceInnerCircleView tab placement between Calendar and Vault
 const innerCirclePath = path.join(__dirname, '..', 'src', 'components', 'workspace', 'WorkspaceInnerCircleView.tsx');

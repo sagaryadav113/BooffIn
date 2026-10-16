@@ -834,17 +834,20 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   }, [selectedCalendarDate]);
 
   const eventsOnSelectedDate = useMemo(() => {
-    return (events || []).filter((e) => {
-      const evDate = (e.start_time || (e as any).event_date || '').split('T')[0];
-      return evDate === selectedCalendarDate;
-    });
+    return (events || [])
+      .filter((e) => !e.id.startsWith('task_seed_') && !e.id.startsWith('demo_'))
+      .filter((e) => {
+        const evDate = (e.start_time || (e as any).event_date || '').split('T')[0];
+        return evDate === selectedCalendarDate;
+      });
   }, [events, selectedCalendarDate]);
 
   const displayedEvents = useMemo(() => {
+    const validEvents = (events || []).filter((e) => !e.id.startsWith('task_seed_') && !e.id.startsWith('demo_'));
     if (calendarViewMode === 'selected') {
       return eventsOnSelectedDate;
     }
-    return events || [];
+    return validEvents;
   }, [eventsOnSelectedDate, events, calendarViewMode]);
 
   const handlePrevMonth = () => {
