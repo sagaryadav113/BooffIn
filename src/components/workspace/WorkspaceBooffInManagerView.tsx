@@ -25,12 +25,13 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-  Timer,
+  Clock,
   X,
   Check,
   ArrowRight,
 } from 'lucide-react-native';
 import { Avatar } from '../core/Avatar';
+import { InteractiveClockPicker } from '../common/InteractiveClockPicker';
 import {
   Workspace,
   WorkspaceMember,
@@ -720,92 +721,137 @@ const SquareTimePicker: React.FC<SquareTimePickerProps> = ({
     onSelectTime(presetTime);
   };
 
+  const [clockMode, setClockMode] = useState<'squares' | 'dial'>('squares');
+
   return (
     <View style={styles.hoveringTimePopoverCard}>
-      {/* Current Time Display & AM/PM Toggle */}
-      <View style={styles.timeHeaderRow}>
-        <View>
-          <Text style={styles.timeDisplayMain}>
-            {String(hour12).padStart(2, '0')}:{String(minute).padStart(2, '0')} {period}
-          </Text>
-          <Text style={styles.timeDisplaySub}>24h: {String(hour24).padStart(2, '0')}:{String(minute).padStart(2, '0')}</Text>
+      {/* Clock Setting Header & Mode Switcher */}
+      <View style={styles.clockModeHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Clock size={14} color="#0F172A" />
+          <Text style={styles.clockModeTitle}>Clock Setting</Text>
         </View>
 
-        <View style={styles.periodToggleRow}>
+        <View style={styles.clockModeTabs}>
           <TouchableOpacity
-            onPress={() => handleTogglePeriod('AM')}
-            style={[styles.periodSquareBtn, period === 'AM' && styles.periodSquareBtnActive]}
+            onPress={() => setClockMode('squares')}
+            style={[styles.clockModeTab, clockMode === 'squares' && styles.clockModeTabActive]}
           >
-            <Text style={[styles.periodSquareText, period === 'AM' && styles.periodSquareTextActive]}>
-              AM
+            <Text style={[styles.clockModeTabText, clockMode === 'squares' && styles.clockModeTabTextActive]}>
+              Squares
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => handleTogglePeriod('PM')}
-            style={[styles.periodSquareBtn, period === 'PM' && styles.periodSquareBtnActive]}
+            onPress={() => setClockMode('dial')}
+            style={[styles.clockModeTab, clockMode === 'dial' && styles.clockModeTabActive]}
           >
-            <Text style={[styles.periodSquareText, period === 'PM' && styles.periodSquareTextActive]}>
-              PM
+            <Text style={[styles.clockModeTabText, clockMode === 'dial' && styles.clockModeTabTextActive]}>
+              Dial
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Small Square Hour Selection */}
-      <Text style={styles.timeSectionLabel}>HOUR</Text>
-      <View style={styles.squaresGrid}>
-        {HOURS_12.map((h) => {
-          const isSelected = h === hour12;
-          return (
-            <TouchableOpacity
-              key={`hour_${h}`}
-              activeOpacity={0.7}
-              onPress={() => handleSelectHour(h)}
-              style={[
-                styles.timeSquareBtn,
-                isSelected && styles.timeSquareBtnHourActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.timeSquareText,
-                  isSelected && styles.timeSquareTextActive,
-                ]}
-              >
-                {String(h).padStart(2, '0')}
+      {clockMode === 'squares' ? (
+        <>
+          {/* Current Time Display & AM/PM Toggle */}
+          <View style={styles.timeHeaderRow}>
+            <View>
+              <Text style={styles.timeDisplayMain}>
+                {String(hour12).padStart(2, '0')}:{String(minute).padStart(2, '0')} {period}
               </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+              <Text style={styles.timeDisplaySub}>24h: {String(hour24).padStart(2, '0')}:{String(minute).padStart(2, '0')}</Text>
+            </View>
 
-      {/* Small Square Minute Selection */}
-      <Text style={styles.timeSectionLabel}>MINUTE</Text>
-      <View style={styles.squaresGrid}>
-        {MINUTES_5.map((m) => {
-          const isSelected = Math.floor(minute / 5) * 5 === m;
-          return (
-            <TouchableOpacity
-              key={`min_${m}`}
-              activeOpacity={0.7}
-              onPress={() => handleSelectMinute(m)}
-              style={[
-                styles.timeSquareBtn,
-                isSelected && styles.timeSquareBtnMinActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.timeSquareText,
-                  isSelected && styles.timeSquareTextActive,
-                ]}
+            <View style={styles.periodToggleRow}>
+              <TouchableOpacity
+                onPress={() => handleTogglePeriod('AM')}
+                style={[styles.periodSquareBtn, period === 'AM' && styles.periodSquareBtnActive]}
               >
-                :{String(m).padStart(2, '0')}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                <Text style={[styles.periodSquareText, period === 'AM' && styles.periodSquareTextActive]}>
+                  AM
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleTogglePeriod('PM')}
+                style={[styles.periodSquareBtn, period === 'PM' && styles.periodSquareBtnActive]}
+              >
+                <Text style={[styles.periodSquareText, period === 'PM' && styles.periodSquareTextActive]}>
+                  PM
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Small Square Hour Selection */}
+          <Text style={styles.timeSectionLabel}>HOUR</Text>
+          <View style={styles.squaresGrid}>
+            {HOURS_12.map((h) => {
+              const isSelected = h === hour12;
+              return (
+                <TouchableOpacity
+                  key={`hour_${h}`}
+                  activeOpacity={0.7}
+                  onPress={() => handleSelectHour(h)}
+                  style={[
+                    styles.timeSquareBtn,
+                    isSelected && styles.timeSquareBtnHourActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.timeSquareText,
+                      isSelected && styles.timeSquareTextActive,
+                    ]}
+                  >
+                    {String(h).padStart(2, '0')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Small Square Minute Selection */}
+          <Text style={styles.timeSectionLabel}>MINUTE</Text>
+          <View style={styles.squaresGrid}>
+            {MINUTES_5.map((m) => {
+              const isSelected = Math.floor(minute / 5) * 5 === m;
+              return (
+                <TouchableOpacity
+                  key={`min_${m}`}
+                  activeOpacity={0.7}
+                  onPress={() => handleSelectMinute(m)}
+                  style={[
+                    styles.timeSquareBtn,
+                    isSelected && styles.timeSquareBtnMinActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.timeSquareText,
+                      isSelected && styles.timeSquareTextActive,
+                    ]}
+                  >
+                    :{String(m).padStart(2, '0')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      ) : (
+        <View style={{ alignItems: 'center', paddingVertical: 4 }}>
+          <InteractiveClockPicker
+            value={selectedTime || '14:00'}
+            onChange={(val) => {
+              try {
+                Haptics.selectionAsync();
+              } catch {}
+              onSelectTime(val);
+            }}
+          />
+        </View>
+      )}
 
       {/* Presets & Done */}
       <View style={styles.popoverFooterRow}>
@@ -1412,12 +1458,16 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
 
               <View style={{ position: 'relative', zIndex: 100 }}>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <View style={{ flex: 1, position: 'relative' }}>
+                  <View style={{ flex: 1.2, position: 'relative' }}>
                     <Text style={styles.fieldLabel}>Due Date (YYYY-MM-DD)</Text>
                     <View style={styles.inputWithIconWrap}>
                       <TextInput
                         value={formDueDate}
                         onChangeText={setFormDueDate}
+                        onFocus={() => {
+                          setIsDatePickerOpen(true);
+                          setIsTimePickerOpen(false);
+                        }}
                         placeholder="2026-10-20"
                         placeholderTextColor="#94A3B8"
                         style={styles.textInputWithIcon}
@@ -1431,17 +1481,21 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
                         style={styles.inputIconBtn}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <Calendar size={15} color={isDatePickerOpen ? '#2563EB' : '#64748B'} />
+                        <Calendar size={16} color={isDatePickerOpen ? '#2563EB' : '#475569'} />
                       </TouchableOpacity>
                     </View>
                   </View>
 
-                  <View style={{ width: 125, position: 'relative' }}>
-                    <Text style={styles.fieldLabel}>Time</Text>
+                  <View style={{ flex: 1, minWidth: 140, position: 'relative' }}>
+                    <Text style={styles.fieldLabel}>Time (Clock)</Text>
                     <View style={styles.inputWithIconWrap}>
                       <TextInput
                         value={formDueTime}
                         onChangeText={setFormDueTime}
+                        onFocus={() => {
+                          setIsTimePickerOpen(true);
+                          setIsDatePickerOpen(false);
+                        }}
                         placeholder="14:00"
                         placeholderTextColor="#94A3B8"
                         style={styles.textInputWithIcon}
@@ -1455,7 +1509,7 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
                         style={styles.inputIconBtn}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <Timer size={15} color={isTimePickerOpen ? '#2563EB' : '#64748B'} />
+                        <Clock size={16} color={isTimePickerOpen ? '#2563EB' : '#0F172A'} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -2242,17 +2296,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#CBD5E1',
     borderRadius: 6,
+    overflow: 'hidden',
   },
   textInputWithIcon: {
     flex: 1,
+    minWidth: 0,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
     color: '#0F172A',
   },
   inputIconBtn: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
 
   /* HOVERING CALENDAR POPOVER */
@@ -2371,18 +2430,61 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     right: 0,
-    width: 265,
+    width: 295,
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    padding: 10,
+    padding: 12,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 14,
     elevation: 12,
     zIndex: 1000,
+  },
+  clockModeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  clockModeTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  clockModeTabs: {
+    flexDirection: 'row',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    padding: 2,
+    borderRadius: 6,
+  },
+  clockModeTab: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  clockModeTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  clockModeTabText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  clockModeTabTextActive: {
+    color: '#0F172A',
+    fontWeight: '700',
   },
   timeHeaderRow: {
     flexDirection: 'row',

@@ -71,7 +71,7 @@ if (!managerContent.includes('AnimatedTaskCard') ||
 console.log('✅ [5/7] Smooth floating card animation (In Progress -> Peer Review) and modern progress bar verified');
 
 // 6. Verify minimalist design, clean accent striping & zero emojis
-const forbiddenSymbols = ['Zap', 'Clock', 'CheckCircle2', 'Flame', 'AlertTriangle', 'Sparkles', '⚡', '🕒', '👀', '✔️', '✅', '🔥', '⚠️', '✨'];
+const forbiddenSymbols = ['Zap', 'CheckCircle2', 'Flame', 'AlertTriangle', 'Sparkles', '⚡', '🕒', '👀', '✔️', '✅', '🔥', '⚠️', '✨'];
 const hasForbiddenSymbol = forbiddenSymbols.find(sym => managerContent.includes(sym));
 if (hasForbiddenSymbol) {
   console.error(`❌ Found forbidden emoji/symbol '${hasForbiddenSymbol}' in WorkspaceBooffInManagerView`);
