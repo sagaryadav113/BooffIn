@@ -108,22 +108,6 @@ export default function NotificationSettingsScreen() {
           value={settings.pushNotifications}
           onValueChange={(val) => updateSetting('pushNotifications', val)}
         />
-        <Divider />
-        <ToggleRow
-          icon="Mail"
-          title="Email Notifications"
-          subtitle="Important direct interactions and message alerts"
-          value={settings.emailNotifications}
-          onValueChange={(val) => updateSetting('emailNotifications', val)}
-        />
-        <Divider />
-        <ToggleRow
-          icon="Inbox"
-          title="Weekly Topic Digest"
-          subtitle="Weekly summary of top preprints and findings in your fields"
-          value={settings.weeklyDigest}
-          onValueChange={(val) => updateSetting('weeklyDigest', val)}
-        />
       </SettingsCardGroup>
     </SettingsLayout>
   );

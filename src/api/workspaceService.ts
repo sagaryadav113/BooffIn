@@ -1,12 +1,17 @@
 import { supabase } from './client';
 import { fetchUserProfile } from './authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from '../store/useAuthStore';
 import {
   Workspace,
   WorkspaceMember,
   WorkspaceMessage,
   WorkspaceBlock,
   WorkspaceEvent,
+  WorkspaceTask,
+  WorkspaceTaskStatus,
+  WorkspaceTaskPriority,
+  WorkspaceTaskColor,
   WorkspaceRoleOpportunity,
   WorkspaceSavedItem,
   WorkspaceSubscriptionTier,
@@ -757,19 +762,24 @@ export const workspaceService = {
         const [f1, f2] = await Promise.all([
           supabase
             .from('follows')
-            .select('id')
+            .select('follower_id, following_id')
             .eq('follower_id', currentUser.id)
             .eq('following_id', targetUserId)
             .maybeSingle(),
           supabase
             .from('follows')
-            .select('id')
+            .select('follower_id, following_id')
             .eq('follower_id', targetUserId)
             .eq('following_id', currentUser.id)
             .maybeSingle(),
         ]);
 
-        const isMutual = Boolean(f1.data && f2.data);
+        const isUserFollowing = Boolean(
+          f1.data || (useAuthStore.getState().followingIds && useAuthStore.getState().followingIds.has(targetUserId))
+        );
+        const isTargetFollowing = Boolean(f2.data);
+        const isMutual = isUserFollowing && isTargetFollowing;
+
         if (!isMutual) {
           return {
             workspaceId: null,
@@ -813,19 +823,24 @@ export const workspaceService = {
           const [f1, f2] = await Promise.all([
             supabase
               .from('follows')
-              .select('id')
+              .select('follower_id, following_id')
               .eq('follower_id', currentUser.id)
               .eq('following_id', targetUserId)
               .maybeSingle(),
             supabase
               .from('follows')
-              .select('id')
+              .select('follower_id, following_id')
               .eq('follower_id', targetUserId)
               .eq('following_id', currentUser.id)
               .maybeSingle(),
           ]);
 
-          const isMutual = Boolean(f1.data && f2.data);
+          const isUserFollowing = Boolean(
+            f1.data || (useAuthStore.getState().followingIds && useAuthStore.getState().followingIds.has(targetUserId))
+          );
+          const isTargetFollowing = Boolean(f2.data);
+          const isMutual = isUserFollowing && isTargetFollowing;
+
           if (!isMutual) {
             return {
               workspaceId: null,
@@ -2595,71 +2610,106 @@ export const workspaceService = {
 
       return { blocks, error: null };
     } catch (err: any) {
-      return { blocks: [], error: err.message || 'Failed to fetch block logs' };
+      return { blocks: [], error: err.message || 'Failed to fetch blocks' };
     }
   },
 
   /**
-   * Events & Calendar (Inner Circle & Community)
+   * Events & Calendar (Inner Circle)
    */
   async getWorkspaceEvents(workspaceId: string): Promise<{ events: WorkspaceEvent[]; error: string | null }> {
     try {
-      const { data, error } = await supabase
-        .from('workspace_events')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .order('start_time', { ascending: true });
-
-      if (error) {
-        return { events: [], error: error.message };
+      const localKey = `@booffin_events_${workspaceId}`;
+      let localEvents: WorkspaceEvent[] = [];
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        if (stored) {
+          localEvents = JSON.parse(stored);
+        }
+      } catch (cacheErr) {
+        console.warn('[workspaceService] error reading local events cache:', cacheErr);
       }
 
-      const rawEvents = data || [];
-      const creatorIds = Array.from(new Set(rawEvents.map((e: any) => e.creator_id).filter(Boolean)));
-      const creatorMap = new Map<string, any>();
+      let dbEvents: any[] = [];
+      try {
+        const { data, error } = await supabase
+          .from('workspace_events')
+          .select('*')
+          .eq('workspace_id', workspaceId)
+          .order('start_time', { ascending: true });
 
-      if (creatorIds.length > 0) {
-        const profs = await Promise.all(
-          creatorIds.map(async (cId: any) => {
-            try {
-              const p = await fetchUserProfile(cId);
-              return { cId, p };
-            } catch {
-              return { cId, p: null };
+        if (!error && data) {
+          dbEvents = data;
+        } else if (error) {
+          console.warn('[workspaceService] getWorkspaceEvents DB note (using local cache):', error.message);
+        }
+      } catch (err: any) {
+        console.warn('[workspaceService] getWorkspaceEvents DB fetch failed:', err.message);
+      }
+
+      // Merge local and DB events (deduplicate by id or title+start_time)
+      const eventMap = new Map<string, WorkspaceEvent>();
+
+      // Add local events first
+      for (const ev of localEvents) {
+        eventMap.set(ev.id, ev);
+      }
+
+      // Add / enrich with DB events
+      if (dbEvents.length > 0) {
+        const creatorIds = Array.from(new Set(dbEvents.map((e: any) => e.creator_id).filter(Boolean)));
+        const creatorMap = new Map<string, any>();
+
+        if (creatorIds.length > 0) {
+          const profs = await Promise.all(
+            creatorIds.map(async (cId: any) => {
+              try {
+                const p = await fetchUserProfile(cId);
+                return { cId, p };
+              } catch {
+                return { cId, p: null };
+              }
+            })
+          );
+
+          profs.forEach(({ cId, p }) => {
+            if (p) {
+              creatorMap.set(cId, {
+                id: p.id,
+                fullName: p.fullName || p.handle || 'Researcher',
+                handle: p.handle,
+                avatarUrl: p.avatarUrl || null,
+                academicTitle: p.academicTitle,
+                institution: p.institution,
+                orcidVerified: p.orcidVerified,
+              });
             }
-          })
-        );
+          });
+        }
 
-        profs.forEach(({ cId, p }) => {
-          if (p) {
-            creatorMap.set(cId, {
-              id: p.id,
-              fullName: p.fullName || p.handle || 'Researcher',
-              handle: p.handle,
-              avatarUrl: p.avatarUrl || null,
-              academicTitle: p.academicTitle,
-              institution: p.institution,
-              orcidVerified: p.orcidVerified,
-            });
-          }
-        });
+        for (const e of dbEvents) {
+          const mapped: WorkspaceEvent = {
+            id: e.id,
+            workspace_id: e.workspace_id,
+            creator_id: e.creator_id,
+            title: e.title,
+            description: e.description,
+            event_type: e.event_type || 'lab_meeting',
+            start_time: e.start_time || e.event_date || e.created_at,
+            end_time: e.end_time,
+            meeting_link: e.meeting_link || e.location_or_url,
+            attendee_ids: e.attendee_ids || [],
+            created_at: e.created_at,
+            creator: creatorMap.get(e.creator_id) || eventMap.get(e.id)?.creator,
+          };
+          eventMap.set(e.id, mapped);
+        }
       }
 
-      const events: WorkspaceEvent[] = rawEvents.map((e: any) => ({
-        id: e.id,
-        workspace_id: e.workspace_id,
-        creator_id: e.creator_id,
-        title: e.title,
-        description: e.description,
-        event_type: e.event_type || 'lab_meeting',
-        start_time: e.start_time || e.event_date || e.created_at,
-        end_time: e.end_time,
-        meeting_link: e.meeting_link || e.location_or_url,
-        created_at: e.created_at,
-        creator: creatorMap.get(e.creator_id),
-      }));
+      const combined = Array.from(eventMap.values());
+      combined.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-      return { events, error: null };
+      return { events: combined, error: null };
     } catch (err: any) {
       return { events: [], error: err.message || 'Failed to load events' };
     }
@@ -2673,35 +2723,452 @@ export const workspaceService = {
     startTime: string;
     endTime?: string;
     meetingLink?: string;
+    attendeeIds?: string[];
   }): Promise<{ event: WorkspaceEvent | null; error: string | null }> {
     try {
+      let effectiveUserId: string | undefined;
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return { event: null, error: 'User not authenticated' };
+      effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+      if (!effectiveUserId) return { event: null, error: 'User not authenticated' };
 
-      const { data, error } = await supabase
-        .from('workspace_events')
-        .insert({
-          workspace_id: params.workspaceId,
-          creator_id: user.id,
-          title: params.title.trim(),
-          description: params.description?.trim() || null,
-          event_type: params.eventType,
-          start_time: params.startTime,
-          end_time: params.endTime || null,
-          meeting_link: params.meetingLink?.trim() || null,
-        })
-        .select()
-        .single();
+      const currentUser = useAuthStore.getState().user;
+      const creatorProfile = {
+        id: effectiveUserId,
+        fullName: currentUser?.fullName || currentUser?.handle || 'Researcher',
+        handle: currentUser?.handle || 'researcher',
+        avatarUrl: currentUser?.avatarUrl || null,
+        academicTitle: currentUser?.academicTitle || null,
+        institution: currentUser?.institution || null,
+        orcidVerified: currentUser?.orcidVerified || false,
+      };
 
-      if (error || !data) {
-        return { event: null, error: error?.message || 'Failed to create event' };
+      const resolvedStartTime = params.startTime || new Date().toISOString();
+      const resolvedTitle = params.title.trim();
+      const resolvedDesc = params.description?.trim() || null;
+      const resolvedType = params.eventType || 'lab_meeting';
+      const resolvedLink = params.meetingLink?.trim() || null;
+
+      // 1. Immediately create local event object with rich creator profile
+      const localEventId = `event_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      let eventResult: WorkspaceEvent = {
+        id: localEventId,
+        workspace_id: params.workspaceId,
+        creator_id: effectiveUserId,
+        title: resolvedTitle,
+        description: resolvedDesc,
+        event_type: resolvedType,
+        start_time: resolvedStartTime,
+        end_time: params.endTime || null,
+        meeting_link: resolvedLink,
+        attendee_ids: params.attendeeIds || [],
+        created_at: new Date().toISOString(),
+        creator: creatorProfile,
+      };
+
+      // 2. Persist to local cache immediately
+      const localKey = `@booffin_events_${params.workspaceId}`;
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        const existingList: WorkspaceEvent[] = stored ? JSON.parse(stored) : [];
+        existingList.push(eventResult);
+        await AsyncStorage.setItem(localKey, JSON.stringify(existingList));
+      } catch (cacheErr) {
+        console.warn('[workspaceService] local events cache write error:', cacheErr);
       }
 
-      return { event: data, error: null };
+      // 3. Attempt DB sync with sanitized UUID array
+      try {
+        const validUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const cleanAttendeeUuids = (params.attendeeIds || []).filter((id) => validUuidRegex.test(id));
+
+        const insertPayload: any = {
+          workspace_id: params.workspaceId,
+          creator_id: effectiveUserId,
+          title: resolvedTitle,
+          description: resolvedDesc,
+          event_type: resolvedType,
+          start_time: resolvedStartTime,
+          event_date: resolvedStartTime,
+          end_time: params.endTime || null,
+          meeting_link: resolvedLink,
+        };
+
+        if (cleanAttendeeUuids.length > 0) {
+          insertPayload.attendee_ids = cleanAttendeeUuids;
+        }
+
+        const { data, error } = await supabase
+          .from('workspace_events')
+          .insert(insertPayload)
+          .select()
+          .maybeSingle();
+
+        if (data && !error) {
+          // Update local cache with DB id
+          eventResult = {
+            ...eventResult,
+            id: data.id,
+          };
+          try {
+            const stored = await AsyncStorage.getItem(localKey);
+            if (stored) {
+              const list: WorkspaceEvent[] = JSON.parse(stored);
+              const updated = list.map((item) => (item.id === localEventId ? eventResult : item));
+              await AsyncStorage.setItem(localKey, JSON.stringify(updated));
+            }
+          } catch {}
+        } else if (error) {
+          console.warn('[workspaceService] Supabase DB event insert note (local cache active):', error.message);
+        }
+      } catch (dbErr: any) {
+        console.warn('[workspaceService] Supabase DB event insert note (local cache active):', dbErr.message);
+      }
+
+      return { event: eventResult, error: null };
     } catch (err: any) {
       return { event: null, error: err.message || 'Failed to create event' };
+    }
+  },
+
+  async deleteWorkspaceEvent(
+    eventId: string,
+    workspaceId: string
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      // 1. Remove from local cache
+      const localKey = `@booffin_events_${workspaceId}`;
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        if (stored) {
+          const list: WorkspaceEvent[] = JSON.parse(stored);
+          const filtered = list.filter((e) => e.id !== eventId);
+          await AsyncStorage.setItem(localKey, JSON.stringify(filtered));
+        }
+      } catch (cacheErr) {
+        console.warn('[workspaceService] local event delete cache error:', cacheErr);
+      }
+
+      // 2. Remove from Supabase
+      try {
+        const { error } = await supabase
+          .from('workspace_events')
+          .delete()
+          .eq('id', eventId);
+        if (error) {
+          console.warn('[workspaceService] Supabase DB event delete note:', error.message);
+        }
+      } catch (dbErr: any) {
+        console.warn('[workspaceService] Supabase DB event delete note:', dbErr.message);
+      }
+
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to delete event' };
+    }
+  },
+
+  /**
+   * BooffIn Manager Tasks (Kanban)
+   */
+  async getWorkspaceTasks(
+    workspaceId: string
+  ): Promise<{ tasks: WorkspaceTask[]; error: string | null }> {
+    try {
+      const localKey = `@booffin_tasks_${workspaceId}`;
+      let localTasks: WorkspaceTask[] = [];
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        if (stored) {
+          localTasks = JSON.parse(stored);
+        }
+      } catch (cacheErr) {
+        console.warn('[workspaceService] local tasks cache read error:', cacheErr);
+      }
+
+      // If local cache is empty, seed with initial sample research tasks for a warm experience
+      if (!localTasks || localTasks.length === 0) {
+        const now = new Date();
+        const tomorrow = new Date(now.getTime() + 86400000).toISOString().split('T')[0];
+        const nextWeek = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0];
+        const seedTasks: WorkspaceTask[] = [
+          {
+            id: `task_seed_1_${workspaceId.slice(0, 6)}`,
+            workspace_id: workspaceId,
+            creator_id: 'system',
+            title: 'Formulate research hypothesis & methodology',
+            description: 'Define experimental variables, benchmark metrics, and theoretical foundation.',
+            status: 'done',
+            priority: 'high',
+            color: 'green',
+            due_date: new Date(now.getTime() - 86400000).toISOString().split('T')[0],
+            tags: ['Methodology', 'Theory'],
+            sync_with_calendar: true,
+            created_at: new Date(now.getTime() - 2 * 86400000).toISOString(),
+          },
+          {
+            id: `task_seed_2_${workspaceId.slice(0, 6)}`,
+            workspace_id: workspaceId,
+            creator_id: 'system',
+            title: 'Run baseline benchmark & statistical analysis',
+            description: 'Execute quantitative simulations against established SOTA reference datasets.',
+            status: 'in_progress',
+            priority: 'urgent',
+            color: 'pink',
+            due_date: tomorrow,
+            due_time: '14:30',
+            tags: ['Analysis', 'Experiments'],
+            sync_with_calendar: true,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: `task_seed_3_${workspaceId.slice(0, 6)}`,
+            workspace_id: workspaceId,
+            creator_id: 'system',
+            title: 'Draft manuscript figures & results narrative',
+            description: 'Synthesize ablation studies and prepare high-res vector figures for peer review.',
+            status: 'review',
+            priority: 'high',
+            color: 'purple',
+            due_date: nextWeek,
+            tags: ['Writing', 'Figures'],
+            sync_with_calendar: true,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: `task_seed_4_${workspaceId.slice(0, 6)}`,
+            workspace_id: workspaceId,
+            creator_id: 'system',
+            title: 'Final preprint submission & repository release',
+            description: 'Complete author affiliations, archive open-source artifacts, and upload preprint.',
+            status: 'todo',
+            priority: 'medium',
+            color: 'blue',
+            due_date: new Date(now.getTime() + 14 * 86400000).toISOString().split('T')[0],
+            tags: ['Submission', 'Preprint'],
+            sync_with_calendar: true,
+            created_at: new Date().toISOString(),
+          },
+        ];
+        localTasks = seedTasks;
+        await AsyncStorage.setItem(localKey, JSON.stringify(localTasks));
+      }
+
+      // Attempt to load from Supabase if table exists
+      let dbTasks: any[] = [];
+      try {
+        const { data, error } = await supabase
+          .from('workspace_tasks')
+          .select('*')
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          dbTasks = data;
+        }
+      } catch {}
+
+      const taskMap = new Map<string, WorkspaceTask>();
+      for (const t of localTasks) {
+        taskMap.set(t.id, t);
+      }
+      for (const t of dbTasks) {
+        taskMap.set(t.id, {
+          id: t.id,
+          workspace_id: t.workspace_id,
+          creator_id: t.creator_id,
+          title: t.title,
+          description: t.description,
+          status: t.status || 'todo',
+          priority: t.priority || 'medium',
+          color: t.color || null,
+          due_date: t.due_date,
+          due_time: t.due_time,
+          assignee_id: t.assignee_id,
+          tags: t.tags || [],
+          sync_with_calendar: Boolean(t.sync_with_calendar),
+          linked_event_id: t.linked_event_id,
+          created_at: t.created_at,
+          updated_at: t.updated_at,
+        });
+      }
+
+      return { tasks: Array.from(taskMap.values()), error: null };
+    } catch (err: any) {
+      return { tasks: [], error: err.message || 'Failed to load tasks' };
+    }
+  },
+
+  async createWorkspaceTask(params: {
+    workspaceId: string;
+    title: string;
+    description?: string;
+    status?: WorkspaceTaskStatus;
+    priority?: WorkspaceTaskPriority;
+    color?: WorkspaceTaskColor | null;
+    dueDate?: string | null;
+    dueTime?: string | null;
+    assigneeId?: string | null;
+    assignee?: any | null;
+    tags?: string[];
+    syncWithCalendar?: boolean;
+    linkedEventId?: string | null;
+  }): Promise<{ task: WorkspaceTask | null; error: string | null }> {
+    try {
+      let effectiveUserId: string | undefined;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+      if (!effectiveUserId) return { task: null, error: 'User not authenticated' };
+
+      const currentUser = useAuthStore.getState().user;
+      const creatorProfile = {
+        id: effectiveUserId,
+        fullName: currentUser?.fullName || currentUser?.handle || 'Researcher',
+        handle: currentUser?.handle || 'researcher',
+        avatarUrl: currentUser?.avatarUrl || null,
+        academicTitle: currentUser?.academicTitle || null,
+        institution: currentUser?.institution || null,
+        orcidVerified: currentUser?.orcidVerified || false,
+      };
+
+      const localTaskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const newTask: WorkspaceTask = {
+        id: localTaskId,
+        workspace_id: params.workspaceId,
+        creator_id: effectiveUserId,
+        title: params.title.trim(),
+        description: params.description?.trim() || null,
+        status: params.status || 'todo',
+        priority: params.priority || 'medium',
+        color: params.color || null,
+        due_date: params.dueDate || null,
+        due_time: params.dueTime || null,
+        assignee_id: params.assigneeId || null,
+        assignee: params.assignee || null,
+        tags: params.tags || [],
+        sync_with_calendar: params.syncWithCalendar ?? true,
+        linked_event_id: params.linkedEventId || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        creator: creatorProfile,
+      };
+
+      // 1. Cache immediately in AsyncStorage
+      const localKey = `@booffin_tasks_${params.workspaceId}`;
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        const list: WorkspaceTask[] = stored ? JSON.parse(stored) : [];
+        list.unshift(newTask);
+        await AsyncStorage.setItem(localKey, JSON.stringify(list));
+      } catch (cacheErr) {
+        console.warn('[workspaceService] local task create cache error:', cacheErr);
+      }
+
+      // 2. Persist to Supabase if table exists
+      try {
+        const { data, error } = await supabase
+          .from('workspace_tasks')
+          .insert({
+            id: localTaskId,
+            workspace_id: params.workspaceId,
+            creator_id: effectiveUserId,
+            title: newTask.title,
+            description: newTask.description,
+            status: newTask.status,
+            priority: newTask.priority,
+            due_date: newTask.due_date,
+            due_time: newTask.due_time,
+            assignee_id: newTask.assignee_id,
+            tags: newTask.tags,
+            sync_with_calendar: newTask.sync_with_calendar,
+            linked_event_id: newTask.linked_event_id,
+          })
+          .select()
+          .maybeSingle();
+
+        if (data && !error) {
+          newTask.id = data.id;
+        }
+      } catch {}
+
+      return { task: newTask, error: null };
+    } catch (err: any) {
+      return { task: null, error: err.message || 'Failed to create task' };
+    }
+  },
+
+  async updateWorkspaceTask(
+    taskId: string,
+    workspaceId: string,
+    updates: Partial<WorkspaceTask>
+  ): Promise<{ task: WorkspaceTask | null; error: string | null }> {
+    try {
+      const localKey = `@booffin_tasks_${workspaceId}`;
+      let updatedTask: WorkspaceTask | null = null;
+
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        if (stored) {
+          const list: WorkspaceTask[] = JSON.parse(stored);
+          const idx = list.findIndex((t) => t.id === taskId);
+          if (idx >= 0) {
+            list[idx] = {
+              ...list[idx],
+              ...updates,
+              updated_at: new Date().toISOString(),
+            };
+            updatedTask = list[idx];
+            await AsyncStorage.setItem(localKey, JSON.stringify(list));
+          }
+        }
+      } catch (cacheErr) {
+        console.warn('[workspaceService] update local task cache error:', cacheErr);
+      }
+
+      // Sync to Supabase
+      try {
+        await supabase
+          .from('workspace_tasks')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', taskId);
+      } catch {}
+
+      return { task: updatedTask, error: null };
+    } catch (err: any) {
+      return { task: null, error: err.message || 'Failed to update task' };
+    }
+  },
+
+  async deleteWorkspaceTask(
+    taskId: string,
+    workspaceId: string
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const localKey = `@booffin_tasks_${workspaceId}`;
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        if (stored) {
+          const list: WorkspaceTask[] = JSON.parse(stored);
+          const filtered = list.filter((t) => t.id !== taskId);
+          await AsyncStorage.setItem(localKey, JSON.stringify(filtered));
+        }
+      } catch (cacheErr) {
+        console.warn('[workspaceService] local task delete cache error:', cacheErr);
+      }
+
+      try {
+        await supabase.from('workspace_tasks').delete().eq('id', taskId);
+      } catch {}
+
+      return { success: true, error: null };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to delete task' };
     }
   },
 
@@ -3308,13 +3775,24 @@ export const workspaceService = {
 
 
   /**
-   * Saved Items (Inner Circle)
+   * Saved Items / Vault (Inner Circle)
    */
   async getWorkspaceSavedItems(
     workspaceId: string,
     userId: string
   ): Promise<{ savedItems: WorkspaceSavedItem[]; error: string | null }> {
     try {
+      const localKey = `@booffin_vault_${workspaceId}_${userId}`;
+      let localItems: WorkspaceSavedItem[] = [];
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        if (stored) {
+          localItems = JSON.parse(stored);
+        }
+      } catch (e) {
+        console.warn('[workspaceService] error reading local vault cache:', e);
+      }
+
       const { data, error } = await supabase
         .from('workspace_saved_items')
         .select('*')
@@ -3323,10 +3801,37 @@ export const workspaceService = {
         .order('created_at', { ascending: false });
 
       if (error) {
-        return { savedItems: [], error: error.message };
+        // Return local items seamlessly if DB returns error (e.g. offline or RLS)
+        return { savedItems: localItems, error: null };
       }
 
-      return { savedItems: data || [], error: null };
+      // Merge DB items and local items (deduplicated by item_id or id)
+      const dbItems = data || [];
+      const itemMap = new Map<string, WorkspaceSavedItem>();
+
+      // Add local items first
+      for (const item of localItems) {
+        itemMap.set(item.item_id || item.id, item);
+      }
+      // DB items take precedence/enrich
+      for (const item of dbItems) {
+        const key = item.item_id || item.id;
+        const existingLocal = itemMap.get(key);
+        itemMap.set(key, {
+          ...existingLocal,
+          ...item,
+          // Preserve local metadata if DB metadata was empty
+          metadata:
+            item.metadata && Object.keys(item.metadata).length > 0
+              ? item.metadata
+              : existingLocal?.metadata || {},
+        });
+      }
+
+      const combined = Array.from(itemMap.values());
+      combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      return { savedItems: combined, error: null };
     } catch (err: any) {
       return { savedItems: [], error: err.message || 'Failed to load saved items' };
     }
@@ -3334,29 +3839,82 @@ export const workspaceService = {
 
   async saveWorkspaceItem(params: {
     workspaceId: string;
-    itemType: 'message' | 'doi_paper' | 'opportunity' | 'event';
+    itemType: 'message' | 'doi_paper' | 'opportunity' | 'event' | 'paper';
     itemId: string;
+    title?: string;
     note?: string;
+    metadata?: any;
   }): Promise<{ success: boolean; error: string | null }> {
     try {
+      let effectiveUserId: string | undefined;
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return { success: false, error: 'User not authenticated' };
+      effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+      if (!effectiveUserId) return { success: false, error: 'User not authenticated' };
 
-      const { error } = await supabase.from('workspace_saved_items').upsert(
-        {
-          workspace_id: params.workspaceId,
-          user_id: user.id,
-          item_type: params.itemType,
-          item_id: params.itemId,
-          note: params.note?.trim() || null,
-        },
-        { onConflict: 'workspace_id,user_id,item_id' }
-      );
+      const resolvedTitle = params.title || params.note?.slice(0, 60) || 'Saved Item';
+      const resolvedType = params.itemType === 'doi_paper' ? 'paper' : params.itemType;
+      const resolvedNote = params.note?.trim() || null;
+      const resolvedMeta = params.metadata || {};
 
-      if (error) {
-        return { success: false, error: error.message };
+      // 1. Immediately persist to local AsyncStorage Vault cache for guaranteed reliability
+      const localKey = `@booffin_vault_${params.workspaceId}_${effectiveUserId}`;
+      const localItem: WorkspaceSavedItem = {
+        id: `vault_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        workspace_id: params.workspaceId,
+        user_id: effectiveUserId,
+        item_type: params.itemType,
+        item_id: params.itemId,
+        title: resolvedTitle,
+        note: resolvedNote,
+        metadata: resolvedMeta,
+        created_at: new Date().toISOString(),
+      };
+
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        const existingList: WorkspaceSavedItem[] = stored ? JSON.parse(stored) : [];
+        const filtered = existingList.filter((i) => i.item_id !== params.itemId && i.id !== params.itemId);
+        filtered.unshift(localItem);
+        await AsyncStorage.setItem(localKey, JSON.stringify(filtered));
+      } catch (cacheErr) {
+        console.warn('[workspaceService] local vault cache write error:', cacheErr);
+      }
+
+      // 2. Safe DB Sync: check existing row first to avoid crashing on missing ON CONFLICT constraints
+      try {
+        const { data: existingRow } = await supabase
+          .from('workspace_saved_items')
+          .select('id')
+          .eq('workspace_id', params.workspaceId)
+          .eq('user_id', effectiveUserId)
+          .eq('item_id', params.itemId)
+          .maybeSingle();
+
+        if (existingRow?.id) {
+          await supabase
+            .from('workspace_saved_items')
+            .update({
+              item_type: resolvedType,
+              title: resolvedTitle,
+              note: resolvedNote,
+              metadata: resolvedMeta,
+            })
+            .eq('id', existingRow.id);
+        } else {
+          await supabase.from('workspace_saved_items').insert({
+            workspace_id: params.workspaceId,
+            user_id: effectiveUserId,
+            item_type: resolvedType,
+            item_id: params.itemId,
+            title: resolvedTitle,
+            note: resolvedNote,
+            metadata: resolvedMeta,
+          });
+        }
+      } catch (dbErr: any) {
+        console.warn('[workspaceService] Supabase DB vault sync note (local cache active):', dbErr.message);
       }
 
       return { success: true, error: null };
@@ -3370,20 +3928,36 @@ export const workspaceService = {
     itemId: string
   ): Promise<{ success: boolean; error: string | null }> {
     try {
+      let effectiveUserId: string | undefined;
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return { success: false, error: 'User not authenticated' };
+      effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+      if (!effectiveUserId) return { success: false, error: 'User not authenticated' };
 
-      const { error } = await supabase
-        .from('workspace_saved_items')
-        .delete()
-        .eq('workspace_id', workspaceId)
-        .eq('user_id', user.id)
-        .eq('item_id', itemId);
+      // 1. Remove from local cache
+      const localKey = `@booffin_vault_${workspaceId}_${effectiveUserId}`;
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        if (stored) {
+          const existingList: WorkspaceSavedItem[] = JSON.parse(stored);
+          const filtered = existingList.filter((i) => i.item_id !== itemId && i.id !== itemId);
+          await AsyncStorage.setItem(localKey, JSON.stringify(filtered));
+        }
+      } catch (cacheErr) {
+        console.warn('[workspaceService] local vault removal error:', cacheErr);
+      }
 
-      if (error) {
-        return { success: false, error: error.message };
+      // 2. Remove from Supabase
+      try {
+        await supabase
+          .from('workspace_saved_items')
+          .delete()
+          .eq('workspace_id', workspaceId)
+          .eq('user_id', effectiveUserId)
+          .or(`item_id.eq.${itemId},id.eq.${itemId}`);
+      } catch (dbErr: any) {
+        console.warn('[workspaceService] Supabase DB delete note:', dbErr.message);
       }
 
       return { success: true, error: null };

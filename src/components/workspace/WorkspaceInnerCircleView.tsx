@@ -81,7 +81,10 @@ import {
   Ban,
   Flag,
   ChevronDown,
+  ChevronUp,
+  ChevronLeft,
   EyeOff,
+  Columns3,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -127,6 +130,8 @@ import { workspaceService } from '../../api/workspaceService';
 import { searchBooffInUsers } from '../../api/search/providers/userSearchProvider';
 import { E2EEStatusBanner } from '../chat/E2EEStatusBanner';
 import { derivePodSessionKey, encryptTextMessage, decryptTextMessage } from '../../utils/e2eeCrypto';
+import { InteractiveClockPicker, parse24HourToClock } from '../common/InteractiveClockPicker';
+import { WorkspaceBooffInManagerView } from './WorkspaceBooffInManagerView';
 
 const SAMPLE_POD_MANUSCRIPTS = [
   {
@@ -224,7 +229,7 @@ const AnimatedTypingIndicator: React.FC<{ name: string; count?: number }> = ({ n
   );
 };
 
-export type InnerCircleTab = 'discussions' | 'calendar' | 'jobs' | 'bookmarked';
+export type InnerCircleTab = 'discussions' | 'calendar' | 'manager' | 'vault' | 'bookmarked';
 
 interface WorkspaceInnerCircleViewProps {
   workspace: Workspace;
@@ -233,6 +238,8 @@ interface WorkspaceInnerCircleViewProps {
 export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> = ({ workspace }) => {
   const currentUser = useAuthStore((s) => s.user);
   const [activeTab, setActiveTab] = useState<InnerCircleTab>('discussions');
+  const [vaultToast, setVaultToast] = useState<{ message: string } | null>(null);
+  const [copiedVaultItemId, setCopiedVaultItemId] = useState<string | null>(null);
 
   // Per-Chat Theme Config
   const activeThemeConfig = useChatThemeStore((s) => s.getThemeConfig(workspace.id));
@@ -256,7 +263,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const sendMessage = useWorkspaceStore((s) => s.sendMessage);
   const markAsRead = useWorkspaceStore((s) => s.markAsRead);
   const loadEvents = useWorkspaceStore((s) => s.loadEvents);
+  const loadTasks = useWorkspaceStore((s) => s.loadTasks);
   const createEvent = useWorkspaceStore((s) => s.createEvent);
+  const deleteEvent = useWorkspaceStore((s) => s.deleteEvent);
   const loadOpportunities = useWorkspaceStore((s) => s.loadOpportunities);
   const createOpportunity = useWorkspaceStore((s) => s.createOpportunity);
   const loadSavedItems = useWorkspaceStore((s) => s.loadSavedItems);
@@ -315,6 +324,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     loadMessages(workspace.id);
     loadMembers(workspace.id);
     loadEvents(workspace.id);
+    loadTasks(workspace.id);
     loadOpportunities(workspace.id);
     loadSavedItems(workspace.id);
     markAsRead(workspace.id);
@@ -436,6 +446,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const [resolvedDoi, setResolvedDoi] = useState<DoiMetadata | null>(null);
   const [attachedDoi, setAttachedDoi] = useState<DoiMetadata | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
   const insets = useSafeAreaInsets();
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -733,16 +744,137 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     return messages.find((m) => m.is_pinned) || null;
   }, [messages, localPinnedMessageId]);
 
-  // Modals
+  // Modals & Calendar State
   const [showEventModal, setShowEventModal] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
   const [eventDesc, setEventDesc] = useState('');
   const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
+  const [eventTime, setEventTime] = useState('14:00');
+  const [showClockPicker, setShowClockPicker] = useState(true);
+  const [eventToDelete, setEventToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+  const [eventType, setEventType] = useState<'lab_meeting' | 'reading_group' | 'milestone' | 'live_session'>('lab_meeting');
+  const [selectedAttendeeIds, setSelectedAttendeeIds] = useState<string[]>([]);
+  const [memberFilterQuery, setMemberFilterQuery] = useState('');
+  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
 
-  const [showJobModal, setShowJobModal] = useState(false);
-  const [jobTitle, setJobTitle] = useState('');
-  const [jobDesc, setJobDesc] = useState('');
-  const [jobAssignee, setJobAssignee] = useState('');
+  // Collapsible Calendar State
+  const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(false);
+  const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(new Date().toISOString().split('T')[0]);
+  const [calendarViewMode, setCalendarViewMode] = useState<'selected' | 'all'>('selected');
+
+  const calendarYear = currentCalendarMonth.getFullYear();
+  const calendarMonthIndex = currentCalendarMonth.getMonth();
+
+  const calendarMonthTitle = currentCalendarMonth.toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const firstDayOfMonth = new Date(calendarYear, calendarMonthIndex, 1).getDay();
+  const daysInCurrentMonth = new Date(calendarYear, calendarMonthIndex + 1, 0).getDate();
+
+  const calendarGrid = useMemo(() => {
+    const cells: Array<{
+      day: number | null;
+      dateStr: string | null;
+      isToday: boolean;
+      isSelected: boolean;
+      hasEvents: boolean;
+      eventCount: number;
+    }> = [];
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      cells.push({
+        day: null,
+        dateStr: null,
+        isToday: false,
+        isSelected: false,
+        hasEvents: false,
+        eventCount: 0,
+      });
+    }
+
+    for (let d = 1; d <= daysInCurrentMonth; d++) {
+      const dateStr = `${calendarYear}-${String(calendarMonthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayEvents = (events || []).filter((e) => {
+        const evDate = (e.start_time || (e as any).event_date || '').split('T')[0];
+        return evDate === dateStr;
+      });
+
+      cells.push({
+        day: d,
+        dateStr,
+        isToday: dateStr === todayStr,
+        isSelected: dateStr === selectedCalendarDate,
+        hasEvents: dayEvents.length > 0,
+        eventCount: dayEvents.length,
+      });
+    }
+
+    return cells;
+  }, [calendarYear, calendarMonthIndex, firstDayOfMonth, daysInCurrentMonth, events, selectedCalendarDate]);
+
+  const formattedSelectedDate = useMemo(() => {
+    try {
+      const parts = selectedCalendarDate.split('-');
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      return d.toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    } catch {
+      return selectedCalendarDate;
+    }
+  }, [selectedCalendarDate]);
+
+  const eventsOnSelectedDate = useMemo(() => {
+    return (events || []).filter((e) => {
+      const evDate = (e.start_time || (e as any).event_date || '').split('T')[0];
+      return evDate === selectedCalendarDate;
+    });
+  }, [events, selectedCalendarDate]);
+
+  const displayedEvents = useMemo(() => {
+    if (calendarViewMode === 'selected') {
+      return eventsOnSelectedDate;
+    }
+    return events || [];
+  }, [eventsOnSelectedDate, events, calendarViewMode]);
+
+  const handlePrevMonth = () => {
+    setCurrentCalendarMonth(new Date(calendarYear, calendarMonthIndex - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentCalendarMonth(new Date(calendarYear, calendarMonthIndex + 1, 1));
+  };
+
+  const handleGoToday = () => {
+    const now = new Date();
+    setCurrentCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    const todayStr = now.toISOString().split('T')[0];
+    setSelectedCalendarDate(todayStr);
+  };
+
+  const openScheduleModalForDate = (dateStr: string) => {
+    setEventDate(dateStr);
+    setSelectedCalendarDate(dateStr);
+    setSelectedAttendeeIds([]);
+    setEventTitle('');
+    setEventDesc('');
+    setEventTime('14:00');
+    setShowClockPicker(true);
+    setShowEventModal(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -1473,19 +1605,86 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     setDeleteTargetMessage(msg);
   };
 
-  // Bookmark Message
+  // Bookmark Message / Save to Vault
   const handleBookmarkMessage = async () => {
     if (!selectedMessage) return;
+    const msgToSave = selectedMessage;
     setShowMessageActionMenu(false);
-    await saveItem({
+    setSelectedMessage(null);
+
+    const contentText = decryptedTextMap[msgToSave.id] || msgToSave.content || '';
+    const titleSnippet = contentText.trim()
+      ? (contentText.trim().length > 60 ? contentText.trim().slice(0, 57) + '...' : contentText.trim())
+      : (msgToSave.doi_metadata?.title || 'Saved Message');
+
+    const res = await saveItem({
       workspaceId: workspace.id,
-      itemType: 'message',
-      itemId: selectedMessage.id,
-      note: selectedMessage.content?.slice(0, 80),
+      itemType: msgToSave.doi_metadata ? 'doi_paper' : 'message',
+      itemId: msgToSave.id,
+      title: titleSnippet,
+      note: contentText,
+      metadata: {
+        message_id: msgToSave.id,
+        sender_id: msgToSave.sender_id,
+        sender_name: msgToSave.sender?.fullName || msgToSave.sender?.handle || 'Researcher',
+        sender_handle: msgToSave.sender?.handle || 'researcher',
+        sender_avatar: msgToSave.sender?.avatarUrl || null,
+        message_type: msgToSave.message_type,
+        created_at: msgToSave.created_at,
+        attachments: msgToSave.attachments || [],
+        doi_metadata: msgToSave.doi_metadata || null,
+      },
     });
+
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
+
+    setVaultToast({ message: res.success ? 'Message saved to Vault' : 'Could not save message' });
+    setTimeout(() => setVaultToast(null), 3000);
+  };
+
+  const handleOpenSavedMessageInDiscussion = (item: WorkspaceSavedItem) => {
+    const targetMsgId = item.metadata?.message_id || item.item_id || item.id;
+    // 1. Switch active tab to 'discussions'
+    setActiveTab('discussions');
+
+    // 2. Clear chat search if active so all messages are visible
+    if (chatSearchQuery) {
+      setChatSearchQuery('');
+    }
+
+    // 3. Highlight target message
+    setHighlightedMessageId(targetMsgId);
+
+    // 4. Smoothly scroll to target message in FlatList
+    setTimeout(() => {
+      const idx = displayedMessages.findIndex(
+        (m) => m.id === targetMsgId || (m.content && item.note && m.content === item.note)
+      );
+      if (idx >= 0 && flatListRef.current) {
+        try {
+          flatListRef.current.scrollToIndex({
+            index: idx,
+            animated: true,
+            viewPosition: 0.5,
+          });
+        } catch {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      } else {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }
+
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+    }, 200);
+
+    // 5. Remove highlight after 3.5s
+    setTimeout(() => {
+      setHighlightedMessageId(null);
+    }, 3500);
   };
 
   // Forward Handlers
@@ -1532,31 +1731,83 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   };
 
   const handleCreateEvent = async () => {
-    if (!eventTitle.trim()) return;
-    await createEvent({
-      workspaceId: workspace.id,
-      title: eventTitle.trim(),
-      description: eventDesc.trim() || undefined,
-      eventType: 'lab_meeting',
-      startTime: `${eventDate}T14:00:00Z`,
-    });
-    setShowEventModal(false);
-    setEventTitle('');
-    setEventDesc('');
+    if (!eventTitle.trim()) {
+      Alert.alert('Missing Title', 'Please enter a title for the event.');
+      return;
+    }
+    setIsSubmittingEvent(true);
+    try {
+      const cleanTime = eventTime && eventTime.includes(':') ? eventTime : '14:00';
+      const resolvedDate = eventDate || selectedCalendarDate || new Date().toISOString().split('T')[0];
+      const startTime = `${resolvedDate}T${cleanTime}:00Z`;
+
+      let finalDesc = eventDesc.trim();
+      const taggedMembers = members.filter((m) => selectedAttendeeIds.includes(m.user_id));
+      if (taggedMembers.length > 0) {
+        const attendeeNames = taggedMembers
+          .map((m) => `@${m.profile?.fullName || m.profile?.handle || 'Member'}`)
+          .join(', ');
+        finalDesc = finalDesc
+          ? `${finalDesc}\n\n👥 Attendees: ${attendeeNames}`
+          : `👥 Attendees: ${attendeeNames}`;
+      }
+
+      const res = await createEvent({
+        workspaceId: workspace.id,
+        title: eventTitle.trim(),
+        description: finalDesc || undefined,
+        eventType,
+        startTime,
+        attendeeIds: selectedAttendeeIds,
+      });
+
+      if (res.success) {
+        setShowEventModal(false);
+        setEventTitle('');
+        setEventDesc('');
+        setSelectedAttendeeIds([]);
+        setVaultToast({ message: 'Event scheduled successfully' });
+        setTimeout(() => setVaultToast(null), 3000);
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+      } else {
+        Alert.alert('Error', res.error || 'Failed to schedule event');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to schedule event');
+    } finally {
+      setIsSubmittingEvent(false);
+    }
   };
 
-  const handleCreateJob = async () => {
-    if (!jobTitle.trim()) return;
-    await createOpportunity({
-      workspaceId: workspace.id,
-      title: jobTitle.trim(),
-      roleType: 'research_assistant',
-      description: jobDesc.trim() || `Job Designation: '${jobTitle.trim()}' assigned to ${jobAssignee || '@Alex P.'} for the next phase of the project`,
-    });
-    setShowJobModal(false);
-    setJobTitle('');
-    setJobDesc('');
-    setJobAssignee('');
+  const handleDeleteEvent = (eventId: string, title: string) => {
+    setEventToDelete({ id: eventId, title });
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!eventToDelete) return;
+    setIsDeletingEvent(true);
+    try {
+      const res = await deleteEvent(eventToDelete.id, workspace.id);
+      if (res.success) {
+        setEventToDelete(null);
+        setVaultToast({ message: 'Event deleted successfully' });
+        setTimeout(() => setVaultToast(null), 3000);
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+      } else {
+        Alert.alert('Delete Failed', res.error || 'Failed to delete event');
+      }
+    } catch (err: any) {
+      Alert.alert('Delete Failed', err.message || 'Failed to delete event');
+    } finally {
+      setIsDeletingEvent(false);
+    }
   };
 
   const handleSearchUsers = async (text: string) => {
@@ -1783,6 +2034,12 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
       {/* 2. Sub-Filter Pill Strip */}
       <View style={styles.subFilterStripContainer}>
+        {vaultToast && (
+          <View style={styles.vaultToastBanner}>
+            <CheckCircle2 size={16} color="#10B981" />
+            <Text style={styles.vaultToastText}>{vaultToast.message}</Text>
+          </View>
+        )}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1810,21 +2067,24 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => setActiveTab('jobs')}
-            style={[styles.filterPill, activeTab === 'jobs' && styles.filterPillActive]}
+            onPress={() => {
+              setActiveTab('manager');
+              loadTasks(workspace.id);
+            }}
+            style={[styles.filterPill, activeTab === 'manager' && styles.filterPillActive]}
           >
-            <Text style={[styles.filterPillText, activeTab === 'jobs' && styles.filterPillTextActive]}>
-              Jobs
+            <Text style={[styles.filterPillText, activeTab === 'manager' && styles.filterPillTextActive]}>
+              BooffIn manager
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => setActiveTab('bookmarked')}
-            style={[styles.filterPill, activeTab === 'bookmarked' && styles.filterPillActive]}
+            onPress={() => setActiveTab('vault')}
+            style={[styles.filterPill, (activeTab === 'vault' || activeTab === 'bookmarked') && styles.filterPillActive]}
           >
-            <Text style={[styles.filterPillText, activeTab === 'bookmarked' && styles.filterPillTextActive]}>
-              Bookmarked
+            <Text style={[styles.filterPillText, (activeTab === 'vault' || activeTab === 'bookmarked') && styles.filterPillTextActive]}>
+              Vault
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -1914,6 +2174,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messagesList}
             showsVerticalScrollIndicator={false}
+            onScrollToIndexFailed={(info) => {
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                  viewPosition: 0.5,
+                });
+              }, 250);
+            }}
             onScroll={(e) => {
               const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
               const paddingToBottom = 120;
@@ -2071,7 +2340,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   const hasMediaContent = !isDeleted && (isAudio || isDocument || Boolean(resolvedDoiMeta) || isPost || isProfile || isWorkspaceInvite || isPoll);
 
                   return (
-                    <View key={item.id} style={{ width: '100%' }}>
+                    <View key={item.id} style={[{ width: '100%' }, highlightedMessageId === item.id && styles.highlightedMessageRow]}>
                       {isFirstOfDateGroup && (
                         <View style={styles.dateSeparatorRow}>
                           <View style={styles.dateSeparatorLine} />
@@ -2111,6 +2380,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                               ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
                               : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }],
                             hasMediaContent && styles.bubbleWithMedia,
+                            highlightedMessageId === item.id && styles.highlightedMessageBubble,
                           ]}
                         >
                     {/* Forwarded Indicator */}
@@ -2947,91 +3217,527 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         </View>
       </Modal>
 
-      {/* TAB 2: Calendar */}
+      {/* TAB 2: Collapsible Interactive Calendar */}
       {activeTab === 'calendar' && (
         <ScrollView contentContainerStyle={{ padding: 16 }}>
+          {/* Top Action & Collapse Toggle Bar */}
           <View style={styles.tabActionBar}>
-            <Text style={styles.tabActionTitle}>Lab Calendar & Milestones</Text>
-            <TouchableOpacity onPress={() => setShowEventModal(true)} style={styles.addBtn}>
-              <Plus size={13} color="#FFFFFF" />
-              <Text style={styles.addBtnText}>Schedule Event</Text>
-            </TouchableOpacity>
+            <View style={{ flex: 1, minWidth: 160, marginRight: 8 }}>
+              <Text style={styles.tabActionTitle}>Lab Calendar & Milestones</Text>
+              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                Schedule group meetings, project reviews, or milestones.
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, flexShrink: 0 }}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsCalendarCollapsed(!isCalendarCollapsed)}
+                style={styles.calendarTogglePill}
+              >
+                {isCalendarCollapsed ? (
+                  <ChevronDown size={14} color="#164E3F" />
+                ) : (
+                  <ChevronUp size={14} color="#164E3F" />
+                )}
+                <Text style={styles.calendarTogglePillText} numberOfLines={1}>
+                  {isCalendarCollapsed ? 'Expand' : 'Collapse'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => openScheduleModalForDate(selectedCalendarDate)}
+                style={styles.addBtn}
+              >
+                <Plus size={13} color="#FFFFFF" />
+                <Text style={styles.addBtnText} numberOfLines={1}>Schedule Event</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {events.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Calendar size={40} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No scheduled events</Text>
-              <Text style={styles.emptySub}>Schedule group meetings, project reviews, or milestones.</Text>
+          {/* Collapsible Month Calendar Grid */}
+          {!isCalendarCollapsed ? (
+            <View style={styles.calendarCard}>
+              {/* Month Navigation Row */}
+              <View style={styles.calendarMonthHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <TouchableOpacity
+                    onPress={handlePrevMonth}
+                    style={styles.calendarNavBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <ChevronLeft size={16} color="#0F172A" />
+                  </TouchableOpacity>
+                  <Text style={styles.calendarMonthTitle}>{calendarMonthTitle}</Text>
+                  <TouchableOpacity
+                    onPress={handleNextMonth}
+                    style={styles.calendarNavBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <ChevronRight size={16} color="#0F172A" />
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity onPress={handleGoToday} style={styles.todayBtn}>
+                  <Text style={styles.todayBtnText}>Today</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Day of Week Headers */}
+              <View style={styles.calendarWeekRow}>
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                  <View key={d} style={styles.calendarWeekHeaderCell}>
+                    <Text style={styles.calendarWeekHeaderText}>{d}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* 7-Column Days Grid */}
+              <View style={styles.calendarGridRow}>
+                {calendarGrid.map((cell, idx) => {
+                  if (cell.day === null || !cell.dateStr) {
+                    return <View key={`blank-${idx}`} style={styles.calendarDayCellWrap} />;
+                  }
+
+                  return (
+                    <View key={cell.dateStr} style={styles.calendarDayCellWrap}>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setSelectedCalendarDate(cell.dateStr!);
+                          try {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          } catch {}
+                        }}
+                        style={[
+                          styles.calendarDayCell,
+                          cell.isToday && styles.calendarDayCellToday,
+                          cell.isSelected && styles.calendarDayCellSelected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarDayText,
+                            cell.isToday && styles.calendarDayTextToday,
+                            cell.isSelected && styles.calendarDayTextSelected,
+                          ]}
+                        >
+                          {cell.day}
+                        </Text>
+                        {cell.hasEvents && (
+                          <View
+                            style={[
+                              styles.calendarEventDot,
+                              cell.isSelected && styles.calendarEventDotSelected,
+                            ]}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           ) : (
-            events.map((ev) => (
-              <View key={ev.id} style={styles.eventCard}>
-                <View style={styles.eventCardHeader}>
-                  <Text style={styles.eventTitle}>{ev.title}</Text>
-                  <Text style={styles.eventDate}>
-                    {new Date(ev.start_time).toLocaleDateString(undefined, {
+            /* Compact Collapsed Banner */
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setIsCalendarCollapsed(false)}
+              style={styles.calendarCollapsedBanner}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, marginRight: 8 }}>
+                <Calendar size={16} color="#166534" />
+                <Text style={styles.calendarCollapsedText} numberOfLines={1} ellipsizeMode="tail">
+                  {calendarMonthTitle} • Selected: {formattedSelectedDate} • {events.length} total event{events.length === 1 ? '' : 's'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#166534' }}>Expand</Text>
+                <ChevronDown size={14} color="#166534" />
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* Agenda & Day Events Section */}
+          <View style={styles.agendaHeaderRow}>
+            <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 150, marginRight: 8 }}>
+              <Text style={styles.agendaTitle} numberOfLines={1} ellipsizeMode="tail">
+                {calendarViewMode === 'selected'
+                  ? `Events for ${formattedSelectedDate}`
+                  : 'All Scheduled Events'}
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, flexShrink: 0 }}>
+              <View style={styles.agendaFilterPills}>
+                <TouchableOpacity
+                  onPress={() => setCalendarViewMode('selected')}
+                  style={[
+                    styles.agendaFilterPill,
+                    calendarViewMode === 'selected' && styles.agendaFilterPillActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.agendaFilterPillText,
+                      calendarViewMode === 'selected' && styles.agendaFilterPillTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    On Date ({eventsOnSelectedDate.length})
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setCalendarViewMode('all')}
+                  style={[
+                    styles.agendaFilterPill,
+                    calendarViewMode === 'all' && styles.agendaFilterPillActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.agendaFilterPillText,
+                      calendarViewMode === 'all' && styles.agendaFilterPillTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    All ({events.length})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => openScheduleModalForDate(selectedCalendarDate)}
+                style={[styles.addBtn, { paddingHorizontal: 10, paddingVertical: 5 }]}
+              >
+                <Plus size={12} color="#FFFFFF" />
+                <Text style={styles.addBtnText} numberOfLines={1}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Events List or Empty State */}
+          {displayedEvents.length === 0 ? (
+            <View style={styles.emptyDayBox}>
+              <Calendar size={36} color="#94A3B8" />
+              <Text style={styles.emptyDayText}>
+                {calendarViewMode === 'selected'
+                  ? `No events scheduled for ${formattedSelectedDate}`
+                  : 'No scheduled events found in this pod'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => openScheduleModalForDate(selectedCalendarDate)}
+                style={styles.addBtn}
+              >
+                <Plus size={13} color="#FFFFFF" />
+                <Text style={styles.addBtnText}>Schedule Event for this Date</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            displayedEvents.map((ev) => {
+              const evDateObj = new Date(ev.start_time);
+              const timeFormatted = evDateObj.toLocaleTimeString(undefined, {
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+              const dateFormatted = evDateObj.toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              });
+              const canDelete =
+                !ev.creator_id ||
+                ev.creator_id === currentUser?.id ||
+                isAdminOrOwner ||
+                isMember;
+
+              // Find tagged attendees
+              const taggedAttendees = (members || []).filter(
+                (m) => ev.attendee_ids && ev.attendee_ids.includes(m.user_id)
+              );
+
+              return (
+                <View key={ev.id} style={styles.eventCardEnhanced}>
+                  <View style={styles.eventCardHeader}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <View style={styles.eventTypeBadge}>
+                        <Text style={styles.eventTypeText}>
+                          {(ev.event_type || 'Lab Meeting').replace('_', ' ')}
+                        </Text>
+                      </View>
+                      <Text style={styles.eventTitle}>{ev.title}</Text>
+                    </View>
+
+                    {canDelete && (
+                      <TouchableOpacity
+                        onPress={() => handleDeleteEvent(ev.id, ev.title)}
+                        style={styles.eventDeleteBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Trash2 size={16} color="#DC2626" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <View style={styles.eventTimeRow}>
+                    <Clock size={12} color="#64748B" />
+                    <Text style={styles.eventTimeText}>
+                      {dateFormatted} at {timeFormatted}
+                    </Text>
+                  </View>
+
+                  {ev.description ? (
+                    <Text style={styles.eventDesc}>{ev.description}</Text>
+                  ) : null}
+
+                  {/* Attendees from Group */}
+                  <View style={styles.eventAttendeesSection}>
+                    <View style={styles.eventAttendeesTitleRow}>
+                      <Users size={12} color="#059669" />
+                      <Text style={styles.eventAttendeesTitle}>
+                        {taggedAttendees.length > 0
+                          ? `Invited from Group (${taggedAttendees.length}):`
+                          : 'Invited from Group: All pod members'}
+                      </Text>
+                    </View>
+                    {taggedAttendees.length > 0 && (
+                      <View style={styles.attendeeChipsContainer}>
+                        {taggedAttendees.map((att) => {
+                          const attName = att.profile?.fullName || att.profile?.handle || 'Member';
+                          return (
+                            <View key={att.user_id} style={styles.attendeeChip}>
+                              <Avatar url={att.profile?.avatarUrl || undefined} name={attName} size={18} />
+                              <Text style={styles.attendeeChipText}>{attName}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Link to BooffIn Manager if milestone/task */}
+                  {(ev.event_type === 'milestone' || ev.title.includes('[Task]')) && (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setActiveTab('manager');
+                        loadTasks(workspace.id);
+                      }}
+                      style={styles.eventViewManagerBtn}
+                    >
+                      <Columns3 size={11} color="#059669" />
+                      <Text style={styles.eventViewManagerBtnText}>View in BooffIn manager</Text>
+                      <ChevronRight size={11} color="#059669" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
+
+      {/* TAB 3: BooffIn Manager (Kanban Board) */}
+      {activeTab === 'manager' && (
+        <WorkspaceBooffInManagerView
+          workspace={workspace}
+          members={members || []}
+          onOpenCalendar={(targetDate) => {
+            if (targetDate) {
+              setSelectedCalendarDate(targetDate);
+            }
+            setActiveTab('calendar');
+          }}
+        />
+      )}
+
+      {/* TAB 4: Vault */}
+      {(activeTab === 'vault' || activeTab === 'bookmarked') && (
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
+          <View style={styles.vaultHeaderRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Bookmark size={20} color="#059669" />
+                <Text style={styles.tabActionTitle}>Pod Vault</Text>
+              </View>
+              <Text style={styles.vaultSubtitle}>
+                Confidential discussions, research papers, and messages saved by your pod members.
+              </Text>
+            </View>
+            {savedItems.length > 0 && (
+              <View style={styles.vaultCountBadge}>
+                <Text style={styles.vaultCountBadgeText}>
+                  {savedItems.length} {savedItems.length === 1 ? 'item' : 'items'}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {savedItems.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.vaultEmptyIconCircle}>
+                <Bookmark size={36} color="#059669" />
+              </View>
+              <Text style={styles.emptyTitle}>Vault is Empty</Text>
+              <Text style={styles.emptySub}>
+                When you find an important message or paper in discussions, tap &quot;Save to Vault&quot; from the message menu to keep it here.
+              </Text>
+            </View>
+          ) : (
+            <View style={{ gap: 12, marginTop: 12 }}>
+              {savedItems.map((item) => {
+                const meta = item.metadata || {};
+                const senderName = meta.sender_name || 'Researcher';
+                const senderHandle = meta.sender_handle ? `@${meta.sender_handle}` : '';
+                const senderAvatar = meta.sender_avatar;
+                const messageText = item.note || item.title || 'Saved Message';
+                const createdDate = meta.created_at || item.created_at;
+                const formattedDate = createdDate
+                  ? new Date(createdDate).toLocaleDateString(undefined, {
                       month: 'short',
                       day: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit',
-                    })}
-                  </Text>
-                </View>
-                {ev.description && <Text style={styles.eventDesc}>{ev.description}</Text>}
-              </View>
-            ))
-          )}
-        </ScrollView>
-      )}
+                    })
+                  : '';
+                const isCopied = copiedVaultItemId === item.id;
+                const doiMeta = meta.doi_metadata;
 
-      {/* TAB 3: Jobs */}
-      {activeTab === 'jobs' && (
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <View style={styles.tabActionBar}>
-            <Text style={styles.tabActionTitle}>Jobs & Task Assignments</Text>
-            <TouchableOpacity onPress={() => setShowJobModal(true)} style={styles.addBtn}>
-              <Plus size={13} color="#FFFFFF" />
-              <Text style={styles.addBtnText}>Assign Task</Text>
-            </TouchableOpacity>
-          </View>
+                return (
+                  <View key={item.id} style={styles.vaultItemCard}>
+                    {/* Top row: Sender info + item type + delete button */}
+                    <View style={styles.vaultCardTopRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                        <Avatar url={senderAvatar || undefined} name={senderName} size={32} />
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text style={styles.vaultSenderName} numberOfLines={1}>
+                              {senderName}
+                            </Text>
+                            {senderHandle ? (
+                              <Text style={styles.vaultSenderHandle} numberOfLines={1}>
+                                {senderHandle}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {formattedDate ? (
+                            <Text style={styles.vaultItemDate}>{formattedDate}</Text>
+                          ) : null}
+                        </View>
+                      </View>
 
-          {opportunities.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Briefcase size={40} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No open tasks</Text>
-              <Text style={styles.emptySub}>Assign project tasks, review calls, or research roles.</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={styles.vaultTypeBadge}>
+                          <Text style={styles.vaultTypeBadgeText}>
+                            {item.item_type === 'doi_paper' || doiMeta ? 'DOI Paper' : 'Message'}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={async () => {
+                            await removeSavedItem(workspace.id, item.item_id || item.id);
+                            try {
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            } catch {}
+                            setVaultToast({ message: 'Removed from Vault' });
+                            setTimeout(() => setVaultToast(null), 2500);
+                          }}
+                          style={styles.vaultDeleteBtn}
+                          accessibilityLabel="Remove from Vault"
+                        >
+                          <Trash2 size={16} color="#DC2626" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Middle: Message Content (Tappable to jump to discussion) */}
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => handleOpenSavedMessageInDiscussion(item)}
+                      style={styles.vaultMessageBody}
+                    >
+                      <Text style={styles.vaultMessageText} selectable={false}>
+                        {messageText}
+                      </Text>
+                      <View style={styles.vaultTapHintRow}>
+                        <MessageSquare size={11} color="#059669" />
+                        <Text style={styles.vaultTapHintText}>Tap to open in discussion</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Optional: DOI Paper Banner if present */}
+                    {doiMeta && (
+                      <View style={styles.vaultDoiSnippet}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <BookOpen size={14} color="#059669" />
+                          <Text style={styles.vaultDoiSnippetLabel}>Research Paper Reference</Text>
+                        </View>
+                        <Text style={styles.vaultDoiSnippetTitle} numberOfLines={2}>
+                          {doiMeta.title || 'Referenced Research Paper'}
+                        </Text>
+                        {doiMeta.doi ? (
+                          <Text style={styles.vaultDoiSnippetCode}>DOI: {doiMeta.doi}</Text>
+                        ) : null}
+                        {doiMeta.url && (
+                          <TouchableOpacity
+                            onPress={() => Linking.openURL(doiMeta.url)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}
+                          >
+                            <Text style={{ fontSize: 12, color: '#059669', fontWeight: '600' }}>Read Paper</Text>
+                            <ExternalLink size={12} color="#059669" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+
+                    {/* Bottom: Action footer */}
+                    <View style={styles.vaultCardFooter}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleOpenSavedMessageInDiscussion(item)}
+                          style={styles.vaultOpenDiscussionBtn}
+                        >
+                          <MessageSquare size={13} color="#164E3F" />
+                          <Text style={styles.vaultOpenDiscussionBtnText}>Open in Discussion</Text>
+                          <ChevronRight size={13} color="#164E3F" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={async () => {
+                            try {
+                              await Clipboard.setStringAsync(messageText);
+                              setCopiedVaultItemId(item.id);
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                              setTimeout(() => setCopiedVaultItemId(null), 2000);
+                            } catch {}
+                          }}
+                          style={styles.vaultCopyBtn}
+                        >
+                          {isCopied ? (
+                            <>
+                              <Check size={13} color="#059669" />
+                              <Text style={styles.vaultCopyBtnTextCopied}>Copied</Text>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} color="#475569" />
+                              <Text style={styles.vaultCopyBtnText}>Copy Text</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Lock size={12} color="#94A3B8" />
+                        <Text style={styles.vaultEncryptedLabel}>Confidential Pod Item</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
-          ) : (
-            opportunities.map((opp) => (
-              <View key={opp.id} style={styles.jobCard}>
-                <Text style={styles.jobTitle}>{opp.title}</Text>
-                <Text style={styles.jobDesc}>{opp.description}</Text>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      )}
-
-      {/* TAB 4: Bookmarked */}
-      {activeTab === 'bookmarked' && (
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <Text style={styles.tabActionTitle}>Saved Vault & Bookmarks</Text>
-          <Text style={styles.vaultSubtitle}>Confidential items saved by your pod members.</Text>
-
-          {savedItems.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Bookmark size={40} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No bookmarked items</Text>
-              <Text style={styles.emptySub}>Save important paper DOIs or discussions to access them anytime.</Text>
-            </View>
-          ) : (
-            savedItems.map((item) => (
-              <View key={item.id} style={styles.vaultItemCard}>
-                <Text style={styles.vaultItemTitle}>{item.note || 'Saved Pod Reference'}</Text>
-                <Text style={styles.vaultItemDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
-              </View>
-            ))
           )}
         </ScrollView>
       )}
@@ -3082,71 +3788,299 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         </View>
       </Modal>
 
-      {/* Modal: Schedule Event */}
+      {/* Modal: Schedule Event with Add People from Group */}
       <Modal visible={showEventModal} transparent animationType="fade" onRequestClose={() => setShowEventModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { maxHeight: '92%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Schedule Lab Event</Text>
-              <TouchableOpacity onPress={() => setShowEventModal(false)}>
+              <View>
+                <Text style={styles.modalTitle}>Schedule Lab Event</Text>
+                <Text style={{ fontSize: 12, color: '#059669', fontWeight: '600', marginTop: 2 }}>
+                  📅 {formattedSelectedDate}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowEventModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <X size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
-            <TextInput
-              value={eventTitle}
-              onChangeText={setEventTitle}
-              placeholder="Event Title (e.g. Project Review)"
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 10 }]}
-            />
-            <TextInput
-              value={eventDesc}
-              onChangeText={setEventDesc}
-              placeholder="Tag members or specify agenda..."
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 14 }]}
-            />
-            <TouchableOpacity onPress={handleCreateEvent} style={styles.confirmAttachBtn}>
-              <Text style={styles.confirmAttachBtnText}>Schedule Event</Text>
-            </TouchableOpacity>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginVertical: 8 }}>
+              {/* Event Name */}
+              <Text style={styles.modalLabel}>Event Title *</Text>
+              <TextInput
+                value={eventTitle}
+                onChangeText={setEventTitle}
+                placeholder="e.g. Model Architecture Review, Journal Club"
+                placeholderTextColor="#94A3B8"
+                style={[styles.doiInput, { marginBottom: 12 }]}
+              />
+
+              {/* Event Time Section with Interactive Clock Picker */}
+              <View style={{ marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={styles.modalLabel}>Event Time *</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowClockPicker(!showClockPicker)}
+                    style={styles.clockTogglePill}
+                  >
+                    <Clock size={13} color="#164E3F" />
+                    <Text style={styles.clockTogglePillText}>
+                      {showClockPicker ? 'Hide Clock' : 'Interactive Clock'}
+                    </Text>
+                    {showClockPicker ? (
+                      <ChevronUp size={13} color="#164E3F" />
+                    ) : (
+                      <ChevronDown size={13} color="#164E3F" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Selected Time Display Banner */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setShowClockPicker(!showClockPicker)}
+                  style={styles.selectedTimeBanner}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={styles.clockIconCircle}>
+                      <Clock size={16} color="#164E3F" />
+                    </View>
+                    <View>
+                      <Text style={styles.selectedTimeValue}>
+                        {(() => {
+                          const parsed = parse24HourToClock(eventTime);
+                          return `${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')} ${parsed.period}`;
+                        })()}
+                      </Text>
+                      <Text style={styles.selectedTimeSub}>
+                        Tap to {showClockPicker ? 'collapse' : 'open interactive dial & change time'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.clockBadgePill}>
+                    <Text style={styles.clockBadgePillText}>
+                      {showClockPicker ? 'Active Dial' : 'Open Dial'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Interactive Clock Picker */}
+                {showClockPicker && (
+                  <InteractiveClockPicker
+                    value={eventTime}
+                    onChange={(newTime) => setEventTime(newTime)}
+                  />
+                )}
+              </View>
+
+              {/* Event Type Chips */}
+              <Text style={styles.modalLabel}>Session Category</Text>
+              <View style={styles.typePillsRow}>
+                {[
+                  { key: 'lab_meeting', label: 'Lab Meeting' },
+                  { key: 'reading_group', label: 'Reading Group' },
+                  { key: 'milestone', label: 'Milestone' },
+                  { key: 'live_session', label: 'Live Session' },
+                ].map((item) => {
+                  const isActive = eventType === item.key;
+                  return (
+                    <TouchableOpacity
+                      key={item.key}
+                      onPress={() => setEventType(item.key as any)}
+                      style={[styles.typePill, isActive && styles.typePillActive]}
+                    >
+                      <Text style={[styles.typePillText, isActive && styles.typePillTextActive]}>
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Description & Agenda */}
+              <Text style={styles.modalLabel}>Description & Agenda</Text>
+              <TextInput
+                value={eventDesc}
+                onChangeText={setEventDesc}
+                placeholder="Add meeting agenda, discussion topics, preprint links..."
+                placeholderTextColor="#94A3B8"
+                multiline
+                numberOfLines={3}
+                style={[styles.doiInput, { height: 72, textAlignVertical: 'top', paddingVertical: 8, marginBottom: 12 }]}
+              />
+
+              {/* Add People from Group Section */}
+              <View style={styles.eventModalSection}>
+                <View style={styles.eventModalSectionHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Users size={15} color="#164E3F" />
+                    <Text style={styles.eventModalSectionTitle}>Add People from Group</Text>
+                  </View>
+                  <Text style={styles.eventModalSelectedBadge}>
+                    {selectedAttendeeIds.length} of {members.length} selected
+                  </Text>
+                </View>
+                <Text style={styles.eventModalSectionSub}>
+                  Select members of this Inner Circle to attend or collaborate
+                </Text>
+
+                <View style={styles.eventModalMemberActions}>
+                  <TextInput
+                    value={memberFilterQuery}
+                    onChangeText={setMemberFilterQuery}
+                    placeholder="Search pod members..."
+                    placeholderTextColor="#94A3B8"
+                    style={styles.eventModalSearchInput}
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (selectedAttendeeIds.length === members.length) {
+                        setSelectedAttendeeIds([]);
+                      } else {
+                        setSelectedAttendeeIds(members.map((m) => m.user_id));
+                      }
+                    }}
+                    style={styles.selectAllBtn}
+                  >
+                    <Text style={styles.selectAllBtnText}>
+                      {selectedAttendeeIds.length === members.length ? 'Clear' : 'Select All'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.eventModalMemberList} nestedScrollEnabled>
+                  {members.length === 0 ? (
+                    <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', paddingVertical: 12 }}>
+                      No other pod members found
+                    </Text>
+                  ) : (
+                    members
+                      .filter((m) => {
+                        if (!memberFilterQuery.trim()) return true;
+                        const q = memberFilterQuery.toLowerCase();
+                        const name = (m.profile?.fullName || '').toLowerCase();
+                        const handle = (m.profile?.handle || '').toLowerCase();
+                        return name.includes(q) || handle.includes(q);
+                      })
+                      .map((m) => {
+                        const isSelected = selectedAttendeeIds.includes(m.user_id);
+                        const name = m.profile?.fullName || m.profile?.handle || 'Pod Member';
+                        const handle = m.profile?.handle ? `@${m.profile.handle}` : '';
+                        const isCurrentUser = m.user_id === currentUser?.id;
+
+                        return (
+                          <TouchableOpacity
+                            key={m.id || m.user_id}
+                            activeOpacity={0.7}
+                            onPress={() => {
+                              if (isSelected) {
+                                setSelectedAttendeeIds((prev) => prev.filter((id) => id !== m.user_id));
+                              } else {
+                                setSelectedAttendeeIds((prev) => [...prev, m.user_id]);
+                              }
+                            }}
+                            style={[
+                              styles.eventMemberRow,
+                              isSelected && styles.eventMemberRowSelected,
+                            ]}
+                          >
+                            <Avatar
+                              url={m.profile?.avatarUrl || undefined}
+                              name={name}
+                              size={32}
+                            />
+                            <View style={styles.eventMemberInfo}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.eventMemberName} numberOfLines={1}>{name}</Text>
+                                {isCurrentUser && (
+                                  <View style={styles.youBadge}>
+                                    <Text style={styles.youBadgeText}>You</Text>
+                                  </View>
+                                )}
+                                {m.role === 'admin' && (
+                                  <View style={styles.adminBadge}>
+                                    <Text style={styles.adminBadgeText}>Admin</Text>
+                                  </View>
+                                )}
+                              </View>
+                              {handle ? <Text style={styles.eventMemberHandle} numberOfLines={1}>{handle}</Text> : null}
+                            </View>
+                            <View style={[styles.checkboxWrap, isSelected && styles.checkboxWrapActive]}>
+                              {isSelected ? <Check size={12} color="#FFFFFF" strokeWidth={3} /> : null}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })
+                  )}
+                </ScrollView>
+              </View>
+            </ScrollView>
+
+            {/* Submit & Cancel */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+              <TouchableOpacity
+                onPress={() => setShowEventModal(false)}
+                style={[styles.confirmAttachBtn, { flex: 1, backgroundColor: '#F1F5F9' }]}
+              >
+                <Text style={[styles.confirmAttachBtnText, { color: '#475569' }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleCreateEvent}
+                disabled={isSubmittingEvent}
+                style={[styles.confirmAttachBtn, { flex: 2 }]}
+              >
+                {isSubmittingEvent ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmAttachBtnText}>Schedule Event</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
-      {/* Modal: Assign Task / Job */}
-      <Modal visible={showJobModal} transparent animationType="fade" onRequestClose={() => setShowJobModal(false)}>
+      {/* Modal: Confirm Delete Event */}
+      <Modal
+        visible={!!eventToDelete}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !isDeletingEvent && setEventToDelete(null)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Assign Task / Role</Text>
-              <TouchableOpacity onPress={() => setShowJobModal(false)}>
-                <X size={20} color="#64748B" />
+          <View style={[styles.modalCard, { maxWidth: 380, padding: 20 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={styles.deleteEventModalIconCircle}>
+                <Trash2 size={26} color="#DC2626" />
+              </View>
+              <Text style={styles.deleteEventModalTitle}>Delete Event</Text>
+              <Text style={styles.deleteEventModalDesc}>
+                Are you sure you want to delete &quot;{eventToDelete?.title}&quot;? This cannot be undone.
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
+              <TouchableOpacity
+                disabled={isDeletingEvent}
+                onPress={() => setEventToDelete(null)}
+                style={styles.deleteEventModalCancelBtn}
+              >
+                <Text style={styles.deleteEventModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={isDeletingEvent}
+                onPress={confirmDeleteEvent}
+                style={styles.deleteEventModalConfirmBtn}
+              >
+                {isDeletingEvent ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.deleteEventModalConfirmText}>Delete Event</Text>
+                )}
               </TouchableOpacity>
             </View>
-            <TextInput
-              value={jobTitle}
-              onChangeText={setJobTitle}
-              placeholder="Job Title (e.g. Lead Researcher)"
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 10 }]}
-            />
-            <TextInput
-              value={jobAssignee}
-              onChangeText={setJobAssignee}
-              placeholder="Assignee (e.g. @Alex P.)"
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 10 }]}
-            />
-            <TextInput
-              value={jobDesc}
-              onChangeText={setJobDesc}
-              placeholder="Task details and scope..."
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 14 }]}
-            />
-            <TouchableOpacity onPress={handleCreateJob} style={styles.confirmAttachBtn}>
-              <Text style={styles.confirmAttachBtnText}>Assign to Pod</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -4139,6 +5073,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 12,
   },
   tabActionTitle: {
@@ -4159,6 +5095,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
+    flexShrink: 0,
   },
   addBtnText: {
     fontSize: 11,
@@ -4191,36 +5128,682 @@ const styles = StyleSheet.create({
   eventDesc: {
     fontSize: 12,
     color: '#475569',
+    lineHeight: 18,
   },
-  jobCard: {
+  // Collapsible Calendar Styles
+  calendarCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  jobTitle: {
+  calendarMonthHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  calendarMonthTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  calendarNavBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  todayBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  todayBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  calendarWeekRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  calendarWeekHeaderCell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarWeekHeaderText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  calendarGridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 4,
+  },
+  calendarDayCellWrap: {
+    width: '14.285%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  calendarDayCell: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  calendarDayCellToday: {
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+  },
+  calendarDayCellSelected: {
+    backgroundColor: '#164E3F',
+  },
+  calendarDayText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  calendarDayTextToday: {
+    color: '#059669',
+    fontWeight: '800',
+  },
+  calendarDayTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  calendarEventDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#10B981',
+    position: 'absolute',
+    bottom: 3,
+  },
+  calendarEventDotSelected: {
+    backgroundColor: '#FFFFFF',
+  },
+  calendarCollapsedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  calendarCollapsedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#166534',
+  },
+  calendarTogglePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flexShrink: 0,
+  },
+  calendarTogglePillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  agendaHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  agendaTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#0F172A',
+  },
+  agendaFilterPills: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  agendaFilterPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+  },
+  agendaFilterPillActive: {
+    backgroundColor: '#164E3F',
+  },
+  agendaFilterPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  agendaFilterPillTextActive: {
+    color: '#FFFFFF',
+  },
+  eventCardEnhanced: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  eventTypeBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#ECFDF5',
+    marginBottom: 6,
+  },
+  eventTypeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+    textTransform: 'uppercase',
+  },
+  eventTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  eventTimeText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  eventAttendeesSection: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  eventAttendeesTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  eventAttendeesTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  attendeeChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  attendeeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  attendeeChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  emptyDayBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 10,
+  },
+  emptyDayText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  // Modal Specific Styles
+  modalLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 6,
+  },
+  timePillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  timePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  clockTogglePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  clockTogglePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#164E3F',
+  },
+  selectedTimeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+  },
+  clockIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedTimeValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  selectedTimeSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  clockBadgePill: {
+    backgroundColor: '#164E3F',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  clockBadgePillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  eventDeleteBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  eventViewManagerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  eventViewManagerBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  deleteEventModalIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  deleteEventModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  deleteEventModalDesc: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  deleteEventModalCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  deleteEventModalCancelText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  deleteEventModalConfirmBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#DC2626',
+    minWidth: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteEventModalConfirmText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  timePillActive: {
+    backgroundColor: '#164E3F',
+    borderColor: '#164E3F',
+  },
+  timePillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  timePillTextActive: {
+    color: '#FFFFFF',
+  },
+  typePillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  typePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  typePillActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  typePillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  typePillTextActive: {
+    color: '#FFFFFF',
+  },
+  eventModalSection: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  eventModalSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
-  jobDesc: {
+  eventModalSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  eventModalSelectedBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  eventModalSectionSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 8,
+  },
+  eventModalMemberActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  eventModalSearchInput: {
+    flex: 1,
+    height: 34,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 6,
+    paddingHorizontal: 10,
     fontSize: 12,
+    color: '#0F172A',
+  },
+  selectAllBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 6,
+  },
+  selectAllBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  eventModalMemberList: {
+    maxHeight: 160,
+  },
+  eventMemberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginBottom: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  eventMemberRowSelected: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
+  eventMemberInfo: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  eventMemberName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  eventMemberHandle: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  youBadge: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  youBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
     color: '#475569',
-    lineHeight: 16,
+  },
+  adminBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  adminBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  checkboxWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
+  checkboxWrapActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  vaultHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  vaultCountBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  vaultCountBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  vaultEmptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   vaultItemCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  vaultCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  vaultSenderAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E2E8F0',
+  },
+  vaultSenderAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vaultSenderAvatarInitials: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  vaultSenderName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  vaultSenderHandle: {
+    fontSize: 12,
+    color: '#64748B',
   },
   vaultItemTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#0F172A',
   },
@@ -4228,6 +5811,159 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94A3B8',
     marginTop: 2,
+  },
+  vaultTypeBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  vaultTypeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  vaultDeleteBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+  },
+  vaultMessageBody: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginBottom: 10,
+  },
+  vaultMessageText: {
+    fontSize: 14,
+    color: '#1E293B',
+    lineHeight: 20,
+  },
+  vaultDoiSnippet: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+  },
+  vaultDoiSnippetLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+    textTransform: 'uppercase',
+  },
+  vaultDoiSnippetTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  vaultDoiSnippetCode: {
+    fontSize: 11,
+    color: '#059669',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  vaultCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  vaultCopyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: '#F8FAFC',
+  },
+  vaultOpenDiscussionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  vaultOpenDiscussionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#164E3F',
+  },
+  vaultTapHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  vaultTapHintText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  highlightedMessageBubble: {
+    borderWidth: 2,
+    borderColor: '#059669',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  highlightedMessageRow: {
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 12,
+  },
+  vaultCopyBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  vaultCopyBtnTextCopied: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  vaultEncryptedLabel: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  vaultToastBanner: {
+    position: 'absolute',
+    top: 4,
+    alignSelf: 'center',
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 9999,
+  },
+  vaultToastText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',

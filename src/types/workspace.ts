@@ -222,7 +222,33 @@ export interface WorkspaceEvent {
   start_time: string;
   end_time: string | null;
   meeting_link: string | null;
+  attendee_ids?: string[];
   created_at: string;
+  creator?: WorkspaceSenderProfile;
+}
+
+export type WorkspaceTaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
+export type WorkspaceTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type WorkspaceTaskColor = 'blue' | 'purple' | 'pink' | 'peach' | 'green';
+
+export interface WorkspaceTask {
+  id: string;
+  workspace_id: string;
+  creator_id: string;
+  title: string;
+  description?: string | null;
+  status: WorkspaceTaskStatus;
+  priority: WorkspaceTaskPriority;
+  color?: WorkspaceTaskColor | null;
+  due_date?: string | null; // e.g. 'YYYY-MM-DD'
+  due_time?: string | null; // e.g. '14:30'
+  assignee_id?: string | null;
+  assignee?: WorkspaceSenderProfile | null;
+  tags?: string[];
+  sync_with_calendar?: boolean;
+  linked_event_id?: string | null;
+  created_at: string;
+  updated_at?: string;
   creator?: WorkspaceSenderProfile;
 }
 
@@ -243,9 +269,11 @@ export interface WorkspaceSavedItem {
   id: string;
   workspace_id: string;
   user_id: string;
-  item_type: 'message' | 'doi_paper' | 'opportunity' | 'event';
+  item_type: 'message' | 'doi_paper' | 'opportunity' | 'event' | 'paper';
   item_id: string;
+  title?: string | null;
   note: string | null;
+  metadata?: any;
   created_at: string;
 }
 

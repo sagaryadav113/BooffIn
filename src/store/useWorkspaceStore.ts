@@ -5,6 +5,10 @@ import {
   WorkspaceMember,
   WorkspaceMessage,
   WorkspaceEvent,
+  WorkspaceTask,
+  WorkspaceTaskStatus,
+  WorkspaceTaskPriority,
+  WorkspaceTaskColor,
   WorkspaceRoleOpportunity,
   WorkspaceSavedItem,
   WorkspaceBlock,
@@ -44,6 +48,7 @@ interface WorkspaceState {
   isLoadingOlderMessages: boolean;
   unreadBelowCountByRoom: Record<string, number>;
   events: WorkspaceEvent[];
+  tasks: WorkspaceTask[];
   opportunities: WorkspaceRoleOpportunity[];
   savedItems: WorkspaceSavedItem[];
   blocks: WorkspaceBlock[];
@@ -146,7 +151,28 @@ interface WorkspaceState {
     startTime: string;
     endTime?: string;
     meetingLink?: string;
+    attendeeIds?: string[];
   }) => Promise<{ success: boolean; error: string | null }>;
+  deleteEvent: (eventId: string, workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
+  loadTasks: (workspaceId: string) => Promise<void>;
+  createTask: (params: {
+    workspaceId: string;
+    title: string;
+    description?: string;
+    status?: WorkspaceTaskStatus;
+    priority?: WorkspaceTaskPriority;
+    color?: WorkspaceTaskColor | null;
+    dueDate?: string | null;
+    dueTime?: string | null;
+    assigneeId?: string | null;
+    assignee?: any | null;
+    tags?: string[];
+    syncWithCalendar?: boolean;
+    linkedEventId?: string | null;
+  }) => Promise<{ success: boolean; task: WorkspaceTask | null; error: string | null }>;
+  updateTask: (taskId: string, workspaceId: string, updates: Partial<WorkspaceTask>) => Promise<{ success: boolean; error: string | null }>;
+  deleteTask: (taskId: string, workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
+  moveTaskStatus: (taskId: string, workspaceId: string, newStatus: WorkspaceTaskStatus) => Promise<{ success: boolean; error: string | null }>;
   loadOpportunities: (workspaceId: string) => Promise<void>;
   createOpportunity: (params: {
     workspaceId: string;
@@ -158,9 +184,11 @@ interface WorkspaceState {
   loadSavedItems: (workspaceId: string) => Promise<void>;
   saveItem: (params: {
     workspaceId: string;
-    itemType: 'message' | 'doi_paper' | 'opportunity' | 'event';
+    itemType: 'message' | 'doi_paper' | 'opportunity' | 'event' | 'paper';
     itemId: string;
+    title?: string;
     note?: string;
+    metadata?: any;
   }) => Promise<{ success: boolean; error: string | null }>;
   removeSavedItem: (workspaceId: string, itemId: string) => Promise<void>;
   loadBlocks: (workspaceId: string) => Promise<void>;
@@ -237,6 +265,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   isLoadingOlderMessages: false,
   unreadBelowCountByRoom: {},
   events: [],
+  tasks: [],
   opportunities: [],
   savedItems: [],
   blocks: [],
@@ -1076,6 +1105,125 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     return { success: true, error: null };
   },
 
+  deleteEvent: async (eventId: string, workspaceId: string) => {
+    // 1. Optimistically filter from active state for instant response
+    set((state) => ({
+      events: (state.events || []).filter((e) => e.id !== eventId),
+    }));
+
+    const res = await workspaceService.deleteWorkspaceEvent(eventId, workspaceId);
+    if (!res.success) {
+      await get().loadEvents(workspaceId);
+      return { success: false, error: res.error || 'Failed to delete event' };
+    }
+    await get().loadEvents(workspaceId);
+    return { success: true, error: null };
+  },
+
+  loadTasks: async (workspaceId: string) => {
+    const res = await workspaceService.getWorkspaceTasks(workspaceId);
+    if (!res.error) {
+      set({ tasks: res.tasks });
+    }
+  },
+
+  createTask: async (params) => {
+    const res = await workspaceService.createWorkspaceTask(params);
+    if (res.error || !res.task) {
+      return { success: false, task: null, error: res.error || 'Failed to create task' };
+    }
+
+    // Optimistically update tasks state
+    set((state) => ({
+      tasks: [res.task!, ...(state.tasks || []).filter((t) => t.id !== res.task!.id)],
+    }));
+
+    // If syncWithCalendar and dueDate is provided, schedule a linked calendar milestone
+    if (params.syncWithCalendar && params.dueDate) {
+      try {
+        const startTime = `${params.dueDate}T${params.dueTime || '09:00'}:00.000Z`;
+        const eventRes = await workspaceService.createWorkspaceEvent({
+          workspaceId: params.workspaceId,
+          title: `[Task] ${params.title}`,
+          description: params.description || `Milestone for task: ${params.title}`,
+          eventType: 'milestone',
+          startTime,
+        });
+
+        if (eventRes.event) {
+          // Link event to task
+          await workspaceService.updateWorkspaceTask(res.task.id, params.workspaceId, {
+            linked_event_id: eventRes.event.id,
+          });
+          set((state) => ({
+            tasks: (state.tasks || []).map((t) =>
+              t.id === res.task!.id ? { ...t, linked_event_id: eventRes.event!.id } : t
+            ),
+          }));
+          await get().loadEvents(params.workspaceId);
+        }
+      } catch (calErr) {
+        console.warn('[useWorkspaceStore] calendar sync note:', calErr);
+      }
+    }
+
+    await get().loadTasks(params.workspaceId);
+    return { success: true, task: res.task, error: null };
+  },
+
+  updateTask: async (taskId, workspaceId, updates) => {
+    // Optimistic update
+    set((state) => ({
+      tasks: (state.tasks || []).map((t) => (t.id === taskId ? { ...t, ...updates } : t)),
+    }));
+
+    const res = await workspaceService.updateWorkspaceTask(taskId, workspaceId, updates);
+    if (!res.task && res.error) {
+      await get().loadTasks(workspaceId);
+      return { success: false, error: res.error };
+    }
+
+    // If task was marked 'done' and has a linked calendar event, update event title to completed
+    if (updates.status === 'done') {
+      const existing = (get().tasks || []).find((t) => t.id === taskId);
+      if (existing?.linked_event_id) {
+        try {
+          const linkedEv = (get().events || []).find((e) => e.id === existing.linked_event_id);
+          if (linkedEv && !linkedEv.title.startsWith('✅')) {
+            // Optimistically update event title with checkmark
+            set((state) => ({
+              events: (state.events || []).map((e) =>
+                e.id === existing.linked_event_id ? { ...e, title: `✅ ${e.title}` } : e
+              ),
+            }));
+          }
+        } catch {}
+      }
+    }
+
+    return { success: true, error: null };
+  },
+
+  deleteTask: async (taskId, workspaceId) => {
+    const task = (get().tasks || []).find((t) => t.id === taskId);
+    set((state) => ({
+      tasks: (state.tasks || []).filter((t) => t.id !== taskId),
+    }));
+
+    if (task?.linked_event_id) {
+      try {
+        await get().deleteEvent(task.linked_event_id, workspaceId);
+      } catch {}
+    }
+
+    const res = await workspaceService.deleteWorkspaceTask(taskId, workspaceId);
+    return { success: res.success, error: res.error };
+  },
+
+  moveTaskStatus: async (taskId, workspaceId, newStatus) => {
+    return get().updateTask(taskId, workspaceId, { status: newStatus });
+  },
+
   loadOpportunities: async (workspaceId: string) => {
     const res = await workspaceService.getWorkspaceRolesOpportunities(workspaceId);
     if (!res.error) {
@@ -1094,9 +1242,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   loadSavedItems: async (workspaceId: string) => {
     const currentUser = useAuthStore.getState().user;
-    if (!currentUser) return;
-    const res = await workspaceService.getWorkspaceSavedItems(workspaceId, currentUser.id);
-    if (!res.error) {
+    const userId = currentUser?.id;
+    if (!userId) return;
+    const res = await workspaceService.getWorkspaceSavedItems(workspaceId, userId);
+    if (!res.error && res.savedItems) {
       set({ savedItems: res.savedItems });
     }
   },
@@ -1113,7 +1262,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const res = await workspaceService.removeSavedWorkspaceItem(workspaceId, itemId);
     if (res.success) {
       set((state) => ({
-        savedItems: state.savedItems.filter((i) => i.item_id !== itemId),
+        savedItems: state.savedItems.filter((i) => i.item_id !== itemId && i.id !== itemId),
       }));
     }
   },

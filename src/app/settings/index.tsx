@@ -183,7 +183,7 @@ export default function SettingsMainScreen() {
         <SettingsRow
           icon="Sun"
           title="Display & Theme"
-          subtitle={`Theme: ${settings.theme} · Default tab: ${settings.defaultTab}`}
+          subtitle={`Default tab: ${settings.defaultTab} · Monochrome Light`}
           onPress={() => router.push('/settings/appearance' as any)}
         />
         <Divider />

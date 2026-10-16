@@ -377,27 +377,6 @@ export const WorkspaceSettingsView: React.FC = () => {
           </Text>
         </View>
 
-        {/* 7-Day History Preview */}
-        <View style={styles.settingRow}>
-          <View style={styles.settingLeft}>
-            <View style={styles.iconBox}>
-              <Clock size={18} color="#064E3B" />
-            </View>
-            <View style={styles.settingTextWrap}>
-              <Text style={styles.settingLabel}>7-Day Chat History Preview</Text>
-              <Text style={styles.settingDesc}>
-                Allow prospective researchers to review the past 7 days of chat before joining
-              </Text>
-            </View>
-          </View>
-          <Switch
-            value={settings.communitySevenDayPreview}
-            onValueChange={() => handleToggle('communitySevenDayPreview', settings.communitySevenDayPreview)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
-
         {/* Public Directory Discoverability */}
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>

@@ -85,9 +85,6 @@ export default function WorkspaceHubScreen() {
   // Community sub-toggle: "Your Community" vs "Joined Community"
   const [communitySubFilter, setCommunitySubFilter] = useState<'your' | 'joined'>('your');
 
-  // Inner Circle sub-toggle: "Groups" vs "People"
-  const [innerCircleSubTab, setInnerCircleSubTab] = useState<'groups' | 'people'>('groups');
-
   // Search Query
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -419,30 +416,6 @@ export default function WorkspaceHubScreen() {
           >
             <Text style={[styles.subToggleText, communitySubFilter === 'joined' && styles.subToggleTextActive]}>
               Joined Community
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Inner Circle Sub-Toggle: Groups vs People */}
-      {activeTab === 'inner_circle' && (
-        <View style={styles.subToggleContainer}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setInnerCircleSubTab('groups')}
-            style={[styles.subToggleBtn, innerCircleSubTab === 'groups' && styles.subToggleBtnActive]}
-          >
-            <Text style={[styles.subToggleText, innerCircleSubTab === 'groups' && styles.subToggleTextActive]}>
-              Groups
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setInnerCircleSubTab('people')}
-            style={[styles.subToggleBtn, innerCircleSubTab === 'people' && styles.subToggleBtnActive]}
-          >
-            <Text style={[styles.subToggleText, innerCircleSubTab === 'people' && styles.subToggleTextActive]}>
-              People
             </Text>
           </TouchableOpacity>
         </View>

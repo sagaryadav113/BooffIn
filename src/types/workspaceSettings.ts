@@ -5,7 +5,6 @@ export interface WorkspaceSettings {
   typingIndicatorsEnabled: boolean;
   soundAndHapticsEnabled: boolean;
   doiAutoPreviewEnabled: boolean;
-  mediaAutoDownload: 'always' | 'wifi' | 'manual';
 
   // Direct Message (DM) Settings
   mutualFollowDMsOnly: boolean;
@@ -13,7 +12,6 @@ export interface WorkspaceSettings {
 
   // Community Settings
   communityNotificationFilter: 'all' | 'mentions_only' | 'mute';
-  communitySevenDayPreview: boolean;
   communityDiscoverableByDefault: boolean;
 
   // Inner Circle Settings
@@ -28,11 +26,9 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   typingIndicatorsEnabled: true,
   soundAndHapticsEnabled: true,
   doiAutoPreviewEnabled: true,
-  mediaAutoDownload: 'always',
   mutualFollowDMsOnly: true,
   e2eeEnabled: true,
   communityNotificationFilter: 'all',
-  communitySevenDayPreview: true,
   communityDiscoverableByDefault: true,
   innerCircleZeroHistoryDefault: true,
   innerCircleAdminOnlyInvites: true,
