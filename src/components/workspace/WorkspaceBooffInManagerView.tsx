@@ -24,6 +24,8 @@ import {
   Edit3,
   User,
   ChevronLeft,
+  ChevronRight,
+  Timer,
   X,
   Check,
   ArrowRight,
@@ -441,6 +443,391 @@ const AnimatedTaskCard: React.FC<AnimatedTaskCardProps> = ({
   );
 };
 
+/**
+ * -------------------------------------------------------------
+ * 1. Hovering Mini Calendar Picker
+ * -------------------------------------------------------------
+ */
+interface HoveringCalendarPickerProps {
+  selectedDate: string;
+  onSelectDate: (dateStr: string) => void;
+  onClose: () => void;
+}
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const WEEKDAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+const HoveringCalendarPicker: React.FC<HoveringCalendarPickerProps> = ({
+  selectedDate,
+  onSelectDate,
+  onClose,
+}) => {
+  const initialDate = useMemo(() => {
+    if (selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
+      const [y, m, d] = selectedDate.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+    return new Date();
+  }, [selectedDate]);
+
+  const [currentYear, setCurrentYear] = useState(initialDate.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(initialDate.getMonth());
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentYear((y) => y - 1);
+      setCurrentMonth(11);
+    } else {
+      setCurrentMonth((m) => m - 1);
+    }
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentYear((y) => y + 1);
+      setCurrentMonth(0);
+    } else {
+      setCurrentMonth((m) => m + 1);
+    }
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+  };
+
+  const calendarDays = useMemo(() => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+    const totalDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const totalDaysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+    const days: {
+      dateStr: string;
+      dayNum: number;
+      isCurrent: boolean;
+      isToday: boolean;
+      isSelected: boolean;
+    }[] = [];
+
+    // Preceding month days
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const dNum = totalDaysInPrevMonth - i;
+      const prevDate = new Date(currentYear, currentMonth - 1, dNum);
+      const dStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`;
+      days.push({
+        dateStr: dStr,
+        dayNum: dNum,
+        isCurrent: false,
+        isToday: dStr === todayStr,
+        isSelected: dStr === selectedDate,
+      });
+    }
+
+    // Current month days
+    for (let d = 1; d <= totalDaysInMonth; d++) {
+      const dStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({
+        dateStr: dStr,
+        dayNum: d,
+        isCurrent: true,
+        isToday: dStr === todayStr,
+        isSelected: dStr === selectedDate,
+      });
+    }
+
+    // Trailing next month days
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let d = 1; d <= remaining; d++) {
+      const nextDate = new Date(currentYear, currentMonth + 1, d);
+      const dStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({
+        dateStr: dStr,
+        dayNum: d,
+        isCurrent: false,
+        isToday: dStr === todayStr,
+        isSelected: dStr === selectedDate,
+      });
+    }
+
+    return days;
+  }, [currentYear, currentMonth, selectedDate]);
+
+  const handleSelectDay = (dateStr: string) => {
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+    onSelectDate(dateStr);
+  };
+
+  const handleSelectToday = () => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    handleSelectDay(todayStr);
+  };
+
+  const handleSelectTomorrow = () => {
+    const tmr = new Date();
+    tmr.setDate(tmr.getDate() + 1);
+    const tmrStr = `${tmr.getFullYear()}-${String(tmr.getMonth() + 1).padStart(2, '0')}-${String(tmr.getDate()).padStart(2, '0')}`;
+    handleSelectDay(tmrStr);
+  };
+
+  return (
+    <View style={styles.hoveringPopoverCard}>
+      {/* Month & Year Navigation Header */}
+      <View style={styles.popoverHeaderRow}>
+        <TouchableOpacity
+          onPress={handlePrevMonth}
+          style={styles.popoverNavBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <ChevronLeft size={15} color="#0F172A" />
+        </TouchableOpacity>
+        <Text style={styles.popoverMonthTitle}>
+          {MONTH_NAMES[currentMonth]} {currentYear}
+        </Text>
+        <TouchableOpacity
+          onPress={handleNextMonth}
+          style={styles.popoverNavBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <ChevronRight size={15} color="#0F172A" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Weekday Row */}
+      <View style={styles.popoverWeekdaysRow}>
+        {WEEKDAY_NAMES.map((wd) => (
+          <Text key={wd} style={styles.popoverWeekdayText}>
+            {wd}
+          </Text>
+        ))}
+      </View>
+
+      {/* Days Grid */}
+      <View style={styles.popoverDaysGrid}>
+        {calendarDays.map((item, idx) => (
+          <TouchableOpacity
+            key={`${item.dateStr}_${idx}`}
+            activeOpacity={0.7}
+            onPress={() => handleSelectDay(item.dateStr)}
+            style={[
+              styles.popoverDayCell,
+              item.isSelected && styles.popoverDayCellSelected,
+              !item.isSelected && item.isToday && styles.popoverDayCellToday,
+            ]}
+          >
+            <Text
+              style={[
+                styles.popoverDayText,
+                !item.isCurrent && styles.popoverDayTextMuted,
+                item.isSelected && styles.popoverDayTextSelected,
+                !item.isSelected && item.isToday && styles.popoverDayTextToday,
+              ]}
+            >
+              {item.dayNum}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Quick Shortcuts Footer */}
+      <View style={styles.popoverFooterRow}>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          <TouchableOpacity onPress={handleSelectToday} style={styles.popoverShortcutPill}>
+            <Text style={styles.popoverShortcutText}>Today</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSelectTomorrow} style={styles.popoverShortcutPill}>
+            <Text style={styles.popoverShortcutText}>Tomorrow</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity onPress={onClose} style={styles.popoverCloseBtn}>
+          <Text style={styles.popoverCloseText}>Done</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+/**
+ * -------------------------------------------------------------
+ * 2. Square Hour and Minute Selection for Time
+ * -------------------------------------------------------------
+ */
+interface SquareTimePickerProps {
+  selectedTime: string; // 'HH:mm' e.g. '14:00'
+  onSelectTime: (timeStr: string) => void;
+  onClose: () => void;
+}
+
+const HOURS_12 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const MINUTES_5 = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+const SquareTimePicker: React.FC<SquareTimePickerProps> = ({
+  selectedTime,
+  onSelectTime,
+  onClose,
+}) => {
+  const { hour24, minute } = useMemo(() => {
+    const [hStr, mStr] = (selectedTime || '14:00').split(':');
+    let h = parseInt(hStr, 10);
+    if (isNaN(h)) h = 14;
+    let m = parseInt(mStr, 10);
+    if (isNaN(m)) m = 0;
+    return { hour24: h, minute: m };
+  }, [selectedTime]);
+
+  const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM';
+  let hour12 = hour24 % 12;
+  if (hour12 === 0) hour12 = 12;
+
+  const update24Time = (newH12: number, newMin: number, newPeriod: 'AM' | 'PM') => {
+    let h24 = newH12 % 12;
+    if (newPeriod === 'PM') h24 += 12;
+    const formatted = `${String(h24).padStart(2, '0')}:${String(newMin).padStart(2, '0')}`;
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+    onSelectTime(formatted);
+  };
+
+  const handleSelectHour = (h: number) => {
+    update24Time(h, minute, period);
+  };
+
+  const handleSelectMinute = (m: number) => {
+    update24Time(hour12, m, period);
+  };
+
+  const handleTogglePeriod = (p: 'AM' | 'PM') => {
+    if (p !== period) {
+      update24Time(hour12, minute, p);
+    }
+  };
+
+  const handlePreset = (presetTime: string) => {
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+    onSelectTime(presetTime);
+  };
+
+  return (
+    <View style={styles.hoveringTimePopoverCard}>
+      {/* Current Time Display & AM/PM Toggle */}
+      <View style={styles.timeHeaderRow}>
+        <View>
+          <Text style={styles.timeDisplayMain}>
+            {String(hour12).padStart(2, '0')}:{String(minute).padStart(2, '0')} {period}
+          </Text>
+          <Text style={styles.timeDisplaySub}>24h: {String(hour24).padStart(2, '0')}:{String(minute).padStart(2, '0')}</Text>
+        </View>
+
+        <View style={styles.periodToggleRow}>
+          <TouchableOpacity
+            onPress={() => handleTogglePeriod('AM')}
+            style={[styles.periodSquareBtn, period === 'AM' && styles.periodSquareBtnActive]}
+          >
+            <Text style={[styles.periodSquareText, period === 'AM' && styles.periodSquareTextActive]}>
+              AM
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleTogglePeriod('PM')}
+            style={[styles.periodSquareBtn, period === 'PM' && styles.periodSquareBtnActive]}
+          >
+            <Text style={[styles.periodSquareText, period === 'PM' && styles.periodSquareTextActive]}>
+              PM
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Small Square Hour Selection */}
+      <Text style={styles.timeSectionLabel}>HOUR</Text>
+      <View style={styles.squaresGrid}>
+        {HOURS_12.map((h) => {
+          const isSelected = h === hour12;
+          return (
+            <TouchableOpacity
+              key={`hour_${h}`}
+              activeOpacity={0.7}
+              onPress={() => handleSelectHour(h)}
+              style={[
+                styles.timeSquareBtn,
+                isSelected && styles.timeSquareBtnHourActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.timeSquareText,
+                  isSelected && styles.timeSquareTextActive,
+                ]}
+              >
+                {String(h).padStart(2, '0')}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Small Square Minute Selection */}
+      <Text style={styles.timeSectionLabel}>MINUTE</Text>
+      <View style={styles.squaresGrid}>
+        {MINUTES_5.map((m) => {
+          const isSelected = Math.floor(minute / 5) * 5 === m;
+          return (
+            <TouchableOpacity
+              key={`min_${m}`}
+              activeOpacity={0.7}
+              onPress={() => handleSelectMinute(m)}
+              style={[
+                styles.timeSquareBtn,
+                isSelected && styles.timeSquareBtnMinActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.timeSquareText,
+                  isSelected && styles.timeSquareTextActive,
+                ]}
+              >
+                :{String(m).padStart(2, '0')}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Presets & Done */}
+      <View style={styles.popoverFooterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
+          {['09:00', '12:00', '14:00', '17:00'].map((preset) => (
+            <TouchableOpacity
+              key={preset}
+              onPress={() => handlePreset(preset)}
+              style={styles.popoverShortcutPill}
+            >
+              <Text style={styles.popoverShortcutText}>{preset}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <TouchableOpacity onPress={onClose} style={styles.popoverCloseBtn}>
+          <Text style={styles.popoverCloseText}>Done</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewProps> = ({
   workspace,
   members,
@@ -483,6 +870,10 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
   const [formAssigneeId, setFormAssigneeId] = useState<string>('');
   const [formTags, setFormTags] = useState('');
   const [formSyncCalendar, setFormSyncCalendar] = useState(true);
+
+  // Hovering Popover state for Date & Time selection
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
   // Filtered Tasks
   const filteredTasks = useMemo(() => {
@@ -548,6 +939,8 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
     setFormAssigneeId(currentUser?.id || '');
     setFormTags('');
     setFormSyncCalendar(true);
+    setIsDatePickerOpen(false);
+    setIsTimePickerOpen(false);
     setIsModalOpen(true);
   };
 
@@ -564,6 +957,8 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
     setFormAssigneeId(task.assignee_id || '');
     setFormTags(task.tags ? task.tags.join(', ') : '');
     setFormSyncCalendar(task.sync_with_calendar ?? true);
+    setIsDatePickerOpen(false);
+    setIsTimePickerOpen(false);
     setIsModalOpen(true);
   };
 
@@ -920,7 +1315,12 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBodyScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.modalBodyScroll}
+              contentContainerStyle={{ paddingBottom: isDatePickerOpen || isTimePickerOpen ? 260 : 20 }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               <Text style={styles.fieldLabel}>Title</Text>
               <TextInput
                 value={formTitle}
@@ -1010,27 +1410,79 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
                 })}
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>Due Date (YYYY-MM-DD)</Text>
-                  <TextInput
-                    value={formDueDate}
-                    onChangeText={setFormDueDate}
-                    placeholder="2026-10-20"
-                    placeholderTextColor="#94A3B8"
-                    style={styles.textInput}
-                  />
+              <View style={{ position: 'relative', zIndex: 100 }}>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1, position: 'relative' }}>
+                    <Text style={styles.fieldLabel}>Due Date (YYYY-MM-DD)</Text>
+                    <View style={styles.inputWithIconWrap}>
+                      <TextInput
+                        value={formDueDate}
+                        onChangeText={setFormDueDate}
+                        placeholder="2026-10-20"
+                        placeholderTextColor="#94A3B8"
+                        style={styles.textInputWithIcon}
+                      />
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setIsDatePickerOpen((prev) => !prev);
+                          setIsTimePickerOpen(false);
+                        }}
+                        style={styles.inputIconBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Calendar size={15} color={isDatePickerOpen ? '#2563EB' : '#64748B'} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={{ width: 125, position: 'relative' }}>
+                    <Text style={styles.fieldLabel}>Time</Text>
+                    <View style={styles.inputWithIconWrap}>
+                      <TextInput
+                        value={formDueTime}
+                        onChangeText={setFormDueTime}
+                        placeholder="14:00"
+                        placeholderTextColor="#94A3B8"
+                        style={styles.textInputWithIcon}
+                      />
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setIsTimePickerOpen((prev) => !prev);
+                          setIsDatePickerOpen(false);
+                        }}
+                        style={styles.inputIconBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Timer size={15} color={isTimePickerOpen ? '#2563EB' : '#64748B'} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
-                <View style={{ width: 110 }}>
-                  <Text style={styles.fieldLabel}>Time</Text>
-                  <TextInput
-                    value={formDueTime}
-                    onChangeText={setFormDueTime}
-                    placeholder="14:00"
-                    placeholderTextColor="#94A3B8"
-                    style={styles.textInput}
+
+                {/* Floating / Hovering Date Picker */}
+                {isDatePickerOpen && (
+                  <HoveringCalendarPicker
+                    selectedDate={formDueDate}
+                    onSelectDate={(newDate) => {
+                      setFormDueDate(newDate);
+                      setIsDatePickerOpen(false);
+                    }}
+                    onClose={() => setIsDatePickerOpen(false)}
                   />
-                </View>
+                )}
+
+                {/* Floating / Hovering Square Time Picker */}
+                {isTimePickerOpen && (
+                  <SquareTimePicker
+                    selectedTime={formDueTime}
+                    onSelectTime={(newTime) => {
+                      setFormDueTime(newTime);
+                    }}
+                    onClose={() => setIsTimePickerOpen(false)}
+                  />
+                )}
               </View>
 
               <Text style={styles.fieldLabel}>Assignee</Text>
@@ -1779,6 +2231,241 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     lineHeight: 16,
+  },
+
+  /* INPUT WITH ICON */
+  inputWithIconWrap: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 6,
+  },
+  textInputWithIcon: {
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  inputIconBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+
+  /* HOVERING CALENDAR POPOVER */
+  hoveringPopoverCard: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    width: 285,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    padding: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    elevation: 12,
+    zIndex: 1000,
+  },
+  popoverHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  popoverNavBtn: {
+    padding: 6,
+    borderRadius: 4,
+    backgroundColor: '#F1F5F9',
+  },
+  popoverMonthTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  popoverWeekdaysRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  popoverWeekdayText: {
+    width: 37,
+    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  popoverDaysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  popoverDayCell: {
+    width: 37,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+  },
+  popoverDayCellSelected: {
+    backgroundColor: '#0F172A',
+  },
+  popoverDayCellToday: {
+    borderWidth: 1,
+    borderColor: '#2563EB',
+  },
+  popoverDayText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#0F172A',
+  },
+  popoverDayTextMuted: {
+    color: '#CBD5E1',
+  },
+  popoverDayTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  popoverDayTextToday: {
+    color: '#2563EB',
+    fontWeight: '700',
+  },
+  popoverFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  popoverShortcutPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#F1F5F9',
+  },
+  popoverShortcutText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  popoverCloseBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#0F172A',
+  },
+  popoverCloseText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  /* HOVERING TIME POPOVER */
+  hoveringTimePopoverCard: {
+    position: 'absolute',
+    top: 60,
+    right: 0,
+    width: 265,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    padding: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    elevation: 12,
+    zIndex: 1000,
+  },
+  timeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  timeDisplayMain: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  timeDisplaySub: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  periodToggleRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  periodSquareBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  periodSquareBtnActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+  },
+  periodSquareText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  periodSquareTextActive: {
+    color: '#FFFFFF',
+  },
+  timeSectionLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+    marginTop: 2,
+  },
+  squaresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 6,
+  },
+  timeSquareBtn: {
+    width: 36,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 5,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  timeSquareBtnHourActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+  },
+  timeSquareBtnMinActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  timeSquareText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  timeSquareTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });
 
