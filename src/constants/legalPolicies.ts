@@ -225,3 +225,48 @@ export const COMMUNITY_GUIDELINES: LegalDocument = {
     },
   ],
 };
+
+export const ACCOUNT_DELETION_POLICY: LegalDocument = {
+  id: 'delete-account',
+  title: 'BooffIn Account and Data Deletion Policy',
+  effectiveDate: 'October 2026',
+  version: '2.0',
+  controller: 'BooffIn Technologies',
+  supportEmail: LEGAL_CONTACTS.support,
+  legalEmail: LEGAL_CONTACTS.legal,
+  privacyEmail: LEGAL_CONTACTS.privacy,
+  summary:
+    'In accordance with Google Play and global data protection regulations, BooffIn provides straightforward mechanisms for users to delete their account and associated personal data at any time.',
+  sections: [
+    {
+      title: '1. In-App Account Deletion',
+      content: [
+        'Users can delete their account directly within the BooffIn app by navigating to: Profile / Menu -> Settings -> Account -> Delete Account.',
+        'Upon confirming deletion, your session is immediately terminated, and your profile information, credentials, and settings are removed.',
+      ],
+    },
+    {
+      title: '2. Web-Based Deletion Request (Without Reinstalling App)',
+      content: [
+        'If you no longer have access to the mobile app, you can request full account and data deletion by emailing privacy@letsbooffin.com or support@letsbooffin.com with the subject "Account Deletion Request".',
+        'Please provide the registered email address associated with your BooffIn account. Our team will verify your identity and process the deletion within 30 days.',
+      ],
+    },
+    {
+      title: '3. Data Deleted Upon Request',
+      content: [
+        'Personal identification data: Name, email address, password hash, avatar images, and biographical information.',
+        'Scholarly credentials: Linked ORCID identifiers, institutional affiliation records, and verification credentials.',
+        'App preferences: Custom bookmarks, reading history, notification preferences, and workspace memberships.',
+      ],
+    },
+    {
+      title: '4. Data Retention and Anonymization',
+      content: [
+        'Public discussions, preprint summaries, or comments that you contributed may be anonymized (attributed to "[Deleted Researcher]") to preserve the continuity of scholarly discussions and scientific discourse.',
+        'Certain log data may be retained for a limited period solely for fraud prevention, security audits, and legal compliance as required by applicable laws.',
+      ],
+    },
+  ],
+};
+

@@ -15,11 +15,13 @@
       ],
       "infoPlist": {
         "NSCameraUsageDescription": "BooffIn requires camera access for private peer-to-peer encrypted video discussions.",
-        "NSMicrophoneUsageDescription": "BooffIn requires microphone access for private peer-to-peer encrypted voice calls."
+        "NSMicrophoneUsageDescription": "BooffIn requires microphone access for private peer-to-peer encrypted voice calls.",
+        "NSPhotoLibraryUsageDescription": "BooffIn requires access to your photo library to allow you to upload scientific diagrams, research figures, and profile avatars."
       }
     },
     "android": {
       "package": "com.booffin.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -82,7 +84,13 @@
         }
       ],
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BooffIn accesses your photos to allow you to upload scientific diagrams, research figures, and profile avatars."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
