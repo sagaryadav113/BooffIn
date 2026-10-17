@@ -55,12 +55,7 @@
             "DEFAULT"
           ]
         }
-      ],
-      "navigationBar": {
-        "visible": "always",
-        "barStyle": "dark-content",
-        "backgroundColor": "#FFFFFF"
-      }
+      ]
     },
     "web": {
       "output": "single",
