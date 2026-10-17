@@ -41,7 +41,7 @@ export interface InAppPaperPdfViewerProps {
 const PDFJS_VIEWER_HTML = `<!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=4.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0, user-scalable=yes">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -51,12 +51,16 @@ const PDFJS_VIEWER_HTML = `<!DOCTYPE html>
       min-height: 100%;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y pinch-zoom;
     }
     body {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 10px 8px 70px;
+      padding: 10px 8px 120px;
     }
     #status-bar {
       color: #F3F4F6;
@@ -101,6 +105,7 @@ const PDFJS_VIEWER_HTML = `<!DOCTYPE html>
       width: 100% !important;
       height: auto !important;
       display: block;
+      pointer-events: none;
     }
     .page-tag {
       font-size: 11px;
@@ -110,6 +115,7 @@ const PDFJS_VIEWER_HTML = `<!DOCTYPE html>
       background: #FAFAFA;
       width: 100%;
       border-top: 1px solid #F3F4F6;
+      user-select: none;
     }
   </style>
 </head>
@@ -546,26 +552,19 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
             style={{
               width: '100%',
-              height: 850,
-              minHeight: 700,
+              height: '100%',
+              flex: 1,
               border: 'none',
               backgroundColor: '#525659',
               display: 'block',
-              borderRadius: 6,
             }}
             title={paper.title}
             allow="fullscreen"
             loading="eager"
           />
 
-          {/* Rating Section Below PDF Viewer */}
-          <View style={styles.ratingSectionBelowPdf}>
-            <View style={styles.ratingSectionHeader}>
-              <Text style={styles.ratingSectionTitle}>Paper Peer Evaluation & Hype Score</Text>
-              <Text style={styles.ratingSectionSubtitle}>
-                Rate this publication on clarity, impact, and visuals to contribute to its community score.
-              </Text>
-            </View>
+          {/* Floating Rating Dock Above Bottom */}
+          <View style={styles.floatingRatingDockWrapper} pointerEvents="box-none">
             <FloatingRatingDock
               paperId={paper.id}
               paperTitle={paper.title}
@@ -590,9 +589,12 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
                 allowUniversalAccessFromFileURLs={true}
                 onLoadEnd={() => setIsViewerReady(true)}
                 onMessage={handleWebViewMessage}
+                scrollEnabled={true}
+                nestedScrollEnabled={true}
                 showsVerticalScrollIndicator={true}
-                bounces={false}
-                overScrollMode="never"
+                showsHorizontalScrollIndicator={false}
+                bounces={true}
+                overScrollMode="always"
               />
 
               {/* In-App Loading Overlay */}
@@ -621,7 +623,11 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
                 originWhitelist={['*']}
                 scalesPageToFit={true}
                 allowsInlineMediaPlayback={true}
+                scrollEnabled={true}
                 nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+                bounces={true}
+                overScrollMode="always"
                 userAgent="Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
                 startInLoadingState={true}
                 renderLoading={() => (
@@ -652,14 +658,8 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
             </>
           )}
 
-          {/* Rating Section Below PDF Viewer */}
-          <View style={styles.ratingSectionBelowPdf}>
-            <View style={styles.ratingSectionHeader}>
-              <Text style={styles.ratingSectionTitle}>Paper Peer Evaluation & Hype Score</Text>
-              <Text style={styles.ratingSectionSubtitle}>
-                Rate this publication on clarity, impact, and visuals to contribute to its community score.
-              </Text>
-            </View>
+          {/* Floating Rating Dock Above Bottom */}
+          <View style={styles.floatingRatingDockWrapper} pointerEvents="box-none">
             <FloatingRatingDock
               paperId={paper.id}
               paperTitle={paper.title}
@@ -759,46 +759,32 @@ const styles = StyleSheet.create({
   },
   webPdfWrapper: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     backgroundColor: '#525659',
     position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
   },
   nativeViewerWrapper: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     backgroundColor: '#525659',
     position: 'relative',
   },
   webView: {
     flex: 1,
-    minHeight: 650,
+    width: '100%',
+    height: '100%',
     backgroundColor: '#525659',
   },
-  ratingSectionBelowPdf: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
+  floatingRatingDockWrapper: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    width: '100%',
-    gap: spacing.sm,
-  },
-  ratingSectionHeader: {
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  ratingSectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  ratingSectionSubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    maxWidth: 420,
+    justifyContent: 'center',
+    zIndex: 50,
   },
   loadingContainer: {
     position: 'absolute',
