@@ -1594,16 +1594,15 @@ export async function checkTargetIsPrivate(targetUserId: string): Promise<boolea
   if (!targetUserId) return false;
   const targetId = (await resolveTargetProfileId(targetUserId)) || targetUserId;
   try {
-    const { data: settingsData } = await supabase
-      .from('user_settings')
-      .select('profile_visibility')
-      .eq('user_id', targetId)
-      .maybeSingle();
-
-    if (settingsData?.profile_visibility === 'private') {
-      return true;
+    // 1. Database-level security definer visibility check
+    const { data: rpcVis, error: rpcErr } = await supabase.rpc('get_user_profile_visibility', {
+      p_user_id: targetId,
+    });
+    if (!rpcErr && rpcVis) {
+      return rpcVis === 'private';
     }
 
+    // 2. Direct profiles table columns (is_private, visibility_level)
     const { data: profData } = await supabase
       .from('profiles')
       .select('visibility_level, is_private')
@@ -1614,6 +1613,17 @@ export async function checkTargetIsPrivate(targetUserId: string): Promise<boolea
       (profData as any)?.visibility_level === 'private' ||
       Boolean((profData as any)?.is_private)
     ) {
+      return true;
+    }
+
+    // 3. User settings fallback (works if caller is owner or admin)
+    const { data: settingsData } = await supabase
+      .from('user_settings')
+      .select('profile_visibility')
+      .eq('user_id', targetId)
+      .maybeSingle();
+
+    if (settingsData?.profile_visibility === 'private') {
       return true;
     }
 
@@ -2186,6 +2196,100 @@ export async function fetchUserFollowingIds(userIdOrHandle: string): Promise<str
     return [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Fetches all user IDs that actively follow the specified user.
+ * Enables instantaneous in-memory reactivity for the "Follow Back" button.
+ */
+export async function fetchUserFollowerIds(userIdOrHandle: string): Promise<string[]> {
+  if (!userIdOrHandle) return [];
+  const targetId = (await resolveTargetProfileId(userIdOrHandle)) || userIdOrHandle;
+
+  try {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('follower_id')
+      .eq('following_id', targetId);
+
+    if (!error && Array.isArray(data)) {
+      return data.map((row) => row.follower_id);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Checks if a target researcher is currently following the caller.
+ */
+export async function checkTargetFollowsCaller(
+  targetUserId: string,
+  callerId?: string
+): Promise<boolean> {
+  const verifiedUserId = await getVerifiedUserId(callerId);
+  if (!verifiedUserId || !targetUserId) return false;
+
+  const targetId = (await resolveTargetProfileId(targetUserId)) || targetUserId;
+  if (!targetId || targetId === verifiedUserId) return false;
+
+  try {
+    const { data } = await supabase
+      .from('follows')
+      .select('follower_id')
+      .eq('follower_id', targetId)
+      .eq('following_id', verifiedUserId)
+      .maybeSingle();
+
+    return Boolean(data);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Removes a follower from the authenticated user's followers list.
+ */
+export async function removeFollower(
+  followerUserId: string,
+  callerId?: string
+): Promise<{ success: boolean; error: string | null }> {
+  const verifiedUserId = await getVerifiedUserId(callerId);
+  if (!verifiedUserId) {
+    return { success: false, error: 'Must be logged in to remove followers.' };
+  }
+
+  const targetFollowerId = (await resolveTargetProfileId(followerUserId)) || followerUserId;
+  if (!targetFollowerId) {
+    return { success: false, error: 'Invalid follower ID.' };
+  }
+
+  try {
+    // 1. Direct delete from follows table
+    const { error } = await supabase
+      .from('follows')
+      .delete()
+      .eq('follower_id', targetFollowerId)
+      .eq('following_id', verifiedUserId);
+
+    if (!error) {
+      return { success: true, error: null };
+    }
+
+    // 2. RPC fallback
+    const { error: rpcError } = await supabase.rpc('remove_follower', {
+      p_follower_id: targetFollowerId,
+    });
+
+    if (rpcError) {
+      return { success: false, error: rpcError.message };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to remove follower.' };
   }
 }
 

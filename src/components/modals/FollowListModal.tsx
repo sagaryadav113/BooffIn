@@ -8,6 +8,8 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Users } from 'lucide-react-native';
@@ -35,11 +37,45 @@ export const FollowListModal: React.FC<FollowListModalProps> = ({
 }) => {
   const currentUserId = useAuthStore((s) => s.user?.id);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
+  const removeFollowerUser = useAuthStore((s) => s.removeFollowerUser);
 
   const [researchers, setResearchers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [removingFollowerId, setRemovingFollowerId] = useState<string | null>(null);
+
+  const isOwnFollowersList = type === 'followers' && Boolean(currentUserId && userId === currentUserId);
+
+  const handleRemoveFollower = (target: UserProfile) => {
+    const confirmTitle = 'Remove follower?';
+    const confirmMsg = `BooffIn won't notify @${target.handle} that they were removed from your followers.`;
+
+    const executeRemove = async () => {
+      setRemovingFollowerId(target.id);
+      try {
+        await removeFollowerUser(target.id);
+        setResearchers((prev) => prev.filter((r) => r.id !== target.id));
+      } finally {
+        setRemovingFollowerId(null);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${confirmTitle}\n${confirmMsg}`)) {
+        executeRemove();
+      }
+    } else {
+      Alert.alert(
+        confirmTitle,
+        confirmMsg,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: executeRemove },
+        ]
+      );
+    }
+  };
 
   const loadData = useCallback(async () => {
     if (!userId) return;
@@ -130,6 +166,8 @@ export const FollowListModal: React.FC<FollowListModalProps> = ({
               <ResearcherCard
                 researcher={item}
                 onFollowToggle={() => toggleFollowUser(item.id)}
+                onRemoveFollower={isOwnFollowersList ? () => handleRemoveFollower(item) : undefined}
+                isRemoving={removingFollowerId === item.id}
               />
             )}
             refreshControl={

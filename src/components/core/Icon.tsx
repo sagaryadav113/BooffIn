@@ -75,6 +75,7 @@ export type IconName =
   | 'BookOpen'
   | 'Award'
   | 'UserPlus'
+  | 'UserMinus'
   | 'UserCheck'
   | 'UserX'
   | 'Flag'

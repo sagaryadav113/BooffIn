@@ -55,7 +55,11 @@ import {
   getResearcherDiscussedTopics,
 } from '../../api/connectionService';
 import { fetchUserProfile, fetchUserProfileByUsername } from '../../api/authService';
-import { fetchUserPosts } from '../../api/socialService';
+import {
+  fetchUserPosts,
+  checkTargetIsPrivate,
+  checkTargetFollowsCaller,
+} from '../../api/socialService';
 import { UserProfile, Post } from '../../types';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { FollowListModal } from '../../components/modals/FollowListModal';
@@ -88,6 +92,7 @@ export default function OtherResearcherProfileScreen() {
   }>();
   const currentUser = useAuthStore((s) => s.user);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
+  const removeFollowerUser = useAuthStore((s) => s.removeFollowerUser);
   const allPosts = usePostStore((s) => s.posts);
 
   const [researcher, setResearcher] = useState<UserProfile | null>(null);
@@ -109,6 +114,7 @@ export default function OtherResearcherProfileScreen() {
 
   const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
   const isRequested = useAuthStore((s) => researcher?.id ? s.requestedUserIds.has(researcher.id) : false);
+  const followsYou = useAuthStore((s) => researcher?.id ? s.followerIds.has(researcher.id) : false);
   const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
   const [isMessageLoading, setIsMessageLoading] = useState(false);
 
@@ -214,6 +220,28 @@ export default function OtherResearcherProfileScreen() {
       }
       if (prof?.id) {
         try {
+          // Check privacy using secure RPC / table check
+          const isPriv = await checkTargetIsPrivate(prof.id);
+          if (isPriv) {
+            prof.visibilityLevel = 'private';
+            prof.isPrivateRestricted = true;
+          }
+
+          // Check if this researcher is following the current viewer
+          if (currentUser?.id && currentUser.id !== prof.id) {
+            const isFoll = await checkTargetFollowsCaller(prof.id, currentUser.id);
+            if (isFoll) {
+              useAuthStore.setState((state) => {
+                if (!state.followerIds.has(prof!.id)) {
+                  const next = new Set(state.followerIds);
+                  next.add(prof!.id);
+                  return { followerIds: next };
+                }
+                return state;
+              });
+            }
+          }
+
           const { data: priv } = await supabase
             .from('user_settings')
             .select('show_likes_on_profile, profile_visibility')
@@ -256,6 +284,26 @@ export default function OtherResearcherProfileScreen() {
       }
       if (prof) {
         try {
+          const isPriv = await checkTargetIsPrivate(prof.id);
+          if (isPriv) {
+            prof.visibilityLevel = 'private';
+            prof.isPrivateRestricted = true;
+          }
+
+          if (currentUser?.id && currentUser.id !== prof.id) {
+            const isFoll = await checkTargetFollowsCaller(prof.id, currentUser.id);
+            if (isFoll) {
+              useAuthStore.setState((state) => {
+                if (!state.followerIds.has(prof!.id)) {
+                  const next = new Set(state.followerIds);
+                  next.add(prof!.id);
+                  return { followerIds: next };
+                }
+                return state;
+              });
+            }
+          }
+
           const { data: priv } = await supabase
             .from('user_settings')
             .select('show_likes_on_profile, profile_visibility')
@@ -407,10 +455,110 @@ export default function OtherResearcherProfileScreen() {
       router.push('/profile/edit');
       return;
     }
+
+    if (isFollowing) {
+      // Unfollow confirmation modal
+      const confirmTitle = `Unfollow @${researcher.handle}?`;
+      const confirmMsg = isPrivateAccount
+        ? `Their profile is private. If you unfollow, you will need to send a follow request to view their research posts again.`
+        : `Are you sure you want to stop following ${researcher.fullName}?`;
+
+      const executeUnfollow = async () => {
+        try {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch {}
+        // Instantly update local state so lock takes effect immediately without reload!
+        setResearcher((prev) =>
+          prev
+            ? {
+                ...prev,
+                isFollowing: false,
+                followersCount: Math.max(0, (prev.followersCount || 1) - 1),
+              }
+            : prev
+        );
+        // If account is private, immediately clear posts from memory so locked screen renders in 0ms
+        if (isPrivateAccount) {
+          setResearcherPosts([]);
+        }
+        await toggleFollowUser(researcher.id);
+      };
+
+      if (Platform.OS === 'web') {
+        if (window.confirm(`${confirmTitle}\n${confirmMsg}`)) {
+          executeUnfollow();
+        }
+      } else {
+        Alert.alert(
+          confirmTitle,
+          confirmMsg,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Unfollow', style: 'destructive', onPress: executeUnfollow },
+          ]
+        );
+      }
+      return;
+    }
+
+    // Follow or Send Follow Request
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
+
+    if (isPrivateAccount) {
+      // Optimistically switch to Requested
+      useAuthStore.setState((s) => {
+        const next = new Set(s.requestedUserIds);
+        next.add(researcher.id);
+        return { requestedUserIds: next };
+      });
+    } else {
+      setResearcher((prev) =>
+        prev
+          ? {
+              ...prev,
+              isFollowing: true,
+              followersCount: (prev.followersCount || 0) + 1,
+            }
+          : prev
+      );
+    }
+
     await toggleFollowUser(researcher.id);
+  };
+
+  const handleRemoveThisFollower = () => {
+    if (!researcher?.id) return;
+    const confirmTitle = 'Remove follower?';
+    const confirmMsg = `BooffIn won't notify @${researcher.handle} that they were removed from your followers.`;
+
+    const executeRemove = async () => {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+      await removeFollowerUser(researcher.id);
+      if (Platform.OS === 'web') {
+        window.alert(`@${researcher.handle} was removed from your followers.`);
+      } else {
+        Alert.alert('Follower Removed', `@${researcher.handle} was removed from your followers.`);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${confirmTitle}\n${confirmMsg}`)) {
+        executeRemove();
+      }
+    } else {
+      Alert.alert(
+        confirmTitle,
+        confirmMsg,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: executeRemove },
+        ]
+      );
+    }
   };
 
   const handleOpenFollowers = () => {
@@ -666,6 +814,16 @@ export default function OtherResearcherProfileScreen() {
                     }}
                     style={styles.bannerIconButton}
                   />
+                  {followsYou && (
+                    <IconButton
+                      icon="UserMinus"
+                      size="sm"
+                      variant="filled"
+                      color={colors.white}
+                      onPress={handleRemoveThisFollower}
+                      style={styles.bannerIconButton}
+                    />
+                  )}
                   <IconButton
                     icon={researcher.isBlocked ? 'UserCheck' : 'UserX'}
                     size="sm"
@@ -711,6 +869,8 @@ export default function OtherResearcherProfileScreen() {
                       ? 'Following'
                       : isRequested
                       ? 'Requested'
+                      : followsYou
+                      ? 'Follow Back'
                       : 'Follow'
                   }
                   variant={isOwnProfile || isFollowing || isRequested ? 'outline' : 'primary'}
@@ -897,7 +1057,13 @@ export default function OtherResearcherProfileScreen() {
               {"Follow this researcher to view their research posts, publications, and scientific discussions."}
             </Text>
             <Button
-              title={isRequested ? 'Requested' : 'Follow'}
+              title={
+                isRequested
+                  ? 'Requested'
+                  : followsYou
+                  ? 'Follow Back'
+                  : 'Follow'
+              }
               variant={isRequested ? 'outline' : 'primary'}
               size="md"
               loading={isFollowLoading}

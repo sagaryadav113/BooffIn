@@ -19,6 +19,8 @@ import {
   toggleFollowUserRpc,
   fetchUserFollowingIds,
   fetchOutgoingFollowRequestIds,
+  fetchUserFollowerIds,
+  removeFollower,
 } from '../api/socialService';
 import { useSearchStore } from './useSearchStore';
 import { supabase } from '../api/client';
@@ -50,6 +52,7 @@ interface AuthState {
   users: UserProfile[];
   followingIds: Set<string>;
   requestedUserIds: Set<string>;
+  followerIds: Set<string>;
   followLoadingIds: Set<string>;
   isInitialized: boolean;
 
@@ -58,6 +61,8 @@ interface AuthState {
   loadFollowingIds: (userId: string) => Promise<void>;
   isFollowingUser: (userId: string) => boolean;
   isRequestedUser: (userId: string) => boolean;
+  isFollowerUser: (userId: string) => boolean;
+  removeFollowerUser: (followerUserId: string) => Promise<boolean>;
   signIn: (email: string, pass: string) => Promise<boolean>;
   signUp: (params: SignUpParams) => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
@@ -79,6 +84,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   users: [],
   followingIds: new Set<string>(),
   requestedUserIds: new Set<string>(),
+  followerIds: new Set<string>(),
   followLoadingIds: new Set<string>(),
   isInitialized: false,
 
@@ -98,15 +104,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   loadFollowingIds: async (userId: string) => {
     if (!userId) {
-      set({ followingIds: new Set<string>(), requestedUserIds: new Set<string>() });
+      set({
+        followingIds: new Set<string>(),
+        requestedUserIds: new Set<string>(),
+        followerIds: new Set<string>(),
+      });
       return;
     }
     try {
       const ids = await fetchUserFollowingIds(userId);
       const reqIds = await fetchOutgoingFollowRequestIds(userId);
+      const fIds = await fetchUserFollowerIds(userId);
       set({
         followingIds: new Set<string>(ids),
         requestedUserIds: new Set<string>(reqIds),
+        followerIds: new Set<string>(fIds),
       });
     } catch {
       // ignore
@@ -119,6 +131,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   isRequestedUser: (userId: string) => {
     return get().requestedUserIds.has(userId);
+  },
+
+  isFollowerUser: (userId: string) => {
+    return get().followerIds.has(userId);
+  },
+
+  removeFollowerUser: async (followerUserId: string) => {
+    const currentUserId = get().user?.id;
+    if (!currentUserId || !followerUserId) return false;
+
+    // Optimistically remove from followerIds and decrement user followersCount
+    const nextFollowers = new Set(get().followerIds);
+    nextFollowers.delete(followerUserId);
+    set((state) => ({
+      followerIds: nextFollowers,
+      user: {
+        ...state.user,
+        followersCount: Math.max(0, (state.user.followersCount || 1) - 1),
+      },
+    }));
+
+    const res = await removeFollower(followerUserId, currentUserId);
+    if (!res.success) {
+      console.warn('[useAuthStore] removeFollower failed:', res.error);
+    }
+    return res.success;
   },
 
   initializeAuth: async () => {
@@ -214,6 +252,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             isAuthenticated: false,
             isLoading: false,
             followingIds: new Set<string>(),
+            requestedUserIds: new Set<string>(),
+            followerIds: new Set<string>(),
             followLoadingIds: new Set<string>(),
           });
         }
@@ -380,6 +420,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authError: null,
       followingIds: new Set<string>(),
       requestedUserIds: new Set<string>(),
+      followerIds: new Set<string>(),
       followLoadingIds: new Set<string>(),
     });
   },

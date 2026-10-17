@@ -13,6 +13,8 @@ import { Sparkles } from 'lucide-react-native';
 export interface ResearcherCardProps {
   researcher: UserProfile;
   onFollowToggle?: () => void;
+  onRemoveFollower?: () => void;
+  isRemoving?: boolean;
   style?: ViewStyle;
   showMutualInterests?: boolean;
 }
@@ -20,11 +22,15 @@ export interface ResearcherCardProps {
 export const ResearcherCard: React.FC<ResearcherCardProps> = ({
   researcher,
   onFollowToggle,
+  onRemoveFollower,
+  isRemoving,
   style,
   showMutualInterests = true,
 }) => {
   const currentUser = useAuthStore((s) => s.user);
   const isFollowing = useAuthStore((s) => s.followingIds.has(researcher.id));
+  const isRequested = useAuthStore((s) => s.requestedUserIds.has(researcher.id));
+  const followsYou = useAuthStore((s) => s.followerIds.has(researcher.id));
   const isLoading = useAuthStore((s) => s.followLoadingIds.has(researcher.id));
   const isSelf = Boolean(currentUser?.id && currentUser.id === researcher.id);
 
@@ -53,6 +59,14 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
       params: { id: researcher.id },
     });
   };
+
+  const followButtonTitle = isFollowing
+    ? 'Following'
+    : isRequested
+    ? 'Requested'
+    : followsYou
+    ? 'Follow Back'
+    : 'Follow';
 
   return (
     <TouchableOpacity
@@ -91,17 +105,31 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
         )}
       </View>
 
-      {onFollowToggle && !isSelf && (
-        <Button
-          title={isFollowing ? 'Following' : 'Follow'}
-          variant={isFollowing ? 'outline' : 'primary'}
-          size="sm"
-          loading={isLoading}
-          disabled={isLoading}
-          onPress={onFollowToggle}
-          style={styles.followButton}
-        />
-      )}
+      <View style={styles.actionsContainer}>
+        {onFollowToggle && !isSelf && (
+          <Button
+            title={followButtonTitle}
+            variant={isFollowing || isRequested ? 'outline' : 'primary'}
+            size="sm"
+            loading={isLoading}
+            disabled={isLoading}
+            onPress={onFollowToggle}
+            style={styles.followButton}
+          />
+        )}
+
+        {onRemoveFollower && !isSelf && (
+          <Button
+            title="Remove"
+            variant="outline"
+            size="sm"
+            loading={isRemoving}
+            disabled={isRemoving}
+            onPress={onRemoveFollower}
+            style={styles.removeButton}
+          />
+        )}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -144,7 +172,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   followButton: {
-    minWidth: 92,
+    minWidth: 84,
+  },
+  removeButton: {
+    minWidth: 70,
   },
 });
