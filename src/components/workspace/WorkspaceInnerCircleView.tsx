@@ -551,8 +551,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             continue;
           }
           if (decryptedTextMap[m.id]) continue;
-          const cipher = m.e2ee_ciphertext || m.attachments?.e2ee_ciphertext;
-          const nonce = m.e2ee_nonce || m.attachments?.e2ee_nonce;
+          let parsedAttachments = m.attachments;
+          if (typeof parsedAttachments === 'string') {
+            try {
+              parsedAttachments = JSON.parse(parsedAttachments);
+            } catch {}
+          }
+          const cipher = m.e2ee_ciphertext || parsedAttachments?.e2ee_ciphertext;
+          const nonce = m.e2ee_nonce || parsedAttachments?.e2ee_nonce;
           if (cipher && nonce) {
             try {
               const dec = await decryptTextMessage(cipher, nonce, podKey);
@@ -564,7 +570,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           } else {
             try {
               const cached = await AsyncStorage.getItem(`e2ee_cache_${m.id}`);
-              if (cached) updates[m.id] = cached;
+              if (cached && !cached.startsWith('🔒')) {
+                updates[m.id] = cached;
+              }
             } catch {}
           }
         }

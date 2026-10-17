@@ -1882,6 +1882,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             newMsg.content === '🚫 This message was deleted'
           );
 
+          let parsedRealtimeAttachments = newMsg.attachments;
+          if (typeof parsedRealtimeAttachments === 'string') {
+            try {
+              parsedRealtimeAttachments = JSON.parse(parsedRealtimeAttachments);
+            } catch {}
+          }
+
           const messageObj: WorkspaceMessage = {
             id: newMsg.id,
             workspace_id: newMsg.workspace_id,
@@ -1896,12 +1903,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             call_metadata: isIncomingMsgDeleted ? null : callMeta,
             audio_metadata: isIncomingMsgDeleted ? null : audioMeta,
             poll_data: isIncomingMsgDeleted ? null : pollData,
-            attachments: isIncomingMsgDeleted ? null : (newMsg.attachments || null),
+            attachments: isIncomingMsgDeleted ? null : (parsedRealtimeAttachments || newMsg.attachments || null),
             reactions: isIncomingMsgDeleted ? null : extractedReactions,
             is_edited: isIncomingMsgDeleted ? false : (newMsg.is_edited || false),
             is_deleted: isIncomingMsgDeleted ? true : false,
-            e2ee_ciphertext: isIncomingMsgDeleted ? null : (newMsg.e2ee_ciphertext || null),
-            e2ee_nonce: isIncomingMsgDeleted ? null : (newMsg.e2ee_nonce || null),
+            e2ee_ciphertext: isIncomingMsgDeleted ? null : (newMsg.e2ee_ciphertext || parsedRealtimeAttachments?.e2ee_ciphertext || null),
+            e2ee_nonce: isIncomingMsgDeleted ? null : (newMsg.e2ee_nonce || parsedRealtimeAttachments?.e2ee_nonce || null),
             media_urls: isIncomingMsgDeleted ? null : (extractedMedia && extractedMedia.length > 0 ? extractedMedia : null),
             is_pinned: isIncomingMsgDeleted ? false : (newMsg.is_pinned || false),
             is_forwarded: isIncomingMsgDeleted ? false : (newMsg.is_forwarded ?? (newMsg.attachments?.is_forwarded || false)),

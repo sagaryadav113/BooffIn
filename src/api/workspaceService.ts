@@ -452,7 +452,7 @@ export const workspaceService = {
             if (cipher && nonce) {
               try {
                 const cached = await AsyncStorage.getItem(`e2ee_cache_${lastMsg.id}`).catch(() => null);
-                if (cached) {
+                if (cached && !cached.startsWith('🔒')) {
                   displayContent = cached;
                 } else {
                   let sessionKey: string | null = null;
@@ -462,7 +462,7 @@ export const workspaceService = {
                       sessionKey = await deriveSharedSessionKey(userId, otherId, ws.id);
                     }
                   } else if (ws.type === 'inner_circle') {
-                    sessionKey = await derivePodSessionKey(ws.id, userId);
+                    sessionKey = await derivePodSessionKey(ws.id);
                   }
                   if (sessionKey) {
                     const dec = await decryptTextMessage(cipher, nonce, sessionKey);

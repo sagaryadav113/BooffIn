@@ -110,8 +110,14 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
       } catch {}
 
       // 2. Decrypt on-the-fly using session key
-      const cipher = lm.e2ee_ciphertext || (lm as any).attachments?.e2ee_ciphertext;
-      const nonce = lm.e2ee_nonce || (lm as any).attachments?.e2ee_nonce;
+      let parsedAttachments = (lm as any).attachments;
+      if (typeof parsedAttachments === 'string') {
+        try {
+          parsedAttachments = JSON.parse(parsedAttachments);
+        } catch {}
+      }
+      const cipher = lm.e2ee_ciphertext || parsedAttachments?.e2ee_ciphertext;
+      const nonce = lm.e2ee_nonce || parsedAttachments?.e2ee_nonce;
       if (cipher && nonce && currentUserId) {
         try {
           let sessionKey: string | null = null;
@@ -125,7 +131,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
               sessionKey = await deriveSharedSessionKey(currentUserId, peerId, workspace.id);
             }
           } else if (isInnerCircle) {
-            sessionKey = await derivePodSessionKey(workspace.id, currentUserId);
+            sessionKey = await derivePodSessionKey(workspace.id);
           }
 
           if (sessionKey) {
