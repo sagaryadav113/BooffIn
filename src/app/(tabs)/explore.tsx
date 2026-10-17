@@ -45,6 +45,8 @@ import {
 } from '../../api/hypedFeedService';
 import { subscribeToPaperRead } from '../../api/hypeScoreService';
 import { Paper, UserProfile } from '../../types';
+import { TrendingTagsSection } from '../../components/explore/TrendingTagsSection';
+import { useTrendingStore } from '../../store/useTrendingStore';
 
 export default function ExploreScreen() {
   const { isDesktop } = useResponsiveLayout();
@@ -76,6 +78,12 @@ export default function ExploreScreen() {
   const posts = usePostStore((s) => s.posts);
   const fetchFeed = usePostStore((s) => s.fetchFeed);
   const currentUser = useAuthStore((s) => s.user);
+
+  // 24h Trending Tags Store
+  const trendingTags = useTrendingStore((s) => s.trendingTags);
+  const isLoadingTrending = useTrendingStore((s) => s.isLoading);
+  const fetchTrending = useTrendingStore((s) => s.fetchTrending);
+  const refreshTrending = useTrendingStore((s) => s.refreshTrending);
 
   // Dynamic user interests for top tab navigation
   const userInterests = useMemo(() => {
@@ -172,9 +180,10 @@ export default function ExploreScreen() {
         fetchTopics(currentUser?.id),
         fetchFeed('For You', currentUser?.id),
         loadHypedFeed(activeTab, timeframe, true),
+        fetchTrending(),
       ]);
     } catch {}
-  }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed, activeTab, timeframe, loadHypedFeed]);
+  }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed, activeTab, timeframe, loadHypedFeed, fetchTrending]);
 
   useEffect(() => {
     loadInitialData();
@@ -185,7 +194,10 @@ export default function ExploreScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    await loadInitialData();
+    await Promise.all([
+      loadInitialData(),
+      refreshTrending(),
+    ]);
     setIsRefreshing(false);
   };
 
@@ -225,6 +237,10 @@ export default function ExploreScreen() {
   const handleSelectRecentOrTopic = (term: string) => {
     setSearchQuery(term);
     executeSearch(term);
+  };
+
+  const handleSelectTrendingTag = (tag: string) => {
+    handleSelectRecentOrTopic(tag);
   };
 
   // Automatically trigger debounced unified search when searchQuery changes
@@ -666,6 +682,13 @@ export default function ExploreScreen() {
                 onClearAll={clearRecentSearches}
               />
             )}
+
+            {/* Trending Topics & Tags (24-Hour Velocity Engine) */}
+            <TrendingTagsSection
+              tags={trendingTags}
+              isLoading={isLoadingTrending}
+              onSelectTag={handleSelectTrendingTag}
+            />
 
             {/* Render Domain Hyped Section */}
             {renderHypedDomainContent()}

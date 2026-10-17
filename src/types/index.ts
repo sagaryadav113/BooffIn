@@ -11,3 +11,4 @@ export * from './settings';
 export * from './scholar';
 export * from './analytics';
 export * from './workspace';
+export * from './trending';
