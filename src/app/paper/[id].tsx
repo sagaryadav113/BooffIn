@@ -60,6 +60,7 @@ import { usePaperStore } from '../../store/usePaperStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 import { useDiscussionStore } from '../../store/useDiscussionStore';
+import { supabase } from '../../api/client';
 import {
   DiscussionTypePills,
   DiscussionComposer,
@@ -456,6 +457,41 @@ export default function PaperDetailScreen() {
   useEffect(() => {
     loadData();
   }, [paperId, activePostId]);
+
+  useEffect(() => {
+    if (!paperId) return;
+
+    const channel = supabase
+      .channel(`paper-discussions-${paperId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'posts' },
+        (payload: any) => {
+          if (payload.new?.paper_id === paperId || payload.old?.paper_id === paperId || !payload.new?.paper_id) {
+            fetchDiscussionsForPaper(paperId, currentUser?.id, doi || paper?.doi, url || paper?.canonicalUrl);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'comments' },
+        () => {
+          fetchDiscussionsForPaper(paperId, currentUser?.id, doi || paper?.doi, url || paper?.canonicalUrl);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'likes' },
+        () => {
+          fetchDiscussionsForPaper(paperId, currentUser?.id, doi || paper?.doi, url || paper?.canonicalUrl);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [paperId, currentUser?.id, doi, paper?.doi, url, paper?.canonicalUrl, fetchDiscussionsForPaper]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

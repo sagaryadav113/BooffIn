@@ -1,8 +1,28 @@
 import { supabase, appStorage } from '../api/client';
+import { useAuthStore } from '../store/useAuthStore';
 
 // In-memory cache for ultra-fast synchronous UI lookups and mapper resolution
 const userLikedCommentsCache = new Map<string, Set<string>>();
 const storageLoadedMap = new Map<string, boolean>();
+
+/**
+ * Resolves the effective user ID for like operations.
+ * Checks explicit parameter -> auth store -> Supabase auth -> 'anonymous'.
+ */
+async function resolveEffectiveUserId(userId?: string): Promise<string> {
+  if (userId && userId.trim().length > 0 && userId !== 'anonymous') {
+    return userId.trim();
+  }
+  const storeUser = useAuthStore.getState().user;
+  if (storeUser?.id && storeUser.id.trim().length > 0 && storeUser.id !== 'usr_me') {
+    return storeUser.id.trim();
+  }
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) return user.id.trim();
+  } catch {}
+  return 'anonymous';
+}
 
 function getStorageKey(userId?: string): string {
   const normalizedUser = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
@@ -14,25 +34,50 @@ function getStorageKey(userId?: string): string {
  */
 export function isCommentLikedSync(commentId: string, userId?: string): boolean {
   if (!commentId) return false;
-  const userKey = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
-  const set = userLikedCommentsCache.get(userKey);
-  return Boolean(set && set.has(commentId));
+  
+  // 1. Check explicit user ID cache
+  if (userId && userId.trim().length > 0) {
+    const set = userLikedCommentsCache.get(userId.trim());
+    if (set && set.has(commentId)) return true;
+  }
+
+  // 2. Check auth store user cache
+  const storeUserId = useAuthStore.getState().user?.id;
+  if (storeUserId && storeUserId.trim().length > 0) {
+    const set = userLikedCommentsCache.get(storeUserId.trim());
+    if (set && set.has(commentId)) return true;
+  }
+
+  // 3. Check anonymous cache fallback
+  const anonSet = userLikedCommentsCache.get('anonymous');
+  if (anonSet && anonSet.has(commentId)) return true;
+
+  return false;
 }
 
 /**
  * Returns the synchronous Set of liked comment IDs for a user.
  */
 export function getLikedCommentIdsSync(userId?: string): Set<string> {
-  const userKey = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
-  return userLikedCommentsCache.get(userKey) || new Set<string>();
+  const normalizedUser = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
+  const direct = userLikedCommentsCache.get(normalizedUser);
+  if (direct && direct.size > 0) return direct;
+
+  const storeUserId = useAuthStore.getState().user?.id;
+  if (storeUserId && userLikedCommentsCache.has(storeUserId)) {
+    return userLikedCommentsCache.get(storeUserId)!;
+  }
+
+  return userLikedCommentsCache.get('anonymous') || new Set<string>();
 }
 
 /**
  * Loads the user's liked comment IDs from persistent storage into memory cache.
+ * Guarantees existing IDs are merged and never overwritten.
  */
 export async function loadUserLikedComments(userId?: string): Promise<Set<string>> {
-  const userKey = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
-  const storageKey = getStorageKey(userId);
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+  const storageKey = getStorageKey(effectiveUserId);
 
   try {
     const raw = await appStorage.getItem(storageKey);
@@ -46,13 +91,31 @@ export async function loadUserLikedComments(userId?: string): Promise<Set<string
       } catch {}
     }
 
-    const set = new Set<string>(ids);
-    userLikedCommentsCache.set(userKey, set);
-    storageLoadedMap.set(userKey, true);
-    return set;
+    // Merge with any existing in-memory set so we never drop likes
+    const existing = userLikedCommentsCache.get(effectiveUserId) || new Set<string>();
+    for (const id of ids) {
+      existing.add(id);
+    }
+
+    // If logged in, also merge any anonymous likes
+    if (effectiveUserId !== 'anonymous') {
+      const anonRaw = await appStorage.getItem(getStorageKey('anonymous'));
+      if (anonRaw) {
+        try {
+          const anonParsed = JSON.parse(anonRaw);
+          if (Array.isArray(anonParsed)) {
+            anonParsed.forEach((id) => existing.add(id));
+          }
+        } catch {}
+      }
+    }
+
+    userLikedCommentsCache.set(effectiveUserId, existing);
+    storageLoadedMap.set(effectiveUserId, true);
+    return existing;
   } catch {
-    const fallback = userLikedCommentsCache.get(userKey) || new Set<string>();
-    userLikedCommentsCache.set(userKey, fallback);
+    const fallback = userLikedCommentsCache.get(effectiveUserId) || new Set<string>();
+    userLikedCommentsCache.set(effectiveUserId, fallback);
     return fallback;
   }
 }
@@ -61,7 +124,8 @@ export async function loadUserLikedComments(userId?: string): Promise<Set<string
  * Persists the user's liked comment IDs to persistent storage.
  */
 async function saveUserLikedComments(userId: string | undefined, set: Set<string>): Promise<void> {
-  const storageKey = getStorageKey(userId);
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+  const storageKey = getStorageKey(effectiveUserId);
   try {
     const arr = Array.from(set);
     await appStorage.setItem(storageKey, JSON.stringify(arr));
@@ -72,9 +136,10 @@ async function saveUserLikedComments(userId: string | undefined, set: Set<string
 
 /**
  * Toggles like status for a comment or reply:
- * 1. Synchronously updates in-memory cache
- * 2. Asynchronously persists to storage (AsyncStorage/SecureStore/localStorage)
- * 3. Atomically updates `comments.likes_count` in Supabase
+ * 1. Ensures persistent storage is loaded FIRST (never overwrites with empty set)
+ * 2. Synchronously updates in-memory cache
+ * 3. Asynchronously persists to storage (AsyncStorage/SecureStore/localStorage)
+ * 4. Atomically updates `comments.likes_count` in Supabase
  */
 export async function toggleCommentLike(
   commentId: string,
@@ -85,11 +150,12 @@ export async function toggleCommentLike(
     return { success: false, isLiked: isCurrentlyLiked, error: 'Missing comment ID' };
   }
 
-  const userKey = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
-  let set = userLikedCommentsCache.get(userKey);
-  if (!set) {
-    set = new Set<string>();
-    userLikedCommentsCache.set(userKey, set);
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+
+  // CRITICAL: Ensure existing liked comments are loaded from disk BEFORE modifying!
+  let set = userLikedCommentsCache.get(effectiveUserId);
+  if (!set || !storageLoadedMap.get(effectiveUserId)) {
+    set = await loadUserLikedComments(effectiveUserId);
   }
 
   const willBeLiked = !isCurrentlyLiked;
@@ -99,10 +165,12 @@ export async function toggleCommentLike(
     set.delete(commentId);
   }
 
-  // Save to persistent storage immediately
-  saveUserLikedComments(userId, set).catch(() => {});
+  userLikedCommentsCache.set(effectiveUserId, set);
 
-  // Update Supabase comments table likes_count
+  // Save to persistent storage immediately
+  saveUserLikedComments(effectiveUserId, set).catch(() => {});
+
+  // Update Supabase comments table likes_count atomically
   try {
     const { data: commentRow } = await supabase
       .from('comments')
@@ -110,7 +178,7 @@ export async function toggleCommentLike(
       .eq('id', commentId)
       .maybeSingle();
 
-    const currentLikes = commentRow?.likes_count || 0;
+    const currentLikes = typeof commentRow?.likes_count === 'number' ? commentRow.likes_count : 0;
     const newCount = Math.max(0, currentLikes + (willBeLiked ? 1 : -1));
 
     await supabase

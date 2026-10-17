@@ -1295,8 +1295,16 @@ export async function fetchComments(
   currentUserId?: string
 ): Promise<{ comments: Comment[]; error: string | null }> {
   try {
+    let resolvedUserId = currentUserId && currentUserId.trim().length > 0 ? currentUserId.trim() : undefined;
+    if (!resolvedUserId) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        resolvedUserId = user?.id;
+      } catch {}
+    }
+
     // Preload user liked comment IDs from persistent storage into synchronous memory
-    await loadUserLikedComments(currentUserId);
+    await loadUserLikedComments(resolvedUserId);
 
     const { data, error } = await supabase
       .from('comments')
@@ -1337,7 +1345,7 @@ export async function fetchComments(
     const rootComments: Comment[] = [];
 
     commentRows.forEach((row: any) => {
-      const comment = mapSupabaseComment(row, currentUserId);
+      const comment = mapSupabaseComment(row, resolvedUserId);
       commentMap.set(comment.id, comment);
     });
 

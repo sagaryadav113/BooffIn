@@ -8,6 +8,7 @@ import {
   UserProfile,
 } from '../types';
 import { supabase } from '../api/client';
+import { useAuthStore } from './useAuthStore';
 import {
   isCommentLikedSync,
   loadUserLikedComments,
@@ -55,6 +56,10 @@ interface DiscussionState {
   toggleLikeReply: (paperId: string, discussionId: string, replyId: string, currentUserId?: string) => void;
   getParticipatingResearchers: (paperId: string) => UserProfile[];
   getInterestedPeople: (paper: Paper, currentUserId?: string) => InterestedPerson[];
+  handleRealtimeDiscussionInsert: (paperId: string, disc: DiscussionContribution) => void;
+  handleRealtimeDiscussionDelete: (paperId: string, discId: string) => void;
+  handleRealtimeReplyInsert: (paperId: string, discussionId: string, reply: DiscussionReply) => void;
+  handleRealtimeReplyDelete: (paperId: string, discussionId: string, replyId: string) => void;
 }
 
 /**
@@ -188,6 +193,20 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
         return;
       }
 
+      let resolvedUserId = currentUserId && currentUserId.trim().length > 0 ? currentUserId.trim() : undefined;
+      if (!resolvedUserId) {
+        resolvedUserId = useAuthStore.getState().user?.id;
+      }
+      if (!resolvedUserId || resolvedUserId === 'usr_me') {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          resolvedUserId = user?.id;
+        } catch {}
+      }
+
+      // Preload user liked comment IDs from persistent storage into synchronous memory
+      await loadUserLikedComments(resolvedUserId);
+
       // Query posts referencing this paper's UUID from Supabase
       const { data, error } = await supabase
         .from('posts')
@@ -207,6 +226,7 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
             orcid_id,
             orcid_verified
           ),
+          likes!left ( user_id ),
           comments(
             id,
             content,
@@ -255,9 +275,15 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
             content: c.content || '',
             mentions: extractMentions(c.content || ''),
             likesCount: typeof c.likes_count === 'number' ? c.likes_count : 0,
-            isLiked: isCommentLikedSync(c.id, currentUserId),
+            isLiked: isCommentLikedSync(c.id, resolvedUserId),
             createdAt: formatRelativeTime(c.created_at),
           }));
+
+        const isDiscussionLiked = Boolean(
+          resolvedUserId &&
+          Array.isArray(row.likes) &&
+          row.likes.some((l: any) => l.user_id === resolvedUserId)
+        ) || isCommentLikedSync(row.id, resolvedUserId);
 
         return {
           id: row.id,
@@ -268,7 +294,7 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
           content: cleanContent,
           mentions: extractMentions(rawContent),
           likesCount: typeof row.likes_count === 'number' ? row.likes_count : 0,
-          isLiked: isCommentLikedSync(row.id, currentUserId),
+          isLiked: isDiscussionLiked,
           repliesCount: replies.length,
           createdAt: formatRelativeTime(row.created_at),
           replies,
@@ -688,6 +714,78 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
 
   getInterestedPeople: (paper: Paper, currentUserId?: string) => {
     return [];
+  },
+
+  handleRealtimeDiscussionInsert: (paperId: string, disc: DiscussionContribution) => {
+    set((state) => {
+      const currentList = state.discussions[paperId] || [];
+      if (currentList.some((d) => d.id === disc.id)) return state;
+      return {
+        discussions: {
+          ...state.discussions,
+          [paperId]: [disc, ...currentList],
+        },
+      };
+    });
+  },
+
+  handleRealtimeDiscussionDelete: (paperId: string, discId: string) => {
+    set((state) => {
+      const currentList = state.discussions[paperId] || [];
+      return {
+        discussions: {
+          ...state.discussions,
+          [paperId]: currentList.filter((d) => d.id !== discId),
+        },
+      };
+    });
+  },
+
+  handleRealtimeReplyInsert: (paperId: string, discussionId: string, reply: DiscussionReply) => {
+    set((state) => {
+      const currentList = state.discussions[paperId] || [];
+      const updated = currentList.map((disc) => {
+        if (disc.id === discussionId) {
+          const currentReplies = disc.replies || [];
+          if (currentReplies.some((r) => r.id === reply.id)) return disc;
+          return {
+            ...disc,
+            repliesCount: currentReplies.length + 1,
+            replies: [...currentReplies, reply],
+          };
+        }
+        return disc;
+      });
+      return {
+        discussions: {
+          ...state.discussions,
+          [paperId]: updated,
+        },
+      };
+    });
+  },
+
+  handleRealtimeReplyDelete: (paperId: string, discussionId: string, replyId: string) => {
+    set((state) => {
+      const currentList = state.discussions[paperId] || [];
+      const updated = currentList.map((disc) => {
+        if (disc.id === discussionId) {
+          const filteredReplies = (disc.replies || []).filter((r) => r.id !== replyId);
+          return {
+            ...disc,
+            repliesCount: filteredReplies.length,
+            replies: filteredReplies,
+          };
+        }
+        return disc;
+      });
+      return {
+        discussions: {
+          ...state.discussions,
+          [paperId]: updated,
+        },
+      };
+    });
   },
 }));
 
