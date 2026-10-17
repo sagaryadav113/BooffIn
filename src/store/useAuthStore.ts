@@ -23,7 +23,7 @@ import {
   removeFollower,
 } from '../api/socialService';
 import { useSearchStore } from './useSearchStore';
-import { supabase } from '../api/client';
+import { supabase, appStorage } from '../api/client';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -111,6 +111,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       return;
     }
+
+    // 1. Immediately read persistent follow requests from local storage so UI doesn't reset or flicker on reload!
+    try {
+      const cachedReqs = await appStorage.getItem(`booffin_outgoing_follow_requests_${userId}`);
+      if (cachedReqs) {
+        const parsed = JSON.parse(cachedReqs);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          set((s) => ({
+            requestedUserIds: new Set([...Array.from(s.requestedUserIds), ...parsed]),
+          }));
+        }
+      }
+    } catch {}
+
     try {
       const ids = await fetchUserFollowingIds(userId);
       const reqIds = await fetchOutgoingFollowRequestIds(userId);

@@ -413,7 +413,7 @@ export async function fetchNotifications(
     if (filter === 'Mentions') {
       query = query.in('notification_type', ['comment', 'reply', 'mention']);
     } else if (filter === 'Follows') {
-      query = query.eq('notification_type', 'follow');
+      query = query.in('notification_type', ['follow', 'follow_request', 'follow_accept']);
     } else if (filter === 'Discussions') {
       query = query.in('notification_type', [
         'comment',
@@ -445,16 +445,72 @@ export async function fetchNotifications(
       .order('created_at', { ascending: false })
       .range(start, end);
 
-    if (error || !data || data.length === 0) {
+    const mappedNotifications: AppNotification[] = Array.isArray(data) ? data.map(mapNotificationRow) : [];
+
+    // 3. On page 1, ensure pending follow requests from private profile requests are included
+    if (page === 1 && (filter === 'All' || filter === 'Follows') && userId) {
+      try {
+        const { data: pendingColReqs } = await supabase
+          .from('collaboration_requests')
+          .select(`
+            id,
+            sender_id,
+            recipient_id,
+            status,
+            created_at,
+            sender:profiles!collaboration_requests_sender_id_fkey (
+              id,
+              username,
+              full_name,
+              avatar_url,
+              academic_title,
+              institution,
+              orcid_id,
+              orcid_verified
+            )
+          `)
+          .eq('recipient_id', userId)
+          .eq('topic', 'follow_request')
+          .eq('status', 'pending');
+
+        if (Array.isArray(pendingColReqs)) {
+          for (const req of pendingColReqs) {
+            const alreadyPresent = mappedNotifications.some(
+              (n) => n.actor.id === req.sender_id && n.type === 'follow_request' && !n.isRead
+            );
+            if (!alreadyPresent && req.sender) {
+              const actor = mapSupabaseProfile(req.sender);
+              mappedNotifications.unshift({
+                id: `col_follow_${req.id}`,
+                type: 'follow_request',
+                actor,
+                content: 'requested to follow you',
+                entityType: 'profile',
+                entityId: req.sender_id,
+                messageSnippet: 'requested to follow you',
+                metadata: {
+                  request_type: 'follow_request',
+                  requester_id: req.sender_id,
+                  target_id: req.recipient_id,
+                  collaboration_request_id: req.id,
+                },
+                createdAt: formatNotificationTime(req.created_at),
+                isRead: false,
+              });
+            }
+          }
+        }
+      } catch {}
+    }
+
+    if (mappedNotifications.length === 0) {
       return { data: [], hasMore: false, error: error?.message || null };
     }
 
-    const mappedNotifications: AppNotification[] = data.map(mapNotificationRow);
-
-    // 3. Robust deduplication of trigger-duplicated rows
+    // 4. Robust deduplication of trigger-duplicated rows
     const { uniqueNotifications, duplicateIds } = deduplicateNotificationList(mappedNotifications);
 
-    // 4. Background purge of redundant duplicate notification rows for the authenticated user
+    // 5. Background purge of redundant duplicate notification rows for the authenticated user
     if (duplicateIds.length > 0 && userId) {
       (async () => {
         try {
@@ -474,7 +530,7 @@ export async function fetchNotifications(
 
     return {
       data: uniqueNotifications,
-      hasMore: data.length === pageSize,
+      hasMore: Boolean(data && data.length === pageSize),
       error: null,
     };
   } catch (err: any) {

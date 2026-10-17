@@ -59,6 +59,7 @@ import {
   fetchUserPosts,
   checkTargetIsPrivate,
   checkTargetFollowsCaller,
+  checkHasFollowRequest,
 } from '../../api/socialService';
 import { UserProfile, Post } from '../../types';
 import { AppHeader } from '../../components/layout/AppHeader';
@@ -236,6 +237,19 @@ export default function OtherResearcherProfileScreen() {
                   const next = new Set(state.followerIds);
                   next.add(prof!.id);
                   return { followerIds: next };
+                }
+                return state;
+              });
+            }
+
+            // Check if current viewer has an active pending follow request to this researcher
+            const hasReq = await checkHasFollowRequest(prof.id, currentUser.id);
+            if (hasReq) {
+              useAuthStore.setState((state) => {
+                if (!state.requestedUserIds.has(prof!.id)) {
+                  const next = new Set(state.requestedUserIds);
+                  next.add(prof!.id);
+                  return { requestedUserIds: next };
                 }
                 return state;
               });
@@ -498,6 +512,20 @@ export default function OtherResearcherProfileScreen() {
           ]
         );
       }
+      return;
+    }
+
+    if (isRequested) {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {}
+      // Optimistically remove from Requested so button immediately returns to "Follow"
+      useAuthStore.setState((s) => {
+        const next = new Set(s.requestedUserIds);
+        next.delete(researcher.id);
+        return { requestedUserIds: next };
+      });
+      await toggleFollowUser(researcher.id);
       return;
     }
 
