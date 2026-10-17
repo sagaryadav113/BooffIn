@@ -196,6 +196,16 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             // 3. Fetch enriched notification record with actor profile
             const fullNotification = await fetchNotificationById(payload.new.id);
             if (fullNotification) {
+              if (fullNotification.type === 'follow_accept' && fullNotification.actor?.id) {
+                useAuthStore.setState((s) => {
+                  const nextFollowing = new Set(s.followingIds);
+                  nextFollowing.add(fullNotification.actor.id);
+                  const nextRequested = new Set(s.requestedUserIds);
+                  nextRequested.delete(fullNotification.actor.id);
+                  return { followingIds: nextFollowing, requestedUserIds: nextRequested };
+                });
+              }
+
               set((state) => {
                 const alreadyExists = state.notifications.some((n) => n.id === fullNotification.id);
                 if (alreadyExists) return state;
