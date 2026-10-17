@@ -56,3 +56,7 @@ scratch/
 dist-electron/
 electron-build/
 
+# Android binaries
+*.aab
+*.apk
+
