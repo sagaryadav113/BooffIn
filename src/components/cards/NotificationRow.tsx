@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, ViewStyle, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, layout, typography } from '../../theme';
 import { AppNotification } from '../../types/notification';
 import { Avatar } from '../core/Avatar';
@@ -8,6 +9,8 @@ import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
 import { getNotificationDeepLink } from '../../api/notificationService';
 import { useNotificationStore } from '../../store/useNotificationStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { acceptFollowRequest, declineFollowRequest } from '../../api/socialService';
 
 export interface NotificationRowProps {
   notification: AppNotification;
@@ -21,6 +24,9 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
   style,
 }) => {
   const markAsRead = useNotificationStore((s) => s.markAsRead);
+  const currentUser = useAuthStore((s) => s.user);
+  const refreshCurrentUserProfile = useAuthStore((s) => s.refreshCurrentUserProfile);
+  const [requestStatus, setRequestStatus] = useState<'idle' | 'accepting' | 'accepted' | 'declining' | 'declined'>('idle');
 
   const handlePress = () => {
     // Automatically mark as read on tap
@@ -40,6 +46,39 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
     });
   };
 
+  const handleAcceptRequest = async (e: any) => {
+    e?.stopPropagation?.();
+    if (requestStatus !== 'idle') return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    setRequestStatus('accepting');
+    markAsRead(notification.id);
+    const res = await acceptFollowRequest(notification.actor.id, currentUser?.id);
+    if (res.success) {
+      setRequestStatus('accepted');
+      refreshCurrentUserProfile();
+    } else {
+      setRequestStatus('idle');
+    }
+  };
+
+  const handleDeclineRequest = async (e: any) => {
+    e?.stopPropagation?.();
+    if (requestStatus !== 'idle') return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    setRequestStatus('declining');
+    markAsRead(notification.id);
+    const res = await declineFollowRequest(notification.actor.id, currentUser?.id);
+    if (res.success) {
+      setRequestStatus('declined');
+    } else {
+      setRequestStatus('idle');
+    }
+  };
+
   const getEventBadge = (): { icon: IconName; bg: string } => {
     switch (notification.type) {
       case 'like':
@@ -55,6 +94,10 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
         return { icon: 'Repeat2', bg: colors.accentGreen };
       case 'follow':
         return { icon: 'User', bg: colors.black };
+      case 'follow_request':
+        return { icon: 'UserPlus', bg: colors.black };
+      case 'follow_accept':
+        return { icon: 'Check', bg: colors.accentGreen };
       case 'paper_discussion':
         return { icon: 'FileText', bg: '#8B5CF6' };
       case 'researcher_post':
@@ -105,6 +148,58 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
           </Typography>
           {notification.content}
         </Typography>
+
+        {/* Action Buttons for Follow Request */}
+        {notification.type === 'follow_request' && (
+          <View style={styles.requestActionsRow}>
+            {requestStatus === 'accepted' ? (
+              <View style={styles.resolvedTag}>
+                <Typography variant="captionBold" color={colors.accentGreen}>
+                  ✓ Approved follower
+                </Typography>
+              </View>
+            ) : requestStatus === 'declined' ? (
+              <View style={styles.resolvedTag}>
+                <Typography variant="metadata" color={colors.textMuted}>
+                  Request removed
+                </Typography>
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.confirmBtn}
+                  onPress={handleAcceptRequest}
+                  disabled={requestStatus !== 'idle'}
+                >
+                  {requestStatus === 'accepting' ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Typography variant="captionBold" color={colors.white}>
+                      Confirm
+                    </Typography>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.deleteBtn}
+                  onPress={handleDeclineRequest}
+                  disabled={requestStatus !== 'idle'}
+                >
+                  {requestStatus === 'declining' ? (
+                    <ActivityIndicator size="small" color={colors.textPrimary} />
+                  ) : (
+                    <Typography variant="captionBold" color={colors.textPrimary}>
+                      Delete
+                    </Typography>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
+
         <Typography variant="metadata" color={colors.textMuted} style={styles.timeText}>
           {notification.createdAt}
         </Typography>
@@ -174,5 +269,38 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: radii.full,
     backgroundColor: colors.accentBlue,
+  },
+  requestActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs + 2,
+    marginBottom: 2,
+  },
+  confirmBtn: {
+    backgroundColor: colors.black,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    minHeight: 28,
+    minWidth: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBtn: {
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    minHeight: 28,
+    minWidth: 65,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resolvedTag: {
+    paddingVertical: 2,
+    paddingHorizontal: spacing.xs,
   },
 });

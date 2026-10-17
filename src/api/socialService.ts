@@ -1,5 +1,5 @@
 import { supabase } from './client';
-import { Post, Comment, PostType, Paper, UserProfile } from '../types';
+import { Post, Comment, PostType, Paper, UserProfile, FollowRequest } from '../types';
 import { getFeedRanker, buildUserRankingContext } from './ranking/feedRanker';
 import { sanitizeExternalUrl, sanitizeTextContent } from '../utils/security';
 import { useAuthStore } from '../store/useAuthStore';
@@ -1552,6 +1552,7 @@ export async function votePoll(
 export interface ToggleFollowResult {
   success: boolean;
   isFollowing: boolean;
+  isRequested?: boolean;
   targetUserId: string;
   targetFollowersCount?: number;
   callerFollowingCount?: number;
@@ -1587,8 +1588,378 @@ async function resolveTargetProfileId(targetIdentifier: string): Promise<string 
 }
 
 /**
+ * Checks if a target researcher has a private profile.
+ */
+export async function checkTargetIsPrivate(targetUserId: string): Promise<boolean> {
+  if (!targetUserId) return false;
+  const targetId = (await resolveTargetProfileId(targetUserId)) || targetUserId;
+  try {
+    const { data: settingsData } = await supabase
+      .from('user_settings')
+      .select('profile_visibility')
+      .eq('user_id', targetId)
+      .maybeSingle();
+
+    if (settingsData?.profile_visibility === 'private') {
+      return true;
+    }
+
+    const { data: profData } = await supabase
+      .from('profiles')
+      .select('visibility_level, is_private')
+      .eq('id', targetId)
+      .maybeSingle();
+
+    if (
+      (profData as any)?.visibility_level === 'private' ||
+      Boolean((profData as any)?.is_private)
+    ) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks if the caller has an active pending follow request to the target user.
+ */
+export async function checkHasFollowRequest(
+  targetUserId: string,
+  callerId?: string
+): Promise<boolean> {
+  const verifiedUserId = await getVerifiedUserId(callerId);
+  if (!verifiedUserId) return false;
+  const targetId = (await resolveTargetProfileId(targetUserId)) || targetUserId;
+  if (!targetId || targetId === verifiedUserId) return false;
+
+  try {
+    const { data, error } = await supabase
+      .from('follow_requests')
+      .select('id')
+      .eq('requester_id', verifiedUserId)
+      .eq('target_id', targetId)
+      .eq('status', 'pending')
+      .maybeSingle();
+
+    if (!error && data?.id) {
+      return true;
+    }
+  } catch {}
+
+  // Fallback: check notifications table for an active follow_request
+  try {
+    const { data: notifData } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('actor_id', verifiedUserId)
+      .eq('recipient_id', targetId)
+      .eq('notification_type', 'follow_request')
+      .eq('read_status', false)
+      .maybeSingle();
+
+    return Boolean(notifData?.id);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetches all target user IDs that the caller currently has an active pending follow request to.
+ */
+export async function fetchOutgoingFollowRequestIds(callerId?: string): Promise<string[]> {
+  const verifiedUserId = await getVerifiedUserId(callerId);
+  if (!verifiedUserId) return [];
+
+  const requestedIds: string[] = [];
+
+  try {
+    const { data, error } = await supabase
+      .from('follow_requests')
+      .select('target_id')
+      .eq('requester_id', verifiedUserId)
+      .eq('status', 'pending');
+
+    if (!error && Array.isArray(data)) {
+      data.forEach((row) => {
+        if (row.target_id) requestedIds.push(row.target_id);
+      });
+      return requestedIds;
+    }
+  } catch {}
+
+  // Fallback: check notifications table
+  try {
+    const { data: notifs } = await supabase
+      .from('notifications')
+      .select('recipient_id')
+      .eq('actor_id', verifiedUserId)
+      .eq('notification_type', 'follow_request')
+      .eq('read_status', false);
+
+    if (Array.isArray(notifs)) {
+      notifs.forEach((n) => {
+        if (n.recipient_id && !requestedIds.includes(n.recipient_id)) {
+          requestedIds.push(n.recipient_id);
+        }
+      });
+    }
+  } catch {}
+
+  return requestedIds;
+}
+
+/**
+ * Fetches incoming pending follow requests for the authenticated user.
+ */
+export async function fetchIncomingFollowRequests(
+  userId?: string
+): Promise<FollowRequest[]> {
+  const verifiedUserId = await getVerifiedUserId(userId);
+  if (!verifiedUserId) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('follow_requests')
+      .select(`
+        id,
+        requester_id,
+        target_id,
+        status,
+        created_at,
+        requester:profiles!requester_id (
+          id,
+          username,
+          full_name,
+          avatar_url,
+          academic_title,
+          institution,
+          orcid_id,
+          orcid_verified
+        )
+      `)
+      .eq('target_id', verifiedUserId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      return data.map((row: any) => ({
+        id: row.id,
+        requesterId: row.requester_id,
+        requester: mapSupabaseProfile(row.requester),
+        targetId: row.target_id,
+        status: row.status,
+        createdAt: row.created_at,
+      }));
+    }
+  } catch {}
+
+  return [];
+}
+
+/**
+ * Sends a follow request to a private researcher profile.
+ */
+export async function sendFollowRequest(
+  targetUserId: string,
+  callerId?: string
+): Promise<{ success: boolean; error: string | null }> {
+  const verifiedUserId = await getVerifiedUserId(callerId);
+  if (!verifiedUserId) {
+    return { success: false, error: 'Must be logged in to request to follow.' };
+  }
+
+  const targetId = (await resolveTargetProfileId(targetUserId)) || targetUserId;
+  if (!targetId || targetId === verifiedUserId) {
+    return { success: false, error: 'Cannot send follow request to self.' };
+  }
+
+  try {
+    // 1. Insert into follow_requests table
+    try {
+      await supabase
+        .from('follow_requests')
+        .insert({
+          requester_id: verifiedUserId,
+          target_id: targetId,
+          status: 'pending',
+        });
+    } catch {}
+
+    // 2. Insert notification to the target user
+    await supabase
+      .from('notifications')
+      .insert({
+        recipient_id: targetId,
+        actor_id: verifiedUserId,
+        notification_type: 'follow_request',
+        entity_type: 'profile',
+        entity_id: verifiedUserId,
+        message_snippet: 'requested to follow you',
+        metadata: {
+          request_type: 'follow_request',
+          requester_id: verifiedUserId,
+          target_id: targetId,
+        },
+        read_status: false,
+      });
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to send follow request.' };
+  }
+}
+
+/**
+ * Cancels a pending follow request sent to a private researcher.
+ */
+export async function cancelFollowRequest(
+  targetUserId: string,
+  callerId?: string
+): Promise<{ success: boolean; error: string | null }> {
+  const verifiedUserId = await getVerifiedUserId(callerId);
+  if (!verifiedUserId) {
+    return { success: false, error: 'Must be logged in to cancel follow request.' };
+  }
+
+  const targetId = (await resolveTargetProfileId(targetUserId)) || targetUserId;
+
+  try {
+    // 1. Remove from follow_requests table
+    try {
+      await supabase
+        .from('follow_requests')
+        .delete()
+        .eq('requester_id', verifiedUserId)
+        .eq('target_id', targetId);
+    } catch {}
+
+    // 2. Remove pending notification
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('actor_id', verifiedUserId)
+      .eq('recipient_id', targetId)
+      .eq('notification_type', 'follow_request');
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to cancel follow request.' };
+  }
+}
+
+/**
+ * Accepts an incoming follow request:
+ * - Adds the requester to target's followers in `follows`
+ * - Notifies requester with `follow_accept`
+ * - Marks incoming follow request as resolved
+ */
+export async function acceptFollowRequest(
+  requesterId: string,
+  targetUserId?: string
+): Promise<{ success: boolean; error: string | null }> {
+  const verifiedUserId = await getVerifiedUserId(targetUserId);
+  if (!verifiedUserId) {
+    return { success: false, error: 'Must be authenticated.' };
+  }
+
+  try {
+    // 1. Add follow relation: requester follows target
+    const { error: followError } = await supabase
+      .from('follows')
+      .insert({
+        follower_id: requesterId,
+        following_id: verifiedUserId,
+      });
+
+    if (followError && followError.code !== '23505') {
+      return { success: false, error: followError.message };
+    }
+
+    // 2. Update follow_requests status if table exists
+    try {
+      await supabase
+        .from('follow_requests')
+        .update({ status: 'accepted', updated_at: new Date().toISOString() })
+        .eq('requester_id', requesterId)
+        .eq('target_id', verifiedUserId);
+    } catch {}
+
+    // 3. Mark the follow_request notification as read
+    await supabase
+      .from('notifications')
+      .update({ read_status: true })
+      .eq('recipient_id', verifiedUserId)
+      .eq('actor_id', requesterId)
+      .eq('notification_type', 'follow_request');
+
+    // 4. Send follow_accept notification to the requester
+    await supabase
+      .from('notifications')
+      .insert({
+        recipient_id: requesterId,
+        actor_id: verifiedUserId,
+        notification_type: 'follow_accept',
+        entity_type: 'profile',
+        entity_id: verifiedUserId,
+        message_snippet: 'accepted your follow request',
+        metadata: {
+          accepted_by: verifiedUserId,
+        },
+        read_status: false,
+      });
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to accept follow request.' };
+  }
+}
+
+/**
+ * Declines an incoming follow request:
+ * - Updates follow_requests status to declined (or deletes)
+ * - Marks incoming notification as read / deleted
+ */
+export async function declineFollowRequest(
+  requesterId: string,
+  targetUserId?: string
+): Promise<{ success: boolean; error: string | null }> {
+  const verifiedUserId = await getVerifiedUserId(targetUserId);
+  if (!verifiedUserId) {
+    return { success: false, error: 'Must be authenticated.' };
+  }
+
+  try {
+    // 1. Remove or decline from follow_requests
+    try {
+      await supabase
+        .from('follow_requests')
+        .delete()
+        .eq('requester_id', requesterId)
+        .eq('target_id', verifiedUserId);
+    } catch {}
+
+    // 2. Mark incoming notification as read
+    await supabase
+      .from('notifications')
+      .update({ read_status: true })
+      .eq('recipient_id', verifiedUserId)
+      .eq('actor_id', requesterId)
+      .eq('notification_type', 'follow_request');
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to decline follow request.' };
+  }
+}
+
+/**
  * Executes an atomic, race-condition-safe toggle follow mutation.
- * Uses toggle_follow RPC when available, falling back to direct table mutation.
+ * Distinguishes between Public and Private profiles:
+ * - Public: Direct follow/unfollow
+ * - Private: Sends follow request if unrequested, cancels follow request if requested, or unfollows if already following
  */
 export async function toggleFollowUserRpc(
   targetUserIdOrHandle: string,
@@ -1616,7 +1987,49 @@ export async function toggleFollowUserRpc(
   }
 
   try {
-    // 1. Attempt server-side RPC toggle_follow passing both target_user_id and caller_user_id
+    // 1. If currently following, always perform unfollow (whether private or public)
+    const isCurrentlyFollowing = await checkIsFollowing(targetId, verifiedUserId);
+    if (isCurrentlyFollowing) {
+      const unfollowRes = await unfollowUser(targetId, verifiedUserId);
+      return {
+        success: unfollowRes.success,
+        isFollowing: !unfollowRes.success,
+        isRequested: false,
+        targetUserId: targetId,
+        error: unfollowRes.error,
+      };
+    }
+
+    // 2. Check if target researcher has a private profile
+    const isTargetPrivate = await checkTargetIsPrivate(targetId);
+
+    if (isTargetPrivate) {
+      // Check if user already has an active pending follow request
+      const hasRequest = await checkHasFollowRequest(targetId, verifiedUserId);
+      if (hasRequest) {
+        // Cancel the follow request
+        const cancelRes = await cancelFollowRequest(targetId, verifiedUserId);
+        return {
+          success: cancelRes.success,
+          isFollowing: false,
+          isRequested: false,
+          targetUserId: targetId,
+          error: cancelRes.error,
+        };
+      } else {
+        // Send follow request
+        const reqRes = await sendFollowRequest(targetId, verifiedUserId);
+        return {
+          success: reqRes.success,
+          isFollowing: false,
+          isRequested: reqRes.success,
+          targetUserId: targetId,
+          error: reqRes.error,
+        };
+      }
+    }
+
+    // 3. Target is public: attempt atomic server-side RPC toggle_follow
     const { data: rpcData, error: rpcError } = await supabase.rpc('toggle_follow', {
       target_user_id: targetId,
       caller_user_id: verifiedUserId,
@@ -1628,6 +2041,7 @@ export async function toggleFollowUserRpc(
         return {
           success: true,
           isFollowing: Boolean(parsed.is_following),
+          isRequested: false,
           targetUserId: targetId,
           targetFollowersCount: parsed.target_followers_count,
           callerFollowingCount: parsed.caller_following_count,
@@ -1636,29 +2050,20 @@ export async function toggleFollowUserRpc(
       }
     }
 
-    // 2. Direct table insert / delete fallback with direct count sync
-    const isCurrentlyFollowing = await checkIsFollowing(targetId, verifiedUserId);
-    if (isCurrentlyFollowing) {
-      const unfollowRes = await unfollowUser(targetId, verifiedUserId);
-      return {
-        success: unfollowRes.success,
-        isFollowing: !unfollowRes.success,
-        targetUserId: targetId,
-        error: unfollowRes.error,
-      };
-    } else {
-      const followRes = await followUser(targetId, verifiedUserId);
-      return {
-        success: followRes.success,
-        isFollowing: followRes.success,
-        targetUserId: targetId,
-        error: followRes.error,
-      };
-    }
+    // 4. Direct table insert fallback
+    const followRes = await followUser(targetId, verifiedUserId);
+    return {
+      success: followRes.success,
+      isFollowing: followRes.success,
+      isRequested: false,
+      targetUserId: targetId,
+      error: followRes.error,
+    };
   } catch (err: any) {
     return {
       success: false,
       isFollowing: false,
+      isRequested: false,
       targetUserId: targetId,
       error: err?.message || 'Failed to toggle follow.',
     };

@@ -48,6 +48,10 @@ export function formatNotificationContent(
   switch (type) {
     case 'follow':
       return 'started following you';
+    case 'follow_request':
+      return 'requested to follow you';
+    case 'follow_accept':
+      return 'accepted your follow request';
     case 'like':
       return 'liked your research post';
     case 'comment':
@@ -257,7 +261,9 @@ export function filterNotificationList(
     return list.filter((n) => n.type === 'comment' || n.type === 'reply' || n.type === 'mention');
   }
   if (filter === 'Follows') {
-    return list.filter((n) => n.type === 'follow');
+    return list.filter(
+      (n) => n.type === 'follow' || n.type === 'follow_request' || n.type === 'follow_accept'
+    );
   }
   if (filter === 'Discussions') {
     return list.filter(

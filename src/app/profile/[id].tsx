@@ -108,8 +108,12 @@ export default function OtherResearcherProfileScreen() {
   const [impressions28d, setImpressions28d] = useState<number | null>(null);
 
   const isFollowing = useAuthStore((s) => researcher?.id ? s.followingIds.has(researcher.id) : false);
+  const isRequested = useAuthStore((s) => researcher?.id ? s.requestedUserIds.has(researcher.id) : false);
   const isFollowLoading = useAuthStore((s) => researcher?.id ? s.followLoadingIds.has(researcher.id) : false);
   const [isMessageLoading, setIsMessageLoading] = useState(false);
+
+  const isPrivateAccount = researcher?.visibilityLevel === 'private' || Boolean(researcher?.isPrivateRestricted);
+  const isLocked = !isOwnProfile && !isFollowing && isPrivateAccount;
 
   // Fetch real 28-day research impressions when viewing own profile via [id].tsx
   useEffect(() => {
@@ -208,20 +212,28 @@ export default function OtherResearcherProfileScreen() {
           });
         }
       }
-      setResearcher(prof);
       if (prof?.id) {
         try {
           const { data: priv } = await supabase
             .from('user_settings')
-            .select('show_likes_on_profile')
+            .select('show_likes_on_profile, profile_visibility')
             .eq('user_id', prof.id)
             .maybeSingle();
           if (priv && priv.show_likes_on_profile !== undefined) {
             setShowLikesOnProfile(Boolean(priv.show_likes_on_profile));
           }
+          if (priv?.profile_visibility) {
+            prof.visibilityLevel = priv.profile_visibility;
+          }
         } catch {}
       }
-      if (prof?.id && !prof.isPrivateRestricted) {
+      setResearcher(prof);
+      const isLockedForViewer =
+        prof?.id &&
+        prof.id !== currentUser?.id &&
+        !prof.isFollowing &&
+        (prof.visibilityLevel === 'private' || Boolean(prof.isPrivateRestricted));
+      if (prof?.id && !isLockedForViewer && !prof.isPrivateRestricted) {
         loadResearcherPosts(prof.id);
       }
       setIsLoading(false);
@@ -243,22 +255,30 @@ export default function OtherResearcherProfileScreen() {
         prof = await fetchUserProfileByUsername(cleanId, currentUser?.id);
       }
       if (prof) {
-        setResearcher(prof);
         try {
           const { data: priv } = await supabase
             .from('user_settings')
-            .select('show_likes_on_profile')
+            .select('show_likes_on_profile, profile_visibility')
             .eq('user_id', prof.id)
             .maybeSingle();
           if (priv && priv.show_likes_on_profile !== undefined) {
             setShowLikesOnProfile(Boolean(priv.show_likes_on_profile));
           }
+          if (priv?.profile_visibility) {
+            prof.visibilityLevel = priv.profile_visibility;
+          }
         } catch {}
+        setResearcher(prof);
       }
       return prof;
     };
     const refreshedProf = await refreshProfile();
-    if (refreshedProf?.id && !refreshedProf.isPrivateRestricted) {
+    const isLockedForViewer =
+      refreshedProf?.id &&
+      refreshedProf.id !== currentUser?.id &&
+      !refreshedProf.isFollowing &&
+      (refreshedProf.visibilityLevel === 'private' || Boolean(refreshedProf.isPrivateRestricted));
+    if (refreshedProf?.id && !isLockedForViewer && !refreshedProf.isPrivateRestricted) {
       await loadResearcherPosts(refreshedProf.id);
     }
     setIsRefreshing(false);
@@ -684,8 +704,16 @@ export default function OtherResearcherProfileScreen() {
               {/* Follow / Edit Profile Button */}
               {!researcher.isBlocked && (
                 <Button
-                  title={isOwnProfile ? 'Edit Profile' : isFollowing ? 'Following' : 'Follow'}
-                  variant={isOwnProfile || isFollowing ? 'outline' : 'primary'}
+                  title={
+                    isOwnProfile
+                      ? 'Edit Profile'
+                      : isFollowing
+                      ? 'Following'
+                      : isRequested
+                      ? 'Requested'
+                      : 'Follow'
+                  }
+                  variant={isOwnProfile || isFollowing || isRequested ? 'outline' : 'primary'}
                   size="sm"
                   loading={isFollowLoading}
                   disabled={isFollowLoading}
@@ -695,7 +723,7 @@ export default function OtherResearcherProfileScreen() {
               )}
 
               {/* BooffIn Workspace 1-on-1 DM Button */}
-              {!isOwnProfile && !researcher.isBlocked && (
+              {!isOwnProfile && !researcher.isBlocked && !isLocked && (
                 <Button
                   title="Message"
                   variant="outline"
@@ -859,15 +887,24 @@ export default function OtherResearcherProfileScreen() {
               <Text style={{ ...typography.captionBold, color: colors.textPrimary }}>Unblock Researcher</Text>
             </TouchableOpacity>
           </View>
-        ) : researcher.isPrivateRestricted ? (
+        ) : isLocked ? (
           <View style={styles.privateProfileContainer}>
             <View style={styles.privateIconCircle}>
-              <Lock size={26} color={colors.textSecondary} />
+              <Lock size={28} color={colors.textPrimary} />
             </View>
-            <Text style={styles.privateTitle}>This Profile is Private</Text>
+            <Text style={styles.privateTitle}>This Account is Private</Text>
             <Text style={styles.privateSubtitle}>
-              {"Only approved connections can view this researcher's full profile, publications, and scientific discussions."}
+              {"Follow this researcher to view their research posts, publications, and scientific discussions."}
             </Text>
+            <Button
+              title={isRequested ? 'Requested' : 'Follow'}
+              variant={isRequested ? 'outline' : 'primary'}
+              size="md"
+              loading={isFollowLoading}
+              disabled={isFollowLoading}
+              onPress={handleFollowToggle}
+              style={{ marginTop: spacing.lg, minWidth: 160 }}
+            />
           </View>
         ) : (
           <>

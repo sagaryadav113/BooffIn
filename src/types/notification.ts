@@ -4,6 +4,8 @@ import { Post } from './post';
 
 export type NotificationType =
   | 'follow'
+  | 'follow_request'
+  | 'follow_accept'
   | 'like'
   | 'comment'
   | 'reply'

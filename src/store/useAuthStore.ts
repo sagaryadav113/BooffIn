@@ -15,7 +15,11 @@ import {
   SignUpParams,
   extractOAuthParams,
 } from '../api/authService';
-import { toggleFollowUserRpc, fetchUserFollowingIds } from '../api/socialService';
+import {
+  toggleFollowUserRpc,
+  fetchUserFollowingIds,
+  fetchOutgoingFollowRequestIds,
+} from '../api/socialService';
 import { useSearchStore } from './useSearchStore';
 import { supabase } from '../api/client';
 
@@ -45,6 +49,7 @@ interface AuthState {
   authError: string | null;
   users: UserProfile[];
   followingIds: Set<string>;
+  requestedUserIds: Set<string>;
   followLoadingIds: Set<string>;
   isInitialized: boolean;
 
@@ -52,6 +57,7 @@ interface AuthState {
   initializeAuth: () => Promise<void>;
   loadFollowingIds: (userId: string) => Promise<void>;
   isFollowingUser: (userId: string) => boolean;
+  isRequestedUser: (userId: string) => boolean;
   signIn: (email: string, pass: string) => Promise<boolean>;
   signUp: (params: SignUpParams) => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
@@ -72,6 +78,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   authError: null,
   users: [],
   followingIds: new Set<string>(),
+  requestedUserIds: new Set<string>(),
   followLoadingIds: new Set<string>(),
   isInitialized: false,
 
@@ -91,12 +98,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   loadFollowingIds: async (userId: string) => {
     if (!userId) {
-      set({ followingIds: new Set<string>() });
+      set({ followingIds: new Set<string>(), requestedUserIds: new Set<string>() });
       return;
     }
     try {
       const ids = await fetchUserFollowingIds(userId);
-      set({ followingIds: new Set<string>(ids) });
+      const reqIds = await fetchOutgoingFollowRequestIds(userId);
+      set({
+        followingIds: new Set<string>(ids),
+        requestedUserIds: new Set<string>(reqIds),
+      });
     } catch {
       // ignore
     }
@@ -104,6 +115,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   isFollowingUser: (userId: string) => {
     return get().followingIds.has(userId);
+  },
+
+  isRequestedUser: (userId: string) => {
+    return get().requestedUserIds.has(userId);
   },
 
   initializeAuth: async () => {
@@ -363,6 +378,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: false,
       isLoading: false,
       authError: null,
+      followingIds: new Set<string>(),
+      requestedUserIds: new Set<string>(),
+      followLoadingIds: new Set<string>(),
     });
   },
 
@@ -421,121 +439,72 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const currentFollowingSet = new Set(get().followingIds);
     const wasFollowing = currentFollowingSet.has(userId);
-    const isNowFollowing = !wasFollowing;
-    const followingDelta = isNowFollowing ? 1 : -1;
-
-    // 1. Optimistic update
-    const nextFollowingSet = new Set(currentFollowingSet);
-    if (isNowFollowing) {
-      nextFollowingSet.add(userId);
-    } else {
-      nextFollowingSet.delete(userId);
-    }
 
     const nextLoadingSet = new Set(get().followLoadingIds);
     nextLoadingSet.add(userId);
+    set({ followLoadingIds: nextLoadingSet });
 
-    set((state) => ({
-      followingIds: nextFollowingSet,
-      followLoadingIds: nextLoadingSet,
-      users: state.users.map((u) => {
-        if (u.id === userId) {
-          return {
-            ...u,
-            isFollowing: isNowFollowing,
-            followersCount: isNowFollowing
-              ? u.followersCount + 1
-              : Math.max(0, u.followersCount - 1),
-          };
-        }
-        return u;
-      }),
-      user: {
-        ...state.user,
-        followingCount: Math.max(0, state.user.followingCount + followingDelta),
-      },
-    }));
-
-    // Also sync search results in useSearchStore immediately
-    useSearchStore.getState().updateResearcherFollowState(userId, isNowFollowing);
-
-    // 2. Real API mutation via atomic RPC
     try {
       const res = await toggleFollowUserRpc(userId, currentUserId);
 
-      // Remove loading lock
       const doneLoadingSet = new Set(get().followLoadingIds);
       doneLoadingSet.delete(userId);
 
       if (!res.success) {
-        console.warn('[useAuthStore] toggleFollowUser failed, rolling back:', res.error);
-        // Rollback state
-        set((state) => ({
-          followingIds: currentFollowingSet,
-          followLoadingIds: doneLoadingSet,
-          users: state.users.map((u) => {
-            if (u.id === userId) {
-              return {
-                ...u,
-                isFollowing: wasFollowing,
-                followersCount: wasFollowing
-                  ? u.followersCount + 1
-                  : Math.max(0, u.followersCount - 1),
-              };
-            }
-            return u;
-          }),
-          user: {
-            ...state.user,
-            followingCount: Math.max(0, state.user.followingCount - followingDelta),
-          },
-          authError: res.error,
-        }));
-        useSearchStore.getState().updateResearcherFollowState(userId, wasFollowing);
+        console.warn('[useAuthStore] toggleFollowUser failed:', res.error);
+        set({ followLoadingIds: doneLoadingSet, authError: res.error });
         return false;
       }
 
-      // If server returned exact counts, sync them
-      if (res.callerFollowingCount !== undefined) {
-        set((state) => ({
-          followLoadingIds: doneLoadingSet,
-          user: {
-            ...state.user,
-            followingCount: res.callerFollowingCount!,
-          },
-        }));
+      const nextFollowingSet = new Set(get().followingIds);
+      const nextRequestedSet = new Set(get().requestedUserIds);
+
+      if (res.isFollowing) {
+        nextFollowingSet.add(userId);
+        nextRequestedSet.delete(userId);
+      } else if (res.isRequested) {
+        nextRequestedSet.add(userId);
+        nextFollowingSet.delete(userId);
       } else {
-        set({ followLoadingIds: doneLoadingSet });
+        nextFollowingSet.delete(userId);
+        nextRequestedSet.delete(userId);
       }
 
-      return true;
-    } catch (err: any) {
-      const doneLoadingSet = new Set(get().followLoadingIds);
-      doneLoadingSet.delete(userId);
+      const followingDelta = res.isFollowing && !wasFollowing ? 1 : !res.isFollowing && wasFollowing ? -1 : 0;
 
-      // Rollback on unexpected exception
       set((state) => ({
-        followingIds: currentFollowingSet,
+        followingIds: nextFollowingSet,
+        requestedUserIds: nextRequestedSet,
         followLoadingIds: doneLoadingSet,
         users: state.users.map((u) => {
           if (u.id === userId) {
             return {
               ...u,
-              isFollowing: wasFollowing,
-              followersCount: wasFollowing
+              isFollowing: res.isFollowing,
+              isRequested: Boolean(res.isRequested),
+              followersCount: res.isFollowing && !wasFollowing
                 ? u.followersCount + 1
-                : Math.max(0, u.followersCount - 1),
+                : !res.isFollowing && wasFollowing
+                ? Math.max(0, u.followersCount - 1)
+                : u.followersCount,
             };
           }
           return u;
         }),
         user: {
           ...state.user,
-          followingCount: Math.max(0, state.user.followingCount - followingDelta),
+          followingCount: res.callerFollowingCount !== undefined
+            ? res.callerFollowingCount
+            : Math.max(0, state.user.followingCount + followingDelta),
         },
-        authError: err?.message || 'Failed to toggle follow.',
       }));
-      useSearchStore.getState().updateResearcherFollowState(userId, wasFollowing);
+
+      useSearchStore.getState().updateResearcherFollowState(userId, res.isFollowing);
+      return true;
+    } catch (err: any) {
+      const doneLoadingSet = new Set(get().followLoadingIds);
+      doneLoadingSet.delete(userId);
+      set({ followLoadingIds: doneLoadingSet, authError: err?.message || 'Failed to toggle follow.' });
       return false;
     }
   },

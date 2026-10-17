@@ -74,6 +74,7 @@ export type IconName =
   | 'Moon'
   | 'BookOpen'
   | 'Award'
+  | 'UserPlus'
   | 'UserCheck'
   | 'UserX'
   | 'Flag'

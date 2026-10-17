@@ -31,6 +31,7 @@ export interface UserProfile {
   savedCount: number;
   joinedDate: string;
   isFollowing?: boolean;
+  isRequested?: boolean;
   openAlexId?: string;
   worksCount?: number;
   citationCount?: number;
@@ -38,4 +39,13 @@ export interface UserProfile {
   isPrivateRestricted?: boolean;
   isBlocked?: boolean;
   visibilityLevel?: 'public' | 'registered' | 'private';
+}
+
+export interface FollowRequest {
+  id: string;
+  requesterId: string;
+  requester?: UserProfile;
+  targetId: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
 }

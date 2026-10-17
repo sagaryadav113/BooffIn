@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import {
   Repeat2,
   UserPlus,
+  UserCheck,
   TrendingUp,
   FileText,
   Sparkles,
@@ -69,9 +70,16 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
           </View>
         );
       case 'follow':
+      case 'follow_request':
         return (
           <View style={[styles.badgeContainer, { backgroundColor: colors.black }]}>
             <UserPlus size={size} color={colors.white} />
+          </View>
+        );
+      case 'follow_accept':
+        return (
+          <View style={[styles.badgeContainer, { backgroundColor: colors.accentGreen }]}>
+            <UserCheck size={size} color={colors.white} />
           </View>
         );
       case 'paper_discussion':

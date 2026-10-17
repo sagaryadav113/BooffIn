@@ -168,6 +168,18 @@ export async function updateUserSettings(
         ...dbPayload,
       });
 
+    if (updates.profileVisibility !== undefined) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            visibility_level: updates.profileVisibility,
+            is_private: updates.profileVisibility === 'private',
+          })
+          .eq('id', userId);
+      } catch {}
+    }
+
     if (error) {
       // Table may not be provisioned yet; local storage already saved state
       return { success: true, error: null };
