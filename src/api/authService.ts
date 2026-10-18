@@ -118,20 +118,28 @@ export async function fetchUserProfile(userId: string, viewerId?: string): Promi
       console.warn('[authService] get_user_profile RPC error:', rpcError.message);
     }
 
-    // 2. Self-profile recovery: If this is the active user reading their own profile,
-    // Supabase RLS safely allows reading own row directly from 'profiles' table if RPC timed out or failed.
+    // 2. Direct database fallback: if RPC fails/is not installed, read directly from public.profiles
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id === userId) {
-        const { data: directData, error: directError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
+      const { data: directData, error: directError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-        if (!directError && directData && directData.id) {
-          return mapProfileRecord(directData);
+      if (!directError && directData && directData.id) {
+        let isFollowing: boolean | undefined = undefined;
+        if (viewerId && viewerId !== directData.id) {
+          try {
+            const { data: followRow } = await supabase
+              .from('follows')
+              .select('following_id')
+              .eq('follower_id', viewerId)
+              .eq('following_id', directData.id)
+              .maybeSingle();
+            isFollowing = Boolean(followRow);
+          } catch {}
         }
+        return mapProfileRecord(directData, undefined, isFollowing);
       }
     } catch {}
 
@@ -173,7 +181,31 @@ export async function fetchUserProfileByUsername(username: string, viewerId?: st
       console.warn('[authService] get_user_profile by username RPC error:', rpcError.message);
     }
 
-    // Fail safe: NEVER fall back to unrestricted table select('*')
+    // 2. Direct database query fallback: if RPC fails/is not installed, query public.profiles by username
+    try {
+      const { data: directData, error: directError } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('username', normalized)
+        .maybeSingle();
+
+      if (!directError && directData && directData.id) {
+        let isFollowing: boolean | undefined = undefined;
+        if (viewerId && viewerId !== directData.id) {
+          try {
+            const { data: followRow } = await supabase
+              .from('follows')
+              .select('following_id')
+              .eq('follower_id', viewerId)
+              .eq('following_id', directData.id)
+              .maybeSingle();
+            isFollowing = Boolean(followRow);
+          } catch {}
+        }
+        return mapProfileRecord(directData, undefined, isFollowing);
+      }
+    } catch {}
+
     return null;
   } catch (err) {
     console.warn('[authService] fetchUserProfileByUsername error:', err);
