@@ -712,12 +712,14 @@ export default function ExploreScreen() {
               />
             )}
 
-            {/* Trending Topics & Tags (24-Hour Velocity Engine) */}
-            <TrendingTagsSection
-              tags={trendingTags}
-              isLoading={isLoadingTrending}
-              onSelectTag={handleSelectTrendingTag}
-            />
+            {/* Trending Topics & Tags (24-Hour Velocity Engine) - Only displayed in 'For You' section */}
+            {activeTab === 'For You' && (
+              <TrendingTagsSection
+                tags={trendingTags}
+                isLoading={isLoadingTrending}
+                onSelectTag={handleSelectTrendingTag}
+              />
+            )}
 
             {/* Render Domain Hyped Section */}
             {renderHypedDomainContent()}
