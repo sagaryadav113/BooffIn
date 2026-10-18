@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import {
   Flame,
-  TrendingUp,
   Hash,
   ChevronDown,
   ChevronUp,
@@ -93,12 +92,6 @@ export const TrendingTagsSection: React.FC<TrendingTagsSectionProps> = ({
                     <Text style={styles.rankText}>
                       {item.rank} · {item.category}
                     </Text>
-                    {item.growthRatePct && item.growthRatePct > 0 ? (
-                      <View style={styles.growthBadge}>
-                        <TrendingUp size={10} color="#059669" />
-                        <Text style={styles.growthBadgeText}>+{item.growthRatePct}%</Text>
-                      </View>
-                    ) : null}
                   </View>
 
                   {/* Main Tag Line */}
@@ -245,21 +238,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     fontWeight: '500',
-  },
-  growthBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: radii.sm,
-  },
-  growthBadgeText: {
-    ...typography.caption,
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#059669',
   },
   tagRow: {
     marginVertical: 1,

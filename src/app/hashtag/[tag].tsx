@@ -17,10 +17,8 @@ import {
   ArrowLeft,
   Flame,
   Clock,
-  TrendingUp,
   Hash,
   Share2,
-  PenLine,
   Sparkles,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -139,12 +137,6 @@ export default function HashtagFeedScreen() {
               {data.rank ? `#${data.rank} Trending in ${data.category}` : data.category}
             </Text>
           </View>
-          {data.growthRatePct && data.growthRatePct > 0 ? (
-            <View style={styles.growthBadge}>
-              <TrendingUp size={11} color="#059669" />
-              <Text style={styles.growthBadgeText}>+{data.growthRatePct}%</Text>
-            </View>
-          ) : null}
         </View>
 
         {/* Main Hashtag Title */}
@@ -169,21 +161,6 @@ export default function HashtagFeedScreen() {
             </View>
           )}
         </View>
-
-        {/* Quick Post Prompt Bar */}
-        <TouchableOpacity
-          activeOpacity={0.82}
-          onPress={handleCreatePost}
-          style={styles.composerBar}
-        >
-          <PenLine size={16} color="#1B4D3E" />
-          <Text style={styles.composerBarText}>
-            Share insights or question on {displayTag}...
-          </Text>
-          <View style={styles.postPill}>
-            <Text style={styles.postPillText}>Post</Text>
-          </View>
-        </TouchableOpacity>
 
         {/* Twitter-style Filter Tabs: Top vs Latest */}
         <View style={styles.tabContainer}>
@@ -309,16 +286,6 @@ export default function HashtagFeedScreen() {
           }
         />
       )}
-
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        activeOpacity={0.88}
-        onPress={handleCreatePost}
-        style={styles.fab}
-      >
-        <PenLine size={20} color="#FFFFFF" strokeWidth={2.5} />
-        <Text style={styles.fabText}>Post</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -391,21 +358,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#475569',
   },
-  growthBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: radii.sm,
-  },
-  growthBadgeText: {
-    ...typography.caption,
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#059669',
-  },
   titleRow: {
     marginBottom: 6,
   },
@@ -442,36 +394,6 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '700',
     color: '#1B4D3E',
-  },
-  composerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: radii.xl,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 14,
-    gap: 10,
-  },
-  composerBarText: {
-    flex: 1,
-    ...typography.body,
-    fontSize: 13.5,
-    color: '#94A3B8',
-  },
-  postPill: {
-    backgroundColor: '#1B4D3E',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: radii.full,
-  },
-  postPillText: {
-    ...typography.caption,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -517,28 +439,5 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     color: '#64748B',
     marginTop: 12,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#1B4D3E',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: radii.full,
-    shadowColor: '#1B4D3E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabText: {
-    ...typography.body,
-    fontSize: 14.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
   },
 });
