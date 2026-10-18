@@ -104,7 +104,7 @@ CREATE TRIGGER on_auth_user_created
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.papers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  doi TEXT,
+  doi TEXT UNIQUE,
   canonical_url TEXT NOT NULL,
   title TEXT NOT NULL,
   abstract TEXT,
@@ -124,6 +124,18 @@ CREATE TABLE IF NOT EXISTS public.papers (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_papers_doi_unique ON public.papers(doi) WHERE doi IS NOT NULL;
+
+-- Ensure doi unique constraint exists even if table was already created earlier
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'papers_doi_key'
+  ) THEN
+    ALTER TABLE public.papers ADD CONSTRAINT papers_doi_key UNIQUE (doi);
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
 ALTER TABLE public.papers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public Read Papers" ON public.papers;
 CREATE POLICY "Public Read Papers" ON public.papers FOR SELECT USING (true);
@@ -571,4 +583,4 @@ INSERT INTO public.papers (
     'bioRxiv', 'Cold Spring Harbor Laboratory', 2024, '2024-05-10', 'preprint',
     'https://www.biorxiv.org/content/10.1101/2024.05.10.593501v1.full.pdf', 'crossref', 16, 9, 87, 42
   )
-ON CONFLICT (doi) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
