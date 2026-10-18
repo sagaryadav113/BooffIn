@@ -149,13 +149,32 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
     });
   };
 
-  // Render text with clickable @mentions and interactive web URLs
+  // Render text with clickable @mentions, #hashtags, and interactive web URLs
   const renderFormattedContent = (content: string) => {
-    const tokenRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|@[a-zA-Z0-9_]{2,30})/gi;
+    const tokenRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|@[a-zA-Z0-9_]{2,30}|#[a-zA-Z0-9_\u00c0-\u024f]{2,50})/gi;
     const parts = content.split(tokenRegex);
 
     return parts.map((part, index) => {
       if (!part) return null;
+
+      if (part.startsWith('#')) {
+        const rawTag = part.replace(/^#/, '');
+        return (
+          <Text
+            key={index}
+            style={styles.hashtagText}
+            onPress={(e) => {
+              e.stopPropagation();
+              router.push({
+                pathname: '/hashtag/[tag]' as any,
+                params: { tag: rawTag },
+              });
+            }}
+          >
+            {part}
+          </Text>
+        );
+      }
 
       if (part.startsWith('@')) {
         const handle = part.replace('@', '');
@@ -859,6 +878,10 @@ const styles = StyleSheet.create({
   mentionText: {
     color: colors.accentBlue,
     fontWeight: '600',
+  },
+  hashtagText: {
+    color: '#0D9488',
+    fontWeight: '700',
   },
   linkText: {
     color: colors.accentBlue,

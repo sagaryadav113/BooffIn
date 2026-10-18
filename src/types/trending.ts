@@ -18,3 +18,14 @@ export interface TrendingResponse {
   totalPostsAnalyzed: number;
   generatedAt: string;
 }
+
+export interface HashtagDetailData {
+  tag: string;
+  rawName: string;
+  category: string;
+  rank?: number;
+  growthRatePct?: number;
+  postsCount24h: number;
+  authorsCount24h: number;
+  posts: import('./post').Post[];
+}

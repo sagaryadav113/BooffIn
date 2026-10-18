@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   Plus,
   Users,
+  Hash,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -240,7 +241,11 @@ export default function ExploreScreen() {
   };
 
   const handleSelectTrendingTag = (tag: string) => {
-    handleSelectRecentOrTopic(tag);
+    const cleanTag = tag.replace(/^#/, '').trim();
+    router.push({
+      pathname: '/hashtag/[tag]' as any,
+      params: { tag: cleanTag },
+    });
   };
 
   // Automatically trigger debounced unified search when searchQuery changes
@@ -630,8 +635,32 @@ export default function ExploreScreen() {
         )}
 
         {/* State B: Active Search Results */}
-        {!isSearching && hasQuery && results && (
+        {!isSearching && hasQuery && (
           <View style={styles.resultsContainer}>
+            {/* If query is a hashtag, show direct one-tap card to view top hashtag discussions */}
+            {searchQuery.trim().startsWith('#') && (
+              <TouchableOpacity
+                activeOpacity={0.82}
+                onPress={() => handleSelectTrendingTag(searchQuery)}
+                style={styles.hashtagBannerCard}
+              >
+                <View style={styles.hashtagBannerLeft}>
+                  <View style={styles.hashtagBannerIcon}>
+                    <Hash size={18} color="#1B4D3E" />
+                  </View>
+                  <View style={styles.hashtagBannerTextCol}>
+                    <Text style={styles.hashtagBannerTitle}>
+                      View discussions for {searchQuery.trim()}
+                    </Text>
+                    <Text style={styles.hashtagBannerSub}>
+                      See top community posts and latest research debates
+                    </Text>
+                  </View>
+                </View>
+                <ArrowRight size={18} color="#1B4D3E" />
+              </TouchableOpacity>
+            )}
+
             {/* Detected Intent Badge */}
             {detectedBadgeText && (
               <View style={styles.detectedPill}>
@@ -816,6 +845,47 @@ const styles = StyleSheet.create({
     ...typography.captionBold,
     fontSize: 12,
     color: '#1B4D3E',
+  },
+  hashtagBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#EAF3EE',
+    borderWidth: 1,
+    borderColor: '#C7E2D4',
+    borderRadius: radii.xl,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  hashtagBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  hashtagBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hashtagBannerTextCol: {
+    flex: 1,
+  },
+  hashtagBannerTitle: {
+    ...typography.body,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1B4D3E',
+  },
+  hashtagBannerSub: {
+    ...typography.caption,
+    fontSize: 11.5,
+    color: '#475569',
+    marginTop: 1,
   },
   sectionWrap: {
     marginBottom: 24,

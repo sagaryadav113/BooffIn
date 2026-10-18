@@ -120,6 +120,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="hashtag/[tag]"
+        options={{
+          headerShown: false,
+          animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
         name="search/index"
         options={{
           headerShown: false,

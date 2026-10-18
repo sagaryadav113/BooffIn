@@ -93,7 +93,7 @@ export const TrendingTagsSection: React.FC<TrendingTagsSectionProps> = ({
                     <Text style={styles.rankText}>
                       {item.rank} · {item.category}
                     </Text>
-                    {item.growthRatePct && item.growthRatePct > 50 ? (
+                    {item.growthRatePct && item.growthRatePct > 0 ? (
                       <View style={styles.growthBadge}>
                         <TrendingUp size={10} color="#059669" />
                         <Text style={styles.growthBadgeText}>+{item.growthRatePct}%</Text>
@@ -109,9 +109,11 @@ export const TrendingTagsSection: React.FC<TrendingTagsSectionProps> = ({
                   {/* Discussion Volume Subtitle */}
                   <View style={styles.statsRow}>
                     <Text style={styles.statsText}>
-                      {item.postsCount24h.toLocaleString()} discussions
+                      {item.postsCount24h.toLocaleString()} {item.postsCount24h === 1 ? 'discussion' : 'discussions'}
                       {item.authorsCount24h > 1
                         ? ` · ${item.authorsCount24h} researchers`
+                        : item.authorsCount24h === 1
+                        ? ' · 1 researcher'
                         : ''}
                     </Text>
                   </View>
