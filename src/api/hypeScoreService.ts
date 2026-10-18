@@ -161,37 +161,71 @@ export function createDefaultPaperMetrics(paperId: string): PaperMetrics {
  */
 const inMemoryMetricsCache = new Map<string, PaperMetrics>();
 const inMemoryUserRatingsCache = new Map<string, UserPaperRating>();
+const paperIdAliasMap = new Map<string, string>();
+const STORAGE_KEY_ALIAS_MAP = 'booffin_paper_id_aliases_v1';
+
+// Auto-load alias map from local storage
+(async () => {
+  try {
+    const raw = await appStorage.getItem(STORAGE_KEY_ALIAS_MAP);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === 'object' && parsed !== null) {
+        Object.entries(parsed).forEach(([k, v]) => {
+          if (typeof v === 'string') paperIdAliasMap.set(k.toLowerCase().trim(), v.trim());
+        });
+      }
+    }
+  } catch {}
+})();
+
+export function registerPaperAlias(id1?: string, id2?: string) {
+  if (!id1 || !id2 || id1.trim() === id2.trim()) return;
+  const k1 = id1.trim().toLowerCase();
+  const k2 = id2.trim().toLowerCase();
+  paperIdAliasMap.set(k1, id2.trim());
+  paperIdAliasMap.set(k2, id1.trim());
+
+  // Also register cleaned DOI variants
+  const clean1 = k1.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '');
+  const clean2 = k2.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '');
+  if (clean1 !== k1) paperIdAliasMap.set(clean1, id2.trim());
+  if (clean2 !== k2) paperIdAliasMap.set(clean2, id1.trim());
+
+  const obj: Record<string, string> = {};
+  paperIdAliasMap.forEach((v, k) => { obj[k] = v; });
+  appStorage.setItem(STORAGE_KEY_ALIAS_MAP, JSON.stringify(obj)).catch(() => {});
+}
 
 /**
  * Retrieves metrics for a given paper ID
  */
 export async function getPaperMetrics(paperId: string): Promise<PaperMetrics> {
   const normalizedId = paperId.trim();
+  const lowerId = normalizedId.toLowerCase();
+
   if (inMemoryMetricsCache.has(normalizedId)) {
     return inMemoryMetricsCache.get(normalizedId)!;
   }
 
-  // 1. Try local storage
+  // Check alias in memory
+  const aliasId = paperIdAliasMap.get(lowerId);
+  if (aliasId && inMemoryMetricsCache.has(aliasId)) {
+    const cached = inMemoryMetricsCache.get(aliasId)!;
+    inMemoryMetricsCache.set(normalizedId, cached);
+    return cached;
+  }
+
+  // 1. Try local storage (direct ID or resolved alias)
   try {
-    const raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${normalizedId}`);
+    let raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${normalizedId}`);
+    if (!raw && aliasId) {
+      raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${aliasId}`);
+    }
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Cleanse legacy mock data
-      if (parsed.impactCount === 6 || (parsed.views >= 24 && parsed.impactCount === 0)) {
-        parsed.views = 0;
-        parsed.uniqueReaders = 0;
-        parsed.viewsLast24h = 0;
-        parsed.viewsLastHour = 0;
-        parsed.impactSum = 0;
-        parsed.impactCount = 0;
-        parsed.claritySum = 0;
-        parsed.clarityCount = 0;
-        parsed.visualsSum = 0;
-        parsed.visualsCount = 0;
-        parsed.hypeScore = 0;
-        parsed.communityRating = 0;
-      }
       inMemoryMetricsCache.set(normalizedId, parsed);
+      if (aliasId) inMemoryMetricsCache.set(aliasId, parsed);
       return parsed;
     }
   } catch {}
@@ -256,8 +290,13 @@ export async function getBatchPaperMetrics(paperIds: string[]): Promise<Map<stri
 
   for (const rawId of paperIds) {
     const id = rawId.trim();
+    const alias = paperIdAliasMap.get(id.toLowerCase());
     if (inMemoryMetricsCache.has(id)) {
       result.set(id, inMemoryMetricsCache.get(id)!);
+    } else if (alias && inMemoryMetricsCache.has(alias)) {
+      const cached = inMemoryMetricsCache.get(alias)!;
+      inMemoryMetricsCache.set(id, cached);
+      result.set(id, cached);
     } else {
       missingIds.push(id);
     }
@@ -267,15 +306,20 @@ export async function getBatchPaperMetrics(paperIds: string[]): Promise<Map<stri
     return result;
   }
 
-  // 1. Try local storage in parallel
+  // 1. Try local storage in parallel (checking both direct ID and alias)
   const stillMissing: string[] = [];
   await Promise.all(
     missingIds.map(async (id) => {
+      const alias = paperIdAliasMap.get(id.toLowerCase());
       try {
-        const raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${id}`);
+        let raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${id}`);
+        if (!raw && alias) {
+          raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${alias}`);
+        }
         if (raw) {
           const parsed = JSON.parse(raw);
           inMemoryMetricsCache.set(id, parsed);
+          if (alias) inMemoryMetricsCache.set(alias, parsed);
           result.set(id, parsed);
           return;
         }
@@ -353,35 +397,54 @@ export async function recordPaperView(
   paper?: Paper
 ): Promise<PaperMetrics> {
   const normalizedId = paperId.trim();
+  const lowerId = normalizedId.toLowerCase();
   const effectiveUserId = userId || 'anonymous_reader';
   const now = Date.now();
   const oneDayAgo = now - 24 * 60 * 60 * 1000;
   const oneHourAgo = now - 60 * 60 * 1000;
 
+  // Register bidirectional alias between paper.id and paper.doi
+  if (paper?.id && paper?.doi) {
+    registerPaperAlias(paper.id, paper.doi);
+  }
+
+  const aliasId = paperIdAliasMap.get(lowerId);
+
   let viewLogs: StoredViewEntry[] = [];
 
   try {
-    const rawLogs = await appStorage.getItem(`${STORAGE_KEY_PREFIX_VIEWS}${normalizedId}`);
+    let rawLogs = await appStorage.getItem(`${STORAGE_KEY_PREFIX_VIEWS}${normalizedId}`);
+    if (!rawLogs && aliasId) {
+      rawLogs = await appStorage.getItem(`${STORAGE_KEY_PREFIX_VIEWS}${aliasId}`);
+    }
     if (rawLogs) {
       viewLogs = JSON.parse(rawLogs);
     }
   } catch {}
 
-  // Append real view event
-  viewLogs.push({ timestamp: now, userId: effectiveUserId });
+  // Deduplicate view if same user viewed within last 5 minutes to prevent spam,
+  // but ALWAYS preserve existing count!
+  const recentUserView = viewLogs.find(
+    (v) => v.userId === effectiveUserId && now - v.timestamp < 5 * 60 * 1000
+  );
 
-  // Calculate real metrics from actual log
-  const realViews = viewLogs.length;
-  const realUniqueReaders = new Set(viewLogs.map((v) => v.userId)).size;
-  const realViewsLast24h = viewLogs.filter((v) => v.timestamp >= oneDayAgo).length;
+  if (!recentUserView) {
+    viewLogs.push({ timestamp: now, userId: effectiveUserId });
+  }
+
+  // Calculate real metrics from actual log (guarantee at least 1 view)
+  const realViews = Math.max(viewLogs.length, 1);
+  const realUniqueReaders = Math.max(new Set(viewLogs.map((v) => v.userId)).size, 1);
+  const realViewsLast24h = Math.max(viewLogs.filter((v) => v.timestamp >= oneDayAgo).length, 1);
   const realViewsLastHour = viewLogs.filter((v) => v.timestamp >= oneHourAgo).length;
 
-  // Persist the real view log
+  // Persist the real view log under primary ID and any aliases
   try {
-    await appStorage.setItem(
-      `${STORAGE_KEY_PREFIX_VIEWS}${normalizedId}`,
-      JSON.stringify(viewLogs.slice(-1000))
-    );
+    const payload = JSON.stringify(viewLogs.slice(-1000));
+    await appStorage.setItem(`${STORAGE_KEY_PREFIX_VIEWS}${normalizedId}`, payload);
+    if (aliasId) {
+      await appStorage.setItem(`${STORAGE_KEY_PREFIX_VIEWS}${aliasId}`, payload);
+    }
   } catch {}
 
   // Update paper metrics with the real view counts
@@ -406,12 +469,37 @@ export async function recordPaperView(
     hypeScore: finalHypeScore,
   };
 
+  // Update in-memory cache under normalized ID and any aliases
   inMemoryMetricsCache.set(normalizedId, updatedMetrics);
+  if (aliasId) {
+    inMemoryMetricsCache.set(aliasId, updatedMetrics);
+  }
+  if (paper?.doi) {
+    inMemoryMetricsCache.set(paper.doi.trim(), updatedMetrics);
+  }
+  if (paper?.id) {
+    inMemoryMetricsCache.set(paper.id.trim(), updatedMetrics);
+  }
+
+  // Persist metrics under both keys
   try {
+    const metricsPayload = JSON.stringify(updatedMetrics);
     await appStorage.setItem(
       `${STORAGE_KEY_PREFIX_METRICS}${normalizedId}`,
-      JSON.stringify(updatedMetrics)
+      metricsPayload
     );
+    if (aliasId) {
+      await appStorage.setItem(
+        `${STORAGE_KEY_PREFIX_METRICS}${aliasId}`,
+        metricsPayload
+      );
+    }
+    if (paper?.doi && paper.doi.trim() !== normalizedId) {
+      await appStorage.setItem(
+        `${STORAGE_KEY_PREFIX_METRICS}${paper.doi.trim()}`,
+        metricsPayload
+      );
+    }
   } catch {}
 
   // If a Paper object is provided, register it in the persistent read papers registry
@@ -421,6 +509,12 @@ export async function recordPaperView(
 
   // Broadcast real-time read event to all active screens
   notifyPaperRead(normalizedId, updatedMetrics, paper);
+  if (aliasId) {
+    notifyPaperRead(aliasId, updatedMetrics, paper);
+  }
+  if (paper?.doi && paper.doi.trim() !== normalizedId) {
+    notifyPaperRead(paper.doi.trim(), updatedMetrics, paper);
+  }
 
   return updatedMetrics;
 }

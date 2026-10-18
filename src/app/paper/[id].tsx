@@ -245,18 +245,18 @@ export default function PaperDetailScreen() {
     hasRecordedReadRef.current = false;
   }, [paperId]);
 
-  // Load verified metrics immediately; count as reader ONLY after > 25 seconds of reading
+  // Load verified metrics immediately and record read after 1.5s dwell time
   useEffect(() => {
     let isMounted = true;
     const targetId = paperId || doi || paper?.id;
     if (!targetId) return;
 
-    // 1. Fetch current status immediately (does NOT count as read)
+    // 1. Fetch current status immediately
     getPaperMetrics(targetId).then((m) => {
       if (isMounted) setPaperMetrics(m);
     });
 
-    // 2. Count 1 verified reader only after spending > 25 seconds reading the paper
+    // 2. Register verified reader after brief 1.5-second dwell time to ensure view is saved
     const timer = setTimeout(async () => {
       if (!isMounted || hasRecordedReadRef.current) return;
       hasRecordedReadRef.current = true;
@@ -273,7 +273,7 @@ export default function PaperDetailScreen() {
           setPaperMetrics(updated);
         }
       }
-    }, 25000);
+    }, 1500);
 
     return () => {
       isMounted = false;
