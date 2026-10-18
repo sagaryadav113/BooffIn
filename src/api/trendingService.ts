@@ -9,7 +9,7 @@ const HASHTAG_REGEX = /(?:^|\s)#([a-zA-Z0-9_\u00c0-\u024f]{2,50})/g;
 // In-memory cache for synchronous 0ms render
 let memoryTrendingCache: TrendingTag[] | null = null;
 let lastFetchTimestamp = 0;
-const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache
 
 /**
  * Intelligent scientific categorization based on hashtag content keywords
@@ -170,23 +170,24 @@ export async function fetchTrendingTags(forceRefresh = false): Promise<TrendingR
   let records: RawPostActivity[] = [];
 
   try {
-    // Fetch all real posts from Supabase database
+    // Fetch recent posts from Supabase database (capped to 60 to prevent egress spikes)
     const { data: postsData, error: postsErr } = await supabase
       .from('posts')
       .select('id, content, author_id, likes_count, comments_count, reposts_count, created_at')
       .order('created_at', { ascending: false })
-      .limit(300);
+      .limit(60);
 
     if (!postsErr && postsData) {
       records = postsData;
     }
 
-    // Also fetch comments containing hashtags
+    // Also fetch comments containing hashtags (capped to 30)
     const { data: commentsData } = await supabase
       .from('comments')
       .select('id, content, author_id, created_at')
       .like('content', '%#%')
-      .limit(100);
+      .order('created_at', { ascending: false })
+      .limit(30);
 
     if (commentsData && commentsData.length > 0) {
       records.push(
@@ -401,7 +402,7 @@ export async function fetchPostsByHashtag(
       query = query.order('created_at', { ascending: false });
     }
 
-    const { data: rawRows, error } = await query.limit(50);
+    const { data: rawRows, error } = await query.limit(25);
 
     if (error) {
       console.warn('[trendingService.fetchPostsByHashtag] Error querying posts:', error.message);

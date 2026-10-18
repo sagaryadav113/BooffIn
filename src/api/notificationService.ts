@@ -373,7 +373,7 @@ export async function fetchNotificationById(notificationId: string): Promise<App
 export async function fetchNotifications(
   filter: NotificationFilter = 'All',
   page: number = 1,
-  pageSize: number = 40,
+  pageSize: number = 25,
   currentUserId?: string
 ): Promise<{ data: AppNotification[]; hasMore: boolean; error: string | null }> {
   try {
@@ -471,7 +471,8 @@ export async function fetchNotifications(
           `)
           .eq('recipient_id', userId)
           .eq('topic', 'follow_request')
-          .eq('status', 'pending');
+          .eq('status', 'pending')
+          .limit(20);
 
         if (Array.isArray(pendingColReqs)) {
           for (const req of pendingColReqs) {

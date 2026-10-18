@@ -200,6 +200,7 @@ export const ChatMediaGalleryModal: React.FC<ChatMediaGalleryModalProps> = ({
                           style={styles.gridImage}
                           contentFit="cover"
                           transition={200}
+                          cachePolicy="disk"
                         />
                       </TouchableOpacity>
                     ))}

@@ -1330,7 +1330,8 @@ export async function fetchComments(
       `
       )
       .eq('post_id', postId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .limit(50);
 
     if (error || !data) {
       return { comments: [], error: error?.message || null };

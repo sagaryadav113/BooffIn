@@ -55,7 +55,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }
 
     try {
-      const { data, hasMore, error } = await fetchNotifications(get().activeFilter, 1, 40, currentUserId);
+      const { data, hasMore, error } = await fetchNotifications(get().activeFilter, 1, 25, currentUserId);
       if (error) {
         set({ error, isLoading: false, isRefreshing: false });
       } else {
@@ -88,7 +88,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set({ isLoadingMore: true });
 
     try {
-      const { data, hasMore: nextHasMore, error } = await fetchNotifications(activeFilter, nextPage, 40, currentUserId);
+      const { data, hasMore: nextHasMore, error } = await fetchNotifications(activeFilter, nextPage, 25, currentUserId);
       if (error) {
         set({ isLoadingMore: false });
         return;

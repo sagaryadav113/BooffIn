@@ -55,6 +55,7 @@ export const Avatar: React.FC<AvatarProps> = ({
           style={{ width: pixelSize, height: pixelSize, borderRadius: pixelSize / 2 }}
           contentFit="cover"
           transition={200}
+          cachePolicy="disk"
         />
       ) : (
         <View

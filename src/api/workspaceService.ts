@@ -1459,7 +1459,8 @@ export const workspaceService = {
             .select('id, sender_id, content, attachments, created_at')
             .eq('workspace_id', workspaceId)
             .or('content.ilike.*Vote:*,content.ilike.*POLL_VOTE*,attachments->>is_poll_vote_action.eq.true')
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: true })
+            .limit(100);
           if (Array.isArray(vData)) {
             voteActions = vData;
           }

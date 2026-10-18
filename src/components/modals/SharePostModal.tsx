@@ -232,6 +232,7 @@ export const SharePostModal: React.FC<SharePostModalProps> = ({
                     source={{ uri: img }}
                     style={styles.snippetThumb}
                     contentFit="cover"
+                    cachePolicy="disk"
                   />
                 ))}
                 {post.images!.length > 3 && (

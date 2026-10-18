@@ -159,6 +159,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                   contentFit="contain"
                   priority="high"
                   transition={150}
+                  cachePolicy="disk"
                 />
               </View>
             ))}

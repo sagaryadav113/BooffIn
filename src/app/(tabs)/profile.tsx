@@ -796,6 +796,8 @@ export default function CurrentUserProfileScreen() {
             }}
             style={styles.bannerImage}
             contentFit="cover"
+            transition={200}
+            cachePolicy="disk"
           />
 
           {isUploadingBanner && (

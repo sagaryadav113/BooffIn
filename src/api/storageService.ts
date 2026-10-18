@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './client';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -52,6 +53,58 @@ function inferMimeType(asset: UploadableImageAsset): string {
   if (uri.endsWith('.webp')) return 'image/webp';
   if (uri.endsWith('.gif')) return 'image/gif';
   return 'image/jpeg';
+}
+
+/**
+ * Downscales and compresses image asset on device before upload to save bandwidth.
+ * Reduces raw 5-10MB camera images down to ~80-180KB (97% egress savings).
+ */
+export async function optimizeImageForUpload(
+  asset: UploadableImageAsset,
+  options: {
+    maxWidth?: number;
+    maxHeight?: number;
+    quality?: number;
+  } = {}
+): Promise<UploadableImageAsset> {
+  try {
+    if (!asset.uri) return asset;
+    const { maxWidth = 1080, maxHeight = 1350, quality = 0.8 } = options;
+
+    const actions: any[] = [];
+    if (asset.width && asset.height) {
+      if (asset.width > maxWidth || asset.height > maxHeight) {
+        if (asset.width / maxWidth >= asset.height / maxHeight) {
+          actions.push({ resize: { width: maxWidth } });
+        } else {
+          actions.push({ resize: { height: maxHeight } });
+        }
+      }
+    } else {
+      actions.push({ resize: { width: maxWidth } });
+    }
+
+    const result = await manipulateAsync(
+      asset.uri,
+      actions,
+      {
+        compress: quality,
+        format: SaveFormat.JPEG,
+        base64: true,
+      }
+    );
+
+    return {
+      uri: result.uri,
+      base64: result.base64,
+      width: result.width,
+      height: result.height,
+      mimeType: 'image/jpeg',
+    };
+  } catch (err) {
+    console.warn('[storageService] Image optimization fallback to original:', err);
+    return asset;
+  }
 }
 
 /**
@@ -242,18 +295,25 @@ export async function uploadProfileAvatar(
 
     if (onProgress) onProgress(0.1);
 
-    // 1. Read binary data
-    const { data: fileData, size } = await getAssetBinaryData(asset);
+    // 1. Optimize and compress avatar to max 400x400 (80% quality, ~50-90KB)
+    const optimized = await optimizeImageForUpload(asset, {
+      maxWidth: 400,
+      maxHeight: 400,
+      quality: 0.82,
+    });
 
-    // 2. Validate file size and MIME type
-    const validation = validateImage(asset, size);
+    // 2. Read binary data
+    const { data: fileData, size } = await getAssetBinaryData(optimized);
+
+    // 3. Validate file size and MIME type
+    const validation = validateImage(optimized, size);
     if (!validation.isValid) {
       return { success: false, url: null, error: validation.error };
     }
 
     if (onProgress) onProgress(0.3);
 
-    // 3. Determine file extension
+    // 4. Determine file extension
     const ext = validation.mimeType.split('/')[1] || 'jpg';
     const cleanExt = ext === 'jpeg' ? 'jpg' : ext;
     const fileName = `avatar_${Date.now()}.${cleanExt}`;
@@ -261,12 +321,12 @@ export async function uploadProfileAvatar(
 
     if (onProgress) onProgress(0.5);
 
-    // 4. Upload to Supabase Storage
+    // 5. Upload to Supabase Storage with 1-year immutable cache header
     const { error: uploadError } = await supabase.storage
       .from(PROFILE_MEDIA_BUCKET)
       .upload(filePath, fileData, {
         contentType: validation.mimeType,
-        cacheControl: '3600',
+        cacheControl: '31536000',
         upsert: true,
       });
 
@@ -281,12 +341,12 @@ export async function uploadProfileAvatar(
 
     if (onProgress) onProgress(0.8);
 
-    // 5. Get public URL with timestamp cache buster
+    // 6. Get clean public URL without cache-busting timestamp (enables phone disk caching)
     const { data: publicData } = supabase.storage
       .from(PROFILE_MEDIA_BUCKET)
       .getPublicUrl(filePath);
 
-    const publicUrl = `${publicData.publicUrl}?t=${Date.now()}`;
+    const publicUrl = publicData.publicUrl;
 
     // 6. Update database record with has_custom_avatar = true
     const { error: dbError } = await supabase
@@ -376,18 +436,25 @@ export async function uploadProfileBanner(
 
     if (onProgress) onProgress(0.1);
 
-    // 1. Read binary data
-    const { data: fileData, size } = await getAssetBinaryData(asset);
+    // 1. Optimize and compress banner to max 1200x450 (80% quality, ~120-180KB)
+    const optimized = await optimizeImageForUpload(asset, {
+      maxWidth: 1200,
+      maxHeight: 450,
+      quality: 0.82,
+    });
 
-    // 2. Validate file size and MIME type
-    const validation = validateImage(asset, size);
+    // 2. Read binary data
+    const { data: fileData, size } = await getAssetBinaryData(optimized);
+
+    // 3. Validate file size and MIME type
+    const validation = validateImage(optimized, size);
     if (!validation.isValid) {
       return { success: false, url: null, error: validation.error };
     }
 
     if (onProgress) onProgress(0.3);
 
-    // 3. Determine file extension
+    // 4. Determine file extension
     const ext = validation.mimeType.split('/')[1] || 'jpg';
     const cleanExt = ext === 'jpeg' ? 'jpg' : ext;
     const fileName = `banner_${Date.now()}.${cleanExt}`;
@@ -395,12 +462,12 @@ export async function uploadProfileBanner(
 
     if (onProgress) onProgress(0.5);
 
-    // 4. Upload to Supabase Storage
+    // 5. Upload to Supabase Storage with 1-year immutable cache header
     const { error: uploadError } = await supabase.storage
       .from(PROFILE_MEDIA_BUCKET)
       .upload(filePath, fileData, {
         contentType: validation.mimeType,
-        cacheControl: '3600',
+        cacheControl: '31536000',
         upsert: true,
       });
 
@@ -415,12 +482,12 @@ export async function uploadProfileBanner(
 
     if (onProgress) onProgress(0.8);
 
-    // 5. Get public URL with timestamp cache buster
+    // 6. Get clean public URL without cache-busting timestamp (enables phone disk caching)
     const { data: publicData } = supabase.storage
       .from(PROFILE_MEDIA_BUCKET)
       .getPublicUrl(filePath);
 
-    const publicUrl = `${publicData.publicUrl}?t=${Date.now()}`;
+    const publicUrl = publicData.publicUrl;
 
     // 6. Update database record with has_custom_banner = true
     const { error: dbError } = await supabase
@@ -601,11 +668,18 @@ export async function uploadPostImage(
 
     if (onProgress) onProgress(0.1);
 
-    // 1. Read binary data
-    const { data: fileData, size } = await getAssetBinaryData(asset);
+    // 1. Optimize and compress post image to max 1080x1350 (78% quality, ~90-160KB)
+    const optimized = await optimizeImageForUpload(asset, {
+      maxWidth: 1080,
+      maxHeight: 1350,
+      quality: 0.78,
+    });
 
-    // 2. Validate file size and MIME type
-    const validation = validateImage(asset, size);
+    // 2. Read binary data
+    const { data: fileData, size } = await getAssetBinaryData(optimized);
+
+    // 3. Validate file size and MIME type
+    const validation = validateImage(optimized, size);
     if (!validation.isValid) {
       return { success: false, url: null, error: validation.error };
     }

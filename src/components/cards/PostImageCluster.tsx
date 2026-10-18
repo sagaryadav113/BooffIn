@@ -51,6 +51,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
               style={styles.fullImage}
               contentFit="cover"
               transition={200}
+              cachePolicy="disk"
             />
           </TouchableOpacity>
         )}
@@ -68,6 +69,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
                 style={styles.fullImage}
                 contentFit="cover"
                 transition={200}
+                cachePolicy="disk"
               />
             </TouchableOpacity>
 
@@ -81,6 +83,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
                 style={styles.fullImage}
                 contentFit="cover"
                 transition={200}
+                cachePolicy="disk"
               />
             </TouchableOpacity>
           </View>
@@ -100,6 +103,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
                 style={styles.fullImage}
                 contentFit="cover"
                 transition={200}
+                cachePolicy="disk"
               />
             </TouchableOpacity>
 
@@ -115,6 +119,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
                   style={styles.fullImage}
                   contentFit="cover"
                   transition={200}
+                  cachePolicy="disk"
                 />
               </TouchableOpacity>
 
@@ -128,6 +133,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
                   style={styles.fullImage}
                   contentFit="cover"
                   transition={200}
+                  cachePolicy="disk"
                 />
               </TouchableOpacity>
             </View>
@@ -149,6 +155,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
                   style={styles.fullImage}
                   contentFit="cover"
                   transition={200}
+                  cachePolicy="disk"
                 />
               </TouchableOpacity>
 
@@ -162,6 +169,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
                   style={styles.fullImage}
                   contentFit="cover"
                   transition={200}
+                  cachePolicy="disk"
                 />
               </TouchableOpacity>
             </View>
@@ -178,6 +186,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
                   style={styles.fullImage}
                   contentFit="cover"
                   transition={200}
+                  cachePolicy="disk"
                 />
               </TouchableOpacity>
 
@@ -191,6 +200,7 @@ export const PostImageCluster: React.FC<PostImageClusterProps> = ({
                   style={styles.fullImage}
                   contentFit="cover"
                   transition={200}
+                  cachePolicy="disk"
                 />
                 {count > 4 && (
                   <View style={styles.moreCountOverlay}>

@@ -815,6 +815,8 @@ export default function OtherResearcherProfileScreen() {
             }}
             style={styles.bannerImage}
             contentFit="cover"
+            transition={200}
+            cachePolicy="disk"
           />
           <View style={styles.bannerNav}>
             <IconButton

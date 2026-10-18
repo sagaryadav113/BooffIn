@@ -414,6 +414,7 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
                               source={{ uri }}
                               style={styles.lockedImageThumb}
                               contentFit="cover"
+                              cachePolicy="disk"
                             />
                             <View style={styles.lockBadge}>
                               <Lock size={10} color={colors.white} />

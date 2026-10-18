@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { Avatar } from '../core/Avatar';
 
 interface GroupCollageAvatarProps {
@@ -32,7 +33,7 @@ export const GroupCollageAvatar: React.FC<GroupCollageAvatarProps> = ({
         <View style={styles.grid}>
           {displayAvatars.map((uri, idx) => (
             <View key={idx} style={[styles.quadrant, { width: halfSize, height: halfSize }]}>
-              <Image source={{ uri }} style={styles.image} />
+              <Image source={{ uri }} style={styles.image} contentFit="cover" cachePolicy="disk" />
             </View>
           ))}
         </View>

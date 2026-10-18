@@ -202,6 +202,7 @@ export const QuotePostModal: React.FC<QuotePostModalProps> = ({
                           source={{ uri: post.images[0] }}
                           style={styles.embeddedImage}
                           contentFit="cover"
+                          cachePolicy="disk"
                         />
                       </View>
                     )}

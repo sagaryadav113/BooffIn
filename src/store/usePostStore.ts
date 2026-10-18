@@ -64,7 +64,7 @@ interface PostState {
 }
 
 const feedCache = new Map<string, { timestamp: number; posts: Post[]; hasMore: boolean }>();
-const FEED_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes in-memory cache
+const FEED_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes in-memory cache
 
 export const usePostStore = create<PostState>((set, get) => ({
   posts: [],

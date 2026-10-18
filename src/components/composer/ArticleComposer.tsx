@@ -646,7 +646,7 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
                 <View style={styles.inlineImagesContainer}>
                   {section.images.map((img) => (
                     <View key={img.id} style={styles.figureCard}>
-                      <Image source={{ uri: img.uri }} style={styles.figureImage} contentFit="contain" />
+                      <Image source={{ uri: img.uri }} style={styles.figureImage} contentFit="contain" cachePolicy="disk" />
                       <View style={styles.captionRow}>
                         <TextInput
                           style={styles.captionInput}
