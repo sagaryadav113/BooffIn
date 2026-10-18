@@ -19,6 +19,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS researchgate_url TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS linkedin_url TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS scopus_id TEXT;
 ALTER TABLE public.paper_authors ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.post_topics ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS path LTREE;
 
 -- 2. Temporarily drop foreign key constraint on profiles.id referencing auth.users

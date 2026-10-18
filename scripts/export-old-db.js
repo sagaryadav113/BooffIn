@@ -68,6 +68,7 @@ async function generate() {
   sql += 'ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS linkedin_url TEXT;\n';
   sql += 'ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS scopus_id TEXT;\n';
   sql += 'ALTER TABLE public.paper_authors ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();\n';
+  sql += 'ALTER TABLE public.post_topics ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();\n';
   sql += 'ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS path LTREE;\n\n';
 
   sql += '-- 2. Temporarily drop foreign key constraint on profiles.id referencing auth.users\n';
