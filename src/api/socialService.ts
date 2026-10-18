@@ -1,4 +1,5 @@
 import { supabase, appStorage } from './client';
+import { PROFILE_MEDIA_BUCKET } from './storageService';
 import { Post, Comment, PostType, Paper, UserProfile, FollowRequest } from '../types';
 import { getFeedRanker, buildUserRankingContext } from './ranking/feedRanker';
 import { sanitizeExternalUrl, sanitizeTextContent } from '../utils/security';
@@ -982,6 +983,14 @@ export async function deletePost(
   }
 
   try {
+    // 1. Fetch post to get media_urls before deletion so we can clean up orphaned storage
+    const { data: postData } = await supabase
+      .from('posts')
+      .select('media_urls')
+      .eq('id', postId)
+      .eq('author_id', user.id)
+      .maybeSingle();
+
     const { error } = await supabase
       .from('posts')
       .delete()
@@ -990,6 +999,27 @@ export async function deletePost(
 
     if (error) {
       return { success: false, error: error.message };
+    }
+
+    // 2. Clean up physical image files from Supabase storage bucket
+    if (postData?.media_urls && Array.isArray(postData.media_urls) && postData.media_urls.length > 0) {
+      try {
+        const pathsToRemove: string[] = [];
+        for (const url of postData.media_urls) {
+          if (typeof url === 'string' && url.includes(`/${PROFILE_MEDIA_BUCKET}/`)) {
+            const parts = url.split(`/${PROFILE_MEDIA_BUCKET}/`);
+            if (parts[1]) {
+              const cleanPath = parts[1].split('?')[0];
+              pathsToRemove.push(cleanPath);
+            }
+          }
+        }
+        if (pathsToRemove.length > 0) {
+          await supabase.storage.from(PROFILE_MEDIA_BUCKET).remove(pathsToRemove);
+        }
+      } catch (storageCleanupErr) {
+        console.warn('[socialService.deletePost] Non-critical storage cleanup error:', storageCleanupErr);
+      }
     }
 
     return { success: true, error: null };

@@ -367,6 +367,23 @@ export async function uploadProfileAvatar(
       hasCustomAvatar: true,
     });
 
+    // 8. Purge old orphaned avatar files for this user from storage to prevent unnecessary disk usage
+    try {
+      const { data: existingFiles } = await supabase.storage
+        .from(PROFILE_MEDIA_BUCKET)
+        .list(userId, { search: 'avatar_' });
+      if (existingFiles && existingFiles.length > 0) {
+        const toDelete = existingFiles
+          .filter((f) => f.name !== fileName && f.name.startsWith('avatar_'))
+          .map((f) => `${userId}/${f.name}`);
+        if (toDelete.length > 0) {
+          await supabase.storage.from(PROFILE_MEDIA_BUCKET).remove(toDelete);
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('[storageService] Avatar storage cleanup warning:', cleanupErr);
+    }
+
     if (onProgress) onProgress(1.0);
 
     return {
@@ -385,7 +402,7 @@ export async function uploadProfileAvatar(
 }
 
 /**
- * Removes user profile avatar from profile and sets has_custom_avatar = true
+ * Removes user profile avatar from profile and purges files from storage
  */
 export async function removeProfileAvatar(
   userId: string
@@ -406,6 +423,21 @@ export async function removeProfileAvatar(
     if (dbError) {
       return { success: false, error: dbError.message };
     }
+
+    // Purge physical avatar files from bucket
+    try {
+      const { data: existingFiles } = await supabase.storage
+        .from(PROFILE_MEDIA_BUCKET)
+        .list(userId, { search: 'avatar_' });
+      if (existingFiles && existingFiles.length > 0) {
+        const toDelete = existingFiles
+          .filter((f) => f.name.startsWith('avatar_'))
+          .map((f) => `${userId}/${f.name}`);
+        if (toDelete.length > 0) {
+          await supabase.storage.from(PROFILE_MEDIA_BUCKET).remove(toDelete);
+        }
+      }
+    } catch {}
 
     await useAuthStore.getState().updateProfile({
       avatarUrl: undefined,
@@ -508,6 +540,23 @@ export async function uploadProfileBanner(
       hasCustomBanner: true,
     });
 
+    // 8. Purge old orphaned banner files for this user from storage to prevent unnecessary disk usage
+    try {
+      const { data: existingFiles } = await supabase.storage
+        .from(PROFILE_MEDIA_BUCKET)
+        .list(userId, { search: 'banner_' });
+      if (existingFiles && existingFiles.length > 0) {
+        const toDelete = existingFiles
+          .filter((f) => f.name !== fileName && f.name.startsWith('banner_'))
+          .map((f) => `${userId}/${f.name}`);
+        if (toDelete.length > 0) {
+          await supabase.storage.from(PROFILE_MEDIA_BUCKET).remove(toDelete);
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('[storageService] Banner storage cleanup warning:', cleanupErr);
+    }
+
     if (onProgress) onProgress(1.0);
 
     return {
@@ -526,7 +575,7 @@ export async function uploadProfileBanner(
 }
 
 /**
- * Removes user profile banner from profile and sets has_custom_banner = true
+ * Removes user profile banner from profile and purges files from storage
  */
 export async function removeProfileBanner(
   userId: string
@@ -547,6 +596,21 @@ export async function removeProfileBanner(
     if (dbError) {
       return { success: false, error: dbError.message };
     }
+
+    // Purge physical banner files from bucket
+    try {
+      const { data: existingFiles } = await supabase.storage
+        .from(PROFILE_MEDIA_BUCKET)
+        .list(userId, { search: 'banner_' });
+      if (existingFiles && existingFiles.length > 0) {
+        const toDelete = existingFiles
+          .filter((f) => f.name.startsWith('banner_'))
+          .map((f) => `${userId}/${f.name}`);
+        if (toDelete.length > 0) {
+          await supabase.storage.from(PROFILE_MEDIA_BUCKET).remove(toDelete);
+        }
+      }
+    } catch {}
 
     await useAuthStore.getState().updateProfile({
       bannerUrl: undefined,
