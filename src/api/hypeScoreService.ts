@@ -197,6 +197,31 @@ export function registerPaperAlias(id1?: string, id2?: string) {
   appStorage.setItem(STORAGE_KEY_ALIAS_MAP, JSON.stringify(obj)).catch(() => {});
 }
 
+const STORAGE_KEY_CLIENT_DEVICE_ID = 'booffin_client_device_id_v1';
+let cachedClientDeviceId: string | null = null;
+
+export async function getClientDeviceId(): Promise<string> {
+  if (cachedClientDeviceId) return cachedClientDeviceId;
+  try {
+    const existing = await appStorage.getItem(STORAGE_KEY_CLIENT_DEVICE_ID);
+    if (existing) {
+      cachedClientDeviceId = existing;
+      return existing;
+    }
+    const newId = 'dev_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now().toString(36);
+    await appStorage.setItem(STORAGE_KEY_CLIENT_DEVICE_ID, newId);
+    cachedClientDeviceId = newId;
+    return newId;
+  } catch {
+    return 'dev_fallback_' + Date.now();
+  }
+}
+
+function isValidUuid(id?: string | null): boolean {
+  if (!id) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+}
+
 /**
  * Retrieves metrics for a given paper ID
  */
@@ -217,53 +242,63 @@ export async function getPaperMetrics(paperId: string): Promise<PaperMetrics> {
   }
 
   // 1. Try local storage (direct ID or resolved alias)
+  let localMetrics: PaperMetrics | null = null;
   try {
     let raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${normalizedId}`);
     if (!raw && aliasId) {
       raw = await appStorage.getItem(`${STORAGE_KEY_PREFIX_METRICS}${aliasId}`);
     }
     if (raw) {
-      const parsed = JSON.parse(raw);
-      inMemoryMetricsCache.set(normalizedId, parsed);
-      if (aliasId) inMemoryMetricsCache.set(aliasId, parsed);
-      return parsed;
+      localMetrics = JSON.parse(raw);
+      inMemoryMetricsCache.set(normalizedId, localMetrics!);
+      if (aliasId) inMemoryMetricsCache.set(aliasId, localMetrics!);
     }
   } catch {}
 
-  // 2. Try Supabase table if available
+  // 2. Try Supabase cloud table (authoritative global metrics across all users)
   try {
-    const { data } = await supabase
-      .from('paper_metrics')
-      .select('*')
-      .eq('paper_id', normalizedId)
-      .maybeSingle();
+    let query = supabase.from('paper_metrics').select('*');
+    if (aliasId) {
+      query = query.or(`paper_id.eq.${normalizedId},doi.eq.${normalizedId},paper_id.eq.${aliasId},doi.eq.${aliasId}`);
+    } else {
+      query = query.or(`paper_id.eq.${normalizedId},doi.eq.${normalizedId}`);
+    }
+
+    const { data } = await query.maybeSingle();
 
     if (data) {
+      const cloudViews = Math.max(Number(data.views) || 0, localMetrics?.views || 1);
       const metrics: PaperMetrics = {
         paperId: data.paper_id,
-        views: data.views || 1,
-        uniqueReaders: data.unique_readers || 1,
-        impactSum: data.impact_sum || 0,
-        impactCount: data.impact_count || 0,
-        claritySum: data.clarity_sum || 0,
-        clarityCount: data.clarity_count || 0,
-        visualsSum: data.visuals_sum || 0,
-        visualsCount: data.visuals_count || 0,
-        impactAvg: data.impact_count > 0 ? data.impact_sum / data.impact_count : 0,
-        clarityAvg: data.clarity_count > 0 ? data.clarity_sum / data.clarity_count : 0,
-        visualsAvg: data.visuals_count > 0 ? data.visuals_sum / data.visuals_count : 0,
-        communityRating: data.community_rating || 0,
-        ratingScore: data.rating_score || 0,
-        popularityScore: data.popularity_score || 0,
-        hypeScore: data.hype_score || 0,
-        viewsLastHour: data.views_last_hour || 1,
-        viewsLast24h: data.views_last_24h || 1,
-        trendScore: data.trend_score || 0,
+        views: cloudViews,
+        uniqueReaders: Math.max(Number(data.unique_readers) || 0, localMetrics?.uniqueReaders || 1),
+        impactSum: Number(data.impact_sum) || localMetrics?.impactSum || 0,
+        impactCount: Number(data.impact_count) || localMetrics?.impactCount || 0,
+        claritySum: Number(data.clarity_sum) || localMetrics?.claritySum || 0,
+        clarityCount: Number(data.clarity_count) || localMetrics?.clarityCount || 0,
+        visualsSum: Number(data.visuals_sum) || localMetrics?.visualsSum || 0,
+        visualsCount: Number(data.visuals_count) || localMetrics?.visualsCount || 0,
+        impactAvg: (Number(data.impact_count) || 0) > 0 ? Number(data.impact_sum) / Number(data.impact_count) : (localMetrics?.impactAvg || 0),
+        clarityAvg: (Number(data.clarity_count) || 0) > 0 ? Number(data.clarity_sum) / Number(data.clarity_count) : (localMetrics?.clarityAvg || 0),
+        visualsAvg: (Number(data.visuals_count) || 0) > 0 ? Number(data.visuals_sum) / Number(data.visuals_count) : (localMetrics?.visualsAvg || 0),
+        communityRating: Number(data.community_rating) || localMetrics?.communityRating || 0,
+        ratingScore: Number(data.rating_score) || localMetrics?.ratingScore || 0,
+        popularityScore: Number(data.popularity_score) || calculatePopularityScore(cloudViews),
+        hypeScore: Number(data.hype_score) || localMetrics?.hypeScore || 0,
+        viewsLastHour: Math.max(Number(data.views_last_hour) || 0, localMetrics?.viewsLastHour || 1),
+        viewsLast24h: Math.max(Number(data.views_last_24h) || 0, localMetrics?.viewsLast24h || 1),
+        trendScore: Number(data.trend_score) || localMetrics?.trendScore || 0,
       };
       inMemoryMetricsCache.set(normalizedId, metrics);
+      if (aliasId) inMemoryMetricsCache.set(aliasId, metrics);
+      appStorage.setItem(`${STORAGE_KEY_PREFIX_METRICS}${normalizedId}`, JSON.stringify(metrics)).catch(() => {});
       return metrics;
     }
   } catch {}
+
+  if (localMetrics) {
+    return localMetrics;
+  }
 
   // 3. Fallback: Initialize baseline metrics
   const defaultMetrics = createDefaultPaperMetrics(normalizedId);
@@ -334,36 +369,45 @@ export async function getBatchPaperMetrics(paperIds: string[]): Promise<Map<stri
 
   // 2. Query Supabase in a single batch query
   try {
+    const queryIds = Array.from(new Set([
+      ...stillMissing,
+      ...stillMissing.map((id) => paperIdAliasMap.get(id.toLowerCase())).filter(Boolean) as string[],
+    ]));
+
     const { data } = await supabase
       .from('paper_metrics')
       .select('*')
-      .in('paper_id', stillMissing);
+      .or(`paper_id.in.(${queryIds.join(',')}),doi.in.(${queryIds.join(',')})`);
 
     if (data && data.length > 0) {
       data.forEach((row: any) => {
         const metrics: PaperMetrics = {
           paperId: row.paper_id,
-          views: row.views || 1,
-          uniqueReaders: row.unique_readers || 1,
-          impactSum: row.impact_sum || 0,
-          impactCount: row.impact_count || 0,
-          claritySum: row.clarity_sum || 0,
-          clarityCount: row.clarity_count || 0,
-          visualsSum: row.visuals_sum || 0,
-          visualsCount: row.visuals_count || 0,
-          impactAvg: row.impact_count > 0 ? row.impact_sum / row.impact_count : 0,
-          clarityAvg: row.clarity_count > 0 ? row.clarity_sum / row.clarity_count : 0,
-          visualsAvg: row.visuals_count > 0 ? row.visuals_sum / row.visuals_count : 0,
-          communityRating: row.community_rating || 0,
-          ratingScore: row.rating_score || 0,
-          popularityScore: row.popularity_score || 0,
-          hypeScore: row.hype_score || 0,
-          viewsLastHour: row.views_last_hour || 1,
-          viewsLast24h: row.views_last_24h || 1,
-          trendScore: row.trend_score || 0,
+          views: Number(row.views) || 1,
+          uniqueReaders: Number(row.unique_readers) || 1,
+          impactSum: Number(row.impact_sum) || 0,
+          impactCount: Number(row.impact_count) || 0,
+          claritySum: Number(row.clarity_sum) || 0,
+          clarityCount: Number(row.clarity_count) || 0,
+          visualsSum: Number(row.visuals_sum) || 0,
+          visualsCount: Number(row.visuals_count) || 0,
+          impactAvg: row.impact_count > 0 ? Number(row.impact_sum) / Number(row.impact_count) : 0,
+          clarityAvg: row.clarity_count > 0 ? Number(row.clarity_sum) / Number(row.clarity_count) : 0,
+          visualsAvg: row.visuals_count > 0 ? Number(row.visuals_sum) / Number(row.visuals_count) : 0,
+          communityRating: Number(row.community_rating) || 0,
+          ratingScore: Number(row.rating_score) || 0,
+          popularityScore: Number(row.popularity_score) || 0,
+          hypeScore: Number(row.hype_score) || 0,
+          viewsLastHour: Number(row.views_last_hour) || 1,
+          viewsLast24h: Number(row.views_last_24h) || 1,
+          trendScore: Number(row.trend_score) || 0,
         };
         inMemoryMetricsCache.set(row.paper_id, metrics);
         result.set(row.paper_id, metrics);
+        if (row.doi) {
+          inMemoryMetricsCache.set(row.doi, metrics);
+          result.set(row.doi, metrics);
+        }
       });
     }
   } catch {}
@@ -389,7 +433,11 @@ interface StoredViewEntry {
 
 /**
  * Records a real in-app view event whenever a user views a paper.
- * Tracks actual reader count, real 24-hour reading velocity, and registers read paper.
+ * YouTube-style global architecture:
+ * - Deduplicates views within a 15-minute window per client / user to prevent spam
+ * - Persists globally to Supabase cloud database forever (days, weeks, months, years)
+ * - Retains instant offline resilient cache
+ * - Broadcasts updated views to all UI components in real time
  */
 export async function recordPaperView(
   paperId: string,
@@ -398,7 +446,6 @@ export async function recordPaperView(
 ): Promise<PaperMetrics> {
   const normalizedId = paperId.trim();
   const lowerId = normalizedId.toLowerCase();
-  const effectiveUserId = userId || 'anonymous_reader';
   const now = Date.now();
   const oneDayAgo = now - 24 * 60 * 60 * 1000;
   const oneHourAgo = now - 60 * 60 * 1000;
@@ -410,6 +457,22 @@ export async function recordPaperView(
 
   const aliasId = paperIdAliasMap.get(lowerId);
 
+  // 1. Identify client device and authenticated user (UUID)
+  const clientId = await getClientDeviceId();
+  let validUserId: string | null = null;
+  if (isValidUuid(userId)) {
+    validUserId = userId!.trim();
+  } else {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (isValidUuid(authData?.user?.id)) {
+        validUserId = authData!.user!.id;
+      }
+    } catch {}
+  }
+
+  // 2. Resilient local view log (ensures offline operation and instant UX)
+  const effectiveLocalUser = validUserId || clientId;
   let viewLogs: StoredViewEntry[] = [];
 
   try {
@@ -422,23 +485,20 @@ export async function recordPaperView(
     }
   } catch {}
 
-  // Deduplicate view if same user viewed within last 5 minutes to prevent spam,
-  // but ALWAYS preserve existing count!
+  // 15-minute YouTube view deduplication per client/user
   const recentUserView = viewLogs.find(
-    (v) => v.userId === effectiveUserId && now - v.timestamp < 5 * 60 * 1000
+    (v) => v.userId === effectiveLocalUser && now - v.timestamp < 15 * 60 * 1000
   );
 
   if (!recentUserView) {
-    viewLogs.push({ timestamp: now, userId: effectiveUserId });
+    viewLogs.push({ timestamp: now, userId: effectiveLocalUser });
   }
 
-  // Calculate real metrics from actual log (guarantee at least 1 view)
-  const realViews = Math.max(viewLogs.length, 1);
-  const realUniqueReaders = Math.max(new Set(viewLogs.map((v) => v.userId)).size, 1);
-  const realViewsLast24h = Math.max(viewLogs.filter((v) => v.timestamp >= oneDayAgo).length, 1);
-  const realViewsLastHour = viewLogs.filter((v) => v.timestamp >= oneHourAgo).length;
+  const localViews = Math.max(viewLogs.length, 1);
+  const localUniqueReaders = Math.max(new Set(viewLogs.map((v) => v.userId)).size, 1);
+  const localViewsLast24h = Math.max(viewLogs.filter((v) => v.timestamp >= oneDayAgo).length, 1);
+  const localViewsLastHour = viewLogs.filter((v) => v.timestamp >= oneHourAgo).length;
 
-  // Persist the real view log under primary ID and any aliases
   try {
     const payload = JSON.stringify(viewLogs.slice(-1000));
     await appStorage.setItem(`${STORAGE_KEY_PREFIX_VIEWS}${normalizedId}`, payload);
@@ -447,9 +507,39 @@ export async function recordPaperView(
     }
   } catch {}
 
-  // Update paper metrics with the real view counts
+  // 3. YouTube-style Global Cloud Synchronization via Supabase RPC
+  let cloudViews = 0;
+  let cloudUniqueReaders = 0;
+  let cloudViewsLast24h = 0;
+  let cloudViewsLastHour = 0;
+
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('record_paper_read', {
+      p_paper_id: normalizedId,
+      p_doi: paper?.doi?.trim() || null,
+      p_user_id: validUserId,
+      p_client_id: clientId,
+    });
+
+    if (!rpcError && rpcData?.success && rpcData?.metrics) {
+      cloudViews = Number(rpcData.metrics.views) || 0;
+      cloudUniqueReaders = Number(rpcData.metrics.uniqueReaders) || 0;
+      cloudViewsLast24h = Number(rpcData.metrics.viewsLast24h) || 0;
+      cloudViewsLastHour = Number(rpcData.metrics.viewsLastHour) || 0;
+    }
+  } catch (err) {
+    console.warn('[hypeScoreService] Supabase record_paper_read error (using resilient fallback):', err);
+  }
+
+  // Authoritative global counts: maximum of cloud and local counts
+  const finalViews = Math.max(cloudViews, localViews);
+  const finalUniqueReaders = Math.max(cloudUniqueReaders, localUniqueReaders);
+  const finalViewsLast24h = Math.max(cloudViewsLast24h, localViewsLast24h);
+  const finalViewsLastHour = Math.max(cloudViewsLastHour, localViewsLastHour);
+
+  // Update paper metrics with global counts
   const currentMetrics = await getPaperMetrics(normalizedId);
-  const popularityScore = calculatePopularityScore(realViews);
+  const popularityScore = calculatePopularityScore(finalViews);
 
   let finalHypeScore = 0;
   const totalVotes = currentMetrics.impactCount + currentMetrics.clarityCount + currentMetrics.visualsCount;
@@ -461,10 +551,10 @@ export async function recordPaperView(
 
   const updatedMetrics: PaperMetrics = {
     ...currentMetrics,
-    views: realViews,
-    uniqueReaders: realUniqueReaders,
-    viewsLast24h: realViewsLast24h,
-    viewsLastHour: realViewsLastHour,
+    views: finalViews,
+    uniqueReaders: finalUniqueReaders,
+    viewsLast24h: finalViewsLast24h,
+    viewsLastHour: finalViewsLastHour,
     popularityScore,
     hypeScore: finalHypeScore,
   };
