@@ -31,6 +31,7 @@ import { fetchPostsByHashtag } from '../../api/trendingService';
 import { HashtagDetailData } from '../../types/trending';
 import { Post } from '../../types/post';
 import { useAuthStore } from '../../store/useAuthStore';
+import { supabase } from '../../api/client';
 
 type SortTab = 'top' | 'latest';
 
@@ -47,7 +48,7 @@ export default function HashtagFeedScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Load posts for this hashtag
+  // Load posts for this hashtag from real Supabase backend
   const loadPosts = useCallback(
     async (sort: SortTab = activeTab, isRefresh = false) => {
       if (!isRefresh && !data) {
@@ -68,7 +69,27 @@ export default function HashtagFeedScreen() {
 
   useEffect(() => {
     loadPosts(activeTab);
-  }, [cleanTag, activeTab]);
+
+    // Setup real-time listener on posts table for live hashtag discussions
+    const channel = supabase
+      .channel(`hashtag_realtime_${cleanTag}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'posts',
+        },
+        () => {
+          loadPosts(activeTab, true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [cleanTag, activeTab, loadPosts]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -141,10 +162,12 @@ export default function HashtagFeedScreen() {
               ? ' · 1 researcher'
               : ''}
           </Text>
-          <View style={styles.timeTag}>
-            <Sparkles size={10} color="#1B4D3E" />
-            <Text style={styles.timeTagText}>Past 24h</Text>
-          </View>
+          {data.postsCount24h > 0 && (
+            <View style={styles.timeTag}>
+              <Sparkles size={10} color="#1B4D3E" />
+              <Text style={styles.timeTagText}>Live</Text>
+            </View>
+          )}
         </View>
 
         {/* Quick Post Prompt Bar */}
