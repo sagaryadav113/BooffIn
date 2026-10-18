@@ -332,10 +332,16 @@ export async function uploadProfileAvatar(
 
     if (uploadError) {
       console.warn('Storage avatar upload error:', uploadError);
+      const isConfigError = uploadError.message.includes('bucket') ||
+        uploadError.message.includes('Bucket') ||
+        uploadError.message.includes('security policy') ||
+        uploadError.message.includes('AccessDenied');
       return {
         success: false,
         url: null,
-        error: uploadError.message || 'Failed to upload profile photo to storage.',
+        error: isConfigError
+          ? "Storage bucket 'profile-media' is missing or not configured in Supabase. Please run FIX_PROFILE_BANNER_AND_STORAGE.sql in Supabase SQL Editor."
+          : (uploadError.message || 'Failed to upload profile photo to storage.'),
       };
     }
 
@@ -349,7 +355,7 @@ export async function uploadProfileAvatar(
     const publicUrl = publicData.publicUrl;
 
     // 6. Update database record with has_custom_avatar = true
-    const { error: dbError } = await supabase
+    let { error: dbError } = await supabase
       .from('profiles')
       .update({
         avatar_url: publicUrl,
@@ -357,8 +363,21 @@ export async function uploadProfileAvatar(
       })
       .eq('id', userId);
 
+    if (dbError && (dbError.message.includes('has_custom_avatar') || dbError.message.includes('column'))) {
+      const retry = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', userId);
+      dbError = retry.error;
+    }
+
     if (dbError) {
       console.warn('Database avatar update error:', dbError);
+      return {
+        success: false,
+        url: null,
+        error: `Database update failed: ${dbError.message}`,
+      };
     }
 
     // 7. Update auth store state and cache
@@ -505,10 +524,16 @@ export async function uploadProfileBanner(
 
     if (uploadError) {
       console.warn('Storage banner upload error:', uploadError);
+      const isConfigError = uploadError.message.includes('bucket') ||
+        uploadError.message.includes('Bucket') ||
+        uploadError.message.includes('security policy') ||
+        uploadError.message.includes('AccessDenied');
       return {
         success: false,
         url: null,
-        error: uploadError.message || 'Failed to upload banner to storage.',
+        error: isConfigError
+          ? "Storage bucket 'profile-media' is missing or not configured in Supabase. Please run FIX_PROFILE_BANNER_AND_STORAGE.sql in Supabase SQL Editor."
+          : (uploadError.message || 'Failed to upload banner to storage.'),
       };
     }
 
@@ -522,7 +547,7 @@ export async function uploadProfileBanner(
     const publicUrl = publicData.publicUrl;
 
     // 6. Update database record with has_custom_banner = true
-    const { error: dbError } = await supabase
+    let { error: dbError } = await supabase
       .from('profiles')
       .update({
         banner_url: publicUrl,
@@ -530,8 +555,21 @@ export async function uploadProfileBanner(
       })
       .eq('id', userId);
 
+    if (dbError && (dbError.message.includes('has_custom_banner') || dbError.message.includes('column'))) {
+      const retry = await supabase
+        .from('profiles')
+        .update({ banner_url: publicUrl })
+        .eq('id', userId);
+      dbError = retry.error;
+    }
+
     if (dbError) {
       console.warn('Database banner update error:', dbError);
+      return {
+        success: false,
+        url: null,
+        error: `Database update failed: ${dbError.message}`,
+      };
     }
 
     // 7. Update auth store state and cache
