@@ -174,17 +174,16 @@ export default function ExploreScreen() {
     };
   }, [activeTab, timeframe, loadHypedFeed]);
 
+  // Load static explore topics & trending once on screen mount
   const loadInitialData = useCallback(async () => {
     try {
       await Promise.all([
         fetchPapers(),
         fetchTopics(currentUser?.id),
-        fetchFeed('For You', currentUser?.id),
-        loadHypedFeed(activeTab, timeframe, true),
         fetchTrending(),
       ]);
     } catch {}
-  }, [currentUser?.id, fetchPapers, fetchTopics, fetchFeed, activeTab, timeframe, loadHypedFeed, fetchTrending]);
+  }, [currentUser?.id, fetchPapers, fetchTopics, fetchTrending]);
 
   useEffect(() => {
     loadInitialData();
@@ -196,8 +195,9 @@ export default function ExploreScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     await Promise.all([
-      loadInitialData(),
+      loadHypedFeed(activeTab, timeframe, true),
       refreshTrending(),
+      fetchPapers(true),
     ]);
     setIsRefreshing(false);
   };

@@ -13,7 +13,7 @@ interface PaperState {
   readPapers: Paper[];
   savedPaperIds: Set<string>;
   isLoading: boolean;
-  fetchPapers: () => Promise<void>;
+  fetchPapers: (forceFresh?: boolean) => Promise<void>;
   fetchPaperById: (id: string) => Promise<Paper | null>;
   toggleSavePaper: (paperId: string, currentUserId?: string, paper?: Paper) => Promise<void>;
   toggleLikePaper: (paperId: string) => void;
@@ -24,13 +24,20 @@ interface PaperState {
   searchPapers: (query: string) => Paper[];
 }
 
+let papersLastFetchedAt = 0;
+const PAPERS_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes in-memory cache
+
 export const usePaperStore = create<PaperState>((set, get) => ({
   papers: [],
   readPapers: [],
   savedPaperIds: new Set<string>(),
   isLoading: false,
 
-  fetchPapers: async () => {
+  fetchPapers: async (forceFresh = false) => {
+    // If fresh cache exists and not forced, return immediately (0 KB network egress)
+    if (!forceFresh && get().papers.length > 0 && Date.now() - papersLastFetchedAt < PAPERS_CACHE_TTL_MS) {
+      return;
+    }
     set({ isLoading: true });
     try {
       const currentUserId = useAuthStore.getState().user?.id;
@@ -39,7 +46,6 @@ export const usePaperStore = create<PaperState>((set, get) => ({
         .select(`
           *,
           authors:paper_authors(author_name, author_order, affiliation),
-          paper_topics(topic:topics(name)),
           bookmarks!left(user_id)
         `)
         .order('created_at', { ascending: false })
@@ -52,6 +58,7 @@ export const usePaperStore = create<PaperState>((set, get) => ({
       }
 
       if (data) {
+        papersLastFetchedAt = Date.now();
         const mappedPapers: Paper[] = data.map((row: any) => mapSupabasePaper(row, currentUserId));
         set({ papers: mappedPapers, isLoading: false });
       } else {

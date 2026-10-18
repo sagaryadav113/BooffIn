@@ -41,7 +41,7 @@ interface PostState {
   feedError: string | null;
 
   // Actions
-  fetchFeed: (tab?: string, currentUserId?: string) => Promise<void>;
+  fetchFeed: (tab?: string, currentUserId?: string, forceFresh?: boolean) => Promise<void>;
   refreshFeed: (currentUserId?: string) => Promise<void>;
   loadMoreFeed: (currentUserId?: string) => Promise<void>;
   setActiveTab: (tab: string, currentUserId?: string) => void;
@@ -63,6 +63,9 @@ interface PostState {
   getPostsByUser: (userId: string) => Post[];
 }
 
+const feedCache = new Map<string, { timestamp: number; posts: Post[]; hasMore: boolean }>();
+const FEED_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes in-memory cache
+
 export const usePostStore = create<PostState>((set, get) => ({
   posts: [],
   comments: {},
@@ -74,9 +77,24 @@ export const usePostStore = create<PostState>((set, get) => ({
   page: 1,
   feedError: null,
 
-  fetchFeed: async (tab, currentUserId) => {
+  fetchFeed: async (tab, currentUserId, forceFresh = false) => {
     const activeTab = tab || get().activeTab;
     const resolvedUserId = currentUserId || useAuthStore.getState().user?.id;
+    const cacheKey = `${activeTab}_${resolvedUserId || 'anon'}`;
+    const cached = feedCache.get(cacheKey);
+
+    // 1. If fresh cache exists and not forced, return cached data immediately (0 KB network egress)
+    if (!forceFresh && cached && Date.now() - cached.timestamp < FEED_CACHE_TTL_MS) {
+      set({
+        posts: cached.posts,
+        hasMore: cached.hasMore,
+        isLoading: false,
+        feedError: null,
+        page: 1,
+      });
+      return;
+    }
+
     set({ isLoading: true, feedError: null, page: 1 });
 
     const res = await apiFetchFeed({
@@ -95,8 +113,11 @@ export const usePostStore = create<PostState>((set, get) => ({
       return;
     }
 
+    const newPosts = res.posts || [];
+    feedCache.set(cacheKey, { timestamp: Date.now(), posts: newPosts, hasMore: res.hasMore });
+
     set({
-      posts: res.posts || [],
+      posts: newPosts,
       hasMore: res.hasMore,
       isLoading: false,
       feedError: null,
@@ -106,7 +127,10 @@ export const usePostStore = create<PostState>((set, get) => ({
 
   refreshFeed: async (currentUserId) => {
     const resolvedUserId = currentUserId || useAuthStore.getState().user?.id;
+    const cacheKey = `${get().activeTab}_${resolvedUserId || 'anon'}`;
+    feedCache.delete(cacheKey);
     set({ isRefreshing: true, feedError: null });
+
     const res = await apiFetchFeed({
       tab: get().activeTab,
       page: 1,
@@ -114,19 +138,15 @@ export const usePostStore = create<PostState>((set, get) => ({
       currentUserId: resolvedUserId,
     });
 
-    if (res.error) {
-      set({
-        isRefreshing: false,
-        feedError: res.error,
-      });
-      return;
+    if (!res.error && res.posts) {
+      feedCache.set(cacheKey, { timestamp: Date.now(), posts: res.posts, hasMore: res.hasMore });
     }
 
     set({
-      posts: res.posts || [],
+      posts: res.posts || get().posts,
       hasMore: res.hasMore,
       isRefreshing: false,
-      feedError: null,
+      feedError: res.error || null,
       page: 1,
     });
   },
