@@ -65,7 +65,7 @@ async function _broadKeywordSearch(
     searchEuropePmc(parsedQuery.europePmcQuery, perSource, page),
     searchSemanticScholar(parsedQuery.semanticScholarQuery, perSource, page),
     searchArxiv(parsedQuery.arxivQuery, Math.min(perSource, 10), page),
-    searchOpenAlex(parsedQuery.openAlexQuery, perSource, page),
+    searchOpenAlex(parsedQuery, perSource, page),
   ]);
 
   const all: Paper[] = [];
@@ -311,20 +311,77 @@ async function searchArxiv(query: string, limit: number, page = 1): Promise<Pape
 // ─────────────────────────────────────────────────────────────────────────────
 // OpenAlex (200M+ works, best broad coverage, completely free)
 // ─────────────────────────────────────────────────────────────────────────────
-async function searchOpenAlex(query: string, limit: number, page = 1): Promise<Paper[]> {
+export async function searchOpenAlex(
+  queryOrParsed: ParsedScientificQuery | string,
+  limit: number,
+  page = 1
+): Promise<Paper[]> {
   try {
-    const url = `https://api.openalex.org/works?search=${encodeURIComponent(
-      query
-    )}&page=${page}&per-page=${limit}&select=id,doi,title,abstract_inverted_index,authorships,publication_year,host_venue,open_access,cited_by_count,primary_location&mailto=dev@booffin.science`;
+    const isParsed = typeof queryOrParsed === 'object' && queryOrParsed !== null;
+    const titleAbstractQuery = isParsed
+      ? (queryOrParsed as ParsedScientificQuery).openAlexTitleAbstractQuery ||
+        (queryOrParsed as ParsedScientificQuery).cleanedQuery
+      : queryOrParsed;
+    const fallbackQuery = isParsed
+      ? (queryOrParsed as ParsedScientificQuery).cleanedQuery
+      : queryOrParsed;
 
-    const res = await fetchWithRetry(url, {
+    // Lean field selection to minimize egress and client memory overhead
+    const fields =
+      'id,doi,title,abstract_inverted_index,authorships,publication_year,open_access,cited_by_count,primary_location,concepts';
+
+    // Tier 1: Targeted Title & Abstract search with native neural/BM25 reranker
+    const tier1Url = `https://api.openalex.org/works?search.title_and_abstract=${encodeURIComponent(
+      titleAbstractQuery
+    )}&rerank=true&page=${page}&per-page=${limit}&select=${fields}&mailto=dev@booffin.science`;
+
+    let res = await fetchWithRetry(tier1Url, {
       headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
       signal: AbortSignal.timeout(7000),
     });
 
-    if (!res.ok) return [];
-    const data = await res.json();
-    const hits: any[] = data.results || [];
+    let data = res.ok ? await res.json() : null;
+    let hits: any[] = data?.results || [];
+
+    // Tier 2: If Tier 1 produced 0 results, fall back to semantic search
+    if (hits.length === 0 && fallbackQuery) {
+      const semanticUrl = `https://api.openalex.org/works?search.semantic=${encodeURIComponent(
+        fallbackQuery
+      )}&page=${page}&per-page=${limit}&select=${fields}&mailto=dev@booffin.science`;
+
+      try {
+        const semRes = await fetchWithRetry(semanticUrl, {
+          headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
+          signal: AbortSignal.timeout(6000),
+        });
+        if (semRes.ok) {
+          const semData = await semRes.json();
+          if (semData?.results?.length) {
+            hits = semData.results;
+          }
+        }
+      } catch {}
+
+      // Tier 3: If still empty, fall back to broad search with rerank
+      if (hits.length === 0) {
+        const broadUrl = `https://api.openalex.org/works?search=${encodeURIComponent(
+          fallbackQuery
+        )}&rerank=true&page=${page}&per-page=${limit}&select=${fields}&mailto=dev@booffin.science`;
+
+        try {
+          const broadRes = await fetchWithRetry(broadUrl, {
+            headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
+            signal: AbortSignal.timeout(6000),
+          });
+          if (broadRes.ok) {
+            const broadData = await broadRes.json();
+            hits = broadData?.results || [];
+          }
+        } catch {}
+      }
+    }
+
+    if (hits.length === 0) return [];
 
     const papers: Paper[] = [];
     for (const item of hits) {
@@ -335,8 +392,8 @@ async function searchOpenAlex(query: string, limit: number, page = 1): Promise<P
         item.primary_location?.pdf_url ||
         item.open_access?.oa_url ||
         undefined;
-      const isOpenAccess = Boolean(item.open_access?.is_oa);
-      const canonicalUrl = item.doi || `https://openalex.org/${item.id}`;
+      const isOpenAccess = Boolean(item.open_access?.is_oa || item.primary_location?.is_oa);
+      const canonicalUrl = item.doi || (item.id ? (item.id.startsWith('http') ? item.id : `https://openalex.org/${item.id}`) : '');
 
       // Reconstruct abstract from inverted index
       let abstract = 'Abstract available on publisher website.';
@@ -363,8 +420,22 @@ async function searchOpenAlex(query: string, limit: number, page = 1): Promise<P
         affiliation: a.institutions?.[0]?.display_name,
       }));
 
-      const journalName = item.host_venue?.display_name || item.primary_location?.source?.display_name || 'Academic Journal';
+      const journalName =
+        item.primary_location?.source?.display_name ||
+        item.host_venue?.display_name ||
+        'Academic Journal';
       const year = item.publication_year || new Date().getFullYear();
+
+      // Extract scientific concepts with confidence scores
+      const extractedConcepts: string[] = Array.isArray(item.concepts)
+        ? item.concepts
+            .filter((c: any) => c && c.display_name && (c.score === undefined || c.score >= 0.25))
+            .sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
+            .slice(0, 6)
+            .map((c: any) => c.display_name)
+        : [];
+
+      const topics = extractedConcepts.length > 0 ? extractedConcepts : [journalName];
 
       papers.push({
         id: `paper_oa_${item.id?.replace('https://openalex.org/', '') || Date.now()}`,
@@ -379,7 +450,7 @@ async function searchOpenAlex(query: string, limit: number, page = 1): Promise<P
         canonicalUrl,
         openAccessUrl: oaUrl,
         isOpenAccess,
-        topics: [journalName],
+        topics,
         citationCount: item.cited_by_count || 0,
         discussionCount: 0,
         likesCount: 0,
