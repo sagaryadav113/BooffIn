@@ -867,6 +867,50 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     return validEvents;
   }, [eventsOnSelectedDate, events, calendarViewMode]);
 
+  const formatEventDisplayDateTime = (startTimeStr: string) => {
+    try {
+      if (!startTimeStr) return { dateFormatted: '', timeFormatted: '' };
+
+      const separator = startTimeStr.includes('T') ? 'T' : ' ';
+      const [datePart, timePartRaw] = startTimeStr.split(separator);
+
+      let dateFormatted = datePart;
+      if (datePart && datePart.includes('-')) {
+        const [y, m, d] = datePart.split('-').map(Number);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const dObj = new Date(y, m - 1, d);
+          dateFormatted = dObj.toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
+        }
+      }
+
+      let timeFormatted = '';
+      if (timePartRaw && timePartRaw.includes(':')) {
+        const [hStr, mStr] = timePartRaw.split(':');
+        const h = parseInt(hStr, 10);
+        const m = (mStr || '00').substring(0, 2);
+        if (!isNaN(h)) {
+          const period = h >= 12 ? 'PM' : 'AM';
+          const displayH = h % 12 === 0 ? 12 : h % 12;
+          timeFormatted = `${String(displayH).padStart(2, '0')}:${m} ${period}`;
+        }
+      }
+
+      if (!timeFormatted) {
+        const d = new Date(startTimeStr);
+        timeFormatted = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        dateFormatted = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      return { dateFormatted, timeFormatted };
+    } catch {
+      return { dateFormatted: startTimeStr, timeFormatted: '' };
+    }
+  };
+
   const handlePrevMonth = () => {
     setCurrentCalendarMonth(new Date(calendarYear, calendarMonthIndex - 1, 1));
   };
@@ -1891,7 +1935,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     try {
       const cleanTime = eventTime && eventTime.includes(':') ? eventTime : '14:00';
       const resolvedDate = eventDate || selectedCalendarDate || new Date().toISOString().split('T')[0];
-      const startTime = `${resolvedDate}T${cleanTime}:00Z`;
+      const startTime = `${resolvedDate}T${cleanTime}:00`;
 
       let finalDesc = eventDesc.trim();
       const taggedMembers = members.filter((m) => selectedAttendeeIds.includes(m.user_id));
@@ -1944,7 +1988,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     try {
       const cleanTime = eventTime && eventTime.includes(':') ? eventTime : '14:00';
       const resolvedDate = eventDate || selectedCalendarDate || new Date().toISOString().split('T')[0];
-      const startTime = `${resolvedDate}T${cleanTime}:00Z`;
+      const startTime = `${resolvedDate}T${cleanTime}:00`;
 
       let finalDesc = eventDesc.trim();
       const taggedMembers = members.filter((m) => selectedAttendeeIds.includes(m.user_id));
@@ -3637,16 +3681,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             </View>
           ) : (
             displayedEvents.map((ev) => {
-              const evDateObj = new Date(ev.start_time);
-              const timeFormatted = evDateObj.toLocaleTimeString(undefined, {
-                hour: '2-digit',
-                minute: '2-digit',
-              });
-              const dateFormatted = evDateObj.toLocaleDateString(undefined, {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              });
+              const { dateFormatted, timeFormatted } = formatEventDisplayDateTime(ev.start_time);
               const canDelete =
                 !ev.creator_id ||
                 ev.creator_id === currentUser?.id ||
@@ -3662,11 +3697,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 <View key={ev.id} style={styles.eventCardEnhanced}>
                   <View style={styles.eventCardHeader}>
                     <View style={{ flex: 1, marginRight: 8 }}>
-                      <View style={styles.eventTypeBadge}>
-                        <Text style={styles.eventTypeText}>
-                          {(ev.event_type || 'Lab Meeting').replace('_', ' ')}
-                        </Text>
-                      </View>
                       <Text style={styles.eventTitle}>{ev.title}</Text>
                     </View>
 
@@ -4085,30 +4115,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     onChange={(newTime) => setEventTime(newTime)}
                   />
                 )}
-              </View>
-
-              {/* Event Type Chips */}
-              <Text style={styles.modalLabel}>Session Category</Text>
-              <View style={styles.typePillsRow}>
-                {[
-                  { key: 'lab_meeting', label: 'Lab Meeting' },
-                  { key: 'reading_group', label: 'Reading Group' },
-                  { key: 'milestone', label: 'Milestone' },
-                  { key: 'live_session', label: 'Live Session' },
-                ].map((item) => {
-                  const isActive = eventType === item.key;
-                  return (
-                    <TouchableOpacity
-                      key={item.key}
-                      onPress={() => setEventType(item.key as any)}
-                      style={[styles.typePill, isActive && styles.typePillActive]}
-                    >
-                      <Text style={[styles.typePillText, isActive && styles.typePillTextActive]}>
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
               </View>
 
               {/* Description & Agenda */}
