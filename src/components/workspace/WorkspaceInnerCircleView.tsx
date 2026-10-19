@@ -813,10 +813,12 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
     for (let d = 1; d <= daysInCurrentMonth; d++) {
       const dateStr = `${calendarYear}-${String(calendarMonthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const dayEvents = (events || []).filter((e) => {
-        const evDate = (e.start_time || (e as any).event_date || '').split('T')[0];
-        return evDate === dateStr;
-      });
+      const dayEvents = (events || [])
+        .filter((e) => !e.id.startsWith('task_seed_') && !e.id.startsWith('demo_'))
+        .filter((e) => {
+          const evDate = (e.start_time || (e as any).event_date || '').split('T')[0];
+          return evDate === dateStr;
+        });
 
       cells.push({
         day: d,
@@ -1881,6 +1883,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         setEventTitle('');
         setEventDesc('');
         setSelectedAttendeeIds([]);
+        loadTasks(workspace.id);
         setVaultToast({ message: 'Event scheduled successfully' });
         setTimeout(() => setVaultToast(null), 3000);
         try {
@@ -2032,7 +2035,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               {onlineCount > 0 && <View style={styles.onlineDot} />}
               <Text style={styles.headerSubtitle} numberOfLines={1}>
                 {memberCount} {memberCount === 1 ? 'member' : 'members'}
-                {onlineCount > 0 ? ` • ${onlineCount} online` : ''} • Confidential Pod
+                {onlineCount > 0 ? ` • ${onlineCount} online` : ''}
               </Text>
             </View>
           </View>
@@ -3337,7 +3340,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           {/* Top Action & Collapse Toggle Bar */}
           <View style={styles.tabActionBar}>
             <View style={{ flex: 1, minWidth: 160, marginRight: 8 }}>
-              <Text style={styles.tabActionTitle}>Lab Calendar & Milestones</Text>
+              <Text style={styles.tabActionTitle}>Calendar & Milestones</Text>
               <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
                 Schedule group meetings, project reviews, or milestones.
               </Text>
@@ -3437,13 +3440,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         >
                           {cell.day}
                         </Text>
-                        {cell.hasEvents && (
-                          <View
-                            style={[
-                              styles.calendarEventDot,
-                              cell.isSelected && styles.calendarEventDotSelected,
-                            ]}
-                          />
+                        {cell.eventCount > 0 && (
+                          <View style={styles.calendarDotsRow}>
+                            {Array.from({ length: Math.min(cell.eventCount, 3) }).map((_, dotIdx) => (
+                              <View
+                                key={dotIdx}
+                                style={[
+                                  styles.calendarEventDot,
+                                  cell.isSelected && styles.calendarEventDotSelected,
+                                ]}
+                              />
+                            ))}
+                          </View>
                         )}
                       </TouchableOpacity>
                     </View>
@@ -3515,18 +3523,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     ]}
                     numberOfLines={1}
                   >
-                    All ({events.length})
+                    All ({(events || []).filter((e) => !e.id.startsWith('task_seed_') && !e.id.startsWith('demo_')).length})
                   </Text>
                 </TouchableOpacity>
               </View>
-
-              <TouchableOpacity
-                onPress={() => openScheduleModalForDate(selectedCalendarDate)}
-                style={[styles.addBtn, { paddingHorizontal: 10, paddingVertical: 5 }]}
-              >
-                <Plus size={12} color="#FFFFFF" />
-                <Text style={styles.addBtnText} numberOfLines={1}>Add</Text>
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -5350,16 +5350,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
   },
+  calendarDotsRow: {
+    position: 'absolute',
+    bottom: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
   calendarEventDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
     backgroundColor: '#10B981',
-    position: 'absolute',
-    bottom: 3,
   },
   calendarEventDotSelected: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#A7F3D0',
   },
   calendarCollapsedBanner: {
     flexDirection: 'row',

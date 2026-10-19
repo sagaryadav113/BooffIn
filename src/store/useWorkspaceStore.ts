@@ -1261,6 +1261,39 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (res.error || !res.event) {
       return { success: false, error: res.error || 'Failed to create event' };
     }
+
+    // Automatically sync event to BooffIn Manager (Kanban board) in 'todo' column
+    try {
+      const datePart = params.startTime ? params.startTime.split('T')[0] : null;
+      let timePart: string | null = null;
+      if (params.startTime && params.startTime.includes('T')) {
+        const rawTime = params.startTime.split('T')[1]?.substring(0, 5);
+        if (rawTime && rawTime.includes(':')) {
+          timePart = rawTime;
+        }
+      }
+
+      const taskRes = await workspaceService.createWorkspaceTask({
+        workspaceId: params.workspaceId,
+        title: params.title,
+        description: params.description || `Event: ${params.title}`,
+        status: 'todo',
+        priority: 'medium',
+        dueDate: datePart,
+        dueTime: timePart,
+        syncWithCalendar: false,
+        linkedEventId: res.event.id,
+      });
+
+      if (taskRes.task) {
+        set((state) => ({
+          tasks: [taskRes.task!, ...(state.tasks || []).filter((t) => t.id !== taskRes.task!.id)],
+        }));
+      }
+    } catch (taskSyncErr) {
+      console.warn('[useWorkspaceStore] calendar to BooffIn manager task sync note:', taskSyncErr);
+    }
+
     await get().loadEvents(params.workspaceId);
     return { success: true, error: null };
   },
@@ -1276,6 +1309,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       await get().loadEvents(workspaceId);
       return { success: false, error: res.error || 'Failed to delete event' };
     }
+
+    // Also remove any linked task from BooffIn Manager if it was linked to this event
+    try {
+      const stateTasks = get().tasks || [];
+      const linkedTask = stateTasks.find((t) => t.linked_event_id === eventId);
+      if (linkedTask) {
+        await workspaceService.deleteWorkspaceTask(linkedTask.id, workspaceId);
+        set((state) => ({
+          tasks: (state.tasks || []).filter((t) => t.id !== linkedTask.id),
+        }));
+      }
+    } catch (delTaskErr) {
+      console.warn('[useWorkspaceStore] delete linked task note:', delTaskErr);
+    }
+
     await get().loadEvents(workspaceId);
     return { success: true, error: null };
   },
