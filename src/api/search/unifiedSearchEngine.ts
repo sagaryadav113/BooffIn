@@ -5,10 +5,35 @@ import { searchOrcidResearchers } from './providers/orcidSearchProvider';
 import { searchBooffInUsers, searchOpenAlexAuthors } from './providers/userSearchProvider';
 import { parseReferenceInput } from '../paper/inputParser';
 import { isValidOrcidId } from '../orcidService';
+import { parseScientificQuery } from './scientificQueryParser';
 
-// In-memory LRU-style cache (10 min TTL)
-const searchCache = new Map<string, { timestamp: number; results: UnifiedSearchResults }>();
+// In-memory zero-storage bounded LRU cache (10 min TTL, max 50 entries)
+const MAX_CACHE_ENTRIES = 50;
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const searchCache = new Map<string, { timestamp: number; results: UnifiedSearchResults }>();
+
+function getCacheEntry(key: string): UnifiedSearchResults | null {
+  const entry = searchCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    searchCache.delete(key);
+    return null;
+  }
+  // Refresh LRU insertion order
+  searchCache.delete(key);
+  searchCache.set(key, entry);
+  return entry.results;
+}
+
+function setCacheEntry(key: string, results: UnifiedSearchResults): void {
+  if (searchCache.has(key)) {
+    searchCache.delete(key);
+  } else if (searchCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = searchCache.keys().next().value;
+    if (oldestKey) searchCache.delete(oldestKey);
+  }
+  searchCache.set(key, { timestamp: Date.now(), results });
+}
 
 /**
  * Detect if a query looks like a personal name (2-4 words, alpha only).
@@ -40,9 +65,9 @@ export async function executeUnifiedSearch(
   }
 
   const cacheKey = `${query.toLowerCase()}__${category}`;
-  const cached = searchCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached.results;
+  const cached = getCacheEntry(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   // ── 1. Detect query intent ───────────────────────────────────────────────
@@ -60,6 +85,17 @@ export async function executeUnifiedSearch(
   else if (isOrcid) detectedType = 'orcid';
   else if (isUrl) detectedType = 'url';
   else if (isUserHandle) detectedType = 'user';
+
+  // Parse scientific semantic intent for literature inquiries
+  const parsedScientific = parseScientificQuery(query);
+  const scientificIntent: UnifiedSearchResults['scientificIntent'] = parsedScientific.intent
+    ? {
+        primaryEntity: parsedScientific.intent.primaryEntity,
+        relationshipIntent: parsedScientific.intent.relationshipIntent,
+        expandedTerms: parsedScientific.intent.expandedTerms,
+        targetTerms: parsedScientific.intent.targetTerms,
+      }
+    : undefined;
 
   // ── 2. Determine what to search ──────────────────────────────────────────
   // Papers: always search unless user is only filtering researchers,
@@ -136,9 +172,10 @@ export async function executeUnifiedSearch(
     topics,
     detectedInputType: detectedType,
     rawQuery: query,
+    scientificIntent,
   };
 
-  searchCache.set(cacheKey, { timestamp: Date.now(), results: finalResults });
+  setCacheEntry(cacheKey, finalResults);
   return finalResults;
 }
 

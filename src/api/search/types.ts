@@ -28,10 +28,18 @@ export interface TopicSearchResult {
   followerCount?: number;
 }
 
+export interface ScientificIntentBadge {
+  primaryEntity?: string;
+  relationshipIntent?: string;
+  expandedTerms?: string[];
+  targetTerms?: string[];
+}
+
 export interface UnifiedSearchResults {
   papers: Paper[];
   researchers: ResearcherSearchResult[];
   topics: TopicSearchResult[];
   detectedInputType?: 'doi' | 'arxiv' | 'orcid' | 'url' | 'user' | 'keyword';
   rawQuery: string;
+  scientificIntent?: ScientificIntentBadge;
 }

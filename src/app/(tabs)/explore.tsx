@@ -281,6 +281,29 @@ export default function ExploreScreen() {
     }
   }, [results?.detectedInputType]);
 
+  const scientificIntentBadge = useMemo(() => {
+    const intent = results?.scientificIntent;
+    if (!intent) return null;
+    const hasEntity = Boolean(
+      intent.primaryEntity &&
+      intent.primaryEntity.toLowerCase() !== searchQuery.trim().toLowerCase()
+    );
+    const hasRel = Boolean(
+      intent.relationshipIntent &&
+      intent.relationshipIntent !== 'General scientific inquiry'
+    );
+
+    if (!hasEntity && !hasRel) return null;
+
+    if (hasRel && hasEntity) {
+      return `${intent.relationshipIntent} • ${intent.primaryEntity}`;
+    }
+    if (hasRel) {
+      return intent.relationshipIntent;
+    }
+    return intent.primaryEntity;
+  }, [results?.scientificIntent, searchQuery]);
+
   const showResearchersFirst = useMemo(() => {
     if (!results) return false;
     return (
@@ -662,12 +685,19 @@ export default function ExploreScreen() {
             )}
 
             {/* Detected Intent Badge */}
-            {detectedBadgeText && (
+            {detectedBadgeText ? (
               <View style={styles.detectedPill}>
                 <Sparkles size={12} color="#1B4D3E" />
                 <Text style={styles.detectedPillText}>{detectedBadgeText}</Text>
               </View>
-            )}
+            ) : scientificIntentBadge ? (
+              <View style={styles.scientificIntentPill}>
+                <Sparkles size={12} color="#1B4D3E" />
+                <Text style={styles.scientificIntentPillText}>
+                  Research Intent: {scientificIntentBadge}
+                </Text>
+              </View>
+            ) : null}
 
             {/* Sections (ordered dynamically based on active category & query intent) */}
             {activeCategory === 'papers' ? (
@@ -844,6 +874,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   detectedPillText: {
+    ...typography.captionBold,
+    fontSize: 12,
+    color: '#1B4D3E',
+  },
+  scientificIntentPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#EAF3EE',
+    borderWidth: 1,
+    borderColor: '#C7E2D4',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+  },
+  scientificIntentPillText: {
     ...typography.captionBold,
     fontSize: 12,
     color: '#1B4D3E',
