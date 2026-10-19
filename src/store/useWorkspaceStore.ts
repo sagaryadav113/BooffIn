@@ -1275,36 +1275,38 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return { success: false, error: res.error || 'Failed to create event' };
     }
 
-    // Automatically sync event to BooffIn Manager (Kanban board) in 'todo' column
-    try {
-      const datePart = params.startTime ? params.startTime.split('T')[0] : null;
-      let timePart: string | null = null;
-      if (params.startTime && params.startTime.includes('T')) {
-        const rawTime = params.startTime.split('T')[1]?.substring(0, 5);
-        if (rawTime && rawTime.includes(':')) {
-          timePart = rawTime;
+    // If event is a milestone, sync milestone to BooffIn Manager (Kanban board)
+    if (params.eventType === 'milestone') {
+      try {
+        const datePart = params.startTime ? params.startTime.split('T')[0] : null;
+        let timePart: string | null = null;
+        if (params.startTime && params.startTime.includes('T')) {
+          const rawTime = params.startTime.split('T')[1]?.substring(0, 5);
+          if (rawTime && rawTime.includes(':')) {
+            timePart = rawTime;
+          }
         }
-      }
 
-      const taskRes = await workspaceService.createWorkspaceTask({
-        workspaceId: params.workspaceId,
-        title: params.title,
-        description: params.description || `Event: ${params.title}`,
-        status: 'todo',
-        priority: 'medium',
-        dueDate: datePart,
-        dueTime: timePart,
-        syncWithCalendar: false,
-        linkedEventId: res.event.id,
-      });
+        const taskRes = await workspaceService.createWorkspaceTask({
+          workspaceId: params.workspaceId,
+          title: params.title,
+          description: params.description || `Milestone: ${params.title}`,
+          status: 'todo',
+          priority: 'medium',
+          dueDate: datePart,
+          dueTime: timePart,
+          syncWithCalendar: false,
+          linkedEventId: res.event.id,
+        });
 
-      if (taskRes.task) {
-        set((state) => ({
-          tasks: [taskRes.task!, ...(state.tasks || []).filter((t) => t.id !== taskRes.task!.id)],
-        }));
+        if (taskRes.task) {
+          set((state) => ({
+            tasks: [taskRes.task!, ...(state.tasks || []).filter((t) => t.id !== taskRes.task!.id)],
+          }));
+        }
+      } catch (taskSyncErr) {
+        console.warn('[useWorkspaceStore] milestone to BooffIn manager task sync note:', taskSyncErr);
       }
-    } catch (taskSyncErr) {
-      console.warn('[useWorkspaceStore] calendar to BooffIn manager task sync note:', taskSyncErr);
     }
 
     // 3. Realtime instant broadcast to other workspace members
@@ -2211,7 +2213,79 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           tasks: (state.tasks || []).filter((t) => t.id !== payload.taskId),
         }));
       })
-      // G. Postgres Changes for Workspace Messages (Resilience & Background Sync)
+      // G. Postgres Changes for Tasks (Instant direct sync, 0 bytes auxiliary storage)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'workspace_tasks',
+          filter: `workspace_id=eq.${workspaceId}`,
+        },
+        (payload: any) => {
+          if (payload.eventType === 'DELETE') {
+            const oldId = payload.old?.id;
+            if (oldId) {
+              set((state) => ({
+                tasks: (state.tasks || []).filter((t) => t.id !== oldId),
+              }));
+            }
+          } else if (payload.eventType === 'INSERT') {
+            const newTask = payload.new;
+            if (newTask && newTask.workspace_id === workspaceId) {
+              set((state) => ({
+                tasks: [newTask, ...(state.tasks || []).filter((t) => t.id !== newTask.id)],
+              }));
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new;
+            if (updated) {
+              set((state) => ({
+                tasks: (state.tasks || []).map((t) => (t.id === updated.id ? { ...t, ...updated } : t)),
+              }));
+            }
+          }
+        }
+      )
+      // H. Postgres Changes for Calendar Events (Instant direct sync, 0 bytes auxiliary storage)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'workspace_events',
+          filter: `workspace_id=eq.${workspaceId}`,
+        },
+        (payload: any) => {
+          if (payload.eventType === 'DELETE') {
+            const oldId = payload.old?.id;
+            if (oldId) {
+              set((state) => ({
+                events: (state.events || []).filter((e) => e.id !== oldId),
+              }));
+            }
+          } else if (payload.eventType === 'INSERT') {
+            const newEv = payload.new;
+            if (newEv && newEv.workspace_id === workspaceId) {
+              set((state) => {
+                const list = (state.events || []).filter((e) => e.id !== newEv.id);
+                const next = [...list, newEv].sort(
+                  (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+                );
+                return { events: next };
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new;
+            if (updated) {
+              set((state) => ({
+                events: (state.events || []).map((e) => (e.id === updated.id ? { ...e, ...updated } : e)),
+              }));
+            }
+          }
+        }
+      )
+      // I. Postgres Changes for Workspace Messages (Resilience & Background Sync)
       .on(
         'postgres_changes',
         {
