@@ -50,6 +50,7 @@ export interface Workspace {
   settings: Record<string, any>;
   topics?: string[];
   research_fields?: string[];
+  topic_tag?: string | null;
   created_at: string;
   updated_at: string;
 

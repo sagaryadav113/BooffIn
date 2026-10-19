@@ -12,6 +12,7 @@ import {
   ScrollView,
   Image,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -46,6 +47,7 @@ import { WorkspaceCard } from '../../components/workspace/WorkspaceCard';
 import { Avatar } from '../../components/core/Avatar';
 import { CreateWorkspaceModal } from '../../components/workspace/CreateWorkspaceModal';
 import { CreateCommunityModal } from '../../components/workspace/CreateCommunityModal';
+import { AddInterestsModal } from '../../components/modals/AddInterestsModal';
 import { WorkspaceDMView } from '../../components/workspace/WorkspaceDMView';
 import { WorkspaceCommunityView } from '../../components/workspace/WorkspaceCommunityView';
 import { WorkspaceInnerCircleView } from '../../components/workspace/WorkspaceInnerCircleView';
@@ -89,6 +91,8 @@ export default function WorkspaceHubScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCreateCommunityModal, setShowCreateCommunityModal] = useState(false);
+  const [showAddInterestsModal, setShowAddInterestsModal] = useState(false);
+  const [joiningCommunityId, setJoiningCommunityId] = useState<string | null>(null);
 
   // Desktop active selected workspace for 3-pane layout
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
@@ -115,6 +119,112 @@ export default function WorkspaceHubScreen() {
     await loadWorkspaces(true);
   }, [loadWorkspaces]);
 
+  // Normalized user research interests from profile
+  const userInterests = useMemo(() => {
+    const list: string[] = [];
+    if (Array.isArray(currentUser?.researchInterests)) {
+      currentUser.researchInterests.forEach((ri) => {
+        if (typeof ri === 'string' && ri.trim()) list.push(ri.trim());
+      });
+    }
+    if (currentUser?.primaryField && typeof currentUser.primaryField === 'string' && currentUser.primaryField.trim()) {
+      list.push(currentUser.primaryField.trim());
+    }
+    if (Array.isArray(currentUser?.secondaryFields)) {
+      currentUser.secondaryFields.forEach((sf) => {
+        if (typeof sf === 'string' && sf.trim()) list.push(sf.trim());
+      });
+    }
+    if (currentUser?.academicTitle && typeof currentUser.academicTitle === 'string' && currentUser.academicTitle.trim()) {
+      list.push(currentUser.academicTitle.trim());
+    }
+    return Array.from(new Set(list));
+  }, [currentUser?.researchInterests, currentUser?.primaryField, currentUser?.secondaryFields, currentUser?.academicTitle]);
+
+  // Suggested Communities: Filtered strictly to user's research interests with zero extra backend egress
+  const suggestedCommunities = useMemo(() => {
+    if (activeTab !== 'community') return [];
+
+    const joinedIds = new Set(communities.map((c) => c.id));
+    const unjoined = discoverableCommunities.filter(
+      (dc) =>
+        !joinedIds.has(dc.id) &&
+        dc.owner_id !== currentUser?.id &&
+        dc.creator_id !== currentUser?.id &&
+        !dc.is_disabled &&
+        dc.status !== 'disabled' &&
+        !dc.settings?.is_disabled
+    );
+
+    const query = searchQuery.trim().toLowerCase();
+    const results: Array<{ community: Workspace; matchedTag?: string }> = [];
+
+    for (const comm of unjoined) {
+      if (query) {
+        const nameMatches = (comm.name || '').toLowerCase().includes(query);
+        const descMatches = (comm.description || '').toLowerCase().includes(query);
+        if (!nameMatches && !descMatches) continue;
+      }
+
+      // Check against user's research interests
+      const commTopics: string[] = [];
+      if (Array.isArray(comm.topics)) commTopics.push(...comm.topics);
+      if (Array.isArray(comm.research_fields)) commTopics.push(...comm.research_fields);
+      if (Array.isArray(comm.settings?.topics)) commTopics.push(...comm.settings.topics);
+      if (Array.isArray(comm.settings?.research_fields)) commTopics.push(...comm.settings.research_fields);
+      if (typeof comm.topic_tag === 'string' && comm.topic_tag.trim()) {
+        commTopics.push(comm.topic_tag.trim());
+      }
+
+      const nameLower = (comm.name || '').toLowerCase();
+      const descLower = (comm.description || '').toLowerCase();
+
+      let isMatch = false;
+      let matchedTag: string | undefined = undefined;
+
+      for (const rawInterest of userInterests) {
+        const interest = rawInterest.toLowerCase().trim();
+        if (!interest) continue;
+
+        // Check direct topic tag matches
+        for (const rawCt of commTopics) {
+          if (typeof rawCt !== 'string') continue;
+          const ct = rawCt.toLowerCase().trim();
+          if (ct && (ct.includes(interest) || interest.includes(ct))) {
+            isMatch = true;
+            matchedTag = rawCt;
+            break;
+          }
+        }
+        if (isMatch) break;
+
+        // Check name or description for keyword / stem match
+        if (interest.length >= 3) {
+          if (nameLower.includes(interest) || descLower.includes(interest)) {
+            isMatch = true;
+            matchedTag = rawInterest;
+            break;
+          }
+          const rootWords = interest.split(/[\s,/-]+/).filter((w) => w.length >= 4);
+          for (const root of rootWords) {
+            if (nameLower.includes(root) || descLower.includes(root)) {
+              isMatch = true;
+              matchedTag = rawInterest;
+              break;
+            }
+          }
+          if (isMatch) break;
+        }
+      }
+
+      if (isMatch) {
+        results.push({ community: comm, matchedTag });
+      }
+    }
+
+    return results;
+  }, [activeTab, communities, discoverableCommunities, currentUser?.id, userInterests, searchQuery]);
+
   // Active items based on active tab
   const activeItems = useMemo(() => {
     let list: Workspace[] = [];
@@ -123,11 +233,10 @@ export default function WorkspaceHubScreen() {
         ? dms.filter((d) => Boolean(d.is_archived))
         : dms.filter((d) => !d.is_archived);
     } else if (activeTab === 'community') {
-      const allComms = [...communities, ...discoverableCommunities.filter((dc) => !communities.some((c) => c.id === dc.id))];
       if (communitySubFilter === 'your') {
-        list = allComms.filter((c) => c.owner_id === currentUser?.id || c.creator_id === currentUser?.id);
+        list = communities.filter((c) => c.owner_id === currentUser?.id || c.creator_id === currentUser?.id);
       } else {
-        list = allComms.filter((c) => c.owner_id !== currentUser?.id && c.creator_id !== currentUser?.id);
+        list = communities.filter((c) => c.owner_id !== currentUser?.id && c.creator_id !== currentUser?.id);
       }
     } else if (activeTab === 'inner_circle') {
       list = innerCircles;
@@ -486,6 +595,137 @@ export default function WorkspaceHubScreen() {
           </View>
         )}
       </TouchableOpacity>
+    );
+  };
+
+  // Join handler for Suggested Communities
+  const handleJoinSuggestedCommunity = async (workspaceId: string) => {
+    try {
+      setJoiningCommunityId(workspaceId);
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch {}
+
+      const res = await joinCommunity(workspaceId);
+      if (res.success) {
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+      } else if (res.error) {
+        Alert.alert('Unable to Join', res.error);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to join community');
+    } finally {
+      setJoiningCommunityId(null);
+    }
+  };
+
+  // Render Suggested Communities Section matching user's interests
+  const renderSuggestedSection = () => {
+    if (activeTab !== 'community') return null;
+
+    return (
+      <View style={styles.suggestedSectionContainer}>
+        <View style={styles.suggestedHeaderRow}>
+          <View style={styles.suggestedHeaderTitleGroup}>
+            <View style={styles.suggestedIconWrap}>
+              <Sparkles size={13} color="#059669" />
+            </View>
+            <Text style={styles.suggestedSectionTitle}>Suggested Communities</Text>
+          </View>
+          {userInterests.length > 0 && suggestedCommunities.length > 0 && (
+            <View style={styles.interestCountPill}>
+              <Text style={styles.interestCountPillText}>
+                {suggestedCommunities.length} {suggestedCommunities.length === 1 ? 'match' : 'matches'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.suggestedSectionSub}>
+          {userInterests.length > 0
+            ? `Based on your research in ${userInterests.slice(0, 2).join(' & ')}`
+            : 'Based on your fields of study & research interests'}
+        </Text>
+
+        {userInterests.length === 0 ? (
+          <View style={styles.suggestedEmptyCard}>
+            <Text style={styles.suggestedEmptyCardText}>
+              Add research interests to your profile to discover communities tailored to your field.
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setShowAddInterestsModal(true)}
+              style={styles.addInterestsBtn}
+            >
+              <Plus size={13} color="#FFFFFF" />
+              <Text style={styles.addInterestsBtnText}>Add Interests</Text>
+            </TouchableOpacity>
+          </View>
+        ) : suggestedCommunities.length === 0 ? (
+          <View style={styles.suggestedEmptyCard}>
+            <Text style={styles.suggestedEmptyCardText}>
+              No other communities matching {userInterests.slice(0, 2).join(', ')} right now. Check back as new research groups are created!
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.suggestedList}>
+            {suggestedCommunities.map(({ community, matchedTag }) => {
+              const isJoining = joiningCommunityId === community.id;
+
+              return (
+                <View key={`suggested-${community.id}`} style={styles.suggestedCard}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => handleSelectWorkspace(community.id)}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start' }}
+                  >
+                    <Avatar
+                      uri={community.avatar_url || undefined}
+                      name={community.name}
+                      size="md"
+                    />
+                    <View style={styles.suggestedCardBody}>
+                      <Text style={styles.suggestedCardTitle} numberOfLines={1}>
+                        {community.name}
+                      </Text>
+                      <Text style={styles.suggestedCardDesc} numberOfLines={2}>
+                        {community.description || 'Collaborative research group discussion and paper reviews.'}
+                      </Text>
+                      <View style={styles.suggestedCardMetaRow}>
+                        <Text style={styles.suggestedCardMeta}>
+                          {community.members_count || 1} {community.members_count === 1 ? 'member' : 'members'}
+                        </Text>
+                        {matchedTag ? (
+                          <View style={styles.suggestedTagPill}>
+                            <Text style={styles.suggestedTagText} numberOfLines={1}>
+                              🔬 {matchedTag}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    disabled={isJoining}
+                    onPress={() => handleJoinSuggestedCommunity(community.id)}
+                    style={[styles.suggestedJoinBtn, isJoining && styles.suggestedJoinBtnDisabled]}
+                  >
+                    {isJoining ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.suggestedJoinBtnText}>Join</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
     );
   };
 
@@ -865,6 +1105,7 @@ export default function WorkspaceHubScreen() {
                         />
                       )
                 }
+                ListFooterComponent={activeTab === 'community' ? renderSuggestedSection : undefined}
                 contentContainerStyle={{ paddingBottom: 20 }}
               />
             </View>
@@ -958,6 +1199,7 @@ export default function WorkspaceHubScreen() {
                       tintColor="#164E3F"
                     />
                   }
+                  ListFooterComponent={activeTab === 'community' ? renderSuggestedSection : undefined}
                   contentContainerStyle={[styles.listContent, { paddingBottom: 76 + bottomInset }]}
                   ListEmptyComponent={
                     <View style={styles.emptyContainer}>
@@ -1022,6 +1264,12 @@ export default function WorkspaceHubScreen() {
       <CreateCommunityModal
         visible={showCreateCommunityModal}
         onClose={() => setShowCreateCommunityModal(false)}
+      />
+
+      {/* Add Interests Modal from Suggested Communities Prompt */}
+      <AddInterestsModal
+        visible={showAddInterestsModal}
+        onClose={() => setShowAddInterestsModal(false)}
       />
     </SafeAreaView>
   );
@@ -1224,6 +1472,163 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#64748B',
+  },
+  // Suggested Communities Section Styles
+  suggestedSectionContainer: {
+    marginTop: 18,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  suggestedHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  suggestedHeaderTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  suggestedIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestedSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  suggestedSectionSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 12,
+  },
+  interestCountPill: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  interestCountPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  suggestedEmptyCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  suggestedEmptyCardText: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  addInterestsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#164E3F',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 10,
+  },
+  addInterestsBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  suggestedList: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  suggestedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  suggestedCardBody: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  suggestedCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  suggestedCardDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+    marginBottom: 6,
+  },
+  suggestedCardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  suggestedCardMeta: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  suggestedTagPill: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  suggestedTagText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#166534',
+  },
+  suggestedJoinBtn: {
+    backgroundColor: '#164E3F',
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 16,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestedJoinBtnDisabled: {
+    opacity: 0.7,
+  },
+  suggestedJoinBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   innerCircleRow: {
     flexDirection: 'row',

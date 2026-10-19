@@ -565,19 +565,21 @@ export const workspaceService = {
         .map(mapPrefs)
         .sort(sortWorkspaces);
 
-      // 6. Fetch public discoverable communities not yet joined
+      // 6. Fetch public discoverable communities not yet joined (lean columns to prevent egress overload)
       const { data: discoverRows } = await supabase
         .from('workspaces')
-        .select('*')
+        .select('id, type, name, slug, description, avatar_url, banner_url, topic_tag, creator_id, owner_id, is_private, max_members, settings, created_at, updated_at')
         .eq('type', 'community')
         .eq('is_private', false)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(30);
 
       const discoverableCommunities: Workspace[] = (discoverRows || [])
         .filter((ws: any) => isWsActive(ws) && !joinedWorkspaceIds.has(ws.id))
         .map((ws: any) => ({
           ...ws,
+          topics: ws.topics || ws.settings?.topics || (ws.topic_tag ? [ws.topic_tag] : []),
+          research_fields: ws.research_fields || ws.settings?.research_fields || ws.settings?.topics || [],
           my_membership_status: undefined,
           unread_count: 0,
         }));
