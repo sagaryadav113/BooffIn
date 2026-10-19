@@ -132,6 +132,7 @@ import { E2EEStatusBanner } from '../chat/E2EEStatusBanner';
 import { derivePodSessionKey, encryptTextMessage, decryptTextMessage } from '../../utils/e2eeCrypto';
 import { InteractiveClockPicker, parse24HourToClock } from '../common/InteractiveClockPicker';
 import { WorkspaceBooffInManagerView } from './WorkspaceBooffInManagerView';
+import { VaultIcon } from '../core/VaultIcon';
 
 const SAMPLE_POD_MANUSCRIPTS = [
   {
@@ -3267,7 +3268,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         {/* 6. Save to Vault */}
         <PopoverDivider />
         <PopoverItem
-          icon={<Bookmark size={16} color="#0F172A" />}
+          icon={<VaultIcon size={16} color="#0F172A" />}
           label="Save to Vault"
           onPress={handleBookmarkMessage}
         />
@@ -3810,7 +3811,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           <View style={styles.vaultHeaderRow}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Bookmark size={20} color="#059669" />
+                <VaultIcon size={22} color="#059669" />
                 <Text style={styles.tabActionTitle}>Pod Vault</Text>
               </View>
               <Text style={styles.vaultSubtitle}>
@@ -3829,7 +3830,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           {savedItems.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.vaultEmptyIconCircle}>
-                <Bookmark size={36} color="#059669" />
+                <VaultIcon size={38} color="#059669" />
               </View>
               <Text style={styles.emptyTitle}>Vault is Empty</Text>
               <Text style={styles.emptySub}>
