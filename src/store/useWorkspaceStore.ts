@@ -100,6 +100,7 @@ interface WorkspaceState {
   sendMessage: (params: {
     workspace_id: string;
     content: string;
+    plaintextContent?: string;
     message_type?: WorkspaceMessageType;
     doi_metadata?: DoiMetadata | null;
     audio_metadata?: WorkspaceAudioMetadata | null;
@@ -639,25 +640,122 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   sendMessage: async (params) => {
-    set({ isSending: true });
+    // Generate unique optimistic temporary ID
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const currentUser = useAuthStore.getState().user;
+    const nowIso = new Date().toISOString();
+
+    const optimisticContent = params.plaintextContent || params.content;
+    const optimisticMessage: WorkspaceMessage = {
+      id: tempId,
+      workspace_id: params.workspace_id,
+      sender_id: currentUser?.id || '',
+      content: optimisticContent,
+      message_type: params.message_type || (params.media_urls && params.media_urls.length > 0 ? 'image' : 'text'),
+      doi_metadata: params.doi_metadata || null,
+      audio_metadata: params.audio_metadata || null,
+      post_metadata: params.post_metadata || null,
+      profile_metadata: params.profile_metadata || null,
+      workspace_invite_metadata: params.workspace_invite_metadata || null,
+      document_metadata: params.document_metadata || null,
+      poll_data: params.poll_data || null,
+      call_metadata: params.call_metadata || null,
+      reply_to_id: params.reply_to_id || null,
+      reply_to_message: params.reply_to_message || null,
+      media_urls: params.media_urls || null,
+      e2ee_ciphertext: params.e2ee_ciphertext || null,
+      e2ee_nonce: params.e2ee_nonce || null,
+      created_at: nowIso,
+      updated_at: nowIso,
+      is_pinned: false,
+      status: 'pending', // WhatsApp clock icon indicator
+      sender: currentUser
+        ? {
+            id: currentUser.id,
+            fullName: currentUser.fullName || currentUser.handle || 'Researcher',
+            handle: currentUser.handle || '',
+            avatarUrl: currentUser.avatarUrl || null,
+            academicTitle: currentUser.academicTitle,
+            institution: currentUser.institution,
+            orcidVerified: currentUser.orcidVerified,
+          }
+        : undefined,
+    };
+
+    // 1. Optimistically append message immediately to room and workspace preview
+    set((state) => {
+      const roomMessages = state.messagesByRoom[params.workspace_id] || (state.activeWorkspaceId === params.workspace_id ? state.messages : []);
+      const updatedRoom = [...roomMessages, optimisticMessage];
+
+      const previewMsg = {
+        ...optimisticMessage,
+        content: optimisticContent !== '🔒 Encrypted message' ? optimisticContent : 'Message',
+      };
+      const updateWs = (w: Workspace) =>
+        w.id === params.workspace_id ? { ...w, last_message: previewMsg, updated_at: nowIso } : w;
+
+      return {
+        messages: state.activeWorkspaceId === params.workspace_id ? updatedRoom : state.messages,
+        messagesByRoom: {
+          ...state.messagesByRoom,
+          [params.workspace_id]: updatedRoom,
+        },
+        dms: state.dms.map(updateWs),
+        communities: state.communities.map(updateWs),
+        innerCircles: state.innerCircles.map(updateWs),
+        isSending: false,
+      };
+    });
+
     try {
       const res = await workspaceService.sendMessage(params);
       if (res.error || !res.message) {
-        set({ isSending: false });
+        // Mark optimistic message with error status
+        set((state) => {
+          const markError = (m: WorkspaceMessage) =>
+            m.id === tempId ? { ...m, status: 'error' as const } : m;
+          return {
+            messages: state.messages.map(markError),
+            messagesByRoom: {
+              ...state.messagesByRoom,
+              [params.workspace_id]: (state.messagesByRoom[params.workspace_id] || []).map(markError),
+            },
+            isSending: false,
+          };
+        });
         return { success: false, error: res.error || 'Failed to send' };
       }
 
-      // Optimistically append message if not already present
+      const confirmedMsg: WorkspaceMessage = {
+        ...res.message,
+        content: params.plaintextContent && res.message.content === '🔒 Encrypted message' ? params.plaintextContent : res.message.content,
+        status: 'sent',
+      };
+
+      // 2. Replace optimistic message with confirmed server message
       set((state) => {
         const roomMessages = state.messagesByRoom[params.workspace_id] || (state.activeWorkspaceId === params.workspace_id ? state.messages : []);
-        const exists = roomMessages.some((m) => m.id === res.message!.id);
-        if (exists) return { isSending: false };
-        const updatedRoom = [...roomMessages, res.message!];
+        const alreadyHasConfirmed = roomMessages.some((m) => m.id === confirmedMsg.id);
+        let updatedRoom: WorkspaceMessage[];
+        if (alreadyHasConfirmed) {
+          updatedRoom = roomMessages.filter((m) => m.id !== tempId);
+        } else {
+          let replaced = false;
+          updatedRoom = roomMessages.map((m) => {
+            if (m.id === tempId) {
+              replaced = true;
+              return confirmedMsg;
+            }
+            return m;
+          });
+          if (!replaced) {
+            updatedRoom.push(confirmedMsg);
+          }
+        }
 
-        // Also update last_message in the workspace lists with the actual plaintext content
         const previewMsg = {
-          ...res.message!,
-          content: params.content !== '🔒 Encrypted message' ? params.content : (res.message!.content !== '🔒 Encrypted message' ? res.message!.content : 'Message'),
+          ...confirmedMsg,
+          content: optimisticContent !== '🔒 Encrypted message' ? optimisticContent : (confirmedMsg.content !== '🔒 Encrypted message' ? confirmedMsg.content : 'Message'),
         };
         const updateWs = (w: Workspace) =>
           w.id === params.workspace_id ? { ...w, last_message: previewMsg, updated_at: previewMsg.created_at } : w;
@@ -682,11 +780,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           type: 'broadcast',
           event: 'new_message',
           payload: {
-            message: res.message,
+            message: confirmedMsg,
           },
         });
         // Clear typing status
-        const currentUser = useAuthStore.getState().user;
         channel.send({
           type: 'broadcast',
           event: 'typing',
@@ -698,9 +795,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         });
       }
 
-      return { success: true, message: res.message, error: null };
+      return { success: true, message: confirmedMsg, error: null };
     } catch (err: any) {
-      set({ isSending: false });
+      set((state) => {
+        const markError = (m: WorkspaceMessage) =>
+          m.id === tempId ? { ...m, status: 'error' as const } : m;
+        return {
+          messages: state.messages.map(markError),
+          messagesByRoom: {
+            ...state.messagesByRoom,
+            [params.workspace_id]: (state.messagesByRoom[params.workspace_id] || []).map(markError),
+          },
+          isSending: false,
+        };
+      });
       return { success: false, error: err.message || 'Failed to send' };
     }
   },
@@ -1541,9 +1649,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         set((state) => {
           const roomMsgs = state.messagesByRoom[workspaceId] || (state.activeWorkspaceId === workspaceId ? state.messages : []);
           const exists = roomMsgs.some((m) => m.id === msg.id);
-          const updatedRoom = exists
-            ? roomMsgs.map((m) => (m.id === msg.id ? { ...m, ...msg } : m))
-            : [...roomMsgs, msg];
+          const currentUserId = useAuthStore.getState().user?.id;
+          let updatedRoom: WorkspaceMessage[];
+          if (exists) {
+            updatedRoom = roomMsgs.map((m) => (m.id === msg.id ? { ...m, ...msg, status: 'sent' as const } : m));
+          } else if (currentUserId && msg.sender_id === currentUserId) {
+            let replaced = false;
+            updatedRoom = roomMsgs.map((m) => {
+              if (!replaced && (m.status === 'pending' || m.id.startsWith('temp_')) && m.content === msg.content) {
+                replaced = true;
+                return { ...msg, status: 'sent' as const };
+              }
+              return m;
+            });
+            if (!replaced) {
+              updatedRoom = [...roomMsgs, { ...msg, status: 'sent' as const }];
+            }
+          } else {
+            updatedRoom = [...roomMsgs, msg];
+          }
           const isCurrentRoom = state.activeWorkspaceId === workspaceId;
 
           const updateWs = (w: Workspace) =>
@@ -2077,9 +2201,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           set((state) => {
             const roomMsgs = state.messagesByRoom[workspaceId] || (state.activeWorkspaceId === workspaceId ? state.messages : []);
             const exists = roomMsgs.some((m) => m.id === messageObj.id);
-            const updatedRoom = exists
-              ? roomMsgs.map((m) => (m.id === messageObj.id ? { ...m, ...messageObj } : m))
-              : [...roomMsgs, messageObj];
+            const currentUserId = useAuthStore.getState().user?.id;
+            let updatedRoom: WorkspaceMessage[];
+            if (exists) {
+              updatedRoom = roomMsgs.map((m) => (m.id === messageObj.id ? { ...m, ...messageObj, status: 'sent' as const } : m));
+            } else if (currentUserId && messageObj.sender_id === currentUserId) {
+              let replaced = false;
+              updatedRoom = roomMsgs.map((m) => {
+                if (!replaced && (m.status === 'pending' || m.id.startsWith('temp_')) && (m.content === messageObj.content || m.content === newMsg.content)) {
+                  replaced = true;
+                  return { ...messageObj, status: 'sent' as const };
+                }
+                return m;
+              });
+              if (!replaced) {
+                updatedRoom = [...roomMsgs, { ...messageObj, status: 'sent' as const }];
+              }
+            } else {
+              updatedRoom = [...roomMsgs, messageObj];
+            }
             const isCurrentRoom = state.activeWorkspaceId === workspaceId;
 
             return {

@@ -199,6 +199,7 @@ export interface WorkspaceMessage {
   created_at: string;
   updated_at: string;
   sender?: WorkspaceSenderProfile;
+  status?: 'pending' | 'sent' | 'delivered' | 'read' | 'error';
 }
 
 export interface WorkspaceBlock {

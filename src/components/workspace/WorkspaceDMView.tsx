@@ -68,6 +68,7 @@ import {
   AlertTriangle,
   Lock,
   ChevronDown,
+  Clock,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -1362,13 +1363,29 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
     const trimmed = inputText.trim();
     if (!trimmed && !attachedDoi) return;
 
-    const replyId = replyingTo?.id || null;
+    const currentAttachedDoi = attachedDoi;
+    const currentReply = replyingTo;
+
+    // Immediately clear input fields so user experiences 0ms UI perception (WhatsApp feel)
+    setInputText('');
+    setAttachedDoi(null);
+    setReplyingTo(null);
+
+    if (workspace.id) {
+      sendTypingIndicator(workspace.id, false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Instantly scroll to bottom to view new pending message
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 20);
 
     let e2eeCipher: string | null = null;
     let e2eeNonce: string | null = null;
 
     // Encrypt message with zero-knowledge shared session key
-    if (currentUser?.id && partner?.id && trimmed && !attachedDoi) {
+    if (currentUser?.id && partner?.id && trimmed && !currentAttachedDoi) {
       try {
         const sessionKey = await deriveSharedSessionKey(currentUser.id, partner.id, workspace.id);
         const enc = await encryptTextMessage(trimmed, sessionKey);
@@ -1381,36 +1398,23 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
     const res = await sendMessage({
       workspace_id: workspace.id,
-      content: e2eeCipher ? '🔒 Encrypted message' : (trimmed || (attachedDoi ? `Shared paper: ${attachedDoi.title}` : '')),
-      message_type: attachedDoi ? 'paper_doi' : (e2eeCipher ? 'e2ee_cipher' : 'text'),
-      doi_metadata: attachedDoi,
+      content: e2eeCipher ? '🔒 Encrypted message' : (trimmed || (currentAttachedDoi ? `Shared paper: ${currentAttachedDoi.title}` : '')),
+      plaintextContent: trimmed,
+      message_type: currentAttachedDoi ? 'paper_doi' : (e2eeCipher ? 'e2ee_cipher' : 'text'),
+      doi_metadata: currentAttachedDoi,
       e2ee_ciphertext: e2eeCipher,
       e2ee_nonce: e2eeNonce,
-      reply_to_id: replyId,
-      reply_to_message: getReplyInfo(replyingTo),
+      reply_to_id: currentReply?.id || null,
+      reply_to_message: getReplyInfo(currentReply),
     });
 
-    if (res.success) {
-      sendTypingIndicator(workspace.id, false);
-      if (trimmed) {
-        const newMsgId = res.message?.id;
-        if (newMsgId) {
-          setDecryptedTextMap((prev) => ({ ...prev, [newMsgId]: trimmed }));
-          try {
-            AsyncStorage.setItem(`e2ee_cache_${newMsgId}`, trimmed).catch(() => {});
-          } catch {}
-        }
-      }
-      setInputText('');
-      setAttachedDoi(null);
-      setReplyingTo(null);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    } else {
-      const err = res.error || 'Failed to send message';
-      if (Platform.OS === 'web') {
-        window.alert(err);
+    if (res.success && trimmed) {
+      const newMsgId = res.message?.id;
+      if (newMsgId) {
+        setDecryptedTextMap((prev) => ({ ...prev, [newMsgId]: trimmed }));
+        try {
+          AsyncStorage.setItem(`e2ee_cache_${newMsgId}`, trimmed).catch(() => {});
+        } catch {}
       }
     }
   };
@@ -2101,7 +2105,11 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
               {isMe && !isDeleted && (
-                settings.readReceiptsEnabled &&
+                item.status === 'pending' || item.id.startsWith('temp_') ? (
+                  <Clock size={11} color="rgba(255,255,255,0.7)" strokeWidth={2} style={{ marginLeft: 4 }} />
+                ) : item.status === 'error' ? (
+                  <AlertTriangle size={12} color="#FCA5A5" strokeWidth={2.2} style={{ marginLeft: 4 }} />
+                ) : settings.readReceiptsEnabled &&
                 effectiveOtherLastReadAt &&
                 new Date(effectiveOtherLastReadAt).getTime() >= new Date(item.created_at).getTime() ? (
                   <CheckCheck size={13} color="#34D399" style={{ marginLeft: 4 }} />
@@ -2656,15 +2664,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           ) : (
             <TouchableOpacity
               activeOpacity={0.8}
-              disabled={isSending}
               onPress={handleSend}
               style={styles.detachedSendBtn}
             >
-              {isSending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Send size={16} color="#FFFFFF" />
-              )}
+              <Send size={16} color="#FFFFFF" />
             </TouchableOpacity>
           )}
         </View>

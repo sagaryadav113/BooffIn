@@ -537,28 +537,33 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const handleSendMessage = async () => {
     const trimmed = inputText.trim();
     if (!trimmed && !attachedDoi) return;
+
+    const currentAttachedDoi = attachedDoi;
+    const currentReply = replyingTo;
+
+    // Immediately clear input fields so user experiences 0ms UI perception (WhatsApp feel)
+    setInputText('');
+    setAttachedDoi(null);
+    setReplyingTo(null);
+
     if (workspace.id) {
       sendTypingIndicator(workspace.id, false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     }
 
-    const replyId = replyingTo?.id || null;
+    // Instantly scroll to bottom to view new pending message
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 20);
 
-    const res = await sendMessage({
+    await sendMessage({
       workspace_id: workspace.id,
-      content: trimmed || (attachedDoi ? `Shared research paper: ${attachedDoi.title}` : ''),
-      message_type: attachedDoi ? 'paper_doi' : 'text',
-      doi_metadata: attachedDoi || undefined,
-      reply_to_id: replyId,
-      reply_to_message: getReplyInfo(replyingTo),
+      content: trimmed || (currentAttachedDoi ? `Shared research paper: ${currentAttachedDoi.title}` : ''),
+      message_type: currentAttachedDoi ? 'paper_doi' : 'text',
+      doi_metadata: currentAttachedDoi || undefined,
+      reply_to_id: currentReply?.id || null,
+      reply_to_message: getReplyInfo(currentReply),
     });
-    if (res.success) {
-      setInputText('');
-      setAttachedDoi(null);
-      setReplyingTo(null);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
   };
 
   const handleSharePaperDoi = async () => {
@@ -2015,7 +2020,11 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                             </Text>
                             {isMe && (
                               <View style={{ marginLeft: 4 }}>
-                                {settings.readReceiptsEnabled ? (
+                                {item.status === 'pending' || item.id.startsWith('temp_') ? (
+                                  <Clock size={11} color="rgba(255,255,255,0.7)" strokeWidth={2} />
+                                ) : item.status === 'error' ? (
+                                  <AlertTriangle size={12} color="#FCA5A5" strokeWidth={2.2} />
+                                ) : settings.readReceiptsEnabled ? (
                                   <CheckCheck size={13} color="#FFFFFF" strokeWidth={2.2} />
                                 ) : (
                                   <Check size={13} color="#FFFFFF" strokeWidth={2} />
@@ -2242,15 +2251,10 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                   ) : (
                     <TouchableOpacity
                       activeOpacity={0.8}
-                      disabled={isSending}
                       onPress={handleSendMessage}
                       style={styles.detachedSendBtn}
                     >
-                      {isSending ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Send size={16} color="#FFFFFF" />
-                      )}
+                      <Send size={16} color="#FFFFFF" />
                     </TouchableOpacity>
                   )}
                 </View>

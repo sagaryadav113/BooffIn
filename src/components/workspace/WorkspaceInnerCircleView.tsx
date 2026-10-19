@@ -1475,12 +1475,30 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     const trimmed = inputText.trim();
     if (!trimmed && !attachedDoi) return;
 
-    const replyId = replyingTo?.id || null;
+    const currentAttachedDoi = attachedDoi;
+    const currentReply = replyingTo;
+
+    // Immediately clear input fields so user experiences 0ms UI perception (WhatsApp feel)
+    setInputText('');
+    setAttachedDoi(null);
+    setReplyingTo(null);
+    setShowMentionPopup(false);
+    setMentionQuery(null);
+
+    if (workspace.id) {
+      sendTypingIndicator(workspace.id, false);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Instantly scroll to bottom to view new pending message
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 20);
 
     let e2eeCipher: string | null = null;
     let e2eeNonce: string | null = null;
 
-    if (workspace.id && trimmed && !attachedDoi) {
+    if (workspace.id && trimmed && !currentAttachedDoi) {
       try {
         const podKey = await derivePodSessionKey(workspace.id);
         const enc = await encryptTextMessage(trimmed, podKey);
@@ -1493,35 +1511,24 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
     const res = await sendMessage({
       workspace_id: workspace.id,
-      content: e2eeCipher ? '🔒 Encrypted message' : (trimmed || (attachedDoi ? `Shared paper: ${attachedDoi.title}` : '')),
-      message_type: attachedDoi ? 'paper_doi' : (e2eeCipher ? 'e2ee_cipher' : 'text'),
-      doi_metadata: attachedDoi,
+      content: e2eeCipher ? '🔒 Encrypted message' : (trimmed || (currentAttachedDoi ? `Shared paper: ${currentAttachedDoi.title}` : '')),
+      plaintextContent: trimmed,
+      message_type: currentAttachedDoi ? 'paper_doi' : (e2eeCipher ? 'e2ee_cipher' : 'text'),
+      doi_metadata: currentAttachedDoi,
       e2ee_ciphertext: e2eeCipher,
       e2ee_nonce: e2eeNonce,
-      reply_to_id: replyId,
-      reply_to_message: getReplyInfo(replyingTo),
+      reply_to_id: currentReply?.id || null,
+      reply_to_message: getReplyInfo(currentReply),
     });
 
-    if (res.success) {
-      sendTypingIndicator(workspace.id, false);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      if (trimmed) {
-        const newMsgId = res.message?.id;
-        if (newMsgId) {
-          setDecryptedTextMap((prev) => ({ ...prev, [newMsgId]: trimmed }));
-          try {
-            AsyncStorage.setItem(`e2ee_cache_${newMsgId}`, trimmed).catch(() => {});
-          } catch {}
-        }
+    if (res.success && trimmed) {
+      const newMsgId = res.message?.id;
+      if (newMsgId) {
+        setDecryptedTextMap((prev) => ({ ...prev, [newMsgId]: trimmed }));
+        try {
+          AsyncStorage.setItem(`e2ee_cache_${newMsgId}`, trimmed).catch(() => {});
+        } catch {}
       }
-      setInputText('');
-      setAttachedDoi(null);
-      setReplyingTo(null);
-      setShowMentionPopup(false);
-      setMentionQuery(null);
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
     }
   };
 
@@ -2675,7 +2682,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </Text>
                       {isMe && (
-                        settings.readReceiptsEnabled ? (
+                        item.status === 'pending' || item.id.startsWith('temp_') ? (
+                          <Clock size={11} color="rgba(255,255,255,0.7)" strokeWidth={2} style={{ marginLeft: 3 }} />
+                        ) : item.status === 'error' ? (
+                          <AlertTriangle size={12} color="#FCA5A5" strokeWidth={2.2} style={{ marginLeft: 3 }} />
+                        ) : settings.readReceiptsEnabled ? (
                           <CheckCheck size={12} color="#A7F3D0" style={{ marginLeft: 3 }} />
                         ) : (
                           <Check size={12} color="#A7F3D0" style={{ marginLeft: 3 }} />
@@ -2910,15 +2921,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 ) : (
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    disabled={isSending}
                     onPress={handleSendMessage}
                     style={styles.detachedSendBtn}
                   >
-                    {isSending ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Send size={16} color="#FFFFFF" />
-                    )}
+                    <Send size={16} color="#FFFFFF" />
                   </TouchableOpacity>
                 )}
               </View>
