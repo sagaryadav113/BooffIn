@@ -201,7 +201,7 @@ export const AuthorCommunitiesModal: React.FC<AuthorCommunitiesModalProps> = ({
               </Text>
               <Text style={styles.emptySubtitle}>
                 {isOwnProfile
-                  ? 'Create an open research community to collaborate, host live sessions, and discuss papers with peers.'
+                  ? 'Create an open research community to collaborate, share resources, and discuss papers with peers.'
                   : `${firstName} has not created any public communities yet.`}
               </Text>
 

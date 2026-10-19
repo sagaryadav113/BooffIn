@@ -27,7 +27,6 @@ import {
   FileText,
   MessageSquare,
   Mic,
-  Video,
   Settings,
   Shield,
   Plus,
@@ -200,7 +199,7 @@ const AnimatedTypingIndicator: React.FC<{ name: string; count: number }> = ({ na
   );
 };
 
-export type CommunityTab = 'papers' | 'discussion' | 'live_sessions';
+export type CommunityTab = 'papers' | 'discussion';
 
 interface WorkspaceCommunityViewProps {
   workspace: Workspace;
@@ -227,7 +226,6 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
   // Workspace Store Data & Actions
   const messages = useWorkspaceStore((s) => s.messages);
-  const events = useWorkspaceStore((s) => s.events);
   const blocks = useWorkspaceStore((s) => s.blocks);
   const members = useWorkspaceStore((s) => s.members);
   const isMessagesLoading = useWorkspaceStore((s) => s.isMessagesLoading);
@@ -236,8 +234,6 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const loadMessages = useWorkspaceStore((s) => s.loadMessages);
   const loadMembers = useWorkspaceStore((s) => s.loadMembers);
   const sendMessage = useWorkspaceStore((s) => s.sendMessage);
-  const loadEvents = useWorkspaceStore((s) => s.loadEvents);
-  const createEvent = useWorkspaceStore((s) => s.createEvent);
   const loadBlocks = useWorkspaceStore((s) => s.loadBlocks);
   const subscribeToWorkspaceMessages = useWorkspaceStore((s) => s.subscribeToWorkspaceMessages);
   const typingUsers = useWorkspaceStore((s) => s.typingUsers);
@@ -443,12 +439,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   // Image Viewer Modal
   const [viewerImageUrl, setViewerImageUrl] = useState<string | null>(null);
 
-  // Info modal & New Event modal
+  // Info modal
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [showEventModal, setShowEventModal] = useState(false);
-  const [eventTitle, setEventTitle] = useState('');
-  const [eventLink, setEventLink] = useState('');
-  const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
 
   const flatListRef = useRef<FlatList>(null);
   const isAtBottomRef = useRef(true);
@@ -495,7 +487,6 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     resetUnreadBelow(workspace.id);
     loadMessages(workspace.id);
     loadMembers(workspace.id);
-    loadEvents(workspace.id);
     loadBlocks(workspace.id);
     markAsRead(workspace.id);
 
@@ -1152,19 +1143,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     } catch {}
   };
 
-  const handleCreateLiveSession = async () => {
-    if (!eventTitle.trim()) return;
-    await createEvent({
-      workspaceId: workspace.id,
-      title: eventTitle.trim(),
-      eventType: 'live_session',
-      meetingLink: eventLink.trim() || undefined,
-      startTime: `${eventDate}T19:00:00Z`,
-    });
-    setShowEventModal(false);
-    setEventTitle('');
-    setEventLink('');
-  };
+
 
   // Helper to extract image url from message
   const extractImageUrl = (m: WorkspaceMessage) => {
@@ -1515,15 +1494,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveTab('live_sessions')}
-            style={[styles.segmentPill, activeTab === 'live_sessions' && styles.segmentPillActive]}
-          >
-            <Text style={[styles.segmentPillText, activeTab === 'live_sessions' && styles.segmentPillTextActive]}>
-              Live Sessions
-            </Text>
-          </TouchableOpacity>
+
         </ScrollView>
       </View>
 
@@ -2289,69 +2260,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         </View>
       )}
 
-      {/* Tab 3: Live Sessions */}
-      {activeTab === 'live_sessions' && (
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <View style={styles.tabActionBar}>
-            <Text style={styles.tabActionTitle}>Live Research Sessions</Text>
-            {!isCommunityDisabled && (
-              <TouchableOpacity
-                onPress={() => setShowEventModal(true)}
-                style={styles.addDoiBtn}
-              >
-                <Plus size={13} color="#FFFFFF" />
-                <Text style={styles.addDoiBtnText}>Schedule Session</Text>
-              </TouchableOpacity>
-            )}
-          </View>
 
-          {events.filter((e) => e.event_type === 'live_session').length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Video size={40} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No upcoming live sessions</Text>
-              <Text style={styles.emptySub}>
-                {isCommunityDisabled
-                  ? 'No live sessions scheduled for this community.'
-                  : 'Schedule your next journal club, Q&A, or live experiment streaming.'}
-              </Text>
-            </View>
-          ) : (
-            events
-              .filter((e) => e.event_type === 'live_session')
-              .map((ev) => (
-                <View key={ev.id} style={styles.liveSessionCard}>
-                  <View style={styles.liveBadgeRow}>
-                    <View style={styles.liveIndicatorRow}>
-                      <View style={styles.redLiveDot} />
-                      <Text style={styles.liveSessionLabel}>LIVE SESSION</Text>
-                    </View>
-                    <Text style={styles.liveSessionTime}>
-                      {new Date(ev.start_time).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
-                  </View>
-                  <Text style={styles.liveSessionTopic}>{ev.title}</Text>
-                  {ev.meeting_link && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (Platform.OS === 'web') window.open(ev.meeting_link!, '_blank');
-                        else Linking.openURL(ev.meeting_link!);
-                      }}
-                      style={styles.joinMeetingBtn}
-                    >
-                      <Text style={styles.joinMeetingBtnText}>Join Live Meeting</Text>
-                      <ExternalLink size={12} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))
-          )}
-        </ScrollView>
-      )}
 
 
 
@@ -2782,36 +2691,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
         </View>
       </Modal>
 
-      {/* Modal: Schedule Live Session */}
-      <Modal visible={showEventModal} transparent animationType="fade" onRequestClose={() => setShowEventModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Schedule Live Research Session</Text>
-              <TouchableOpacity onPress={() => setShowEventModal(false)}>
-                <X size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              value={eventTitle}
-              onChangeText={setEventTitle}
-              placeholder="Session Topic (e.g. CRISPR Gene Therapy Review)"
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 10 }]}
-            />
-            <TextInput
-              value={eventLink}
-              onChangeText={setEventLink}
-              placeholder="Meeting URL (Google Meet / Zoom / Jitsi)"
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 14 }]}
-            />
-            <TouchableOpacity onPress={handleCreateLiveSession} style={styles.confirmAttachBtn}>
-              <Text style={styles.confirmAttachBtnText}>Schedule Session</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+
 
       {/* Media, Links & Papers Gallery Modal */}
       <ChatMediaGalleryModal
@@ -4199,62 +4079,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  liveSessionCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-  },
-  liveBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  liveIndicatorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  redLiveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#DC2626',
-  },
-  liveSessionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#DC2626',
-    letterSpacing: 0.5,
-  },
-  liveSessionTime: {
-    fontSize: 11.5,
-    color: '#64748B',
-  },
-  liveSessionTopic: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 10,
-  },
-  joinMeetingBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#164E3F',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-  },
-  joinMeetingBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
