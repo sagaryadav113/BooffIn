@@ -947,7 +947,7 @@ export const workspaceService = {
       } = await supabase.auth.getUser();
       if (!user) return { workspace: null, error: 'User not authenticated' };
 
-      // Strict Community Limit: Maximum 3 active communities created per user
+      // Strict Community Limit: Maximum 2 active communities created per user
       const { data: userCommunities, error: countErr } = await supabase
         .from('workspaces')
         .select('id, settings')
@@ -961,11 +961,11 @@ export const workspaceService = {
           c.settings?.is_deleted !== true
       ).length;
 
-      if (!countErr && activeCount >= 3) {
+      if (!countErr && activeCount >= 2) {
         return {
           workspace: null,
           error:
-            'Community Limit Reached: You cannot have more than 3 active communities. Please disable one of your existing communities to create a new one.',
+            'Community Limit Reached: You cannot have more than 2 active communities. Please disable one of your existing communities to create a new one.',
         };
       }
 

@@ -70,7 +70,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
   }, [communities, currentUser?.id]);
 
   const ownedCommunitiesCount = activeOwnedCommunities.length;
-  const hasReachedLimit = ownedCommunitiesCount >= 3;
+  const hasReachedLimit = ownedCommunitiesCount >= 2;
 
   const [communityToDisable, setCommunityToDisable] = useState<Workspace | null>(null);
   const [showDisableConfirmModal, setShowDisableConfirmModal] = useState(false);
@@ -281,7 +281,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
   // Create Community
   const handleCreateCommunity = async () => {
     if (hasReachedLimit) {
-      setErrorText('Community Limit Reached: You must disable one of your 3 active communities to create a new one.');
+      setErrorText('Community Limit Reached: You must disable one of your 2 active communities to create a new one.');
       return;
     }
 
@@ -358,10 +358,10 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                 <View style={styles.limitInfoCard}>
                   <View style={styles.limitInfoHeader}>
                     <Info size={17} color="#0F172A" strokeWidth={2.2} />
-                    <Text style={styles.limitInfoTitle}>Community Limit (3/3 Active)</Text>
+                    <Text style={styles.limitInfoTitle}>Community Limit (2/2 Active)</Text>
                   </View>
                   <Text style={styles.limitInfoSub}>
-                    You have reached the limit of 3 active communities. To create a new one, disable an existing community to free up a slot.
+                    You have reached the limit of 2 active communities. To create a new one, disable an existing community to free up a slot.
                   </Text>
                   <View style={styles.limitInfoNoteBox}>
                     <Text style={styles.limitInfoNoteText}>
@@ -404,7 +404,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                 <View style={styles.capacityBadgeContainer}>
                   <View style={styles.capacityPill}>
                     <Text style={styles.capacityPillText}>
-                      Community Capacity: {ownedCommunitiesCount}/3 Active
+                      Community Capacity: {ownedCommunitiesCount}/2 Active
                     </Text>
                   </View>
                 </View>
@@ -752,7 +752,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
             ) : (
               <Text style={styles.createBtnText}>
                 {hasReachedLimit
-                  ? 'Limit Reached (3/3 Communities)'
+                  ? 'Limit Reached (2/2 Communities)'
                   : selectedUsers.length > 0
                   ? `Create community (${selectedUsers.length} invited)`
                   : 'Create community'}

@@ -368,12 +368,12 @@ export const WorkspaceSettingsView: React.FC = () => {
             <Text style={styles.capacityLabel}>Active Communities Created</Text>
             <View style={styles.capacityPill}>
               <Text style={styles.capacityPillText}>
-                {activeOwnedCommunitiesCount}/3 Active
+                {activeOwnedCommunitiesCount}/2 Active
               </Text>
             </View>
           </View>
           <Text style={styles.capacityDesc}>
-            You can maintain up to 3 active communities. Inactive/disabled communities remain view-only.
+            You can maintain up to 2 active communities. Inactive/disabled communities remain view-only.
           </Text>
         </View>
 
