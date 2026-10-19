@@ -132,7 +132,12 @@ interface WorkspaceState {
   ) => Promise<{ success: boolean; reactions: Record<string, string[]>; pollData?: WorkspacePollData; error: string | null }>;
   editMessage: (
     messageId: string,
-    newContent: string
+    newContent: string,
+    e2eePayload?: {
+      ciphertext?: string | null;
+      nonce?: string | null;
+      plaintextContent?: string | null;
+    }
   ) => Promise<{ success: boolean; error: string | null }>;
   deleteMessage: (
     messageId: string,
@@ -958,18 +963,62 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 
-  editMessage: async (messageId, newContent) => {
+  editMessage: async (messageId, newContent, e2eePayload) => {
     let targetWorkspaceId: string | null = null;
     // Optimistic update
-    set((state) => ({
-      messages: state.messages.map((m) => {
-        if (m.id === messageId) {
-          targetWorkspaceId = m.workspace_id;
-          return { ...m, content: newContent.trim(), is_edited: true, updated_at: new Date().toISOString() };
+    set((state) => {
+      const updateItem = (m: WorkspaceMessage): WorkspaceMessage => {
+        if (m.id !== messageId) return m;
+        targetWorkspaceId = m.workspace_id;
+        return {
+          ...m,
+          content: newContent.trim(),
+          ...(e2eePayload?.ciphertext ? { e2ee_ciphertext: e2eePayload.ciphertext } : {}),
+          ...(e2eePayload?.nonce ? { e2ee_nonce: e2eePayload.nonce } : {}),
+          is_edited: true,
+          updated_at: new Date().toISOString(),
+        };
+      };
+
+      const updatedMsgs = state.messages.map(updateItem);
+      let updatedMessagesByRoom = state.messagesByRoom;
+      for (const [wId, rMsgs] of Object.entries(state.messagesByRoom)) {
+        if (rMsgs.some((m) => m.id === messageId)) {
+          targetWorkspaceId = targetWorkspaceId || wId;
+          updatedMessagesByRoom = {
+            ...updatedMessagesByRoom,
+            [wId]: rMsgs.map(updateItem),
+          };
         }
-        return m;
-      }),
-    }));
+      }
+
+      const updateWsLastMsg = (w: Workspace): Workspace => {
+        if (!w.last_message || w.last_message.id !== messageId) return w;
+        return {
+          ...w,
+          last_message: {
+            ...w.last_message,
+            content: newContent.trim(),
+            ...(e2eePayload?.ciphertext ? { e2ee_ciphertext: e2eePayload.ciphertext } : {}),
+            ...(e2eePayload?.nonce ? { e2ee_nonce: e2eePayload.nonce } : {}),
+            is_edited: true,
+            updated_at: new Date().toISOString(),
+          },
+        };
+      };
+
+      return {
+        messages: updatedMsgs,
+        messagesByRoom: updatedMessagesByRoom,
+        dms: state.dms.map(updateWsLastMsg),
+        communities: state.communities.map(updateWsLastMsg),
+        innerCircles: state.innerCircles.map(updateWsLastMsg),
+      };
+    });
+
+    if (e2eePayload?.plaintextContent) {
+      AsyncStorage.setItem(`e2ee_cache_${messageId}`, e2eePayload.plaintextContent).catch(() => {});
+    }
 
     if (targetWorkspaceId) {
       const channel = activeWorkspaceChannels.get(targetWorkspaceId);
@@ -982,13 +1031,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             action: 'edit',
             messageId,
             newContent: newContent.trim(),
+            e2ee_ciphertext: e2eePayload?.ciphertext || null,
+            e2ee_nonce: e2eePayload?.nonce || null,
+            plaintextContent: e2eePayload?.plaintextContent || null,
           },
         });
       }
     }
 
     try {
-      const res = await workspaceService.editMessage(messageId, newContent);
+      const res = await workspaceService.editMessage(messageId, newContent, e2eePayload);
       return res;
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -1832,22 +1884,52 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             };
           });
         } else if (payload.action === 'edit') {
+          if (payload.plaintextContent) {
+            AsyncStorage.setItem(`e2ee_cache_${payload.messageId}`, payload.plaintextContent).catch(() => {});
+          } else if (payload.e2ee_ciphertext) {
+            AsyncStorage.removeItem(`e2ee_cache_${payload.messageId}`).catch(() => {});
+          }
           set((state) => {
             const isCurrentRoom = state.activeWorkspaceId === workspaceId;
-            const updateItem = (m: WorkspaceMessage) =>
-              m.id === payload.messageId
-                ? { ...m, content: payload.newContent, is_edited: true, updated_at: new Date().toISOString() }
-                : m;
+            const updateItem = (m: WorkspaceMessage): WorkspaceMessage => {
+              if (m.id !== payload.messageId) return m;
+              return {
+                ...m,
+                content: payload.newContent,
+                e2ee_ciphertext: payload.e2ee_ciphertext !== undefined ? payload.e2ee_ciphertext : m.e2ee_ciphertext,
+                e2ee_nonce: payload.e2ee_nonce !== undefined ? payload.e2ee_nonce : m.e2ee_nonce,
+                is_edited: true,
+                updated_at: new Date().toISOString(),
+              };
+            };
 
             const updatedMsgs = state.messages.map(updateItem);
             const room = state.messagesByRoom[workspaceId];
             const updatedRoom = room ? room.map(updateItem) : undefined;
+
+            const updateWsLastMsg = (w: Workspace): Workspace => {
+              if (w.id !== workspaceId || !w.last_message || w.last_message.id !== payload.messageId) return w;
+              return {
+                ...w,
+                last_message: {
+                  ...w.last_message,
+                  content: payload.newContent,
+                  e2ee_ciphertext: payload.e2ee_ciphertext !== undefined ? payload.e2ee_ciphertext : w.last_message.e2ee_ciphertext,
+                  e2ee_nonce: payload.e2ee_nonce !== undefined ? payload.e2ee_nonce : w.last_message.e2ee_nonce,
+                  is_edited: true,
+                  updated_at: new Date().toISOString(),
+                },
+              };
+            };
 
             return {
               messages: isCurrentRoom ? updatedMsgs : state.messages,
               messagesByRoom: updatedRoom
                 ? { ...state.messagesByRoom, [workspaceId]: updatedRoom }
                 : state.messagesByRoom,
+              dms: state.dms.map(updateWsLastMsg),
+              communities: state.communities.map(updateWsLastMsg),
+              innerCircles: state.innerCircles.map(updateWsLastMsg),
             };
           });
         } else if (payload.action === 'reaction' || payload.action === 'poll_vote') {

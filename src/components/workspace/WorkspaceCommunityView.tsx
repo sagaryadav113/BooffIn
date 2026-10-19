@@ -979,10 +979,13 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
   const handleCopyMessage = async () => {
     if (!selectedMessage) return;
     setShowMessageActionMenu(false);
-    await Clipboard.setStringAsync(selectedMessage.content || '');
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+    const content = selectedMessage.content === '🔒 Encrypted message' ? '' : (selectedMessage.content || '');
+    if (content) {
+      await Clipboard.setStringAsync(content);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    }
   };
 
   const handleStartReply = () => {
@@ -995,7 +998,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
     if (!selectedMessage) return;
     setShowMessageActionMenu(false);
     setEditingMessage(selectedMessage);
-    setEditInputText(selectedMessage.content || '');
+    const content = selectedMessage.content === '🔒 Encrypted message' ? '' : (selectedMessage.content || '');
+    setEditInputText(content);
   };
 
   const handleSaveEdit = async () => {

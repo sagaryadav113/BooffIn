@@ -530,6 +530,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
   // E2EE Pod Vault Auto-Decryption
   const [decryptedTextMap, setDecryptedTextMap] = useState<Record<string, string>>({});
+  const lastDecryptedCipherRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     async function decryptPodMessages() {
@@ -550,7 +551,6 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             }
             continue;
           }
-          if (decryptedTextMap[m.id]) continue;
           let parsedAttachments = m.attachments;
           if (typeof parsedAttachments === 'string') {
             try {
@@ -559,11 +559,16 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           }
           const cipher = m.e2ee_ciphertext || parsedAttachments?.e2ee_ciphertext;
           const nonce = m.e2ee_nonce || parsedAttachments?.e2ee_nonce;
+
+          if (decryptedTextMap[m.id] && cipher && lastDecryptedCipherRef.current[m.id] === cipher) continue;
+          if (decryptedTextMap[m.id] && !cipher && !m.is_edited) continue;
+
           if (cipher && nonce) {
             try {
               const dec = await decryptTextMessage(cipher, nonce, podKey);
               if (dec && !dec.startsWith('🔒 [')) {
                 updates[m.id] = dec;
+                lastDecryptedCipherRef.current[m.id] = cipher;
                 AsyncStorage.setItem(`e2ee_cache_${m.id}`, dec).catch(() => {});
               }
             } catch {}
@@ -1565,14 +1570,61 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     await toggleReaction(msgId, emoji);
   };
 
+  const getDecryptedOrPlaintext = async (msg: WorkspaceMessage): Promise<string> => {
+    if (decryptedTextMap[msg.id] && !decryptedTextMap[msg.id].startsWith('🔒')) {
+      return decryptedTextMap[msg.id];
+    }
+    try {
+      const cached = await AsyncStorage.getItem(`e2ee_cache_${msg.id}`);
+      if (cached && !cached.startsWith('🔒')) {
+        return cached;
+      }
+    } catch {}
+
+    let parsedAttachments = msg.attachments;
+    if (typeof parsedAttachments === 'string') {
+      try {
+        parsedAttachments = JSON.parse(parsedAttachments);
+      } catch {}
+    }
+    const cipher = msg.e2ee_ciphertext || parsedAttachments?.e2ee_ciphertext;
+    const nonce = msg.e2ee_nonce || parsedAttachments?.e2ee_nonce;
+    if (cipher && nonce && workspace.id) {
+      try {
+        const podKey = await derivePodSessionKey(workspace.id);
+        const dec = await decryptTextMessage(cipher, nonce, podKey);
+        if (dec && !dec.startsWith('🔒 [')) {
+          setDecryptedTextMap((prev) => ({ ...prev, [msg.id]: dec }));
+          lastDecryptedCipherRef.current[msg.id] = cipher;
+          return dec;
+        }
+      } catch {}
+    }
+    if (msg.content && msg.content !== '🔒 Encrypted message') {
+      return msg.content;
+    }
+    return '';
+  };
+
   // Copy Message Text
   const handleCopyMessage = async () => {
     if (!selectedMessage) return;
+    const msg = selectedMessage;
     setShowMessageActionMenu(false);
-    await Clipboard.setStringAsync(selectedMessage.content || '');
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+    setSelectedMessage(null);
+    const textToCopy =
+      (await getDecryptedOrPlaintext(msg)) ||
+      (msg.content !== '🔒 Encrypted message' ? msg.content : '') ||
+      '';
+    if (textToCopy) {
+      await Clipboard.setStringAsync(textToCopy);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      if (Platform.OS === 'web') {
+        window.alert('Message copied to clipboard');
+      }
+    }
   };
 
   // Toggle Pin Message to Pod
@@ -1599,20 +1651,65 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   };
 
   // Edit Message Handlers
-  const handleStartEdit = () => {
+  const handleStartEdit = async () => {
     if (!selectedMessage) return;
-    setEditingMessage(selectedMessage);
-    setEditInputText(selectedMessage.content || '');
+    const msg = selectedMessage;
     setShowMessageActionMenu(false);
+    setSelectedMessage(null);
+    setEditingMessage(msg);
+
+    // Immediate synchronous population from memory
+    const syncText =
+      decryptedTextMap[msg.id] ||
+      (msg.content !== '🔒 Encrypted message' ? (msg.content || '') : '');
+    setEditInputText(syncText);
+
+    // Asynchronous resolution if empty
+    if (!syncText) {
+      const resolved = await getDecryptedOrPlaintext(msg);
+      if (resolved) {
+        setEditInputText(resolved);
+      }
+    }
   };
 
   const handleSaveEdit = async () => {
     if (!editingMessage || !editInputText.trim()) return;
     setIsSavingEdit(true);
-    await editMessage(editingMessage.id, editInputText.trim());
-    setIsSavingEdit(false);
-    setEditingMessage(null);
-    setEditInputText('');
+    const newText = editInputText.trim();
+    try {
+      const isEncrypted = Boolean(
+        editingMessage.e2ee_ciphertext ||
+        (editingMessage.attachments as any)?.e2ee_ciphertext ||
+        editingMessage.content === '🔒 Encrypted message'
+      );
+
+      let e2eePayload: { ciphertext?: string; nonce?: string; plaintextContent?: string } | undefined;
+      if (isEncrypted) {
+        const podKey = await derivePodSessionKey(workspace.id);
+        const enc = await encryptTextMessage(newText, podKey);
+        e2eePayload = {
+          ciphertext: enc.ciphertext,
+          nonce: enc.nonce,
+          plaintextContent: newText,
+        };
+        setDecryptedTextMap((prev) => ({ ...prev, [editingMessage.id]: newText }));
+        lastDecryptedCipherRef.current[editingMessage.id] = enc.ciphertext;
+        AsyncStorage.setItem(`e2ee_cache_${editingMessage.id}`, newText).catch(() => {});
+      }
+
+      await editMessage(
+        editingMessage.id,
+        isEncrypted ? '🔒 Encrypted message' : newText,
+        e2eePayload
+      );
+      setEditingMessage(null);
+      setEditInputText('');
+    } catch (err) {
+      console.warn('Pod edit error:', err);
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   // Delete Message Handlers

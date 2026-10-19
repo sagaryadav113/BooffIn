@@ -2353,17 +2353,63 @@ export const workspaceService = {
    */
   async editMessage(
     messageId: string,
-    newContent: string
+    newContent: string,
+    e2eePayload?: {
+      ciphertext?: string | null;
+      nonce?: string | null;
+    }
   ): Promise<{ success: boolean; error: string | null }> {
     try {
-      const { error } = await supabase
+      let updatePayload: any = {
+        content: newContent.trim(),
+        is_edited: true,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (e2eePayload?.ciphertext) {
+        updatePayload.e2ee_ciphertext = e2eePayload.ciphertext;
+        updatePayload.e2ee_nonce = e2eePayload.nonce || null;
+
+        // Fetch current attachments to merge e2ee fields
+        try {
+          const { data: curr } = await supabase
+            .from('workspace_messages')
+            .select('attachments')
+            .eq('id', messageId)
+            .maybeSingle();
+          let currentAttachments = curr?.attachments || {};
+          if (typeof currentAttachments === 'string') {
+            try {
+              currentAttachments = JSON.parse(currentAttachments);
+            } catch {}
+          }
+          currentAttachments = {
+            ...currentAttachments,
+            e2ee_ciphertext: e2eePayload.ciphertext,
+            e2ee_nonce: e2eePayload.nonce || null,
+          };
+          updatePayload.attachments = currentAttachments;
+        } catch {}
+      }
+
+      let { error } = await supabase
         .from('workspace_messages')
-        .update({
+        .update(updatePayload)
+        .eq('id', messageId);
+
+      // Fallback if schema doesn't have e2ee_ciphertext as dedicated column
+      if (error && (error.message.includes('column') || error.message.includes('schema cache'))) {
+        const fallbackPayload: any = {
           content: newContent.trim(),
           is_edited: true,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', messageId);
+        };
+        if (updatePayload.attachments) {
+          fallbackPayload.attachments = updatePayload.attachments;
+        }
+        const retry = await supabase.from('workspace_messages').update(fallbackPayload).eq('id', messageId);
+        error = retry.error;
+      }
 
       if (error) {
         return { success: false, error: error.message };
