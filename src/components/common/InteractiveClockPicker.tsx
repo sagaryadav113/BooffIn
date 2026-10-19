@@ -1,11 +1,13 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   StyleProp,
   ViewStyle,
+  Platform,
 } from 'react-native';
 import Svg, { Circle, Line } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -58,6 +60,15 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
 
   const { hour, minute, period } = useMemo(() => parse24HourToClock(value), [value]);
 
+  const [rawHourInput, setRawHourInput] = useState<string | null>(null);
+  const [rawMinuteInput, setRawMinuteInput] = useState<string | null>(null);
+
+  const hourInputRef = useRef<TextInput>(null);
+  const minuteInputRef = useRef<TextInput>(null);
+
+  const displayHour = rawHourInput !== null ? rawHourInput : String(hour).padStart(2, '0');
+  const displayMinute = rawMinuteInput !== null ? rawMinuteInput : String(minute).padStart(2, '0');
+
   const updateTime = useCallback(
     (newHour: number, newMin: number, newPeriod: 'AM' | 'PM') => {
       const formatted = formatClockTo24Hour(newHour, newMin, newPeriod);
@@ -70,6 +81,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
   );
 
   const handleSelectHour = (h: number) => {
+    setRawHourInput(null);
     updateTime(h, minute, period);
     // Smooth auto-transition to minute selection
     setTimeout(() => {
@@ -78,6 +90,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
   };
 
   const handleSelectMinute = (m: number) => {
+    setRawMinuteInput(null);
     updateTime(hour, m, period);
   };
 
@@ -87,10 +100,83 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
     }
   };
 
-  const handleAdjustMinute = (delta: number) => {
-    let nextM = (minute + delta) % 60;
-    if (nextM < 0) nextM += 60;
-    updateTime(hour, nextM, period);
+  // Manual Typing: Hour validation (cannot cross 24)
+  const handleHourChangeText = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+
+    if (cleaned === '') {
+      setRawHourInput('');
+      return;
+    }
+
+    let num = parseInt(cleaned, 10);
+    if (isNaN(num)) {
+      setRawHourInput('');
+      return;
+    }
+
+    // Validation: Hours cannot cross 24 (valid range: 0 to 23 / 24 max)
+    if (num > 23) {
+      num = 23;
+    }
+
+    let newPeriod = period;
+    let newHour12 = num;
+
+    if (num === 0) {
+      newPeriod = 'AM';
+      newHour12 = 12;
+    } else if (num >= 13 && num <= 23) {
+      // User entered 24-hour style (e.g. 14 -> 2 PM, 23 -> 11 PM)
+      newPeriod = 'PM';
+      newHour12 = num % 12;
+      if (newHour12 === 0) newHour12 = 12;
+    } else if (num >= 1 && num <= 12) {
+      newHour12 = num;
+    }
+
+    setRawHourInput(String(num).slice(0, 2));
+    updateTime(newHour12, minute, newPeriod);
+
+    // Auto-advance to minute input when 2 digits are typed
+    if (cleaned.length >= 2) {
+      setTimeout(() => {
+        minuteInputRef.current?.focus();
+        setMode('minute');
+      }, 50);
+    }
+  };
+
+  const handleHourBlur = () => {
+    setRawHourInput(null);
+  };
+
+  // Manual Typing: Minute validation (cannot cross 60, max 59)
+  const handleMinuteChangeText = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+
+    if (cleaned === '') {
+      setRawMinuteInput('');
+      return;
+    }
+
+    let num = parseInt(cleaned, 10);
+    if (isNaN(num)) {
+      setRawMinuteInput('');
+      return;
+    }
+
+    // Validation: Minutes cannot cross 60 (max is 59)
+    if (num >= 60) {
+      num = 59;
+    }
+
+    setRawMinuteInput(cleaned.length === 1 ? cleaned : String(num).padStart(2, '0'));
+    updateTime(hour, num, period);
+  };
+
+  const handleMinuteBlur = () => {
+    setRawMinuteInput(null);
   };
 
   // Clock Hand End Coordinates
@@ -152,40 +238,70 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      {/* Header: Digital Display + AM/PM Toggle */}
+      {/* Header: Editable Digital Display (Manual typing) + AM/PM Toggle */}
       <View style={styles.digitalHeader}>
         <View style={styles.digitalTimeRow}>
+          {/* Editable Hour Segment */}
           <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setMode('hour')}
+            activeOpacity={0.8}
+            onPress={() => {
+              setMode('hour');
+              hourInputRef.current?.focus();
+            }}
             style={[styles.digitalSegment, mode === 'hour' && styles.digitalSegmentActive]}
           >
-            <Text
+            <TextInput
+              ref={hourInputRef}
+              value={displayHour}
+              onChangeText={handleHourChangeText}
+              onFocus={() => setMode('hour')}
+              onBlur={handleHourBlur}
+              keyboardType="number-pad"
+              maxLength={2}
+              selectTextOnFocus
+              placeholder="00"
+              placeholderTextColor="#94A3B8"
+              returnKeyType="next"
+              onSubmitEditing={() => {
+                minuteInputRef.current?.focus();
+                setMode('minute');
+              }}
               style={[
-                styles.digitalDigit,
-                mode === 'hour' && styles.digitalDigitActive,
+                styles.digitalInput,
+                mode === 'hour' && styles.digitalInputActive,
               ]}
-            >
-              {String(hour).padStart(2, '0')}
-            </Text>
+            />
             <Text style={styles.digitalSub}>HOUR</Text>
           </TouchableOpacity>
 
           <Text style={styles.digitalColon}>:</Text>
 
+          {/* Editable Minute Segment */}
           <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setMode('minute')}
+            activeOpacity={0.8}
+            onPress={() => {
+              setMode('minute');
+              minuteInputRef.current?.focus();
+            }}
             style={[styles.digitalSegment, mode === 'minute' && styles.digitalSegmentActive]}
           >
-            <Text
+            <TextInput
+              ref={minuteInputRef}
+              value={displayMinute}
+              onChangeText={handleMinuteChangeText}
+              onFocus={() => setMode('minute')}
+              onBlur={handleMinuteBlur}
+              keyboardType="number-pad"
+              maxLength={2}
+              selectTextOnFocus
+              placeholder="00"
+              placeholderTextColor="#94A3B8"
+              returnKeyType="done"
               style={[
-                styles.digitalDigit,
-                mode === 'minute' && styles.digitalDigitActive,
+                styles.digitalInput,
+                mode === 'minute' && styles.digitalInputActive,
               ]}
-            >
-              {String(minute).padStart(2, '0')}
-            </Text>
+            />
             <Text style={styles.digitalSub}>MIN</Text>
           </TouchableOpacity>
         </View>
@@ -214,7 +330,10 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
       {/* Mode Sub-nav: Pick Hours vs Minutes */}
       <View style={styles.modeTabsRow}>
         <TouchableOpacity
-          onPress={() => setMode('hour')}
+          onPress={() => {
+            setMode('hour');
+            hourInputRef.current?.focus();
+          }}
           style={[styles.modeTab, mode === 'hour' && styles.modeTabActive]}
         >
           <Clock size={12} color={mode === 'hour' ? '#164E3F' : '#64748B'} />
@@ -224,7 +343,10 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setMode('minute')}
+          onPress={() => {
+            setMode('minute');
+            minuteInputRef.current?.focus();
+          }}
           style={[styles.modeTab, mode === 'minute' && styles.modeTabActive]}
         >
           <Clock size={12} color={mode === 'minute' ? '#164E3F' : '#64748B'} />
@@ -327,40 +449,6 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Fine-Tuning Minute Steppers */}
-      <View style={styles.steppersContainer}>
-        <Text style={styles.stepperLabel}>Fine-tune Minutes:</Text>
-        <View style={styles.steppersRow}>
-          <TouchableOpacity
-            onPress={() => handleAdjustMinute(-5)}
-            style={styles.stepperPill}
-          >
-            <Text style={styles.stepperPillText}>- 5m</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleAdjustMinute(-1)}
-            style={styles.stepperPill}
-          >
-            <Text style={styles.stepperPillText}>- 1m</Text>
-          </TouchableOpacity>
-          <View style={styles.currentMinuteBadge}>
-            <Text style={styles.currentMinuteText}>:{String(minute).padStart(2, '0')}</Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => handleAdjustMinute(1)}
-            style={styles.stepperPill}
-          >
-            <Text style={styles.stepperPillText}>+ 1m</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleAdjustMinute(5)}
-            style={styles.stepperPill}
-          >
-            <Text style={styles.stepperPillText}>+ 5m</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {/* Quick Presets Row */}
       <View style={styles.presetsSection}>
         <Text style={styles.presetsLabel}>Quick Presets:</Text>
@@ -371,6 +459,8 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
               <TouchableOpacity
                 key={p.time}
                 onPress={() => {
+                  setRawHourInput(null);
+                  setRawMinuteInput(null);
                   onChange(p.time);
                   try {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -425,25 +515,32 @@ const styles = StyleSheet.create({
   },
   digitalSegment: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'transparent',
-    minWidth: 54,
+    borderColor: '#E2E8F0',
+    minWidth: 56,
   },
   digitalSegmentActive: {
     backgroundColor: '#ECFDF5',
     borderColor: '#164E3F',
   },
-  digitalDigit: {
+  digitalInput: {
     fontSize: 22,
     fontWeight: '800',
     color: '#334155',
     letterSpacing: 0.5,
+    textAlign: 'center',
+    padding: 0,
+    margin: 0,
+    minWidth: 42,
+    height: 30,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outline: 'none' } as any) : {}),
   },
-  digitalDigitActive: {
+  digitalInputActive: {
     color: '#164E3F',
   },
   digitalSub: {
@@ -455,8 +552,9 @@ const styles = StyleSheet.create({
   digitalColon: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#64748B',
+    color: '#164E3F',
     marginHorizontal: 2,
+    marginBottom: 8,
   },
   periodSwitcher: {
     flexDirection: 'row',
@@ -548,52 +646,6 @@ const styles = StyleSheet.create({
   numberTextSelected: {
     color: '#FFFFFF',
     fontWeight: '800',
-  },
-  steppersContainer: {
-    width: '100%',
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    alignItems: 'center',
-  },
-  stepperLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    marginBottom: 6,
-  },
-  steppersRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  stepperPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  stepperPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  currentMinuteBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  currentMinuteText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#164E3F',
   },
   presetsSection: {
     width: '100%',
