@@ -9,9 +9,8 @@ import {
   ViewStyle,
   Platform,
 } from 'react-native';
-import Svg, { Circle, Line } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
-import { Clock } from 'lucide-react-native';
+import { ChevronUp, ChevronDown } from 'lucide-react-native';
 
 export interface InteractiveClockPickerProps {
   value: string; // 'HH:mm', e.g. '14:30'
@@ -19,14 +18,10 @@ export interface InteractiveClockPickerProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const DIAL_SIZE = 230;
-const DIAL_RADIUS = DIAL_SIZE / 2; // 115
-const HAND_RADIUS = 78; // Distance from center to numbers
-
 export function parse24HourToClock(timeStr: string) {
-  const [hStr, mStr] = (timeStr || '14:00').split(':');
+  const [hStr, mStr] = (timeStr || '07:00').split(':');
   let h = parseInt(hStr, 10);
-  if (isNaN(h)) h = 14;
+  if (isNaN(h)) h = 7;
   let m = parseInt(mStr, 10);
   if (isNaN(m)) m = 0;
 
@@ -56,7 +51,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
   onChange,
   style,
 }) => {
-  const [mode, setMode] = useState<'hour' | 'minute'>('hour');
+  const [activeCol, setActiveCol] = useState<'hour' | 'minute' | 'period'>('hour');
 
   const { hour, minute, period } = useMemo(() => parse24HourToClock(value), [value]);
 
@@ -80,27 +75,46 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
     [onChange]
   );
 
-  const handleSelectHour = (h: number) => {
+  // Chevron Handlers
+  const incrementHour = () => {
+    let next = hour + 1;
+    if (next > 12) next = 1;
+    setActiveCol('hour');
     setRawHourInput(null);
-    updateTime(h, minute, period);
-    // Smooth auto-transition to minute selection
-    setTimeout(() => {
-      setMode('minute');
-    }, 200);
+    updateTime(next, minute, period);
   };
 
-  const handleSelectMinute = (m: number) => {
+  const decrementHour = () => {
+    let prev = hour - 1;
+    if (prev < 1) prev = 12;
+    setActiveCol('hour');
+    setRawHourInput(null);
+    updateTime(prev, minute, period);
+  };
+
+  const incrementMinute = () => {
+    let next = minute + 1;
+    if (next >= 60) next = 0;
+    setActiveCol('minute');
     setRawMinuteInput(null);
-    updateTime(hour, m, period);
+    updateTime(hour, next, period);
   };
 
-  const handleTogglePeriod = (p: 'AM' | 'PM') => {
-    if (p !== period) {
-      updateTime(hour, minute, p);
-    }
+  const decrementMinute = () => {
+    let prev = minute - 1;
+    if (prev < 0) prev = 59;
+    setActiveCol('minute');
+    setRawMinuteInput(null);
+    updateTime(hour, prev, period);
   };
 
-  // Manual Typing: Hour validation (cannot cross 24)
+  const togglePeriod = () => {
+    const nextP = period === 'AM' ? 'PM' : 'AM';
+    setActiveCol('period');
+    updateTime(hour, minute, nextP);
+  };
+
+  // Keyboard Typing: Hour with validation <= 24
   const handleHourChangeText = (text: string) => {
     const cleaned = text.replace(/[^0-9]/g, '');
 
@@ -115,7 +129,6 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
       return;
     }
 
-    // Validation: Hours cannot cross 24 (valid range: 0 to 23 / 24 max)
     if (num > 23) {
       num = 23;
     }
@@ -127,7 +140,6 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
       newPeriod = 'AM';
       newHour12 = 12;
     } else if (num >= 13 && num <= 23) {
-      // User entered 24-hour style (e.g. 14 -> 2 PM, 23 -> 11 PM)
       newPeriod = 'PM';
       newHour12 = num % 12;
       if (newHour12 === 0) newHour12 = 12;
@@ -138,11 +150,11 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
     setRawHourInput(String(num).slice(0, 2));
     updateTime(newHour12, minute, newPeriod);
 
-    // Auto-advance to minute input when 2 digits are typed
+    // Auto-advance to minute field when 2 digits are typed
     if (cleaned.length >= 2) {
       setTimeout(() => {
         minuteInputRef.current?.focus();
-        setMode('minute');
+        setActiveCol('minute');
       }, 50);
     }
   };
@@ -151,7 +163,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
     setRawHourInput(null);
   };
 
-  // Manual Typing: Minute validation (cannot cross 60, max 59)
+  // Keyboard Typing: Minute with validation < 60
   const handleMinuteChangeText = (text: string) => {
     const cleaned = text.replace(/[^0-9]/g, '');
 
@@ -166,7 +178,6 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
       return;
     }
 
-    // Validation: Minutes cannot cross 60 (max is 59)
     if (num >= 60) {
       num = 59;
     }
@@ -179,277 +190,215 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
     setRawMinuteInput(null);
   };
 
-  // Clock Hand End Coordinates
-  const handCoords = useMemo(() => {
-    let angleRad = 0;
-    if (mode === 'hour') {
-      const angleDeg = (hour % 12) * 30; // 360 / 12 = 30
-      angleRad = (angleDeg * Math.PI) / 180;
-    } else {
-      const angleDeg = minute * 6; // 360 / 60 = 6
-      angleRad = (angleDeg * Math.PI) / 180;
-    }
-
-    const x = DIAL_RADIUS + HAND_RADIUS * Math.sin(angleRad);
-    const y = DIAL_RADIUS - HAND_RADIUS * Math.cos(angleRad);
-    return { x, y };
-  }, [mode, hour, minute]);
-
-  // Touch on dial face
-  const handleDialPress = (evt: any) => {
-    const { locationX, locationY } = evt.nativeEvent;
-    if (typeof locationX !== 'number' || typeof locationY !== 'number') return;
-
-    const dx = locationX - DIAL_RADIUS;
-    const dy = locationY - DIAL_RADIUS;
-    let angleRad = Math.atan2(dx, -dy);
-    if (angleRad < 0) angleRad += 2 * Math.PI;
-    const deg = (angleRad * 180) / Math.PI;
-
-    if (mode === 'hour') {
-      let snappedH = Math.round(deg / 30) % 12;
-      if (snappedH === 0) snappedH = 12;
-      handleSelectHour(snappedH);
-    } else {
-      let snappedM = Math.round(deg / 6) % 60;
-      handleSelectMinute(snappedM);
+  // Optional Web mouse-wheel scroll support
+  const handleWheelCol = (e: any, col: 'hour' | 'minute' | 'period') => {
+    if (Platform.OS !== 'web') return;
+    const delta = e.deltaY;
+    if (delta < 0) {
+      if (col === 'hour') incrementHour();
+      else if (col === 'minute') incrementMinute();
+      else togglePeriod();
+    } else if (delta > 0) {
+      if (col === 'hour') decrementHour();
+      else if (col === 'minute') decrementMinute();
+      else togglePeriod();
     }
   };
 
-  // Hour numbers 1-12
-  const hourPositions = useMemo(() => {
-    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => {
-      const angleRad = ((h * 30) * Math.PI) / 180;
-      const x = DIAL_RADIUS + HAND_RADIUS * Math.sin(angleRad) - 16;
-      const y = DIAL_RADIUS - HAND_RADIUS * Math.cos(angleRad) - 16;
-      return { num: h, x, y };
-    });
-  }, []);
-
-  // Minute numbers (00, 05, 10... 55)
-  const minutePositions = useMemo(() => {
-    return [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => {
-      const angleRad = ((m * 6) * Math.PI) / 180;
-      const x = DIAL_RADIUS + HAND_RADIUS * Math.sin(angleRad) - 16;
-      const y = DIAL_RADIUS - HAND_RADIUS * Math.cos(angleRad) - 16;
-      return { num: m, label: String(m).padStart(2, '0'), x, y };
-    });
-  }, []);
-
   return (
     <View style={[styles.container, style]}>
-      {/* Header: Editable Digital Display (Manual typing) + AM/PM Toggle */}
-      <View style={styles.digitalHeader}>
-        <View style={styles.digitalTimeRow}>
-          {/* Editable Hour Segment */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              setMode('hour');
-              hourInputRef.current?.focus();
-            }}
-            style={[styles.digitalSegment, mode === 'hour' && styles.digitalSegmentActive]}
-          >
-            <TextInput
-              ref={hourInputRef}
-              value={displayHour}
-              onChangeText={handleHourChangeText}
-              onFocus={() => setMode('hour')}
-              onBlur={handleHourBlur}
-              keyboardType="number-pad"
-              maxLength={2}
-              selectTextOnFocus
-              placeholder="00"
-              placeholderTextColor="#94A3B8"
-              returnKeyType="next"
-              onSubmitEditing={() => {
-                minuteInputRef.current?.focus();
-                setMode('minute');
-              }}
-              style={[
-                styles.digitalInput,
-                mode === 'hour' && styles.digitalInputActive,
-              ]}
-            />
-            <Text style={styles.digitalSub}>HOUR</Text>
-          </TouchableOpacity>
+      {/* 1. UP CHEVRONS ROW */}
+      <View style={styles.chevronsRow}>
+        <TouchableOpacity
+          onPress={incrementHour}
+          activeOpacity={0.6}
+          style={styles.chevronBtn}
+          accessibilityLabel="Increment Hour"
+        >
+          <ChevronUp
+            size={22}
+            color={activeCol === 'hour' ? '#0D9488' : '#64748B'}
+            strokeWidth={2.5}
+          />
+        </TouchableOpacity>
 
-          <Text style={styles.digitalColon}>:</Text>
+        <View style={styles.colonSpacer} />
 
-          {/* Editable Minute Segment */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              setMode('minute');
-              minuteInputRef.current?.focus();
-            }}
-            style={[styles.digitalSegment, mode === 'minute' && styles.digitalSegmentActive]}
-          >
-            <TextInput
-              ref={minuteInputRef}
-              value={displayMinute}
-              onChangeText={handleMinuteChangeText}
-              onFocus={() => setMode('minute')}
-              onBlur={handleMinuteBlur}
-              keyboardType="number-pad"
-              maxLength={2}
-              selectTextOnFocus
-              placeholder="00"
-              placeholderTextColor="#94A3B8"
-              returnKeyType="done"
-              style={[
-                styles.digitalInput,
-                mode === 'minute' && styles.digitalInputActive,
-              ]}
-            />
-            <Text style={styles.digitalSub}>MIN</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={incrementMinute}
+          activeOpacity={0.6}
+          style={styles.chevronBtn}
+          accessibilityLabel="Increment Minute"
+        >
+          <ChevronUp
+            size={22}
+            color={activeCol === 'minute' ? '#0D9488' : '#64748B'}
+            strokeWidth={2.5}
+          />
+        </TouchableOpacity>
 
-        {/* AM / PM Segmented Control */}
-        <View style={styles.periodSwitcher}>
-          <TouchableOpacity
-            onPress={() => handleTogglePeriod('AM')}
-            style={[styles.periodBtn, period === 'AM' && styles.periodBtnActive]}
-          >
-            <Text style={[styles.periodText, period === 'AM' && styles.periodTextActive]}>
-              AM
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleTogglePeriod('PM')}
-            style={[styles.periodBtn, period === 'PM' && styles.periodBtnActive]}
-          >
-            <Text style={[styles.periodText, period === 'PM' && styles.periodTextActive]}>
-              PM
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <View style={styles.colonSpacer} />
+
+        <TouchableOpacity
+          onPress={togglePeriod}
+          activeOpacity={0.6}
+          style={styles.chevronBtn}
+          accessibilityLabel="Toggle AM/PM"
+        >
+          <ChevronUp
+            size={22}
+            color={activeCol === 'period' ? '#0D9488' : '#64748B'}
+            strokeWidth={2.5}
+          />
+        </TouchableOpacity>
       </View>
 
-      {/* Mode Sub-nav: Pick Hours vs Minutes */}
-      <View style={styles.modeTabsRow}>
+      {/* 2. MAIN DIGITAL CARD (Windows Alarm Style in Light Mode) */}
+      <View style={styles.timeCard}>
+        {/* Hour Column */}
         <TouchableOpacity
+          activeOpacity={0.9}
           onPress={() => {
-            setMode('hour');
+            setActiveCol('hour');
             hourInputRef.current?.focus();
           }}
-          style={[styles.modeTab, mode === 'hour' && styles.modeTabActive]}
+          // @ts-ignore Web wheel event
+          onWheel={(e) => handleWheelCol(e, 'hour')}
+          style={[styles.segment, activeCol === 'hour' && styles.segmentActive]}
         >
-          <Clock size={12} color={mode === 'hour' ? '#164E3F' : '#64748B'} />
-          <Text style={[styles.modeTabText, mode === 'hour' && styles.modeTabTextActive]}>
-            Select Hour ({hour} {period})
-          </Text>
+          <TextInput
+            ref={hourInputRef}
+            value={displayHour}
+            onChangeText={handleHourChangeText}
+            onFocus={() => setActiveCol('hour')}
+            onBlur={handleHourBlur}
+            keyboardType="number-pad"
+            maxLength={2}
+            selectTextOnFocus
+            placeholder="00"
+            placeholderTextColor="#94A3B8"
+            returnKeyType="next"
+            onSubmitEditing={() => {
+              minuteInputRef.current?.focus();
+              setActiveCol('minute');
+            }}
+            style={[
+              styles.timeInput,
+              activeCol === 'hour' && styles.timeInputActive,
+            ]}
+          />
+          {activeCol === 'hour' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
 
+        {/* Colon 1 */}
+        <View style={styles.colonContainer}>
+          <Text style={styles.colonText}>:</Text>
+        </View>
+
+        {/* Minute Column */}
         <TouchableOpacity
+          activeOpacity={0.9}
           onPress={() => {
-            setMode('minute');
+            setActiveCol('minute');
             minuteInputRef.current?.focus();
           }}
-          style={[styles.modeTab, mode === 'minute' && styles.modeTabActive]}
+          // @ts-ignore Web wheel event
+          onWheel={(e) => handleWheelCol(e, 'minute')}
+          style={[styles.segment, activeCol === 'minute' && styles.segmentActive]}
         >
-          <Clock size={12} color={mode === 'minute' ? '#164E3F' : '#64748B'} />
-          <Text style={[styles.modeTabText, mode === 'minute' && styles.modeTabTextActive]}>
-            Select Minute (:{String(minute).padStart(2, '0')})
-          </Text>
+          <TextInput
+            ref={minuteInputRef}
+            value={displayMinute}
+            onChangeText={handleMinuteChangeText}
+            onFocus={() => setActiveCol('minute')}
+            onBlur={handleMinuteBlur}
+            keyboardType="number-pad"
+            maxLength={2}
+            selectTextOnFocus
+            placeholder="00"
+            placeholderTextColor="#94A3B8"
+            returnKeyType="done"
+            onSubmitEditing={() => setActiveCol('period')}
+            style={[
+              styles.timeInput,
+              activeCol === 'minute' && styles.timeInputActive,
+            ]}
+          />
+          {activeCol === 'minute' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
-      </View>
 
-      {/* Interactive Dial Face */}
-      <View style={styles.dialWrapper}>
+        {/* Colon 2 */}
+        <View style={styles.colonContainer}>
+          <Text style={styles.colonText}>:</Text>
+        </View>
+
+        {/* Period Column (AM / PM) */}
         <TouchableOpacity
-          activeOpacity={1}
-          onPress={handleDialPress}
-          style={styles.dialCircle}
+          activeOpacity={0.7}
+          onPress={togglePeriod}
+          // @ts-ignore Web wheel event
+          onWheel={(e) => handleWheelCol(e, 'period')}
+          style={[styles.segment, activeCol === 'period' && styles.segmentActive]}
         >
-          {/* SVG Hand and Hub */}
-          <Svg width={DIAL_SIZE} height={DIAL_SIZE} style={StyleSheet.absoluteFill}>
-            {/* Outer Subtle Rim */}
-            <Circle
-              cx={DIAL_RADIUS}
-              cy={DIAL_RADIUS}
-              r={DIAL_RADIUS - 2}
-              fill="#F8FAFC"
-              stroke="#E2E8F0"
-              strokeWidth={1.5}
-            />
-            {/* Center Hand Line */}
-            <Line
-              x1={DIAL_RADIUS}
-              y1={DIAL_RADIUS}
-              x2={handCoords.x}
-              y2={handCoords.y}
-              stroke="#164E3F"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-            />
-            {/* Selected Target Disc */}
-            <Circle
-              cx={handCoords.x}
-              cy={handCoords.y}
-              r={16}
-              fill="#164E3F"
-            />
-            {/* Center Hub */}
-            <Circle
-              cx={DIAL_RADIUS}
-              cy={DIAL_RADIUS}
-              r={5}
-              fill="#164E3F"
-            />
-          </Svg>
-
-          {/* Numbers positioned on the dial */}
-          {mode === 'hour'
-            ? hourPositions.map((pos) => {
-                const isSelected = pos.num === hour;
-                return (
-                  <TouchableOpacity
-                    key={`h-${pos.num}`}
-                    onPress={() => handleSelectHour(pos.num)}
-                    style={[
-                      styles.numberCircle,
-                      { left: pos.x, top: pos.y },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.numberText,
-                        isSelected && styles.numberTextSelected,
-                      ]}
-                    >
-                      {pos.num}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })
-            : minutePositions.map((pos) => {
-                const isSelected = pos.num === minute;
-                return (
-                  <TouchableOpacity
-                    key={`m-${pos.num}`}
-                    onPress={() => handleSelectMinute(pos.num)}
-                    style={[
-                      styles.numberCircle,
-                      { left: pos.x, top: pos.y },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.numberText,
-                        isSelected && styles.numberTextSelected,
-                      ]}
-                    >
-                      {pos.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+          <Text
+            style={[
+              styles.periodText,
+              activeCol === 'period' && styles.periodTextActive,
+            ]}
+          >
+            {period}
+          </Text>
+          {activeCol === 'period' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
       </View>
 
-      {/* Quick Presets Row */}
+      {/* 3. DOWN CHEVRONS ROW */}
+      <View style={styles.chevronsRow}>
+        <TouchableOpacity
+          onPress={decrementHour}
+          activeOpacity={0.6}
+          style={styles.chevronBtn}
+          accessibilityLabel="Decrement Hour"
+        >
+          <ChevronDown
+            size={22}
+            color={activeCol === 'hour' ? '#0D9488' : '#64748B'}
+            strokeWidth={2.5}
+          />
+        </TouchableOpacity>
+
+        <View style={styles.colonSpacer} />
+
+        <TouchableOpacity
+          onPress={decrementMinute}
+          activeOpacity={0.6}
+          style={styles.chevronBtn}
+          accessibilityLabel="Decrement Minute"
+        >
+          <ChevronDown
+            size={22}
+            color={activeCol === 'minute' ? '#0D9488' : '#64748B'}
+            strokeWidth={2.5}
+          />
+        </TouchableOpacity>
+
+        <View style={styles.colonSpacer} />
+
+        <TouchableOpacity
+          onPress={togglePeriod}
+          activeOpacity={0.6}
+          style={styles.chevronBtn}
+          accessibilityLabel="Toggle AM/PM"
+        >
+          <ChevronDown
+            size={22}
+            color={activeCol === 'period' ? '#0D9488' : '#64748B'}
+            strokeWidth={2.5}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* 4. QUICK PRESETS ROW */}
       <View style={styles.presetsSection}>
         <Text style={styles.presetsLabel}>Quick Presets:</Text>
         <View style={styles.presetsRow}>
@@ -489,7 +438,8 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
@@ -500,157 +450,96 @@ const styles = StyleSheet.create({
     elevation: 2,
     marginVertical: 6,
   },
-  digitalHeader: {
+  chevronsRow: {
+    width: 280,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 8,
-    marginBottom: 12,
   },
-  digitalTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  colonSpacer: {
+    width: 16,
   },
-  digitalSegment: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 10,
+  chevronBtn: {
+    flex: 1,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 8,
+  },
+  timeCard: {
+    width: 280,
+    height: 74,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    minWidth: 56,
+    borderColor: '#CBD5E1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 4,
+    overflow: 'hidden',
   },
-  digitalSegmentActive: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#164E3F',
+  segment: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    backgroundColor: 'transparent',
   },
-  digitalInput: {
-    fontSize: 22,
+  segmentActive: {
+    backgroundColor: '#FFFFFF',
+  },
+  timeInput: {
+    fontSize: 32,
     fontWeight: '800',
     color: '#334155',
     letterSpacing: 0.5,
     textAlign: 'center',
+    width: '100%',
+    height: '100%',
     padding: 0,
     margin: 0,
-    minWidth: 42,
-    height: 30,
     ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outline: 'none' } as any) : {}),
   },
-  digitalInputActive: {
-    color: '#164E3F',
-  },
-  digitalSub: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#94A3B8',
-    marginTop: 1,
-  },
-  digitalColon: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#164E3F',
-    marginHorizontal: 2,
-    marginBottom: 8,
-  },
-  periodSwitcher: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  periodBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  periodBtnActive: {
-    backgroundColor: '#164E3F',
-    shadowColor: '#164E3F',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 1,
+  timeInputActive: {
+    color: '#0F172A',
   },
   periodText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#475569',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
   periodTextActive: {
-    color: '#FFFFFF',
+    color: '#0F172A',
   },
-  modeTabsRow: {
-    flexDirection: 'row',
+  colonContainer: {
+    width: 16,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginBottom: 12,
   },
-  modeTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  modeTabActive: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#164E3F',
-  },
-  modeTabText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  modeTabTextActive: {
-    color: '#164E3F',
-    fontWeight: '700',
-  },
-  dialWrapper: {
-    width: DIAL_SIZE,
-    height: DIAL_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 4,
-  },
-  dialCircle: {
-    width: DIAL_SIZE,
-    height: DIAL_SIZE,
-    borderRadius: DIAL_RADIUS,
-    position: 'relative',
-  },
-  numberCircle: {
-    position: 'absolute',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  numberText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  numberTextSelected: {
-    color: '#FFFFFF',
+  colonText: {
+    fontSize: 24,
     fontWeight: '800',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 8,
+    right: 8,
+    height: 3.5,
+    borderRadius: 2,
+    backgroundColor: '#0D9488', // Cyan/teal accent line matching Windows alarm
   },
   presetsSection: {
-    width: '100%',
+    width: 280,
     marginTop: 12,
-    paddingTop: 8,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
@@ -663,13 +552,14 @@ const styles = StyleSheet.create({
   presetsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 4,
   },
   presetChip: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 6,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -679,7 +569,7 @@ const styles = StyleSheet.create({
     borderColor: '#164E3F',
   },
   presetChipText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: '#475569',
   },

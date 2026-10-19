@@ -3939,7 +3939,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   >
                     <Clock size={13} color="#164E3F" />
                     <Text style={styles.clockTogglePillText}>
-                      {showClockPicker ? 'Hide Clock' : 'Interactive Clock'}
+                      {showClockPicker ? 'Hide Time' : 'Set Time'}
                     </Text>
                     {showClockPicker ? (
                       <ChevronUp size={13} color="#164E3F" />
@@ -3967,13 +3967,13 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         })()}
                       </Text>
                       <Text style={styles.selectedTimeSub}>
-                        Tap to {showClockPicker ? 'collapse' : 'open interactive dial & change time'}
+                        Tap to {showClockPicker ? 'collapse' : 'open time picker & adjust'}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.clockBadgePill}>
                     <Text style={styles.clockBadgePillText}>
-                      {showClockPicker ? 'Active Dial' : 'Open Dial'}
+                      {showClockPicker ? 'Active Picker' : 'Change Time'}
                     </Text>
                   </View>
                 </TouchableOpacity>
