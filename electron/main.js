@@ -53,7 +53,7 @@ function createWindow() {
     const responseHeaders = { ...details.responseHeaders };
 
     // Do NOT alter headers for Supabase API or auth calls
-    if (details.url.includes('supabase.co') || details.url.includes('lvstuqhrmagzqkgwlisl')) {
+    if (details.url.includes('supabase.co') || details.url.includes('xdzrpsptamdhqomhvjsx')) {
       callback({ cancel: false, responseHeaders });
       return;
     }

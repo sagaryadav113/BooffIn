@@ -7,8 +7,8 @@ import { supabase } from '../../api/client';
 import { AdminMember, AdminRole, AdminStatus } from '../types/roles';
 import { adminAuditService } from './adminAuditService';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://lvstuqhrmagzqkgwlisl.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_fXyEsViLthF0T7A3NHBXpA_UUUVbrbx';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://xdzrpsptamdhqomhvjsx.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_EXMXn9ZWnmn1ggqEt93WvQ_HHKqfKqs';
 
 /**
  * Isolated client for fallback signups without overwriting active admin session

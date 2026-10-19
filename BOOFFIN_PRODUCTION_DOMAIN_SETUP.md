@@ -5,7 +5,7 @@
 **Business Email:** `admin@letsbooffin.com`  
 **DNS Registrar:** GoDaddy  
 **Hosting Provider:** Vercel (Dual Isolated Projects)  
-**Database & Auth Authority:** Supabase Production (`lvstuqhrmagzqkgwlisl`)
+**Database & Auth Authority:** Supabase Production (`xdzrpsptamdhqomhvjsx`)
 
 ---
 
@@ -86,8 +86,8 @@ Create a dedicated, isolated project for the Admin Portal:
    * **Output Directory:** `dist`
 5. Under **Environment Variables**, add:
    * `BOOFFIN_TARGET` = `admin` *(Crucial: Instructs Expo to compile exclusively from `src/admin-app`, excluding all public routes and ORCID secrets)*
-   * `EXPO_PUBLIC_SUPABASE_URL` = `https://lvstuqhrmagzqkgwlisl.supabase.co`
-   * `EXPO_PUBLIC_SUPABASE_ANON_KEY` = `[Your Production Publishable/Anon Key]`
+   * `EXPO_PUBLIC_SUPABASE_URL` = `https://xdzrpsptamdhqomhvjsx.supabase.co`
+   * `EXPO_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_EXMXn9ZWnmn1ggqEt93WvQ_HHKqfKqs`
    * `EXPO_PUBLIC_APP_ENV` = `production`
 6. Click **Deploy**.
 7. Once deployed, go to **Settings > Domains** in the `booffin-admin` project.

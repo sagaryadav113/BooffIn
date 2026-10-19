@@ -4,7 +4,7 @@
 **Primary URL:** `https://<admin-portal-project>.vercel.app`  
 **Future Custom Domain:** `https://admin.booffin.com`  
 **Existing Public App:** `https://booff-in.vercel.app` (Completely untouched & isolated)  
-**Backend Authority:** Supabase PostgreSQL (`lvstuqhrmagzqkgwlisl`) via GoTrue Auth, RLS, and MFA (AAL2)  
+**Backend Authority:** Supabase PostgreSQL (`xdzrpsptamdhqomhvjsx`) via GoTrue Auth, RLS, and MFA (AAL2)  
 **Status:** Prepared for separate Vercel deployment (Awaiting human approval)
 
 ---

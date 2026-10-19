@@ -30,7 +30,7 @@ export const AdminSettingsView: React.FC = () => {
           <AdminBadge label="PRODUCTION" variant="emerald" size="sm" />
         </View>
         <Text style={styles.cardText}>
-          Connected Cloud: BooffIn Production Supabase Cluster (<Text style={styles.mono}>lvstuqhrmagzqkgwlisl</Text>)
+          Connected Cloud: BooffIn Production Supabase Cluster (<Text style={styles.mono}>xdzrpsptamdhqomhvjsx</Text>)
         </Text>
         <Text style={styles.cardSubtext}>
           Production Database Protection: Strict zero-trust RBAC and AAL2 TOTP validation active across all administrative endpoints.

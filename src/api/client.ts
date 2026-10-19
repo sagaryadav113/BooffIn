@@ -113,8 +113,17 @@ export const appStorage = {
   },
 };
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://xdzrpsptamdhqomhvjsx.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_EXMXn9ZWnmn1ggqEt93WvQ_HHKqfKqs';
+const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const isDeprecatedCluster = Boolean(rawSupabaseUrl && rawSupabaseUrl.includes('lvstuqhrmagzqkgwlisl'));
+
+const supabaseUrl = (!rawSupabaseUrl || isDeprecatedCluster)
+  ? 'https://xdzrpsptamdhqomhvjsx.supabase.co'
+  : rawSupabaseUrl;
+
+const rawAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseAnonKey = (!rawAnonKey || isDeprecatedCluster)
+  ? 'sb_publishable_EXMXn9ZWnmn1ggqEt93WvQ_HHKqfKqs'
+  : rawAnonKey;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
