@@ -2919,6 +2919,86 @@ export const workspaceService = {
     }
   },
 
+  async updateWorkspaceEvent(
+    eventId: string,
+    workspaceId: string,
+    updates: {
+      title?: string;
+      description?: string | null;
+      eventType?: 'lab_meeting' | 'reading_group' | 'milestone' | 'live_session' | string;
+      startTime?: string;
+      endTime?: string | null;
+      meetingLink?: string | null;
+      attendeeIds?: string[];
+    }
+  ): Promise<{ event: WorkspaceEvent | null; error: string | null }> {
+    try {
+      // 1. Update local cache
+      const localKey = `@booffin_events_${workspaceId}`;
+      let updatedEvent: WorkspaceEvent | null = null;
+      try {
+        const stored = await AsyncStorage.getItem(localKey);
+        if (stored) {
+          const list: WorkspaceEvent[] = JSON.parse(stored);
+          const updatedList = list.map((ev) => {
+            if (ev.id === eventId) {
+              updatedEvent = {
+                ...ev,
+                title: updates.title !== undefined ? updates.title.trim() : ev.title,
+                description: updates.description !== undefined ? (updates.description ? updates.description.trim() : null) : ev.description,
+                event_type: (updates.eventType !== undefined ? updates.eventType : ev.event_type) as any,
+                start_time: updates.startTime !== undefined ? updates.startTime : ev.start_time,
+                end_time: updates.endTime !== undefined ? updates.endTime : ev.end_time,
+                meeting_link: updates.meetingLink !== undefined ? updates.meetingLink : ev.meeting_link,
+                attendee_ids: updates.attendeeIds !== undefined ? updates.attendeeIds : ev.attendee_ids,
+              };
+              return updatedEvent;
+            }
+            return ev;
+          });
+          await AsyncStorage.setItem(localKey, JSON.stringify(updatedList));
+        }
+      } catch (cacheErr) {
+        console.warn('[workspaceService] local event update cache error:', cacheErr);
+      }
+
+      // 2. Update Supabase
+      try {
+        const validUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const dbUpdates: any = {};
+        if (updates.title !== undefined) dbUpdates.title = updates.title.trim();
+        if (updates.description !== undefined) dbUpdates.description = updates.description ? updates.description.trim() : null;
+        if (updates.eventType !== undefined) dbUpdates.event_type = updates.eventType;
+        if (updates.startTime !== undefined) {
+          dbUpdates.start_time = updates.startTime;
+          dbUpdates.event_date = updates.startTime;
+        }
+        if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime;
+        if (updates.meetingLink !== undefined) dbUpdates.meeting_link = updates.meetingLink;
+        if (updates.attendeeIds !== undefined) {
+          dbUpdates.attendee_ids = updates.attendeeIds.filter((id) => validUuidRegex.test(id));
+        }
+
+        const { data, error } = await supabase
+          .from('workspace_events')
+          .update(dbUpdates)
+          .eq('id', eventId)
+          .select()
+          .maybeSingle();
+
+        if (data && !error && updatedEvent) {
+          updatedEvent = { ...(updatedEvent as object), ...(data as object) } as WorkspaceEvent;
+        }
+      } catch (dbErr: any) {
+        console.warn('[workspaceService] Supabase DB event update note:', dbErr.message);
+      }
+
+      return { event: updatedEvent, error: null };
+    } catch (err: any) {
+      return { event: null, error: err.message || 'Failed to update event' };
+    }
+  },
+
   /**
    * BooffIn Manager Tasks (Kanban)
    */

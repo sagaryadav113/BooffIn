@@ -265,6 +265,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   const loadEvents = useWorkspaceStore((s) => s.loadEvents);
   const loadTasks = useWorkspaceStore((s) => s.loadTasks);
   const createEvent = useWorkspaceStore((s) => s.createEvent);
+  const updateEvent = useWorkspaceStore((s) => s.updateEvent);
   const deleteEvent = useWorkspaceStore((s) => s.deleteEvent);
   const loadOpportunities = useWorkspaceStore((s) => s.loadOpportunities);
   const createOpportunity = useWorkspaceStore((s) => s.createOpportunity);
@@ -759,6 +760,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
   // Modals & Calendar State
   const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<WorkspaceEvent | null>(null);
   const [eventTitle, setEventTitle] = useState('');
   const [eventDesc, setEventDesc] = useState('');
   const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
@@ -881,12 +883,45 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
   };
 
   const openScheduleModalForDate = (dateStr: string) => {
+    setEditingEvent(null);
     setEventDate(dateStr);
     setSelectedCalendarDate(dateStr);
     setSelectedAttendeeIds([]);
     setEventTitle('');
     setEventDesc('');
     setEventTime('14:00');
+    setEventType('lab_meeting');
+    setShowClockPicker(true);
+    setShowEventModal(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+  };
+
+  const openEditModalForEvent = (ev: WorkspaceEvent) => {
+    setEditingEvent(ev);
+    setEventTitle(ev.title || '');
+    // Clean out any previously appended attendee footnote
+    const cleanDesc = (ev.description || '')
+      .replace(/\n\n👥 Attendees: [^\n]+/g, '')
+      .replace(/👥 Attendees: [^\n]+/g, '')
+      .trim();
+    setEventDesc(cleanDesc);
+
+    const evDate = (ev.start_time || (ev as any).event_date || '').split('T')[0] || selectedCalendarDate;
+    setEventDate(evDate);
+    setSelectedCalendarDate(evDate);
+
+    let evTime = '14:00';
+    if (ev.start_time && ev.start_time.includes('T')) {
+      const rawTime = ev.start_time.split('T')[1]?.substring(0, 5);
+      if (rawTime && rawTime.includes(':')) {
+        evTime = rawTime;
+      }
+    }
+    setEventTime(evTime);
+    setEventType((ev.event_type as any) || 'lab_meeting');
+    setSelectedAttendeeIds(ev.attendee_ids || []);
     setShowClockPicker(true);
     setShowEventModal(true);
     try {
@@ -1894,6 +1929,59 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       }
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to schedule event');
+    } finally {
+      setIsSubmittingEvent(false);
+    }
+  };
+
+  const handleUpdateEvent = async () => {
+    if (!editingEvent) return;
+    if (!eventTitle.trim()) {
+      Alert.alert('Missing Title', 'Please enter a title for the event.');
+      return;
+    }
+    setIsSubmittingEvent(true);
+    try {
+      const cleanTime = eventTime && eventTime.includes(':') ? eventTime : '14:00';
+      const resolvedDate = eventDate || selectedCalendarDate || new Date().toISOString().split('T')[0];
+      const startTime = `${resolvedDate}T${cleanTime}:00Z`;
+
+      let finalDesc = eventDesc.trim();
+      const taggedMembers = members.filter((m) => selectedAttendeeIds.includes(m.user_id));
+      if (taggedMembers.length > 0) {
+        const attendeeNames = taggedMembers
+          .map((m) => `@${m.profile?.fullName || m.profile?.handle || 'Member'}`)
+          .join(', ');
+        finalDesc = finalDesc
+          ? `${finalDesc}\n\n👥 Attendees: ${attendeeNames}`
+          : `👥 Attendees: ${attendeeNames}`;
+      }
+
+      const res = await updateEvent(editingEvent.id, workspace.id, {
+        title: eventTitle.trim(),
+        description: finalDesc || null,
+        eventType,
+        startTime,
+        attendeeIds: selectedAttendeeIds,
+      });
+
+      if (res.success) {
+        setShowEventModal(false);
+        setEditingEvent(null);
+        setEventTitle('');
+        setEventDesc('');
+        setSelectedAttendeeIds([]);
+        loadTasks(workspace.id);
+        setVaultToast({ message: 'Event updated successfully' });
+        setTimeout(() => setVaultToast(null), 3000);
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+      } else {
+        Alert.alert('Error', res.error || 'Failed to update event');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update event');
     } finally {
       setIsSubmittingEvent(false);
     }
@@ -3582,15 +3670,27 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                       <Text style={styles.eventTitle}>{ev.title}</Text>
                     </View>
 
-                    {canDelete && (
-                      <TouchableOpacity
-                        onPress={() => handleDeleteEvent(ev.id, ev.title)}
-                        style={styles.eventDeleteBtn}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Trash2 size={16} color="#DC2626" />
-                      </TouchableOpacity>
-                    )}
+                    <View style={styles.eventActionsRow}>
+                      {canDelete && (
+                        <TouchableOpacity
+                          onPress={() => openEditModalForEvent(ev)}
+                          style={styles.eventEditBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Pencil size={15} color="#164E3F" />
+                        </TouchableOpacity>
+                      )}
+
+                      {canDelete && (
+                        <TouchableOpacity
+                          onPress={() => handleDeleteEvent(ev.id, ev.title)}
+                          style={styles.eventDeleteBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Trash2 size={16} color="#DC2626" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
 
                   <View style={styles.eventTimeRow}>
@@ -3902,18 +4002,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         </View>
       </Modal>
 
-      {/* Modal: Schedule Event with Add People from Group */}
-      <Modal visible={showEventModal} transparent animationType="fade" onRequestClose={() => setShowEventModal(false)}>
+      {/* Modal: Schedule / Edit Event with Add People from Group */}
+      <Modal visible={showEventModal} transparent animationType="fade" onRequestClose={() => { setShowEventModal(false); setEditingEvent(null); }}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxHeight: '92%' }]}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Schedule Lab Event</Text>
+                <Text style={styles.modalTitle}>{editingEvent ? 'Edit Event' : 'Schedule Event'}</Text>
                 <Text style={{ fontSize: 12, color: '#059669', fontWeight: '600', marginTop: 2 }}>
                   📅 {formattedSelectedDate}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setShowEventModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity onPress={() => { setShowEventModal(false); setEditingEvent(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <X size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
@@ -4133,21 +4233,23 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             {/* Submit & Cancel */}
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
               <TouchableOpacity
-                onPress={() => setShowEventModal(false)}
+                onPress={() => { setShowEventModal(false); setEditingEvent(null); }}
                 style={[styles.confirmAttachBtn, { flex: 1, backgroundColor: '#F1F5F9' }]}
               >
                 <Text style={[styles.confirmAttachBtnText, { color: '#475569' }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={handleCreateEvent}
+                onPress={editingEvent ? handleUpdateEvent : handleCreateEvent}
                 disabled={isSubmittingEvent}
                 style={[styles.confirmAttachBtn, { flex: 2 }]}
               >
                 {isSubmittingEvent ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.confirmAttachBtnText}>Schedule Event</Text>
+                  <Text style={styles.confirmAttachBtnText}>
+                    {editingEvent ? 'Save Changes' : 'Schedule Event'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -5607,6 +5709,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  eventActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  eventEditBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
   eventDeleteBtn: {
     padding: 6,

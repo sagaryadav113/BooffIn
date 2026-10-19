@@ -160,6 +160,19 @@ interface WorkspaceState {
     attendeeIds?: string[];
   }) => Promise<{ success: boolean; error: string | null }>;
   deleteEvent: (eventId: string, workspaceId: string) => Promise<{ success: boolean; error: string | null }>;
+  updateEvent: (
+    eventId: string,
+    workspaceId: string,
+    updates: {
+      title?: string;
+      description?: string | null;
+      eventType?: 'live_session' | 'reading_group' | 'lab_meeting' | 'milestone' | string;
+      startTime?: string;
+      endTime?: string | null;
+      meetingLink?: string | null;
+      attendeeIds?: string[];
+    }
+  ) => Promise<{ success: boolean; error: string | null }>;
   loadTasks: (workspaceId: string) => Promise<void>;
   createTask: (params: {
     workspaceId: string;
@@ -1322,6 +1335,74 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
     } catch (delTaskErr) {
       console.warn('[useWorkspaceStore] delete linked task note:', delTaskErr);
+    }
+
+    await get().loadEvents(workspaceId);
+    return { success: true, error: null };
+  },
+
+  updateEvent: async (eventId, workspaceId, updates) => {
+    // 1. Optimistic update
+    set((state) => ({
+      events: (state.events || []).map((ev) =>
+        ev.id === eventId
+          ? {
+              ...ev,
+              title: updates.title !== undefined ? updates.title : ev.title,
+              description: updates.description !== undefined ? updates.description : ev.description,
+              event_type: (updates.eventType !== undefined ? updates.eventType : ev.event_type) as any,
+              start_time: updates.startTime !== undefined ? updates.startTime : ev.start_time,
+              end_time: updates.endTime !== undefined ? updates.endTime : ev.end_time,
+              meeting_link: updates.meetingLink !== undefined ? updates.meetingLink : ev.meeting_link,
+              attendee_ids: updates.attendeeIds !== undefined ? updates.attendeeIds : ev.attendee_ids,
+            }
+          : ev
+      ),
+    }));
+
+    const res = await workspaceService.updateWorkspaceEvent(eventId, workspaceId, updates);
+    if (!res.event && res.error) {
+      await get().loadEvents(workspaceId);
+      return { success: false, error: res.error || 'Failed to update event' };
+    }
+
+    // 2. Also sync changes to linked task in BooffIn Manager
+    try {
+      const stateTasks = get().tasks || [];
+      const linkedTask = stateTasks.find((t) => t.linked_event_id === eventId);
+      if (linkedTask) {
+        const datePart = updates.startTime ? updates.startTime.split('T')[0] : (linkedTask.due_date ?? null);
+        let timePart: string | null = linkedTask.due_time ?? null;
+        if (updates.startTime && updates.startTime.includes('T')) {
+          const rawTime = updates.startTime.split('T')[1]?.substring(0, 5);
+          if (rawTime && rawTime.includes(':')) {
+            timePart = rawTime;
+          }
+        }
+
+        await workspaceService.updateWorkspaceTask(linkedTask.id, workspaceId, {
+          title: updates.title !== undefined ? updates.title : linkedTask.title,
+          description: updates.description !== undefined ? (updates.description || null) : linkedTask.description,
+          due_date: datePart,
+          due_time: timePart,
+        });
+
+        set((state) => ({
+          tasks: (state.tasks || []).map((t) =>
+            t.id === linkedTask.id
+              ? {
+                  ...t,
+                  title: updates.title !== undefined ? updates.title : t.title,
+                  description: updates.description !== undefined ? (updates.description || null) : t.description,
+                  due_date: datePart,
+                  due_time: timePart,
+                }
+              : t
+          ),
+        }));
+      }
+    } catch (taskSyncErr) {
+      console.warn('[useWorkspaceStore] update linked task note:', taskSyncErr);
     }
 
     await get().loadEvents(workspaceId);
