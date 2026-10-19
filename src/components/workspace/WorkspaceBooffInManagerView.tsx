@@ -884,10 +884,18 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
 
   const currentUser = useAuthStore((s) => s.user);
   const tasks = useWorkspaceStore((s) => s.tasks);
+  const loadTasks = useWorkspaceStore((s) => s.loadTasks);
   const createTask = useWorkspaceStore((s) => s.createTask);
   const updateTask = useWorkspaceStore((s) => s.updateTask);
   const deleteTask = useWorkspaceStore((s) => s.deleteTask);
   const moveTaskStatus = useWorkspaceStore((s) => s.moveTaskStatus);
+
+  // Fresh load on mount or workspace change
+  useEffect(() => {
+    if (workspace?.id) {
+      loadTasks(workspace.id);
+    }
+  }, [workspace?.id, loadTasks]);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');

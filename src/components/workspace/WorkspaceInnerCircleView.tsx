@@ -335,6 +335,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
     };
   }, [workspace.id]);
 
+  // Tab switch refresher: reload latest events or tasks when user switches to those tabs
+  useEffect(() => {
+    if (activeTab === 'calendar') {
+      loadEvents(workspace.id);
+    } else if (activeTab === 'manager') {
+      loadTasks(workspace.id);
+    }
+  }, [activeTab, workspace.id]);
+
   // Initial scroll to latest message when messages load
   useEffect(() => {
     if (messages.length > 0 && !hasInitialScrolledRef.current) {

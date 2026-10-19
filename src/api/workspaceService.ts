@@ -1505,12 +1505,16 @@ export const workspaceService = {
         }
       });
 
-      // 2. Filter out raw vote transaction records from visible chat messages
+      // 2. Filter out raw vote transaction records and sync records from visible chat messages
       const visibleRawList = rawList.filter((m: any) => {
         const isVoteAction =
           m.attachments?.is_poll_vote_action === true ||
           (typeof m.content === 'string' && (m.content.includes('Vote:') || m.content.includes('[POLL_VOTE]')));
-        return !isVoteAction;
+        const isSyncAction =
+          m.attachments?.is_task_sync_action === true ||
+          m.attachments?.is_event_sync_action === true ||
+          (typeof m.content === 'string' && (m.content.startsWith('[TASK_SYNC') || m.content.startsWith('[EVENT_SYNC')));
+        return !isVoteAction && !isSyncAction;
       });
 
       const messages: WorkspaceMessage[] = visibleRawList.map((m: any) => {
@@ -2756,8 +2760,45 @@ export const workspaceService = {
         }
       }
 
+      // 3. Fallback & Cross-Device Sync: Reconcile event sync records from workspace_messages
+      try {
+        const { data: mData } = await supabase
+          .from('workspace_messages')
+          .select('id, sender_id, content, attachments, created_at')
+          .eq('workspace_id', workspaceId)
+          .or('attachments->>is_event_sync_action.eq.true,content.ilike.*EVENT_SYNC*')
+          .order('created_at', { ascending: true })
+          .limit(100);
+
+        if (Array.isArray(mData)) {
+          for (const m of mData) {
+            const action = m.attachments?.action || (m.content?.includes('DELETE') ? 'delete' : m.content?.includes('UPDATE') ? 'update' : 'create');
+            if (action === 'create' && m.attachments?.event) {
+              const ev = m.attachments.event as WorkspaceEvent;
+              if (!eventMap.has(ev.id)) {
+                eventMap.set(ev.id, ev);
+              }
+            } else if (action === 'update' && m.attachments?.eventId) {
+              const existing = eventMap.get(m.attachments.eventId);
+              if (existing) {
+                eventMap.set(m.attachments.eventId, { ...existing, ...m.attachments.updates });
+              }
+            } else if (action === 'delete' && m.attachments?.eventId) {
+              eventMap.delete(m.attachments.eventId);
+            }
+          }
+        }
+      } catch (syncFetchErr) {
+        console.warn('[workspaceService] events sync ledger read note:', syncFetchErr);
+      }
+
       const combined = Array.from(eventMap.values());
       combined.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      // Save merged events into local cache for instantaneous subsequent renders
+      try {
+        await AsyncStorage.setItem(localKey, JSON.stringify(combined));
+      } catch {}
 
       return { events: combined, error: null };
     } catch (err: any) {
@@ -2876,6 +2917,23 @@ export const workspaceService = {
         console.warn('[workspaceService] Supabase DB event insert note (local cache active):', dbErr.message);
       }
 
+      // 4. Multi-device sync ledger broadcast via workspace_messages
+      try {
+        await supabase.from('workspace_messages').insert({
+          workspace_id: params.workspaceId,
+          sender_id: effectiveUserId,
+          content: `[EVENT_SYNC:CREATE] ${resolvedTitle}`,
+          message_type: 'system',
+          attachments: {
+            is_event_sync_action: true,
+            action: 'create',
+            event: eventResult,
+          },
+        });
+      } catch (syncMsgErr) {
+        console.warn('[workspaceService] event sync message broadcast note:', syncMsgErr);
+      }
+
       return { event: eventResult, error: null };
     } catch (err: any) {
       return { event: null, error: err.message || 'Failed to create event' };
@@ -2912,6 +2970,26 @@ export const workspaceService = {
       } catch (dbErr: any) {
         console.warn('[workspaceService] Supabase DB event delete note:', dbErr.message);
       }
+
+      // 3. Multi-device sync delete record in workspace_messages
+      try {
+        let effectiveUserId: string | undefined;
+        const { data: { user } } = await supabase.auth.getUser();
+        effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+        if (effectiveUserId) {
+          await supabase.from('workspace_messages').insert({
+            workspace_id: workspaceId,
+            sender_id: effectiveUserId,
+            content: `[EVENT_SYNC:DELETE] ${eventId}`,
+            message_type: 'system',
+            attachments: {
+              is_event_sync_action: true,
+              action: 'delete',
+              eventId,
+            },
+          });
+        }
+      } catch {}
 
       return { success: true, error: null };
     } catch (err: any) {
@@ -2993,6 +3071,27 @@ export const workspaceService = {
         console.warn('[workspaceService] Supabase DB event update note:', dbErr.message);
       }
 
+      // 3. Multi-device sync update record in workspace_messages
+      try {
+        let effectiveUserId: string | undefined;
+        const { data: { user } } = await supabase.auth.getUser();
+        effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+        if (effectiveUserId) {
+          await supabase.from('workspace_messages').insert({
+            workspace_id: workspaceId,
+            sender_id: effectiveUserId,
+            content: `[EVENT_SYNC:UPDATE] ${eventId}`,
+            message_type: 'system',
+            attachments: {
+              is_event_sync_action: true,
+              action: 'update',
+              eventId,
+              updates,
+            },
+          });
+        }
+      } catch {}
+
       return { event: updatedEvent, error: null };
     } catch (err: any) {
       return { event: null, error: err.message || 'Failed to update event' };
@@ -3023,7 +3122,7 @@ export const workspaceService = {
         localTasks = localTasks.filter((t) => !t.id.startsWith('task_seed_'));
       }
 
-      // Attempt to load from Supabase if table exists
+      // 1. Attempt to load from Supabase workspace_tasks table
       let dbTasks: any[] = [];
       try {
         const { data, error } = await supabase
@@ -3062,7 +3161,47 @@ export const workspaceService = {
         });
       }
 
-      return { tasks: Array.from(taskMap.values()), error: null };
+      // 2. Cross-Device Sync: Reconcile task sync records from workspace_messages
+      try {
+        const { data: tData } = await supabase
+          .from('workspace_messages')
+          .select('id, sender_id, content, attachments, created_at')
+          .eq('workspace_id', workspaceId)
+          .or('attachments->>is_task_sync_action.eq.true,content.ilike.*TASK_SYNC*')
+          .order('created_at', { ascending: true })
+          .limit(150);
+
+        if (Array.isArray(tData)) {
+          for (const m of tData) {
+            const action = m.attachments?.action || (m.content?.includes('DELETE') ? 'delete' : m.content?.includes('UPDATE') ? 'update' : 'create');
+            if (action === 'create' && m.attachments?.task) {
+              const t = m.attachments.task as WorkspaceTask;
+              taskMap.set(t.id, t);
+            } else if (action === 'update' && m.attachments?.taskId) {
+              const existing = taskMap.get(m.attachments.taskId);
+              if (existing) {
+                taskMap.set(m.attachments.taskId, {
+                  ...existing,
+                  ...m.attachments.updates,
+                  updated_at: m.created_at,
+                });
+              }
+            } else if (action === 'delete' && m.attachments?.taskId) {
+              taskMap.delete(m.attachments.taskId);
+            }
+          }
+        }
+      } catch (syncFetchErr) {
+        console.warn('[workspaceService] tasks sync ledger read note:', syncFetchErr);
+      }
+
+      const tasksList = Array.from(taskMap.values());
+      // Save merged tasks into local cache for instantaneous subsequent renders
+      try {
+        await AsyncStorage.setItem(localKey, JSON.stringify(tasksList));
+      } catch {}
+
+      return { tasks: tasksList, error: null };
     } catch (err: any) {
       return { tasks: [], error: err.message || 'Failed to load tasks' };
     }
@@ -3147,6 +3286,7 @@ export const workspaceService = {
             description: newTask.description,
             status: newTask.status,
             priority: newTask.priority,
+            color: newTask.color,
             due_date: newTask.due_date,
             due_time: newTask.due_time,
             assignee_id: newTask.assignee_id,
@@ -3161,6 +3301,23 @@ export const workspaceService = {
           newTask.id = data.id;
         }
       } catch {}
+
+      // 3. Multi-device sync ledger broadcast via workspace_messages
+      try {
+        await supabase.from('workspace_messages').insert({
+          workspace_id: params.workspaceId,
+          sender_id: effectiveUserId,
+          content: `[TASK_SYNC:CREATE] ${newTask.title}`,
+          message_type: 'system',
+          attachments: {
+            is_task_sync_action: true,
+            action: 'create',
+            task: newTask,
+          },
+        });
+      } catch (taskSyncMsgErr) {
+        console.warn('[workspaceService] task sync message insert note:', taskSyncMsgErr);
+      }
 
       return { task: newTask, error: null };
     } catch (err: any) {
@@ -3196,7 +3353,7 @@ export const workspaceService = {
         console.warn('[workspaceService] update local task cache error:', cacheErr);
       }
 
-      // Sync to Supabase
+      // Sync to Supabase table
       try {
         await supabase
           .from('workspace_tasks')
@@ -3205,6 +3362,27 @@ export const workspaceService = {
             updated_at: new Date().toISOString(),
           })
           .eq('id', taskId);
+      } catch {}
+
+      // Multi-device sync ledger broadcast via workspace_messages
+      try {
+        let effectiveUserId: string | undefined;
+        const { data: { user } } = await supabase.auth.getUser();
+        effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+        if (effectiveUserId) {
+          await supabase.from('workspace_messages').insert({
+            workspace_id: workspaceId,
+            sender_id: effectiveUserId,
+            content: `[TASK_SYNC:UPDATE] ${taskId}`,
+            message_type: 'system',
+            attachments: {
+              is_task_sync_action: true,
+              action: 'update',
+              taskId,
+              updates,
+            },
+          });
+        }
       } catch {}
 
       return { task: updatedTask, error: null };
@@ -3232,6 +3410,26 @@ export const workspaceService = {
 
       try {
         await supabase.from('workspace_tasks').delete().eq('id', taskId);
+      } catch {}
+
+      // Multi-device sync delete record in workspace_messages
+      try {
+        let effectiveUserId: string | undefined;
+        const { data: { user } } = await supabase.auth.getUser();
+        effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+        if (effectiveUserId) {
+          await supabase.from('workspace_messages').insert({
+            workspace_id: workspaceId,
+            sender_id: effectiveUserId,
+            content: `[TASK_SYNC:DELETE] ${taskId}`,
+            message_type: 'system',
+            attachments: {
+              is_task_sync_action: true,
+              action: 'delete',
+              taskId,
+            },
+          });
+        }
       } catch {}
 
       return { success: true, error: null };

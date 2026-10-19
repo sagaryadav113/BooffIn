@@ -1307,6 +1307,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       console.warn('[useWorkspaceStore] calendar to BooffIn manager task sync note:', taskSyncErr);
     }
 
+    // 3. Realtime instant broadcast to other workspace members
+    try {
+      let channel = activeWorkspaceChannels.get(params.workspaceId);
+      if (!channel) {
+        channel = supabase.channel(`workspace_room:${params.workspaceId}`, {
+          config: { broadcast: { self: false } },
+        });
+        activeWorkspaceChannels.set(params.workspaceId, channel);
+        channel.subscribe();
+      }
+      channel.send({
+        type: 'broadcast',
+        event: 'workspace_event_created',
+        payload: { event: res.event },
+      });
+    } catch {}
+
     await get().loadEvents(params.workspaceId);
     return { success: true, error: null };
   },
@@ -1316,6 +1333,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => ({
       events: (state.events || []).filter((e) => e.id !== eventId),
     }));
+
+    // Broadcast instant delete
+    try {
+      const channel = activeWorkspaceChannels.get(workspaceId);
+      channel?.send({
+        type: 'broadcast',
+        event: 'workspace_event_deleted',
+        payload: { eventId },
+      });
+    } catch {}
 
     const res = await workspaceService.deleteWorkspaceEvent(eventId, workspaceId);
     if (!res.success) {
@@ -1359,6 +1386,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           : ev
       ),
     }));
+
+    // Broadcast instant update
+    try {
+      const channel = activeWorkspaceChannels.get(workspaceId);
+      channel?.send({
+        type: 'broadcast',
+        event: 'workspace_event_updated',
+        payload: { eventId, updates },
+      });
+    } catch {}
 
     const res = await workspaceService.updateWorkspaceEvent(eventId, workspaceId, updates);
     if (!res.event && res.error) {
@@ -1457,6 +1494,24 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     await get().loadTasks(params.workspaceId);
+
+    // Broadcast instant create
+    try {
+      let channel = activeWorkspaceChannels.get(params.workspaceId);
+      if (!channel) {
+        channel = supabase.channel(`workspace_room:${params.workspaceId}`, {
+          config: { broadcast: { self: false } },
+        });
+        activeWorkspaceChannels.set(params.workspaceId, channel);
+        channel.subscribe();
+      }
+      channel.send({
+        type: 'broadcast',
+        event: 'workspace_task_created',
+        payload: { task: res.task },
+      });
+    } catch {}
+
     return { success: true, task: res.task, error: null };
   },
 
@@ -1465,6 +1520,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => ({
       tasks: (state.tasks || []).map((t) => (t.id === taskId ? { ...t, ...updates } : t)),
     }));
+
+    // Broadcast instant update
+    try {
+      const channel = activeWorkspaceChannels.get(workspaceId);
+      channel?.send({
+        type: 'broadcast',
+        event: 'workspace_task_updated',
+        payload: { taskId, updates },
+      });
+    } catch {}
 
     const res = await workspaceService.updateWorkspaceTask(taskId, workspaceId, updates);
     if (!res.task && res.error) {
@@ -1498,6 +1563,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => ({
       tasks: (state.tasks || []).filter((t) => t.id !== taskId),
     }));
+
+    // Broadcast instant delete
+    try {
+      const channel = activeWorkspaceChannels.get(workspaceId);
+      channel?.send({
+        type: 'broadcast',
+        event: 'workspace_task_deleted',
+        payload: { taskId },
+      });
+    } catch {}
 
     if (task?.linked_event_id) {
       try {
@@ -2086,7 +2161,57 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           });
         }
       })
-      // E. Postgres Changes for Workspace Messages (Resilience & Background Sync)
+      // E. Realtime Instant Broadcast: Calendar Events Sync
+      .on('broadcast', { event: 'workspace_event_created' }, ({ payload }: any) => {
+        if (!payload?.event || payload.event.workspace_id !== workspaceId) return;
+        set((state) => {
+          const list = (state.events || []).filter((e) => e.id !== payload.event.id);
+          const next = [...list, payload.event].sort(
+            (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+          );
+          return { events: next };
+        });
+      })
+      .on('broadcast', { event: 'workspace_event_updated' }, ({ payload }: any) => {
+        if (!payload?.eventId) return;
+        set((state) => ({
+          events: (state.events || []).map((e) =>
+            e.id === payload.eventId
+              ? { ...e, ...(payload.updates || {}), ...(payload.event || {}) }
+              : e
+          ),
+        }));
+      })
+      .on('broadcast', { event: 'workspace_event_deleted' }, ({ payload }: any) => {
+        if (!payload?.eventId) return;
+        set((state) => ({
+          events: (state.events || []).filter((e) => e.id !== payload.eventId),
+        }));
+      })
+      // F. Realtime Instant Broadcast: Kanban Tasks Sync
+      .on('broadcast', { event: 'workspace_task_created' }, ({ payload }: any) => {
+        if (!payload?.task || payload.task.workspace_id !== workspaceId) return;
+        set((state) => ({
+          tasks: [payload.task, ...(state.tasks || []).filter((t) => t.id !== payload.task.id)],
+        }));
+      })
+      .on('broadcast', { event: 'workspace_task_updated' }, ({ payload }: any) => {
+        if (!payload?.taskId) return;
+        set((state) => ({
+          tasks: (state.tasks || []).map((t) =>
+            t.id === payload.taskId
+              ? { ...t, ...(payload.updates || {}), ...(payload.task || {}) }
+              : t
+          ),
+        }));
+      })
+      .on('broadcast', { event: 'workspace_task_deleted' }, ({ payload }: any) => {
+        if (!payload?.taskId) return;
+        set((state) => ({
+          tasks: (state.tasks || []).filter((t) => t.id !== payload.taskId),
+        }));
+      })
+      // G. Postgres Changes for Workspace Messages (Resilience & Background Sync)
       .on(
         'postgres_changes',
         {
@@ -2115,6 +2240,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
           const newMsg = payload.new;
           if (!newMsg || !newMsg.id) return;
+
+          // If incoming message is a task sync or event sync ledger record, reconcile store without adding to chat
+          if (
+            newMsg.attachments?.is_task_sync_action ||
+            (typeof newMsg.content === 'string' && newMsg.content.startsWith('[TASK_SYNC'))
+          ) {
+            get().loadTasks(workspaceId);
+            return;
+          }
+          if (
+            newMsg.attachments?.is_event_sync_action ||
+            (typeof newMsg.content === 'string' && newMsg.content.startsWith('[EVENT_SYNC'))
+          ) {
+            get().loadEvents(workspaceId);
+            return;
+          }
 
           // Privacy Hardening: Suppress incoming database messages from blocked users
           try {
