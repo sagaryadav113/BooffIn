@@ -231,13 +231,13 @@ export default function ExploreScreen() {
       try {
         Haptics.selectionAsync();
       } catch {}
-      executeSearch(q);
+      executeSearch(q, true);
     }
   };
 
   const handleSelectRecentOrTopic = (term: string) => {
     setSearchQuery(term);
-    executeSearch(term);
+    executeSearch(term, true);
   };
 
   const handleSelectTrendingTag = (tag: string) => {
@@ -248,14 +248,14 @@ export default function ExploreScreen() {
     });
   };
 
-  // Automatically trigger debounced unified search when searchQuery changes
+  // Automatically trigger debounced unified search when searchQuery changes (preview only, do not save intermediate keystrokes)
   useEffect(() => {
     const trimmed = searchQuery.trim();
     if (!trimmed) {
       return;
     }
     const timer = setTimeout(() => {
-      executeSearch(trimmed);
+      executeSearch(trimmed, false);
     }, 280);
     return () => clearTimeout(timer);
   }, [searchQuery, activeCategory, executeSearch]);

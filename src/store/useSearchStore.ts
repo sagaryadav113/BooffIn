@@ -16,7 +16,7 @@ interface SearchState {
   // Actions
   setQuery: (query: string) => void;
   setCategory: (category: SearchCategory) => void;
-  search: (overrideQuery?: string, overrideCategory?: SearchCategory) => Promise<void>;
+  search: (overrideQuery?: string, overrideCategory?: SearchCategory, saveToRecent?: boolean) => Promise<void>;
   loadMore: () => Promise<void>;
   clearSearch: () => void;
   addRecentSearch: (term: string) => void;
@@ -66,7 +66,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     }
   },
 
-  search: async (overrideQuery?: string, overrideCategory?: SearchCategory) => {
+  search: async (overrideQuery?: string, overrideCategory?: SearchCategory, saveToRecent: boolean = false) => {
     const q = (overrideQuery !== undefined ? overrideQuery : get().query).trim();
     const cat = overrideCategory || get().activeCategory;
 
@@ -101,7 +101,9 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         hasMore: results.hasMore,
       });
 
-      get().addRecentSearch(q);
+      if (saveToRecent) {
+        get().addRecentSearch(q);
+      }
     } catch (err: any) {
       set({
         isLoading: false,
@@ -195,11 +197,16 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
   addRecentSearch: (term: string) => {
     const clean = term.trim();
-    if (!clean) return;
+    if (!clean || clean.length < 2) return;
+    const lowerClean = clean.toLowerCase();
     set((state) => {
-      const filtered = state.recentSearches.filter(
-        (s) => s.toLowerCase() !== clean.toLowerCase()
-      );
+      const filtered = state.recentSearches.filter((s) => {
+        const lowerS = s.toLowerCase().trim();
+        if (lowerS === lowerClean) return false;
+        if (lowerClean.startsWith(lowerS) && lowerS.length < lowerClean.length) return false;
+        if (lowerS.length < 2) return false;
+        return true;
+      });
       return {
         recentSearches: [clean, ...filtered].slice(0, 8),
       };

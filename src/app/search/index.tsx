@@ -88,10 +88,10 @@ export default function SearchScreen() {
     }
   }, [params.category, setCategory]);
 
-  // Sync debounced input with store search
+  // Sync debounced input with store search (preview only, do not save intermediate keystrokes)
   useEffect(() => {
     setStoreQuery(debouncedQuery);
-    executeSearch(debouncedQuery, activeCategory);
+    executeSearch(debouncedQuery, activeCategory, false);
   }, [debouncedQuery, activeCategory, setStoreQuery, executeSearch]);
 
   const handleSelectDiscovery = (suggestionQuery: string, suggestionCategory?: SearchCategory) => {
@@ -102,7 +102,7 @@ export default function SearchScreen() {
     if (suggestionCategory) {
       setCategory(suggestionCategory);
     }
-    executeSearch(suggestionQuery, suggestionCategory || activeCategory);
+    executeSearch(suggestionQuery, suggestionCategory || activeCategory, true);
   };
 
   const handleCategoryPress = (category: SearchCategory) => {
@@ -151,6 +151,11 @@ export default function SearchScreen() {
             placeholder="Search researchers, papers, topics, discussions..."
             autoFocus={!params.q}
             onClear={handleClear}
+            onSubmitEditing={() => {
+              if (inputQuery.trim()) {
+                executeSearch(inputQuery.trim(), activeCategory, true);
+              }
+            }}
           />
         </View>
       </View>

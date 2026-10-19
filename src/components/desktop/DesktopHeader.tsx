@@ -126,7 +126,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
     setIsSearchOpen(false);
     if (trimmed) {
       setExploreQuery(trimmed);
-      executeExploreSearch(trimmed);
+      executeExploreSearch(trimmed, true);
       if (onSearch) {
         onSearch(trimmed);
       } else if (!isExplorePage) {

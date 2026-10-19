@@ -25,7 +25,7 @@ interface ExploreSearchState {
   loadRecentSearches: () => Promise<void>;
   setSearchQuery: (query: string) => void;
   setActiveCategory: (category: SearchFilterCategory) => void;
-  executeSearch: (queryOverride?: string) => Promise<void>;
+  executeSearch: (queryOverride?: string, saveToRecent?: boolean) => Promise<void>;
   loadMoreResearchers: () => Promise<void>;
   loadMorePapers: () => Promise<void>;
   clearSearch: () => void;
@@ -53,7 +53,21 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          set({ recentSearches: parsed });
+          // Clean up single-letter fragments and redundant prefixes from previous debounced typing
+          const cleaned: string[] = [];
+          for (const item of parsed) {
+            const trimmed = typeof item === 'string' ? item.trim() : '';
+            if (trimmed.length < 2) continue;
+            const lower = trimmed.toLowerCase();
+            const isPrefix = cleaned.some(
+              (c) => c.toLowerCase().startsWith(lower) && c.length > lower.length
+            );
+            if (!isPrefix && !cleaned.some((c) => c.toLowerCase() === lower)) {
+              cleaned.push(trimmed);
+            }
+          }
+          set({ recentSearches: cleaned.slice(0, 8) });
+          appStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, JSON.stringify(cleaned.slice(0, 8))).catch(() => {});
         }
       }
     } catch {}
@@ -79,11 +93,11 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
     set({ activeCategory: category });
     const currentQuery = get().searchQuery.trim();
     if (currentQuery) {
-      get().executeSearch();
+      get().executeSearch(currentQuery, false);
     }
   },
 
-  executeSearch: async (queryOverride?: string) => {
+  executeSearch: async (queryOverride?: string, saveToRecent: boolean = false) => {
     const targetQuery = (queryOverride !== undefined ? queryOverride : get().searchQuery).trim();
     if (!targetQuery) {
       set({
@@ -106,7 +120,10 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
       papersPage: 1,
       hasMorePapers: false,
     });
-    get().addRecentSearch(targetQuery);
+
+    if (saveToRecent) {
+      get().addRecentSearch(targetQuery);
+    }
 
     try {
       const results = await executeUnifiedSearch(targetQuery, get().activeCategory);
@@ -229,9 +246,20 @@ export const useExploreSearchStore = create<ExploreSearchState>((set, get) => ({
 
   addRecentSearch: (query: string) => {
     const trimmed = query.trim();
-    if (!trimmed) return;
+    // Do not save single-letter or empty queries
+    if (!trimmed || trimmed.length < 2) return;
     const current = get().recentSearches;
-    const filtered = current.filter((item) => item.toLowerCase() !== trimmed.toLowerCase());
+    const lowerTrimmed = trimmed.toLowerCase();
+
+    // Filter out exact matches and partial prefix fragments (e.g. "genes" when adding "genes in alzheimers")
+    const filtered = current.filter((item) => {
+      const lowerItem = item.toLowerCase().trim();
+      if (lowerItem === lowerTrimmed) return false;
+      if (lowerTrimmed.startsWith(lowerItem) && lowerItem.length < lowerTrimmed.length) return false;
+      if (lowerItem.length < 2) return false;
+      return true;
+    });
+
     const updated = [trimmed, ...filtered].slice(0, 8);
     set({ recentSearches: updated });
     appStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
