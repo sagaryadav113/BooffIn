@@ -269,7 +269,36 @@ interface WorkspaceState {
 }
 
 const activeWorkspaceChannels = new Map<string, any>();
+let activeGlobalWorkspaceChannel: any = null;
+let activeGlobalWorkspaceUserId: string | null = null;
+let globalWorkspaceSubscribersCount = 0;
 let currentMessagesRequestId = 0;
+
+function safelyPurgeRealtimeChannel(topicName: string) {
+  if (!topicName) return;
+  const rawTopic = topicName.startsWith('realtime:') ? topicName.replace(/^realtime:/, '') : topicName;
+  const fullTopic = `realtime:${rawTopic}`;
+
+  try {
+    const existing = supabase.getChannels().find(
+      (c: any) => c.topic === fullTopic || c.topic === rawTopic || c.subTopic === rawTopic
+    );
+    if (existing) {
+      try {
+        supabase.removeChannel(existing);
+      } catch {}
+    }
+  } catch {}
+
+  try {
+    const realtimeClient = (supabase as any).realtime;
+    if (realtimeClient && Array.isArray(realtimeClient.channels)) {
+      realtimeClient.channels = realtimeClient.channels.filter(
+        (c: any) => c.topic !== fullTopic && c.topic !== rawTopic && c.subTopic !== rawTopic
+      );
+    }
+  } catch {}
+}
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   dms: [],
@@ -332,6 +361,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       } catch {}
     });
     activeWorkspaceChannels.clear();
+    if (activeGlobalWorkspaceChannel) {
+      try {
+        supabase.removeChannel(activeGlobalWorkspaceChannel);
+      } catch {}
+      if (activeGlobalWorkspaceUserId) {
+        safelyPurgeRealtimeChannel(`user_global_workspaces:${activeGlobalWorkspaceUserId}`);
+      }
+      activeGlobalWorkspaceChannel = null;
+      activeGlobalWorkspaceUserId = null;
+      globalWorkspaceSubscribersCount = 0;
+    }
     set({
       dms: [],
       communities: [],
@@ -1867,6 +1907,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     // 1. Clean up any existing channel for this workspace first to prevent callback-after-subscribe errors
+    const channelName = `workspace_room:${workspaceId}`;
     const existing = activeWorkspaceChannels.get(workspaceId);
     if (existing) {
       try {
@@ -1874,14 +1915,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       } catch {}
       activeWorkspaceChannels.delete(workspaceId);
     }
-
-    const channelName = `workspace_room:${workspaceId}`;
-    try {
-      const existingInClient = supabase.getChannels().find((c: any) => c.topic === `realtime:${channelName}` || c.topic === channelName);
-      if (existingInClient) {
-        supabase.removeChannel(existingInClient);
-      }
-    } catch {}
+    safelyPurgeRealtimeChannel(channelName);
 
     // 2. Establish dedicated real-time room channel with broadcast support
     const channel = supabase.channel(channelName, {
@@ -2689,50 +2723,92 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     return () => {
       activeWorkspaceChannels.delete(workspaceId);
-      supabase.removeChannel(channel);
+      safelyPurgeRealtimeChannel(channelName);
+      try {
+        supabase.removeChannel(channel);
+      } catch {}
     };
   },
 
   subscribeToGlobalWorkspaceUpdates: (userId: string) => {
-    const channel = supabase
-      .channel(`user_global_workspaces:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'workspace_members',
-        },
-        () => {
-          get().loadWorkspaces(true);
+    if (!userId) {
+      return () => {};
+    }
+
+    globalWorkspaceSubscribersCount++;
+
+    // If an existing global channel is already established and actively listening for this user, reuse it
+    if (
+      activeGlobalWorkspaceChannel &&
+      activeGlobalWorkspaceUserId === userId &&
+      (activeGlobalWorkspaceChannel.state === 'joined' || activeGlobalWorkspaceChannel.state === 'joining')
+    ) {
+      return () => {
+        globalWorkspaceSubscribersCount = Math.max(0, globalWorkspaceSubscribersCount - 1);
+        if (globalWorkspaceSubscribersCount === 0) {
+          safelyPurgeRealtimeChannel(`user_global_workspaces:${userId}`);
+          activeGlobalWorkspaceChannel = null;
+          activeGlobalWorkspaceUserId = null;
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'workspace_messages',
-        },
-        () => {
-          get().loadWorkspaces(true);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'workspaces',
-        },
-        () => {
-          get().loadWorkspaces(true);
-        }
-      )
-      .subscribe();
+      };
+    }
+
+    const channelName = `user_global_workspaces:${userId}`;
+
+    // Clean up any stale or lingering channel instance before attaching listeners
+    safelyPurgeRealtimeChannel(channelName);
+
+    try {
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'workspace_members',
+          },
+          () => {
+            get().loadWorkspaces(true);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'workspace_messages',
+          },
+          () => {
+            get().loadWorkspaces(true);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'workspaces',
+          },
+          () => {
+            get().loadWorkspaces(true);
+          }
+        );
+
+      channel.subscribe();
+      activeGlobalWorkspaceChannel = channel;
+      activeGlobalWorkspaceUserId = userId;
+    } catch (err) {
+      console.warn('[Workspace] Realtime global subscription warning:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      globalWorkspaceSubscribersCount = Math.max(0, globalWorkspaceSubscribersCount - 1);
+      if (globalWorkspaceSubscribersCount === 0) {
+        safelyPurgeRealtimeChannel(channelName);
+        activeGlobalWorkspaceChannel = null;
+        activeGlobalWorkspaceUserId = null;
+      }
     };
   },
 }));

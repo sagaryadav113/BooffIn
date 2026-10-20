@@ -109,7 +109,9 @@ export default function WorkspaceHubScreen() {
     if (currentUser?.id) {
       const unsubscribe = subscribeToGlobalWorkspaceUpdates(currentUser.id);
       return () => {
-        unsubscribe();
+        try {
+          unsubscribe();
+        } catch {}
       };
     }
   }, [currentUser?.id]);
