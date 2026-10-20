@@ -10,7 +10,7 @@ import {
   Check,
   FileText,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePaperStore } from '../../store/usePaperStore';
@@ -32,6 +32,7 @@ interface SuggestedResearcher {
 }
 
 export const DesktopRightSidebar: React.FC = () => {
+  const { colors, isDark } = useTheme();
   const currentUser = useAuthStore((s) => s.user);
   const papers = usePaperStore((s) => s.papers);
   const fetchPapers = usePaperStore((s) => s.fetchPapers);
@@ -142,13 +143,13 @@ export const DesktopRightSidebar: React.FC = () => {
     >
       <View style={styles.container}>
         {/* 1. Real Researcher Impact / Analytics Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
           <View style={styles.impactHeader}>
             <View style={styles.impactTitleRow}>
-              <View style={styles.impactIconBadge}>
-                <Activity size={16} color="#064E3B" strokeWidth={2.4} />
+              <View style={[styles.impactIconBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE' }]}>
+                <Activity size={16} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.4} />
               </View>
-              <Text style={styles.cardTitle}>Research Impact</Text>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Research Impact</Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -171,10 +172,10 @@ export const DesktopRightSidebar: React.FC = () => {
           {currentUser?.id ? (
             <>
               <View style={styles.impactBody}>
-                <Text style={styles.impactStatNumber}>
+                <Text style={[styles.impactStatNumber, { color: colors.textPrimary }]}>
                   {isLoadingAnalytics ? '...' : totalImpressions.toLocaleString()}
                 </Text>
-                <Text style={styles.impactStatLabel}>Impressions (last 28d)</Text>
+                <Text style={[styles.impactStatLabel, { color: colors.textSecondary }]}>Impressions (last 28d)</Text>
               </View>
 
               {/* Daily Series Sparkline Visualization */}
@@ -189,7 +190,7 @@ export const DesktopRightSidebar: React.FC = () => {
                           styles.sparklineBar,
                           {
                             height: Math.max((views / maxViews) * 28, 4),
-                            backgroundColor: views > 0 ? '#064E3B' : '#CBD5E1',
+                            backgroundColor: views > 0 ? (isDark ? '#10B981' : '#064E3B') : (isDark ? '#334155' : '#CBD5E1'),
                           },
                         ]}
                       />
@@ -206,13 +207,13 @@ export const DesktopRightSidebar: React.FC = () => {
                           styles.sparklineBar,
                           {
                             height: 4,
-                            backgroundColor: '#E2E8F0',
+                            backgroundColor: isDark ? '#1E293B' : '#E2E8F0',
                           },
                         ]}
                       />
                     ))}
                   </View>
-                  <Text style={styles.emptySparklineText}>
+                  <Text style={[styles.emptySparklineText, { color: colors.textTertiary }]}>
                     {totalImpressions === 0
                       ? 'No impressions yet in the last 28 days'
                       : 'Live analytics sync daily'}
@@ -223,10 +224,10 @@ export const DesktopRightSidebar: React.FC = () => {
           ) : (
             <>
               <View style={styles.impactBody}>
-                <Text style={[styles.impactStatNumber, { fontSize: 18, color: '#1E293B' }]}>
+                <Text style={[styles.impactStatNumber, { fontSize: 18, color: colors.textPrimary }]}>
                   Track Your Reach
                 </Text>
-                <Text style={styles.impactStatLabel}>Sign in to view your research impressions and readership analytics</Text>
+                <Text style={[styles.impactStatLabel, { color: colors.textSecondary }]}>Sign in to view your research impressions and readership analytics</Text>
               </View>
 
               <View style={styles.emptySparklineBox}>
@@ -238,7 +239,7 @@ export const DesktopRightSidebar: React.FC = () => {
                         styles.sparklineBar,
                         {
                           height: 4,
-                          backgroundColor: '#E2E8F0',
+                          backgroundColor: isDark ? '#1E293B' : '#E2E8F0',
                         },
                       ]}
                     />
@@ -250,11 +251,11 @@ export const DesktopRightSidebar: React.FC = () => {
         </View>
 
         {/* 2. Hyped Papers Section (Ranked 1 to 5) */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.headerLeft}>
               <TrendingUp size={16} color="#DC2626" strokeWidth={2.4} />
-              <Text style={styles.cardTitle}>Hyped Papers</Text>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Hyped Papers</Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -266,8 +267,8 @@ export const DesktopRightSidebar: React.FC = () => {
               }
               style={styles.seeAllRow}
             >
-              <Text style={styles.seeAllText}>See all</Text>
-              <ArrowRight size={12} color="#064E3B" />
+              <Text style={[styles.seeAllText, { color: isDark ? '#34D399' : '#064E3B' }]}>See all</Text>
+              <ArrowRight size={12} color={isDark ? '#34D399' : '#064E3B'} />
             </TouchableOpacity>
           </View>
 
@@ -280,17 +281,29 @@ export const DesktopRightSidebar: React.FC = () => {
                   onPress={() => router.push(`/paper/${paper.id}`)}
                   style={styles.paperTrendingItem}
                 >
-                  <View style={[styles.rankBadge, idx === 0 && styles.rankBadgeTop]}>
-                    <Text style={[styles.rankBadgeText, idx === 0 && styles.rankBadgeTextTop]}>
+                  <View
+                    style={[
+                      styles.rankBadge,
+                      { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' },
+                      idx === 0 && (isDark ? { backgroundColor: 'rgba(245, 158, 11, 0.2)' } : styles.rankBadgeTop),
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.rankBadgeText,
+                        { color: isDark ? '#94A3B8' : '#64748B' },
+                        idx === 0 && (isDark ? { color: '#FBBF24' } : styles.rankBadgeTextTop),
+                      ]}
+                    >
                       {idx + 1}
                     </Text>
                   </View>
 
                   <View style={styles.paperTrendingMeta}>
-                    <Text style={styles.paperTrendingTitle} numberOfLines={2}>
+                    <Text style={[styles.paperTrendingTitle, { color: colors.textPrimary }]} numberOfLines={2}>
                       {paper.title}
                     </Text>
-                    <Text style={styles.paperTrendingSub} numberOfLines={1}>
+                    <Text style={[styles.paperTrendingSub, { color: colors.textSecondary }]} numberOfLines={1}>
                       {[
                         paper.journal || paper.publisher,
                         paper.publicationYear,
@@ -304,8 +317,8 @@ export const DesktopRightSidebar: React.FC = () => {
               ))
             ) : (
               <View style={{ paddingVertical: 14, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color="#064E3B" />
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 6 }}>
+                <ActivityIndicator size="small" color={isDark ? '#34D399' : '#064E3B'} />
+                <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 6 }}>
                   Loading hyped papers...
                 </Text>
               </View>
@@ -315,19 +328,19 @@ export const DesktopRightSidebar: React.FC = () => {
 
         {/* 3. Real Suggested Researchers from Database */}
         {suggestedResearchers.length > 0 && (
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.headerLeft}>
-                <Users size={16} color="#064E3B" strokeWidth={2.4} />
-                <Text style={styles.cardTitle}>Researchers to Follow</Text>
+                <Users size={16} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.4} />
+                <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Researchers to Follow</Text>
               </View>
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => router.push('/search?tab=researchers')}
                 style={styles.seeAllRow}
               >
-                <Text style={styles.seeAllText}>View all</Text>
-                <ArrowRight size={12} color="#64748B" />
+                <Text style={[styles.seeAllText, { color: isDark ? '#34D399' : '#064E3B' }]}>View all</Text>
+                <ArrowRight size={12} color={isDark ? '#34D399' : '#064E3B'} />
               </TouchableOpacity>
             </View>
 
@@ -347,10 +360,10 @@ export const DesktopRightSidebar: React.FC = () => {
                         size="sm"
                       />
                       <View style={styles.researcherInfo}>
-                        <Text style={styles.researcherName} numberOfLines={1}>
+                        <Text style={[styles.researcherName, { color: colors.textPrimary }]} numberOfLines={1}>
                           {researcher.fullName}
                         </Text>
-                        <Text style={styles.researcherSub} numberOfLines={1}>
+                        <Text style={[styles.researcherSub, { color: colors.textSecondary }]} numberOfLines={1}>
                           {[researcher.academicTitle, researcher.institution]
                             .filter(Boolean)
                             .join(' · ') || `@${researcher.handle}`}
@@ -363,13 +376,20 @@ export const DesktopRightSidebar: React.FC = () => {
                       onPress={() => handleFollowToggle(researcher.id)}
                       style={[
                         styles.followBtn,
-                        isFollowing && styles.followingBtn,
+                        {
+                          borderColor: isDark ? '#10B981' : '#064E3B',
+                          backgroundColor: colors.backgroundCard,
+                        },
+                        isFollowing && {
+                          backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#EAF3EE',
+                          borderColor: isDark ? '#10B981' : '#064E3B',
+                        },
                       ]}
                     >
                       {isFollowing ? (
-                        <Check size={14} color="#064E3B" strokeWidth={2.5} />
+                        <Check size={14} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.5} />
                       ) : (
-                        <Plus size={14} color="#064E3B" strokeWidth={2.5} />
+                        <Plus size={14} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.5} />
                       )}
                     </TouchableOpacity>
                   </View>

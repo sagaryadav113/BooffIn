@@ -9,13 +9,15 @@ import {
   CheckCircle2,
   ArrowRight,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { fetchUserAnalytics } from '../../api/analyticsService';
 import { UserAnalyticsSummary } from '../../types/analytics';
 
 export const DesktopSettingsRightSidebar: React.FC = () => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const currentUser = useAuthStore((s) => s.user);
   const [analytics, setAnalytics] = useState<UserAnalyticsSummary | null>(null);
 
@@ -41,7 +43,7 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
     >
       <View style={styles.container}>
         {/* User Real Profile Preview Card */}
-        <View style={styles.profileCard}>
+        <View style={[styles.profileCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
           {/* Banner */}
           <View style={styles.bannerWrap}>
             {currentUser?.bannerUrl ? (
@@ -56,7 +58,7 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
           </View>
 
           {/* Avatar */}
-          <View style={styles.avatarWrap}>
+          <View style={[styles.avatarWrap, { borderColor: colors.cardBackground }]}>
             <Avatar
               uri={currentUser?.avatarUrl}
               name={currentUser?.fullName || currentUser?.handle || 'User'}
@@ -67,24 +69,24 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
           {/* Info */}
           <View style={styles.infoSection}>
             <View style={styles.nameRow}>
-              <Text style={styles.fullName} numberOfLines={1}>
+              <Text style={[styles.fullName, { color: colors.textPrimary }]} numberOfLines={1}>
                 {currentUser?.fullName || currentUser?.handle || 'Academic Researcher'}
               </Text>
               {currentUser?.orcidVerified && (
-                <CheckCircle2 size={15} color="#064E3B" fill="#EAF3EE" />
+                <CheckCircle2 size={15} color={isDark ? "#34D399" : "#064E3B"} fill={isDark ? "rgba(16, 185, 129, 0.2)" : "#EAF3EE"} />
               )}
             </View>
 
-            <Text style={styles.handle}>@{currentUser?.handle || 'scholar'}</Text>
+            <Text style={[styles.handle, { color: colors.textSecondary }]}>@{currentUser?.handle || 'scholar'}</Text>
 
-            <Text style={styles.headline} numberOfLines={2}>
+            <Text style={[styles.headline, { color: colors.textSecondary }]} numberOfLines={2}>
               {[currentUser?.academicTitle, currentUser?.institution]
                 .filter(Boolean)
                 .join(' · ') || 'Researcher on BooffIn'}
             </Text>
 
             {currentUser?.bio ? (
-              <Text style={styles.bioText} numberOfLines={3}>
+              <Text style={[styles.bioText, { color: colors.textSecondary }]} numberOfLines={3}>
                 {currentUser.bio}
               </Text>
             ) : null}
@@ -94,13 +96,13 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
               {currentUser?.location && (
                 <View style={styles.metaItem}>
                   <MapPin size={12} color="#64748B" />
-                  <Text style={styles.metaText}>{currentUser.location}</Text>
+                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>{currentUser.location}</Text>
                 </View>
               )}
               {currentUser?.joinedDate && (
                 <View style={styles.metaItem}>
                   <Calendar size={12} color="#64748B" />
-                  <Text style={styles.metaText}>Joined {currentUser.joinedDate}</Text>
+                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>Joined {currentUser.joinedDate}</Text>
                 </View>
               )}
             </View>
@@ -109,39 +111,39 @@ export const DesktopSettingsRightSidebar: React.FC = () => {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => router.push('/profile/analytics')}
-              style={styles.impactBar}
+              style={[styles.impactBar, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE' }]}
             >
               <View style={styles.impactLeft}>
-                <Activity size={15} color="#064E3B" />
+                <Activity size={15} color={isDark ? "#34D399" : "#064E3B"} />
                 <View>
-                  <Text style={styles.impactTitle}>RESEARCH IMPACT</Text>
-                  <Text style={styles.impactCount}>
+                  <Text style={[styles.impactTitle, { color: isDark ? "#34D399" : "#064E3B" }]}>RESEARCH IMPACT</Text>
+                  <Text style={[styles.impactCount, { color: isDark ? "#34D399" : "#064E3B" }]}>
                     {(analytics?.totalImpressions ?? analytics?.totalViews ?? 0).toLocaleString()} Impressions (last 28d)
                   </Text>
                 </View>
               </View>
-              <ArrowRight size={14} color="#064E3B" />
+              <ArrowRight size={14} color={isDark ? "#34D399" : "#064E3B"} />
             </TouchableOpacity>
 
             {/* Real Database Profile Counts */}
-            <View style={styles.statsRow}>
+            <View style={[styles.statsRow, { borderTopColor: colors.borderLight }]}>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>
+                <Text style={[styles.statNumber, { color: colors.textPrimary }]}>
                   {currentUser?.followingCount ?? 0}
                 </Text>
-                <Text style={styles.statLabel}>Following</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Following</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>
+                <Text style={[styles.statNumber, { color: colors.textPrimary }]}>
                   {currentUser?.followersCount ?? 0}
                 </Text>
-                <Text style={styles.statLabel}>Followers</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Followers</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>
+                <Text style={[styles.statNumber, { color: colors.textPrimary }]}>
                   {currentUser?.postsCount ?? 0}
                 </Text>
-                <Text style={styles.statLabel}>Posts & Shares</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Posts & Shares</Text>
               </View>
             </View>
           </View>

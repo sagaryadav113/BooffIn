@@ -15,7 +15,7 @@ import {
   Download,
   Layers,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -29,6 +29,7 @@ interface DesktopLeftSidebarProps {
 export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
   onOpenMessages,
 }) => {
+  const { colors, isDark } = useTheme();
   const pathname = usePathname();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const workspaceUnread = useWorkspaceStore((s) => s.unreadTotal);
@@ -123,6 +124,11 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
     },
   ];
 
+  const activeBg = isDark ? 'rgba(16, 185, 129, 0.14)' : '#EAF3EE';
+  const activeColor = isDark ? '#34D399' : '#064E3B';
+  const inactiveIconColor = isDark ? '#94A3B8' : '#475569';
+  const inactiveTextColor = isDark ? '#CBD5E1' : '#334155';
+
   return (
     <aside
       style={{
@@ -135,7 +141,7 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
         overflowY: 'auto',
       }}
     >
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background, borderRightColor: colors.border }]}>
         {/* Main Navigation Group */}
         <View style={styles.navGroup}>
           {navItems.map((item) => {
@@ -145,24 +151,28 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
                 key={item.id}
                 activeOpacity={0.7}
                 onPress={item.onPress}
-                style={[styles.navItem, item.isActive && styles.navItemActive]}
+                style={[
+                  styles.navItem,
+                  item.isActive && { backgroundColor: activeBg },
+                ]}
               >
                 <IconComponent
                   size={19}
-                  color={item.isActive ? '#064E3B' : '#475569'}
+                  color={item.isActive ? activeColor : inactiveIconColor}
                   strokeWidth={item.isActive ? 2.4 : 2}
                 />
                 <Text
                   style={[
                     styles.navLabel,
-                    item.isActive && styles.navLabelActive,
+                    { color: item.isActive ? activeColor : inactiveTextColor },
+                    item.isActive && { fontWeight: '700' },
                   ]}
                 >
                   {item.label}
                 </Text>
 
                 {item.badge !== undefined && item.badge > 0 && (
-                  <View style={styles.navBadge}>
+                  <View style={[styles.navBadge, { backgroundColor: activeColor }]}>
                     <Text style={styles.navBadgeText}>
                       {item.badge > 99 ? '99+' : item.badge}
                     </Text>
@@ -174,8 +184,8 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
         </View>
 
         {/* MY RESEARCH Section */}
-        <View style={styles.sectionDivider} />
-        <Text style={styles.sectionHeader}>MY RESEARCH</Text>
+        <View style={[styles.sectionDivider, { backgroundColor: colors.border }]} />
+        <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>MY RESEARCH</Text>
         <View style={styles.navGroup}>
           {myResearchItems.map((item) => {
             const IconComponent = item.icon;
@@ -184,17 +194,21 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
                 key={item.id}
                 activeOpacity={0.7}
                 onPress={item.onPress}
-                style={[styles.navItem, item.isActive && styles.navItemActive]}
+                style={[
+                  styles.navItem,
+                  item.isActive && { backgroundColor: activeBg },
+                ]}
               >
                 <IconComponent
                   size={18}
-                  color={item.isActive ? '#064E3B' : '#475569'}
+                  color={item.isActive ? activeColor : inactiveIconColor}
                   strokeWidth={item.isActive ? 2.4 : 2}
                 />
                 <Text
                   style={[
                     styles.navLabel,
-                    item.isActive && styles.navLabelActive,
+                    { color: item.isActive ? activeColor : inactiveTextColor },
+                    item.isActive && { fontWeight: '700' },
                   ]}
                 >
                   {item.label}
@@ -205,30 +219,34 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
         </View>
 
         {/* Bottom Install App, Settings & Help */}
-        <View style={styles.bottomSection}>
+        <View style={[styles.bottomSection, { borderTopColor: colors.border }]}>
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleInstallPress}
             style={styles.navItem}
           >
-            <Download size={18} color="#475569" strokeWidth={2} />
-            <Text style={styles.navLabel}>Install App</Text>
+            <Download size={18} color={inactiveIconColor} strokeWidth={2} />
+            <Text style={[styles.navLabel, { color: inactiveTextColor }]}>Install App</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => router.push('/settings')}
-            style={[styles.navItem, isSettingsActive && styles.navItemActive]}
+            style={[
+              styles.navItem,
+              isSettingsActive && { backgroundColor: activeBg },
+            ]}
           >
             <Settings
               size={18}
-              color={isSettingsActive ? '#064E3B' : '#475569'}
+              color={isSettingsActive ? activeColor : inactiveIconColor}
               strokeWidth={2}
             />
             <Text
               style={[
                 styles.navLabel,
-                isSettingsActive && styles.navLabelActive,
+                { color: isSettingsActive ? activeColor : inactiveTextColor },
+                isSettingsActive && { fontWeight: '700' },
               ]}
             >
               Settings
@@ -240,8 +258,8 @@ export const DesktopLeftSidebar: React.FC<DesktopLeftSidebarProps> = ({
             onPress={() => router.push('/settings/help')}
             style={styles.navItem}
           >
-            <HelpCircle size={18} color="#475569" strokeWidth={2} />
-            <Text style={styles.navLabel}>Help & Safety</Text>
+            <HelpCircle size={18} color={inactiveIconColor} strokeWidth={2} />
+            <Text style={[styles.navLabel, { color: inactiveTextColor }]}>Help & Safety</Text>
           </TouchableOpacity>
         </View>
 

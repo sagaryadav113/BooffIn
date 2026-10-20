@@ -1,8 +1,8 @@
 /**
  * BooffIn Design System - Color Tokens
- * Scientific, minimal, calm, and trustworthy monochrome palette with journal accents.
+ * Scientific, minimal, calm, and trustworthy palette with elevation depth for dark mode.
  */
-export const colors = {
+export const lightColors = {
   // Base Backgrounds
   background: '#FFFFFF',
   backgroundSecondary: '#F8F9FA',
@@ -27,6 +27,7 @@ export const colors = {
   // Pure Constants
   black: '#000000',
   white: '#FFFFFF',
+  primary: '#000000',
 
   // Borders & Separators
   border: '#EBECEF',
@@ -37,6 +38,7 @@ export const colors = {
   // Typography Hierarchy
   textPrimary: '#111827',
   textSecondary: '#6B7280',
+  textTertiary: '#64748B',
   textMuted: '#9CA3AF',
   textInverse: '#FFFFFF',
 
@@ -66,4 +68,74 @@ export const colors = {
   surfacePressed: 'rgba(0, 0, 0, 0.06)',
 };
 
-export type Colors = typeof colors;
+export const darkColors: typeof lightColors = {
+  // Base Backgrounds (Obsidian Slate Elevation System)
+  background: '#0B0F17',
+  backgroundSecondary: '#111622',
+  backgroundTertiary: '#161D2A',
+  backgroundCard: '#161B26',
+  cardBackground: '#161B26',
+  backgroundElevated: '#1F2636',
+
+  // Monochromatic Grays (Inverted for Dark Elevation)
+  gray50: '#111622',
+  gray100: '#161D2A',
+  gray200: '#1F2636',
+  gray300: '#2E384D',
+  gray400: '#4B5565',
+  gray500: '#6B7280',
+  gray600: '#94A3B8',
+  gray700: '#CBD5E1',
+  gray800: '#E2E8F0',
+  gray900: '#F1F5F9',
+  gray950: '#F8FAFC',
+
+  // Pure Constants
+  black: '#000000',
+  white: '#FFFFFF',
+  primary: '#10B981',
+
+  // Borders & Separators (Refined Low-Glare Lines)
+  border: '#222A3A',
+  borderLight: '#1A2230',
+  borderDark: '#2D3748',
+  borderFocused: '#10B981',
+
+  // Typography Hierarchy (Anti-Glare Luma Calibrated)
+  textPrimary: '#F1F5F9',
+  textSecondary: '#94A3B8',
+  textTertiary: '#64748B',
+  textMuted: '#64748B',
+  textInverse: '#0B0F17',
+
+  // Scientific Journal Accents (Pastel-Balanced)
+  journalNature: '#F87171',
+  journalScience: '#FBBF24',
+  journalCell: '#38BDF8',
+  journalBioRxiv: '#EF4444',
+  journalArXiv: '#F59E0B',
+  journalPnas: '#818CF8',
+  journalProtocols: '#34D399',
+
+  // Interactive Accents & Feedback
+  accentBlue: '#3B82F6',
+  accentLink: '#60A5FA',
+  accentBlueHover: '#93C5FD',
+  accentGreen: '#10B981',
+  brandGreen: '#10B981', // Emerald shift for dark mode readability
+  brandDarkGreen: '#059669',
+  accentRed: '#F87171',
+  error: '#F87171',
+  accentOrange: '#FBBF24',
+
+  // Overlays & Backdrop
+  backdrop: 'rgba(0, 0, 0, 0.75)',
+  surfaceHover: 'rgba(255, 255, 255, 0.04)',
+  surfacePressed: 'rgba(255, 255, 255, 0.08)',
+};
+
+/**
+ * Default fallback colors export for backward-compatibility with existing code
+ */
+export const colors = lightColors;
+export type Colors = typeof lightColors;

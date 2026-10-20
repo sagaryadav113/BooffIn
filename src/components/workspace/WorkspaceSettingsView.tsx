@@ -50,7 +50,7 @@ import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { WorkspaceSettings } from '../../types/workspaceSettings';
 import {
   LEGAL_CONTACTS,
@@ -61,6 +61,9 @@ import {
 } from '../../constants/legalPolicies';
 
 export const WorkspaceSettingsView: React.FC = () => {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = React.useMemo(() => getStyles(colors, isDark), [colors, isDark]);
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom || 0;
   const currentUser = useAuthStore((s) => s.user);
@@ -192,7 +195,7 @@ export const WorkspaceSettingsView: React.FC = () => {
       {/* Header Banner */}
       <View style={styles.headerBanner}>
         <View style={styles.headerIconCircle}>
-          <Settings size={24} color="#064E3B" strokeWidth={2.2} />
+          <Settings size={24} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
         </View>
         <View style={styles.headerTextWrap}>
           <Text style={styles.headerTitle}>Workspace Settings</Text>
@@ -205,7 +208,7 @@ export const WorkspaceSettingsView: React.FC = () => {
       {/* SECTION 1: GLOBAL CHAT & PRIVACY PREFERENCES */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
-          <Layers size={17} color="#064E3B" strokeWidth={2.2} />
+          <Layers size={17} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
           <Text style={styles.sectionTitle}>Global Chat & Privacy</Text>
         </View>
 
@@ -213,7 +216,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
             <View style={styles.iconBox}>
-              <CheckCheck size={18} color="#064E3B" />
+              <CheckCheck size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={styles.settingTextWrap}>
               <Text style={styles.settingLabel}>Send Read Receipts</Text>
@@ -225,7 +228,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           <Switch
             value={settings.readReceiptsEnabled}
             onValueChange={() => handleToggle('readReceiptsEnabled', settings.readReceiptsEnabled)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
+            trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: isDark ? '#10B981' : '#064E3B' }}
             thumbColor="#FFFFFF"
           />
         </View>
@@ -234,7 +237,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
             <View style={styles.iconBox}>
-              <Radio size={18} color="#064E3B" />
+              <Radio size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={styles.settingTextWrap}>
               <Text style={styles.settingLabel}>Active Online Presence</Text>
@@ -246,7 +249,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           <Switch
             value={settings.onlinePresenceEnabled}
             onValueChange={() => handleToggle('onlinePresenceEnabled', settings.onlinePresenceEnabled)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
+            trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: isDark ? '#10B981' : '#064E3B' }}
             thumbColor="#FFFFFF"
           />
         </View>
@@ -255,7 +258,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
             <View style={styles.iconBox}>
-              <Sparkles size={18} color="#064E3B" />
+              <Sparkles size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={styles.settingTextWrap}>
               <Text style={styles.settingLabel}>Typing Indicators</Text>
@@ -267,7 +270,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           <Switch
             value={settings.typingIndicatorsEnabled}
             onValueChange={() => handleToggle('typingIndicatorsEnabled', settings.typingIndicatorsEnabled)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
+            trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: isDark ? '#10B981' : '#064E3B' }}
             thumbColor="#FFFFFF"
           />
         </View>
@@ -276,7 +279,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
             <View style={styles.iconBox}>
-              <Volume2 size={18} color="#064E3B" />
+              <Volume2 size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={styles.settingTextWrap}>
               <Text style={styles.settingLabel}>In-App Sounds & Haptics</Text>
@@ -288,7 +291,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           <Switch
             value={settings.soundAndHapticsEnabled}
             onValueChange={() => handleToggle('soundAndHapticsEnabled', settings.soundAndHapticsEnabled)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
+            trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: isDark ? '#10B981' : '#064E3B' }}
             thumbColor="#FFFFFF"
           />
         </View>
@@ -297,7 +300,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
           <View style={styles.settingLeft}>
             <View style={styles.iconBox}>
-              <FileText size={18} color="#064E3B" />
+              <FileText size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={styles.settingTextWrap}>
               <Text style={styles.settingLabel}>Paper & DOI Auto-Previews</Text>
@@ -309,7 +312,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           <Switch
             value={settings.doiAutoPreviewEnabled}
             onValueChange={() => handleToggle('doiAutoPreviewEnabled', settings.doiAutoPreviewEnabled)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
+            trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: isDark ? '#10B981' : '#064E3B' }}
             thumbColor="#FFFFFF"
           />
         </View>
@@ -318,7 +321,7 @@ export const WorkspaceSettingsView: React.FC = () => {
       {/* SECTION 2: DIRECT MESSAGES (DM) */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
-          <MessageSquare size={17} color="#064E3B" strokeWidth={2.2} />
+          <MessageSquare size={17} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
           <Text style={styles.sectionTitle}>Direct Messages (DM)</Text>
         </View>
 
@@ -326,7 +329,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
             <View style={styles.iconBox}>
-              <Shield size={18} color="#064E3B" />
+              <Shield size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={styles.settingTextWrap}>
               <Text style={styles.settingLabel}>Mutual Follow Requirement</Text>
@@ -338,7 +341,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           <Switch
             value={settings.mutualFollowDMsOnly}
             onValueChange={() => handleToggle('mutualFollowDMsOnly', settings.mutualFollowDMsOnly)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
+            trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: isDark ? '#10B981' : '#064E3B' }}
             thumbColor="#FFFFFF"
           />
         </View>
@@ -346,7 +349,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         {/* E2EE Info Card */}
         <View style={styles.infoBanner}>
           <View style={styles.infoBannerHeader}>
-            <Lock size={15} color="#064E3B" strokeWidth={2.2} />
+            <Lock size={15} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
             <Text style={styles.infoBannerTitle}>End-to-End Encryption (E2EE)</Text>
           </View>
           <Text style={styles.infoBannerText}>
@@ -358,7 +361,7 @@ export const WorkspaceSettingsView: React.FC = () => {
       {/* SECTION 3: COMMUNITY MANAGEMENT */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
-          <Users size={17} color="#064E3B" strokeWidth={2.2} />
+          <Users size={17} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
           <Text style={styles.sectionTitle}>Community Settings</Text>
         </View>
 
@@ -381,7 +384,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
             <View style={styles.iconBox}>
-              <Eye size={18} color="#064E3B" />
+              <Eye size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={styles.settingTextWrap}>
               <Text style={styles.settingLabel}>Public Directory Listing</Text>
@@ -393,7 +396,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           <Switch
             value={settings.communityDiscoverableByDefault}
             onValueChange={() => handleToggle('communityDiscoverableByDefault', settings.communityDiscoverableByDefault)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
+            trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: isDark ? '#10B981' : '#064E3B' }}
             thumbColor="#FFFFFF"
           />
         </View>
@@ -467,7 +470,7 @@ export const WorkspaceSettingsView: React.FC = () => {
       {/* SECTION 4: INNER CIRCLE (RESEARCH PODS) */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
-          <Shield size={17} color="#064E3B" strokeWidth={2.2} />
+          <Shield size={17} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
           <Text style={styles.sectionTitle}>Inner Circle (Research Pods)</Text>
         </View>
 
@@ -475,7 +478,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
             <View style={styles.iconBox}>
-              <Lock size={18} color="#064E3B" />
+              <Lock size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={styles.settingTextWrap}>
               <Text style={styles.settingLabel}>Zero Historical Chat for Joiners</Text>
@@ -487,7 +490,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           <Switch
             value={settings.innerCircleZeroHistoryDefault}
             onValueChange={() => handleToggle('innerCircleZeroHistoryDefault', settings.innerCircleZeroHistoryDefault)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
+            trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: isDark ? '#10B981' : '#064E3B' }}
             thumbColor="#FFFFFF"
           />
         </View>
@@ -496,7 +499,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={styles.settingRow}>
           <View style={styles.settingLeft}>
             <View style={styles.iconBox}>
-              <Shield size={18} color="#064E3B" />
+              <Shield size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={styles.settingTextWrap}>
               <Text style={styles.settingLabel}>Admin-Only Invitations</Text>
@@ -508,7 +511,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           <Switch
             value={settings.innerCircleAdminOnlyInvites}
             onValueChange={() => handleToggle('innerCircleAdminOnlyInvites', settings.innerCircleAdminOnlyInvites)}
-            trackColor={{ false: '#CBD5E1', true: '#064E3B' }}
+            trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: isDark ? '#10B981' : '#064E3B' }}
             thumbColor="#FFFFFF"
           />
         </View>
@@ -549,7 +552,7 @@ export const WorkspaceSettingsView: React.FC = () => {
       {/* SECTION 5: PRIVACY, SAFETY, POLICIES & TERMS */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
-          <ShieldCheck size={17} color="#064E3B" strokeWidth={2.2} />
+          <ShieldCheck size={17} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
           <Text style={styles.sectionTitle}>Privacy, Safety & Legal Terms</Text>
         </View>
 
@@ -565,7 +568,7 @@ export const WorkspaceSettingsView: React.FC = () => {
             <View style={styles.contactRow}>
               <View style={styles.contactRowLeft}>
                 <View style={[styles.contactIconWrap, { backgroundColor: '#DCFCE7' }]}>
-                  <Mail size={16} color="#064E3B" />
+                  <Mail size={16} color={isDark ? '#34D399' : '#064E3B'} />
                 </View>
                 <View style={styles.contactTextWrap}>
                   <Text style={styles.contactRole}>Official App Support</Text>
@@ -578,7 +581,7 @@ export const WorkspaceSettingsView: React.FC = () => {
                   onPress={() => handleSendEmail(LEGAL_CONTACTS.support, 'BooffIn Support Request')}
                   activeOpacity={0.7}
                 >
-                  <Mail size={13} color="#064E3B" />
+                  <Mail size={13} color={isDark ? '#34D399' : '#064E3B'} />
                   <Text style={styles.contactActionText}>Mail</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -702,7 +705,7 @@ export const WorkspaceSettingsView: React.FC = () => {
         <View style={styles.legalDocCard}>
           <View style={styles.legalDocCardHeader}>
             <View style={[styles.legalDocIconWrap, { backgroundColor: '#DCFCE7' }]}>
-              <ShieldCheck size={18} color="#064E3B" />
+              <ShieldCheck size={18} color={isDark ? '#34D399' : '#064E3B'} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.legalDocCardTitle}>Privacy Policy & Data Security</Text>
@@ -751,7 +754,7 @@ export const WorkspaceSettingsView: React.FC = () => {
             activeOpacity={0.8}
           >
             <Text style={styles.viewDocBtnText}>Read Complete Privacy Policy</Text>
-            <ExternalLink size={14} color="#064E3B" />
+            <ExternalLink size={14} color={isDark ? '#34D399' : '#064E3B'} />
           </TouchableOpacity>
         </View>
 
@@ -808,7 +811,7 @@ export const WorkspaceSettingsView: React.FC = () => {
             activeOpacity={0.8}
           >
             <Text style={styles.viewDocBtnText}>Read Complete Terms of Service</Text>
-            <ExternalLink size={14} color="#064E3B" />
+            <ExternalLink size={14} color={isDark ? '#34D399' : '#064E3B'} />
           </TouchableOpacity>
         </View>
 
@@ -865,7 +868,7 @@ export const WorkspaceSettingsView: React.FC = () => {
             activeOpacity={0.8}
           >
             <Text style={styles.viewDocBtnText}>Read Community Guidelines</Text>
-            <ExternalLink size={14} color="#064E3B" />
+            <ExternalLink size={14} color={isDark ? '#34D399' : '#064E3B'} />
           </TouchableOpacity>
         </View>
       </View>
@@ -873,7 +876,7 @@ export const WorkspaceSettingsView: React.FC = () => {
       {/* SECTION 6: DATA, STORAGE & RESET */}
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
-          <Download size={17} color="#064E3B" strokeWidth={2.2} />
+          <Download size={17} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
           <Text style={styles.sectionTitle}>Storage & Maintenance</Text>
         </View>
 
@@ -885,7 +888,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           activeOpacity={0.7}
         >
           <View style={styles.actionLeft}>
-            <View style={[styles.iconBox, { backgroundColor: '#F1F5F9' }]}>
+            <View style={[styles.iconBox, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9' }]}>
               <Trash2 size={18} color="#475569" />
             </View>
             <View style={styles.settingTextWrap}>
@@ -898,7 +901,7 @@ export const WorkspaceSettingsView: React.FC = () => {
             </View>
           </View>
           {isClearingCache ? (
-            <ActivityIndicator size="small" color="#064E3B" />
+            <ActivityIndicator size="small" color={isDark ? '#34D399' : '#064E3B'} />
           ) : cacheClearedSuccess ? (
             <CheckCircle2 size={20} color="#059669" />
           ) : (
@@ -913,7 +916,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           activeOpacity={0.7}
         >
           <View style={styles.actionLeft}>
-            <View style={[styles.iconBox, { backgroundColor: '#FEF2F2' }]}>
+            <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2' }]}>
               <RotateCcw size={18} color="#DC2626" />
             </View>
             <View style={styles.settingTextWrap}>
@@ -966,7 +969,7 @@ export const WorkspaceSettingsView: React.FC = () => {
           >
             {/* Summary Callout */}
             <View style={styles.modalSummaryBox}>
-              <Info size={18} color="#064E3B" style={{ marginTop: 2 }} />
+              <Info size={18} color={isDark ? '#34D399' : '#064E3B'} style={{ marginTop: 2 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.modalSummaryLabel}>Executive Summary</Text>
                 <Text style={styles.modalSummaryText}>{activeLegalDoc?.summary}</Text>
@@ -1054,10 +1057,10 @@ export const WorkspaceSettingsView: React.FC = () => {
 );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   scrollContent: {
     padding: 16,
@@ -1068,18 +1071,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   loadingText: {
     fontSize: 13,
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   headerBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0FDF4',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#F0FDF4',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#BBF7D0',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
@@ -1089,7 +1092,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1099,19 +1102,19 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#064E3B',
+    color: isDark ? '#34D399' : '#064E3B',
     marginBottom: 2,
   },
   headerSub: {
     fontSize: 12,
-    color: '#166534',
+    color: isDark ? colors.textSecondary : '#166534',
     lineHeight: 16,
   },
   sectionCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
     padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
@@ -1127,12 +1130,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.textPrimary,
   },
   settingRow: {
     flexDirection: 'row',
@@ -1140,12 +1143,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
   },
   settingRowVertical: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
     gap: 10,
   },
   settingLeft: {
@@ -1159,7 +1162,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1169,18 +1172,18 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0F172A',
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   settingDesc: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textSecondary,
     lineHeight: 16,
   },
   infoBanner: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#F0FDF4',
     borderWidth: 1,
-    borderColor: '#DCFCE7',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#DCFCE7',
     borderRadius: 12,
     padding: 12,
     marginTop: 10,
@@ -1194,15 +1197,15 @@ const styles = StyleSheet.create({
   infoBannerTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#064E3B',
+    color: isDark ? '#34D399' : '#064E3B',
   },
   infoBannerText: {
     fontSize: 12,
-    color: '#166534',
+    color: isDark ? colors.textSecondary : '#166534',
     lineHeight: 16,
   },
   capacityCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
@@ -1216,10 +1219,10 @@ const styles = StyleSheet.create({
   capacityLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.textPrimary,
   },
   capacityPill: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
@@ -1227,16 +1230,16 @@ const styles = StyleSheet.create({
   capacityPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#064E3B',
+    color: isDark ? '#34D399' : '#064E3B',
   },
   capacityDesc: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textSecondary,
     lineHeight: 16,
   },
   segmentedRow: {
     flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
     padding: 3,
     gap: 4,
@@ -1249,7 +1252,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   segmentBtnActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
@@ -1259,10 +1262,10 @@ const styles = StyleSheet.create({
   segmentBtnText: {
     fontSize: 11.5,
     fontWeight: '600',
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   segmentBtnTextActive: {
-    color: '#064E3B',
+    color: isDark ? '#34D399' : '#064E3B',
     fontWeight: '700',
   },
   actionRow: {
@@ -1271,7 +1274,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
   },
   actionLeft: {
     flexDirection: 'row',
@@ -1283,35 +1286,34 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0F172A',
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   actionDesc: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textSecondary,
     lineHeight: 16,
   },
-  // Legal, Safety & Privacy Styles
   legalSectionIntro: {
     marginBottom: 16,
   },
   legalSectionIntroTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   legalSectionIntroSub: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textSecondary,
     lineHeight: 16,
     marginBottom: 10,
   },
   contactEmailList: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
     paddingHorizontal: 12,
     paddingVertical: 4,
   },
@@ -1321,7 +1323,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: colors.borderLight,
     gap: 8,
   },
   contactRowLeft: {
@@ -1343,12 +1345,12 @@ const styles = StyleSheet.create({
   contactRole: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   contactEmailText: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.textPrimary,
   },
   contactBtnGroup: {
     flexDirection: 'row',
@@ -1359,26 +1361,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.borderLight,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 8,
   },
   contactActionBtnCopied: {
-    borderColor: '#86EFAC',
-    backgroundColor: '#F0FDF4',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.4)' : '#86EFAC',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#F0FDF4',
   },
   contactActionText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#334155',
+    color: colors.textSecondary,
   },
   legalDocCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
     borderRadius: 12,
     padding: 14,
     marginBottom: 14,
@@ -1399,25 +1401,25 @@ const styles = StyleSheet.create({
   legalDocCardTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.textPrimary,
   },
   legalDocCardVersion: {
     fontSize: 11,
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   legalDocCardSummary: {
     fontSize: 12,
-    color: '#475569',
+    color: colors.textSecondary,
     lineHeight: 17,
     marginBottom: 10,
   },
   legalKeyPointsBox: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
     borderRadius: 8,
     padding: 10,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
     marginBottom: 12,
   },
   keyPointRow: {
@@ -1427,7 +1429,7 @@ const styles = StyleSheet.create({
   },
   keyPointText: {
     fontSize: 11.5,
-    color: '#334155',
+    color: colors.textSecondary,
     lineHeight: 16,
     flex: 1,
   },
@@ -1436,30 +1438,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#BBF7D0',
     paddingVertical: 9,
     borderRadius: 8,
   },
   viewDocBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#064E3B',
+    color: isDark ? '#34D399' : '#064E3B',
   },
-  // Document Reader Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '88%',
     minHeight: '65%',
     paddingBottom: 20,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.borderLight,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1468,7 +1471,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: colors.borderLight,
   },
   modalHeaderTitleWrap: {
     flex: 1,
@@ -1477,18 +1480,18 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#0F172A',
+    color: colors.textPrimary,
   },
   modalSubTitle: {
     fontSize: 11,
-    color: '#64748B',
+    color: colors.textSecondary,
     marginTop: 2,
   },
   modalCloseBtn: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1502,9 +1505,9 @@ const styles = StyleSheet.create({
   modalSummaryBox: {
     flexDirection: 'row',
     gap: 10,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#F0FDF4',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#BBF7D0',
     borderRadius: 12,
     padding: 12,
     marginBottom: 14,
@@ -1512,50 +1515,50 @@ const styles = StyleSheet.create({
   modalSummaryLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#064E3B',
+    color: isDark ? '#34D399' : '#064E3B',
     textTransform: 'uppercase',
     marginBottom: 2,
   },
   modalSummaryText: {
     fontSize: 12,
-    color: '#166534',
+    color: isDark ? colors.textSecondary : '#166534',
     lineHeight: 17,
   },
   controllerBanner: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
     padding: 12,
     marginBottom: 16,
     gap: 4,
   },
   controllerText: {
     fontSize: 11.5,
-    color: '#475569',
+    color: colors.textSecondary,
   },
   modalSectionBlock: {
     marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
     paddingBottom: 12,
   },
   modalSectionTitle: {
     fontSize: 13.5,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.textPrimary,
     marginBottom: 6,
   },
   modalParagraph: {
     fontSize: 12,
-    color: '#334155',
+    color: colors.textSecondary,
     lineHeight: 18,
     marginBottom: 6,
   },
   modalFooterCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
     borderRadius: 12,
     padding: 14,
     marginTop: 10,
@@ -1564,12 +1567,12 @@ const styles = StyleSheet.create({
   modalFooterTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   modalFooterSub: {
     fontSize: 11.5,
-    color: '#64748B',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -1584,7 +1587,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#064E3B',
+    backgroundColor: isDark ? '#059669' : '#064E3B',
     paddingVertical: 10,
     borderRadius: 8,
   },
@@ -1599,25 +1602,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.borderLight,
     paddingVertical: 10,
     borderRadius: 8,
   },
   modalFooterCopyBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#334155',
+    color: colors.textSecondary,
   },
   modalBottomBar: {
     paddingHorizontal: 20,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: colors.borderLight,
   },
   modalPrimaryDoneBtn: {
-    backgroundColor: '#064E3B',
+    backgroundColor: isDark ? '#059669' : '#064E3B',
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',

@@ -89,7 +89,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { GroupCollageAvatar } from './GroupCollageAvatar';
 import {
@@ -237,6 +237,8 @@ interface WorkspaceInnerCircleViewProps {
 }
 
 export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> = ({ workspace }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const currentUser = useAuthStore((s) => s.user);
   const [activeTab, setActiveTab] = useState<InnerCircleTab>('discussions');
   const [vaultToast, setVaultToast] = useState<{ message: string } | null>(null);
@@ -1972,6 +1974,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         setEventTitle('');
         setEventDesc('');
         setSelectedAttendeeIds([]);
+        loadEvents(workspace.id);
         loadTasks(workspace.id);
         setVaultToast({ message: 'Event scheduled successfully' });
         setTimeout(() => setVaultToast(null), 3000);
@@ -2115,7 +2118,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           styles.messageText,
           isMe
             ? [styles.myMessageText, { color: activeThemeConfig.myBubbleTextColor }]
-            : [styles.otherMessageText, { color: activeThemeConfig.otherBubbleTextColor }],
+            : [styles.otherMessageText, { color: activeThemeConfig.id === 'default' && isDark ? '#FFFFFF' : activeThemeConfig.otherBubbleTextColor }],
         ]}
       >
         {parts.map((part, i) => {
@@ -2142,18 +2145,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* 1. Header Bar matching BooffIn academic aesthetic */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.cardBackground, borderBottomColor: colors.borderLight }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <ArrowLeft size={20} color="#164E3F" />
+          <ArrowLeft size={20} color={isDark ? "#34D399" : "#164E3F"} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -2168,14 +2171,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                 {workspace.name || "BooffIn's inner circle"}
               </Text>
-              <Shield size={13} color="#164E3F" />
+              <Shield size={13} color={isDark ? "#34D399" : "#164E3F"} />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               {onlineCount > 0 && <View style={styles.onlineDot} />}
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
                 {memberCount} {memberCount === 1 ? 'member' : 'members'}
                 {onlineCount > 0 ? ` • ${onlineCount} online` : ''}
               </Text>
@@ -2190,7 +2193,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             style={[styles.headerIconBtn, showSearchBar && styles.headerIconBtnActive]}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Search size={19} color={showSearchBar ? '#164E3F' : '#64748B'} />
+            <Search size={19} color={showSearchBar ? (isDark ? "#34D399" : "#164E3F") : colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -2199,7 +2202,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             style={styles.headerIconBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <FolderOpen size={19} color="#64748B" />
+            <FolderOpen size={19} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -2208,7 +2211,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             style={styles.headerIconBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <MoreVertical size={20} color="#164E3F" />
+            <MoreVertical size={20} color={isDark ? "#34D399" : colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -2293,7 +2296,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       )}
 
       {/* 2. Sub-Filter Pill Strip */}
-      <View style={styles.subFilterStripContainer}>
+      <View style={[styles.subFilterStripContainer, { backgroundColor: colors.cardBackground, borderBottomColor: colors.borderLight }]}>
         {vaultToast && (
           <View style={styles.vaultToastBanner}>
             <CheckCircle2 size={16} color="#10B981" />
@@ -2308,9 +2311,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setActiveTab('discussions')}
-            style={[styles.filterPill, activeTab === 'discussions' && styles.filterPillActive]}
+            style={[styles.filterPill, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9' }, activeTab === 'discussions' && [styles.filterPillActive, { backgroundColor: isDark ? '#059669' : '#164E3F' }]]}
           >
-            <Text style={[styles.filterPillText, activeTab === 'discussions' && styles.filterPillTextActive]}>
+            <Text style={[styles.filterPillText, { color: isDark ? colors.textSecondary : '#475569' }, activeTab === 'discussions' && styles.filterPillTextActive]}>
               Discussions
             </Text>
           </TouchableOpacity>
@@ -2318,9 +2321,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setActiveTab('calendar')}
-            style={[styles.filterPill, activeTab === 'calendar' && styles.filterPillActive]}
+            style={[styles.filterPill, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9' }, activeTab === 'calendar' && [styles.filterPillActive, { backgroundColor: isDark ? '#059669' : '#164E3F' }]]}
           >
-            <Text style={[styles.filterPillText, activeTab === 'calendar' && styles.filterPillTextActive]}>
+            <Text style={[styles.filterPillText, { color: isDark ? colors.textSecondary : '#475569' }, activeTab === 'calendar' && styles.filterPillTextActive]}>
               Calendar
             </Text>
           </TouchableOpacity>
@@ -2331,9 +2334,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               setActiveTab('manager');
               loadTasks(workspace.id);
             }}
-            style={[styles.filterPill, activeTab === 'manager' && styles.filterPillActive]}
+            style={[styles.filterPill, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9' }, activeTab === 'manager' && [styles.filterPillActive, { backgroundColor: isDark ? '#059669' : '#164E3F' }]]}
           >
-            <Text style={[styles.filterPillText, activeTab === 'manager' && styles.filterPillTextActive]}>
+            <Text style={[styles.filterPillText, { color: isDark ? colors.textSecondary : '#475569' }, activeTab === 'manager' && styles.filterPillTextActive]}>
               BooffIn manager
             </Text>
           </TouchableOpacity>
@@ -2341,9 +2344,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setActiveTab('vault')}
-            style={[styles.filterPill, (activeTab === 'vault' || activeTab === 'bookmarked') && styles.filterPillActive]}
+            style={[styles.filterPill, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9' }, (activeTab === 'vault' || activeTab === 'bookmarked') && [styles.filterPillActive, { backgroundColor: isDark ? '#059669' : '#164E3F' }]]}
           >
-            <Text style={[styles.filterPillText, (activeTab === 'vault' || activeTab === 'bookmarked') && styles.filterPillTextActive]}>
+            <Text style={[styles.filterPillText, { color: isDark ? colors.textSecondary : '#475569' }, (activeTab === 'vault' || activeTab === 'bookmarked') && styles.filterPillTextActive]}>
               Vault
             </Text>
           </TouchableOpacity>
@@ -2359,7 +2362,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             style={[
               StyleSheet.absoluteFill,
               {
-                backgroundColor: activeThemeConfig.backgroundColor,
+                backgroundColor: activeThemeConfig.id === "default" && isDark ? colors.background : activeThemeConfig.backgroundColor,
                 overflow: 'hidden',
                 width: '100%',
                 height: '100%',
@@ -2481,10 +2484,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             }
             ListEmptyComponent={
               <View style={styles.emptyMessagesContainer}>
-                <View style={styles.emptyIconCircle}>
-                  <MessageSquare size={32} color="#164E3F" />
+                <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ECFDF5" }]}>
+                  <MessageSquare size={32} color={isDark ? "#34D399" : "#164E3F"} />
                 </View>
-                <Text style={styles.emptyMessagesTitle}>
+                <Text style={[styles.emptyMessagesTitle, { color: colors.textPrimary }]}>
                   {chatSearchQuery.trim()
                     ? 'No matching discussions'
                     : !isMember
@@ -2493,7 +2496,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     ? 'Fresh Pod Workspace'
                     : 'Welcome to the Research Pod'}
                 </Text>
-                <Text style={styles.emptyMessagesSub}>
+                <Text style={[styles.emptyMessagesSub, { color: colors.textSecondary }]}>
                   {chatSearchQuery.trim()
                     ? `No messages matched "${chatSearchQuery}". Try clearing filters.`
                     : !isMember
@@ -2603,11 +2606,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     <View key={item.id} style={[{ width: '100%' }, highlightedMessageId === item.id && styles.highlightedMessageRow]}>
                       {isFirstOfDateGroup && (
                         <View style={styles.dateSeparatorRow}>
-                          <View style={styles.dateSeparatorLine} />
-                          <View style={styles.dateSeparatorPill}>
-                            <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
+                          <View style={[styles.dateSeparatorLine, { backgroundColor: colors.borderLight }]} />
+                          <View style={[styles.dateSeparatorPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+                            <Text style={[styles.dateSeparatorText, { color: colors.textSecondary }]}>{getDateLabel(item.created_at)}</Text>
                           </View>
-                          <View style={styles.dateSeparatorLine} />
+                          <View style={[styles.dateSeparatorLine, { backgroundColor: colors.borderLight }]} />
                         </View>
                       )}
                       <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
@@ -2638,7 +2641,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                             styles.messageBubble,
                             isMe
                               ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
-                              : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }],
+                              : [styles.otherBubble, { backgroundColor: activeThemeConfig.id === 'default' && isDark ? '#1F2636' : activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' || isDark ? 1 : 0, borderColor: isDark ? colors.borderLight : 'rgba(0,0,0,0.06)' }],
                             hasMediaContent && styles.bubbleWithMedia,
                             highlightedMessageId === item.id && styles.highlightedMessageBubble,
                           ]}
@@ -2662,7 +2665,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     )}
 
                     {!isMe && (
-                      <Text style={styles.senderName}>{item.sender?.fullName || 'Researcher'}</Text>
+                      <Text style={[styles.senderName, { color: isDark ? '#34D399' : '#164E3F' }]}>{item.sender?.fullName || 'Researcher'}</Text>
                     )}
 
                     {/* Quoted Reply Box */}
@@ -2918,7 +2921,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                           styles.timestamp,
                           isMe
                             ? [styles.myTimestamp, { color: activeThemeConfig.timestampMyColor }]
-                            : [styles.otherTimestamp, { color: activeThemeConfig.timestampOtherColor }],
+                            : [styles.otherTimestamp, { color: activeThemeConfig.id === 'default' && isDark ? '#94A3B8' : activeThemeConfig.timestampOtherColor }],
                         ]}
                       >
                         {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -3106,12 +3109,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 />
               </View>
             ) : (
-              <View style={[styles.bottomDockContainer, { paddingBottom: bottomInset > 0 ? bottomInset + 8 : 8 }]}>
+              <View style={[styles.bottomDockContainer, { backgroundColor: colors.cardBackground, borderTopColor: colors.borderLight, paddingBottom: bottomInset > 0 ? bottomInset + 8 : 8 }]}>
                 <View
                   style={[
                     styles.inputCapsule,
+                    { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
                     (isInputFocused || Boolean(inputText.trim())) && [
                       styles.inputCapsuleFocused,
+                      { backgroundColor: isDark ? colors.backgroundSecondary : '#FFFFFF', borderColor: isDark ? '#10B981' : '#164E3F' },
                       activeThemeConfig?.accentColor ? { borderColor: activeThemeConfig.accentColor } : null,
                     ],
                   ]}
@@ -3125,7 +3130,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     {isUploadingMedia ? (
                       <ActivityIndicator size="small" color="#164E3F" />
                     ) : (
-                      <Camera size={19} color="#64748B" />
+                      <Camera size={19} color={colors.textSecondary} />
                     )}
                   </TouchableOpacity>
 
@@ -3135,8 +3140,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     onFocus={() => setIsInputFocused(true)}
                     onBlur={() => setIsInputFocused(false)}
                     placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
-                    placeholderTextColor="#94A3B8"
-                    style={styles.textInput}
+                    placeholderTextColor={colors.textMuted}
+                    style={[styles.textInput, { color: colors.textPrimary }]}
                     multiline
                     maxLength={2000}
                   />
@@ -3147,7 +3152,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                       onPress={() => setShowAttachMenu(true)}
                       style={styles.mediaIconBtn}
                     >
-                      <Paperclip size={19} color="#64748B" />
+                      <Paperclip size={19} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -3156,7 +3161,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => setIsRecordingVoice(true)}
-                    style={styles.detachedMicBtn}
+                    style={[styles.detachedMicBtn, { backgroundColor: isDark ? '#059669' : '#164E3F' }]}
                   >
                     <Mic size={18} color="#FFFFFF" />
                   </TouchableOpacity>
@@ -3164,7 +3169,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={handleSendMessage}
-                    style={styles.detachedSendBtn}
+                    style={[styles.detachedSendBtn, { backgroundColor: isDark ? '#059669' : '#164E3F' }]}
                   >
                     <Send size={16} color="#FFFFFF" />
                   </TouchableOpacity>

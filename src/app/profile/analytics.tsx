@@ -23,7 +23,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { DiscussionIcon } from '../../components/core/DiscussionIcon';
 import { LikeIcon } from '../../components/core/LikeIcon';
 import { AnalyticsTimeframe, UserAnalyticsSummary } from '../../types/analytics';
@@ -40,6 +40,8 @@ const TIMEFRAMES: { key: AnalyticsTimeframe; label: string }[] = [
 ];
 
 export default function ProfileAnalyticsScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
   const { user, isAuthenticated } = useAuthStore();
   const targetUserId = user?.id;
 
@@ -90,13 +92,13 @@ export default function ProfileAnalyticsScreen() {
   const activeTimeframeLabel = TIMEFRAMES.find((t) => t.key === selectedTimeframe)?.label || '28 Days';
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.cardBackground} />
 
       {/* Top Header */}
-      <View style={styles.navBar}>
+      <View style={[styles.navBar, { backgroundColor: colors.cardBackground, borderBottomColor: colors.borderLight }]}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: colors.backgroundSecondary }]}
           onPress={() => router.back()}
           activeOpacity={0.7}
         >
@@ -104,14 +106,14 @@ export default function ProfileAnalyticsScreen() {
         </TouchableOpacity>
 
         <View style={styles.navTitleRow}>
-          <Text style={styles.navTitle}>Profile Analytics</Text>
-          <Text style={styles.navSubTitle}>
+          <Text style={[styles.navTitle, { color: colors.textPrimary }]}>Profile Analytics</Text>
+          <Text style={[styles.navSubTitle, { color: colors.textSecondary }]}>
             {user?.fullName ? `${user.fullName} · Live Impact` : 'Audience & Engagement Insights'}
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.refreshButton}
+          style={[styles.refreshButton, { backgroundColor: colors.backgroundSecondary }]}
           onPress={handleRefresh}
           activeOpacity={0.7}
         >
@@ -120,7 +122,7 @@ export default function ProfileAnalyticsScreen() {
       </View>
 
       {/* Timeframe Filter Switcher */}
-      <View style={styles.filterBarContainer}>
+      <View style={[styles.filterBarContainer, { backgroundColor: colors.cardBackground, borderBottomColor: colors.borderLight }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -133,7 +135,11 @@ export default function ProfileAnalyticsScreen() {
                 key={tf.key}
                 style={[
                   styles.timeframePill,
-                  isSelected && styles.timeframePillActive,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
+                  isSelected && {
+                    backgroundColor: isDark ? '#10B981' : '#064E3B',
+                    borderColor: isDark ? '#10B981' : '#064E3B',
+                  },
                 ]}
                 onPress={() => handleTimeframeChange(tf.key)}
                 activeOpacity={0.7}
@@ -141,7 +147,8 @@ export default function ProfileAnalyticsScreen() {
                 <Text
                   style={[
                     styles.timeframeText,
-                    isSelected && styles.timeframeTextActive,
+                    { color: colors.textSecondary },
+                    isSelected && { color: colors.white },
                   ]}
                 >
                   {tf.label}
@@ -156,7 +163,7 @@ export default function ProfileAnalyticsScreen() {
       {isLoading && !summary ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.accentBlue} />
-          <Text style={styles.loadingText}>Fetching real performance metrics...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Fetching real performance metrics...</Text>
         </View>
       ) : (
         <ScrollView
@@ -172,143 +179,154 @@ export default function ProfileAnalyticsScreen() {
           }
         >
           {/* Header Real Data Banner */}
-          <View style={styles.summaryBanner}>
+          <View style={[styles.summaryBanner, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
             <View style={styles.bannerHeader}>
-              <View style={styles.bannerBadge}>
-                <Sparkles size={12} color="#064E3B" />
-                <Text style={styles.bannerBadgeText}>Live Scientific Telemetry</Text>
+              <View style={[styles.bannerBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(6, 78, 59, 0.08)' }]}>
+                <Sparkles size={12} color={isDark ? '#34D399' : '#064E3B'} />
+                <Text style={[styles.bannerBadgeText, { color: isDark ? '#34D399' : '#064E3B' }]}>Live Scientific Telemetry</Text>
               </View>
-              <Text style={styles.bannerPeriodText}>Last {activeTimeframeLabel}</Text>
+              <Text style={[styles.bannerPeriodText, { color: colors.textSecondary }]}>Last {activeTimeframeLabel}</Text>
             </View>
 
             <View style={styles.bannerMetricRow}>
               <View>
-                <Text style={styles.bannerMainLabel}>Total Research Impressions</Text>
-                <Text style={styles.bannerMainValue}>
+                <Text style={[styles.bannerMainLabel, { color: colors.textSecondary }]}>Total Research Impressions</Text>
+                <Text style={[styles.bannerMainValue, { color: colors.textPrimary }]}>
                   {formatNumber(summary?.totalImpressions ?? summary?.totalViews)}
                 </Text>
               </View>
-              <View style={styles.bannerRateBadge}>
+              <View
+                style={[
+                  styles.bannerRateBadge,
+                  {
+                    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : 'rgba(245, 158, 11, 0.08)',
+                    borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)',
+                  },
+                ]}
+              >
                 <Zap size={14} color="#F59E0B" />
-                <Text style={styles.bannerRateText}>
+                <Text style={[styles.bannerRateText, { color: isDark ? '#FBBF24' : '#D97706' }]}>
                   {summary?.engagementRate || 0}%
                 </Text>
-                <Text style={styles.bannerRateSub}>Eng. Rate</Text>
+                <Text style={[styles.bannerRateSub, { color: colors.textSecondary }]}>Eng. Rate</Text>
               </View>
             </View>
           </View>
 
           {/* Core Metrics Grid */}
-          <Text style={styles.sectionHeader}>PERFORMANCE & REACH</Text>
+          <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>PERFORMANCE & REACH</Text>
           <View style={styles.metricsGrid}>
             {/* 1. Total Impressions */}
-            <View style={styles.metricCard}>
+            <View style={[styles.metricCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
               <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
                   <Eye size={16} color="#3B82F6" />
                 </View>
-                <Text style={styles.metricLabel}>Total Impressions</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Total Impressions</Text>
               </View>
-              <Text style={styles.metricValue}>
+              <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
                 {formatNumber(summary?.totalImpressions ?? summary?.totalViews)}
               </Text>
-              <Text style={styles.metricSub}>Feed & search appearances</Text>
+              <Text style={[styles.metricSub, { color: colors.textSecondary }]}>Feed & search appearances</Text>
             </View>
 
             {/* 2. Unique Reach */}
-            <View style={styles.metricCard}>
+            <View style={[styles.metricCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
               <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                  <Users size={16} color={colors.accentGreen} />
+                <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)' }]}>
+                  <Users size={16} color={isDark ? '#34D399' : colors.accentGreen} />
                 </View>
-                <Text style={styles.metricLabel}>Unique Reach</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Unique Reach</Text>
               </View>
-              <Text style={styles.metricValue}>
+              <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
                 {formatNumber(summary?.uniqueReach)}
               </Text>
-              <Text style={styles.metricSub}>Distinct scholars reached</Text>
+              <Text style={[styles.metricSub, { color: colors.textSecondary }]}>Distinct scholars reached</Text>
             </View>
 
             {/* 3. Engaged Scholars */}
-            <View style={styles.metricCard}>
+            <View style={[styles.metricCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
               <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
                   <Zap size={16} color="#F59E0B" />
                 </View>
-                <Text style={styles.metricLabel}>Engaged Scholars</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Engaged Scholars</Text>
               </View>
-              <Text style={styles.metricValue}>
+              <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
                 {formatNumber(summary?.engagedScholars || summary?.totalEngagement)}
               </Text>
-              <Text style={styles.metricSub}>Active interactions & reads</Text>
+              <Text style={[styles.metricSub, { color: colors.textSecondary }]}>Active interactions & reads</Text>
             </View>
 
             {/* 4. Library Saves & Citations */}
-            <View style={styles.metricCard}>
+            <View style={[styles.metricCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
               <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.12)' }]}>
                   <FileText size={16} color="#8B5CF6" />
                 </View>
-                <Text style={styles.metricLabel}>Library Saves</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Library Saves</Text>
               </View>
-              <Text style={styles.metricValue}>
+              <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
                 {formatNumber(summary?.totalSaves)}
               </Text>
-              <Text style={styles.metricSub}>Saved for future citation</Text>
+              <Text style={[styles.metricSub, { color: colors.textSecondary }]}>Saved for future citation</Text>
             </View>
 
             {/* 5. Discussions */}
-            <View style={styles.metricCard}>
+            <View style={[styles.metricCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
               <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 78, 59, 0.1)' }]}>
-                  <DiscussionIcon size={16} color="#064E3B" />
+                <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(6, 78, 59, 0.1)' }]}>
+                  <DiscussionIcon size={16} color={isDark ? '#34D399' : '#064E3B'} />
                 </View>
-                <Text style={styles.metricLabel}>Discussions</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Discussions</Text>
               </View>
-              <Text style={styles.metricValue}>
+              <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
                 {formatNumber(summary?.totalDiscussions)}
               </Text>
-              <Text style={styles.metricSub}>Peer reviews & comments</Text>
+              <Text style={[styles.metricSub, { color: colors.textSecondary }]}>Peer reviews & comments</Text>
             </View>
 
             {/* 6. Followers & Growth */}
-            <View style={styles.metricCard}>
+            <View style={[styles.metricCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
               <View style={styles.metricCardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(236, 72, 153, 0.1)' }]}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(236, 72, 153, 0.12)' }]}>
                   <Users size={16} color="#EC4899" />
                 </View>
-                <Text style={styles.metricLabel}>Followers</Text>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Followers</Text>
               </View>
               <View style={styles.followerRow}>
-                <Text style={styles.metricValue}>
+                <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
                   {formatNumber(summary?.totalFollowers)}
                 </Text>
                 {(summary?.newFollowers || 0) > 0 && (
-                  <View style={styles.newFollowerTag}>
-                    <Text style={styles.newFollowerTagText}>
+                  <View style={[styles.newFollowerTag, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)' }]}>
+                    <Text style={[styles.newFollowerTagText, { color: isDark ? '#34D399' : colors.accentGreen }]}>
                       +{summary?.newFollowers} new
                     </Text>
                   </View>
                 )}
               </View>
-              <Text style={styles.metricSub}>Total scientific audience</Text>
+              <Text style={[styles.metricSub, { color: colors.textSecondary }]}>Total scientific audience</Text>
             </View>
           </View>
 
           {/* Audience Discovery & Distribution (Instagram-Style) */}
-          <Text style={styles.sectionHeader}>AUDIENCE DISCOVERY & REACH</Text>
-          <View style={styles.discoveryCard}>
+          <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>AUDIENCE DISCOVERY & REACH</Text>
+          <View style={[styles.discoveryCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
             <View style={styles.discoveryHeader}>
-              <Text style={styles.discoveryTitle}>Discovery Breakdown</Text>
-              <Text style={styles.discoverySub}>Followers vs. Non-Followers reached</Text>
+              <Text style={[styles.discoveryTitle, { color: colors.textPrimary }]}>Discovery Breakdown</Text>
+              <Text style={[styles.discoverySub, { color: colors.textSecondary }]}>Followers vs. Non-Followers reached</Text>
             </View>
 
             {/* Segmented Progress Bar */}
-            <View style={styles.splitBarContainer}>
+            <View style={[styles.splitBarContainer, { backgroundColor: isDark ? '#1F2636' : colors.backgroundSecondary }]}>
               <View
                 style={[
                   styles.splitBarFollowers,
-                  { width: `${summary?.followerReachPercent ?? 0}%` },
+                  {
+                    width: `${summary?.followerReachPercent ?? 0}%`,
+                    backgroundColor: isDark ? '#10B981' : '#064E3B',
+                  },
                 ]}
               />
               <View
@@ -321,15 +339,15 @@ export default function ProfileAnalyticsScreen() {
 
             <View style={styles.splitLegendRow}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#064E3B' }]} />
-                <Text style={styles.legendText}>
-                  Followers: <Text style={{ fontWeight: '700' }}>{summary?.followerReachPercent ?? 0}%</Text>
+                <View style={[styles.legendDot, { backgroundColor: isDark ? '#10B981' : '#064E3B' }]} />
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  Followers: <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{summary?.followerReachPercent ?? 0}%</Text>
                 </Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
-                <Text style={styles.legendText}>
-                  Discovery (Non-Followers): <Text style={{ fontWeight: '700' }}>{summary?.nonFollowerReachPercent ?? 0}%</Text>
+                <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                  Discovery (Non-Followers): <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{summary?.nonFollowerReachPercent ?? 0}%</Text>
                 </Text>
               </View>
             </View>
@@ -338,30 +356,30 @@ export default function ProfileAnalyticsScreen() {
           {/* Top Disciplines & Institutions */}
           <View style={styles.demographicsRow}>
             {/* Top Disciplines */}
-            <View style={styles.demoCard}>
-              <Text style={styles.demoTitle}>Top Disciplines Reached</Text>
+            <View style={[styles.demoCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
+              <Text style={[styles.demoTitle, { color: colors.textPrimary }]}>Top Disciplines Reached</Text>
               <View style={styles.demoList}>
                 {summary?.topDisciplines && summary.topDisciplines.length > 0 ? (
                   summary.topDisciplines.map((disc, idx) => (
                     <View key={idx} style={styles.demoItem}>
                       <View style={styles.demoItemHeader}>
-                        <Text style={styles.demoItemName} numberOfLines={1}>
+                        <Text style={[styles.demoItemName, { color: colors.textPrimary }]} numberOfLines={1}>
                           {disc.name}
                         </Text>
-                        <Text style={styles.demoItemPercent}>{disc.percentage}%</Text>
+                        <Text style={[styles.demoItemPercent, { color: colors.textSecondary }]}>{disc.percentage}%</Text>
                       </View>
-                      <View style={styles.progressBarTrack}>
+                      <View style={[styles.progressBarTrack, { backgroundColor: isDark ? '#1F2636' : colors.backgroundSecondary }]}>
                         <View
                           style={[
                             styles.progressBarFill,
-                            { width: `${Math.min(100, disc.percentage)}%`, backgroundColor: '#064E3B' },
+                            { width: `${Math.min(100, disc.percentage)}%`, backgroundColor: isDark ? '#10B981' : '#064E3B' },
                           ]}
                         />
                       </View>
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.emptyDemoText}>
+                  <Text style={[styles.emptyDemoText, { color: colors.textSecondary }]}>
                     Audience discipline data will populate as researchers engage with your posts.
                   </Text>
                 )}
@@ -369,19 +387,19 @@ export default function ProfileAnalyticsScreen() {
             </View>
 
             {/* Top Institutions */}
-            <View style={styles.demoCard}>
-              <Text style={styles.demoTitle}>Top Institutions</Text>
+            <View style={[styles.demoCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
+              <Text style={[styles.demoTitle, { color: colors.textPrimary }]}>Top Institutions</Text>
               <View style={styles.demoList}>
                 {summary?.topInstitutions && summary.topInstitutions.length > 0 ? (
                   summary.topInstitutions.map((inst, idx) => (
                     <View key={idx} style={styles.demoItem}>
                       <View style={styles.demoItemHeader}>
-                        <Text style={styles.demoItemName} numberOfLines={1}>
+                        <Text style={[styles.demoItemName, { color: colors.textPrimary }]} numberOfLines={1}>
                           {inst.name}
                         </Text>
-                        <Text style={styles.demoItemPercent}>{inst.percentage}%</Text>
+                        <Text style={[styles.demoItemPercent, { color: colors.textSecondary }]}>{inst.percentage}%</Text>
                       </View>
-                      <View style={styles.progressBarTrack}>
+                      <View style={[styles.progressBarTrack, { backgroundColor: isDark ? '#1F2636' : colors.backgroundSecondary }]}>
                         <View
                           style={[
                             styles.progressBarFill,
@@ -392,7 +410,7 @@ export default function ProfileAnalyticsScreen() {
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.emptyDemoText}>
+                  <Text style={[styles.emptyDemoText, { color: colors.textSecondary }]}>
                     Institution data will populate as verified scholars read and interact.
                   </Text>
                 )}
@@ -402,7 +420,7 @@ export default function ProfileAnalyticsScreen() {
 
 
           {/* Interactive Graphical Chart */}
-          <Text style={styles.sectionHeader}>IMPRESSIONS & ACTIVITY TIMELINE</Text>
+          <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>IMPRESSIONS & ACTIVITY TIMELINE</Text>
           {summary?.dailySeries ? (
             <AnalyticsChart
               data={summary.dailySeries}
@@ -413,38 +431,38 @@ export default function ProfileAnalyticsScreen() {
           {/* Top Performing Posts */}
           {summary?.topPosts && summary.topPosts.length > 0 && (
             <View style={styles.topPostsSection}>
-              <Text style={styles.sectionHeader}>TOP RESEARCH POSTS</Text>
+              <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>TOP RESEARCH POSTS</Text>
               {summary.topPosts.map((post, idx) => (
-                <View key={post.id || idx} style={styles.topPostCard}>
-                  <View style={styles.topPostBadge}>
-                    <Text style={styles.topPostRank}>#{idx + 1}</Text>
+                <View key={post.id || idx} style={[styles.topPostCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
+                  <View style={[styles.topPostBadge, { backgroundColor: colors.backgroundSecondary }]}>
+                    <Text style={[styles.topPostRank, { color: colors.textSecondary }]}>#{idx + 1}</Text>
                   </View>
                   <View style={styles.topPostContent}>
-                    <Text style={styles.topPostText} numberOfLines={2}>
+                    <Text style={[styles.topPostText, { color: colors.textPrimary }]} numberOfLines={2}>
                       {post.content}
                     </Text>
                     <View style={styles.topPostStatsRow}>
                       <View style={styles.topPostStatItem}>
                         <Eye size={12} color={colors.textSecondary} />
-                        <Text style={styles.topPostStatText}>
+                        <Text style={[styles.topPostStatText, { color: colors.textSecondary }]}>
                           {formatNumber(post.impressionsCount ?? post.viewsCount)} impressions
                         </Text>
                       </View>
                       <View style={styles.topPostStatItem}>
                         <LikeIcon size={12} isLiked={true} color={colors.textSecondary} />
-                        <Text style={styles.topPostStatText}>
+                        <Text style={[styles.topPostStatText, { color: colors.textSecondary }]}>
                           {formatNumber(post.likesCount)}
                         </Text>
                       </View>
                       <View style={styles.topPostStatItem}>
                         <DiscussionIcon size={12} color={colors.textSecondary} />
-                        <Text style={styles.topPostStatText}>
+                        <Text style={[styles.topPostStatText, { color: colors.textSecondary }]}>
                           {formatNumber(post.commentsCount)}
                         </Text>
                       </View>
                       <View style={styles.topPostStatItem}>
                         <Share2 size={12} color={colors.textSecondary} />
-                        <Text style={styles.topPostStatText}>
+                        <Text style={[styles.topPostStatText, { color: colors.textSecondary }]}>
                           {formatNumber(post.repostsCount)}
                         </Text>
                       </View>

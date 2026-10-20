@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { FileText, MessageSquare, Image as ImageIcon, BookOpen } from 'lucide-react-native';
-import { radii } from '../../theme';
+import { radii, useTheme } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { PaperLookupModal } from '../modals/PaperLookupModal';
@@ -10,6 +10,7 @@ import { ImageAttachmentModal } from '../modals/ImageAttachmentModal';
 import { Paper } from '../../types';
 
 export const DesktopWritePostCard: React.FC = () => {
+  const { colors, isDark } = useTheme();
   const currentUser = useAuthStore((s) => s.user);
   const [paperModalVisible, setPaperModalVisible] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
@@ -31,7 +32,7 @@ export const DesktopWritePostCard: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => router.push('/(tabs)/create')}
@@ -42,44 +43,44 @@ export const DesktopWritePostCard: React.FC = () => {
           name={currentUser?.fullName || currentUser?.handle || 'Researcher'}
           size="md"
         />
-        <View style={styles.inputPlaceholder}>
-          <Text style={styles.placeholderText}>
+        <View style={[styles.inputPlaceholder, { backgroundColor: isDark ? '#111622' : '#F8FAFC', borderColor: colors.border }]}>
+          <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
             Share your latest research, DOI preprint, or start a scientific discussion...
           </Text>
         </View>
       </TouchableOpacity>
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
       <View style={styles.actionsRow}>
         {/* 1. Share Paper - Directly opens Add Paper lookup without first opening post section */}
         <TouchableOpacity
           activeOpacity={0.75}
           onPress={() => setPaperModalVisible(true)}
-          style={styles.actionPill}
+          style={[styles.actionPill, { backgroundColor: isDark ? '#111622' : '#F8FAFC' }]}
         >
-          <FileText size={16} color="#064E3B" strokeWidth={2.2} />
-          <Text style={styles.actionPillText}>Share Paper</Text>
+          <FileText size={16} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
+          <Text style={[styles.actionPillText, { color: colors.textPrimary }]}>Share Paper</Text>
         </TouchableOpacity>
 
         {/* 2. Discussion - Opens standard post writing section */}
         <TouchableOpacity
           activeOpacity={0.75}
           onPress={() => router.push('/(tabs)/create')}
-          style={styles.actionPill}
+          style={[styles.actionPill, { backgroundColor: isDark ? '#111622' : '#F8FAFC' }]}
         >
-          <MessageSquare size={16} color="#2563EB" strokeWidth={2.2} />
-          <Text style={styles.actionPillText}>Discussion</Text>
+          <MessageSquare size={16} color="#3B82F6" strokeWidth={2.2} />
+          <Text style={[styles.actionPillText, { color: colors.textPrimary }]}>Discussion</Text>
         </TouchableOpacity>
 
         {/* 3. Figure / Media - Directly opens file selection / camera options without first opening post section */}
         <TouchableOpacity
           activeOpacity={0.75}
           onPress={() => setImageModalVisible(true)}
-          style={styles.actionPill}
+          style={[styles.actionPill, { backgroundColor: isDark ? '#111622' : '#F8FAFC' }]}
         >
-          <ImageIcon size={16} color="#D97706" strokeWidth={2.2} />
-          <Text style={styles.actionPillText}>Figure / Media</Text>
+          <ImageIcon size={16} color="#F59E0B" strokeWidth={2.2} />
+          <Text style={[styles.actionPillText, { color: colors.textPrimary }]}>Figure / Media</Text>
         </TouchableOpacity>
 
         {/* 4. Article - Directly opens long-form research article composer */}
@@ -91,10 +92,10 @@ export const DesktopWritePostCard: React.FC = () => {
               params: { type: 'article' },
             })
           }
-          style={styles.actionPill}
+          style={[styles.actionPill, { backgroundColor: isDark ? '#111622' : '#F8FAFC' }]}
         >
-          <BookOpen size={16} color="#7C3AED" strokeWidth={2.2} />
-          <Text style={styles.actionPillText}>Article</Text>
+          <BookOpen size={16} color="#8B5CF6" strokeWidth={2.2} />
+          <Text style={[styles.actionPillText, { color: colors.textPrimary }]}>Article</Text>
         </TouchableOpacity>
       </View>
 

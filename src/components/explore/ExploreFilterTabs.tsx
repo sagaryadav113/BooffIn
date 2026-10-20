@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import * as Haptics from 'expo-haptics';
 import { FileText, Users, Hash, Compass } from 'lucide-react-native';
 import { SearchFilterCategory } from '../../api/search/types';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 
 interface ExploreFilterTabsProps {
   activeCategory: SearchFilterCategory;
@@ -20,28 +20,31 @@ export const ExploreFilterTabs: React.FC<ExploreFilterTabsProps> = ({
   onSelectCategory,
   counts,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   const tabs: { id: SearchFilterCategory; label: string; icon: React.ReactNode; count?: number }[] = [
     {
       id: 'all',
       label: 'All',
-      icon: <Compass size={14} color={activeCategory === 'all' ? colors.white : colors.textSecondary} />,
+      icon: <Compass size={14} color={activeCategory === 'all' ? '#FFFFFF' : colors.textSecondary} />,
     },
     {
       id: 'papers',
       label: 'Papers',
-      icon: <FileText size={14} color={activeCategory === 'papers' ? colors.white : colors.textSecondary} />,
+      icon: <FileText size={14} color={activeCategory === 'papers' ? '#FFFFFF' : colors.textSecondary} />,
       count: counts?.papers,
     },
     {
       id: 'researchers',
       label: 'Researchers',
-      icon: <Users size={14} color={activeCategory === 'researchers' ? colors.white : colors.textSecondary} />,
+      icon: <Users size={14} color={activeCategory === 'researchers' ? '#FFFFFF' : colors.textSecondary} />,
       count: counts?.researchers,
     },
     {
       id: 'topics',
       label: 'Topics',
-      icon: <Hash size={14} color={activeCategory === 'topics' ? colors.white : colors.textSecondary} />,
+      icon: <Hash size={14} color={activeCategory === 'topics' ? '#FFFFFF' : colors.textSecondary} />,
       count: counts?.topics,
     },
   ];
@@ -54,7 +57,7 @@ export const ExploreFilterTabs: React.FC<ExploreFilterTabsProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -67,15 +70,37 @@ export const ExploreFilterTabs: React.FC<ExploreFilterTabsProps> = ({
               key={tab.id}
               activeOpacity={0.75}
               onPress={() => handleTabPress(tab.id)}
-              style={[styles.tabBtn, isActive && styles.tabBtnActive]}
+              style={[
+                styles.tabBtn,
+                {
+                  backgroundColor: isDark ? colors.cardBackground : colors.backgroundSecondary,
+                  borderColor: colors.borderLight,
+                },
+                isActive && {
+                  backgroundColor: isDark ? '#10B981' : staticColors.black,
+                  borderColor: isDark ? '#10B981' : staticColors.black,
+                },
+              ]}
             >
               {tab.icon}
-              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: colors.textSecondary },
+                  isActive && styles.tabTextActive,
+                ]}
+              >
                 {tab.label}
               </Text>
               {tab.count !== undefined && tab.count > 0 && (
-                <View style={[styles.badge, isActive && styles.badgeActive]}>
-                  <Text style={[styles.badgeText, isActive && styles.badgeTextActive]}>
+                <View
+                  style={[
+                    styles.badge,
+                    { backgroundColor: isDark ? '#1F2636' : colors.backgroundTertiary },
+                    isActive && styles.badgeActive,
+                  ]}
+                >
+                  <Text style={[styles.badgeText, { color: colors.textSecondary }, isActive && styles.badgeTextActive]}>
                     {tab.count}
                   </Text>
                 </View>
@@ -92,8 +117,8 @@ const styles = StyleSheet.create({
   container: {
     paddingVertical: spacing.xs + 2,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    backgroundColor: colors.background,
+    borderBottomColor: staticColors.borderLight,
+    backgroundColor: staticColors.background,
   },
   scrollContent: {
     paddingHorizontal: spacing.md,
@@ -106,25 +131,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: radii.full,
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
   },
   tabBtnActive: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
+    backgroundColor: staticColors.black,
+    borderColor: staticColors.black,
   },
   tabText: {
     ...typography.captionMedium,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 13,
   },
   tabTextActive: {
     ...typography.captionBold,
-    color: colors.white,
+    color: '#FFFFFF',
   },
   badge: {
-    backgroundColor: colors.backgroundTertiary,
+    backgroundColor: staticColors.backgroundTertiary,
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: radii.full,
@@ -134,10 +159,10 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...typography.microBold,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 11,
   },
   badgeTextActive: {
-    color: colors.white,
+    color: '#FFFFFF',
   },
 });

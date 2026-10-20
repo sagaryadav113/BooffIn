@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '../../theme';
+import { colors, spacing, useTheme } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
 
@@ -27,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   style,
   disableSafeArea = false,
 }) => {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const topInset = disableSafeArea
     ? 0
@@ -43,7 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <View style={[styles.container, { paddingTop: topInset + spacing.sm }, style]}>
+    <View style={[styles.container, { backgroundColor: colors.background, borderBottomColor: colors.borderLight, paddingTop: topInset + spacing.sm }, style]}>
       <View style={styles.leftSection}>
         {showBack && (
           <TouchableOpacity

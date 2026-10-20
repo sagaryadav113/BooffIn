@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors, radii, spacing, typography, layout, useColors, useIsDark } from '../../theme';
 import { Icon } from './Icon';
 
 export interface SearchBarProps {
@@ -34,18 +34,20 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   autoFocus = false,
   style,
 }) => {
+  const dynamicColors = useColors();
+  const isDark = useIsDark();
   const isFilterVisible = showFilterButton !== undefined ? showFilterButton : showFilter;
 
   return (
     <View style={[styles.container, style]}>
-      <View style={styles.inputWrapper}>
-        <Icon name="Search" size="sm" color={colors.textSecondary} style={styles.searchIcon} />
+      <View style={[styles.inputWrapper, { backgroundColor: dynamicColors.backgroundSecondary, borderColor: dynamicColors.borderLight }]}>
+        <Icon name="Search" size="sm" color={dynamicColors.textSecondary} style={styles.searchIcon} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
+          placeholderTextColor={dynamicColors.textMuted}
+          style={[styles.input, { color: dynamicColors.textPrimary }]}
           autoFocus={autoFocus}
           onSubmitEditing={onSubmitEditing}
           returnKeyType="search"
@@ -58,7 +60,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             style={styles.clearButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Icon name="X" size="xs" color={colors.textSecondary} />
+            <Icon name="X" size="xs" color={dynamicColors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -66,10 +68,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       {isFilterVisible && onFilterPress && (
         <TouchableOpacity
           onPress={onFilterPress}
-          style={styles.filterButton}
+          style={[styles.filterButton, { backgroundColor: dynamicColors.backgroundSecondary, borderColor: dynamicColors.borderLight }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Icon name="SlidersHorizontal" size="sm" color={colors.textPrimary} />
+          <Icon name="SlidersHorizontal" size="sm" color={dynamicColors.textPrimary} />
         </TouchableOpacity>
       )}
     </View>

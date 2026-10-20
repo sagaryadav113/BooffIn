@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { colors, radii, spacing } from '../../theme';
+import { colors as staticColors, radii, spacing, useColors, useIsDark } from '../../theme';
 import { SettingsLayout } from '../../components/settings/SettingsLayout';
 import { SettingsCardGroup } from '../../components/settings/SettingsCardGroup';
 import { SettingsSectionHeader } from '../../components/settings/SettingsSectionHeader';
@@ -26,6 +26,8 @@ const ACADEMIC_ROLE_OPTIONS = [
 ];
 
 export default function ResearchProfileScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
   const { user, updateProfile } = useAuthStore();
 
   const [roleModalOpen, setRoleModalOpen] = useState(false);
@@ -124,7 +126,7 @@ export default function ResearchProfileScreen() {
           </Typography>
           <TouchableOpacity
             activeOpacity={0.7}
-            style={styles.pickerSelector}
+            style={[styles.pickerSelector, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}
             onPress={() => setRoleModalOpen(true)}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -292,9 +294,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: staticColors.border,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,

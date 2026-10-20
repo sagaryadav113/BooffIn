@@ -35,7 +35,7 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 import { ArticleData, ArticleReference, ArticleSection, ArticleImage } from '../../types/post';
 import { UserProfile } from '../../types/user';
 import { AddReferenceModal } from './AddReferenceModal';
@@ -64,6 +64,7 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
   submitButtonTitle,
   isEditing = false,
 }) => {
+  const { colors, isDark } = useTheme();
   // Document Structure State
   const [title, setTitle] = useState(initialData?.title || '');
   const [subheading, setSubheading] = useState(initialData?.subheading || '');
@@ -421,10 +422,10 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       {/* Top App Header (Matching Screenshot 1) */}
-      <View style={styles.topHeader}>
+      <View style={[styles.topHeader, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
         <TouchableOpacity
           onPress={onExit}
           style={styles.headerIconButton}
@@ -434,9 +435,9 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
         </TouchableOpacity>
 
         {/* Sync Status Badge */}
-        <View style={styles.syncBadge}>
+        <View style={[styles.syncBadge, { backgroundColor: colors.backgroundSecondary }]}>
           <View style={styles.syncDot} />
-          <Text style={styles.syncText}>{autoSaveStatus}</Text>
+          <Text style={[styles.syncText, { color: colors.textSecondary }]}>{autoSaveStatus}</Text>
         </View>
 
         <View style={styles.headerActions}>
@@ -472,23 +473,23 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.draftsButton}
+            style={[styles.draftsButton, { backgroundColor: colors.backgroundSecondary }]}
             onPress={async () => {
               Alert.alert('Auto-Save Active', 'Your draft is continuously saved locally.');
             }}
           >
-            <Text style={styles.draftsButtonText}>Drafts</Text>
+            <Text style={[styles.draftsButtonText, { color: colors.textPrimary }]}>Drafts</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.publishButton, (!title.trim() || isPublishing) && styles.publishButtonDisabled]}
+            style={[styles.publishButton, { backgroundColor: colors.primary }, (!title.trim() || isPublishing) && styles.publishButtonDisabled]}
             onPress={handlePublishPress}
             disabled={!title.trim() || isPublishing}
           >
             {isPublishing ? (
-              <ActivityIndicator size="small" color={colors.white} />
+              <ActivityIndicator size="small" color={isDark ? colors.black : colors.white} />
             ) : (
-              <Text style={styles.publishButtonText}>
+              <Text style={[styles.publishButtonText, { color: isDark ? colors.black : colors.white }]}>
                 {submitButtonTitle || (isEditing ? 'Save Changes' : 'Publish')}
               </Text>
             )}
@@ -498,16 +499,16 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
 
       {/* Main Long-Form Article Canvas */}
       <ScrollView
-        style={styles.scrollCanvas}
+        style={[styles.scrollCanvas, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.canvasContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Article Title Input */}
         <TextInput
-          style={styles.titleInput}
+          style={[styles.titleInput, { color: colors.textPrimary }]}
           placeholder="Title"
-          placeholderTextColor="#A0AEC0"
+          placeholderTextColor={colors.textMuted}
           value={title}
           onChangeText={(t) => {
             saveToHistory();
@@ -519,9 +520,9 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
 
         {/* Subheading / Authors Line */}
         <TextInput
-          style={styles.subheadingInput}
+          style={[styles.subheadingInput, { color: colors.textSecondary }]}
           placeholder="Add a subheading or co-authors..."
-          placeholderTextColor="#CBD5E0"
+          placeholderTextColor={colors.textMuted}
           value={subheading}
           onChangeText={(t) => {
             saveToHistory();
@@ -532,13 +533,13 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
         />
 
         <View style={styles.authorBadgeRow}>
-          <Text style={styles.authorByline}>
+          <Text style={[styles.authorByline, { color: colors.textSecondary }]}>
             By {authors.join(', ')}
           </Text>
         </View>
 
         {/* Tagged Research Topics / Fields (1,200+ Taxonomy) */}
-        <View style={styles.topicsSectionCard}>
+        <View style={[styles.topicsSectionCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
           <View style={styles.topicsHeaderRow}>
             <View style={styles.topicsTitleWrap}>
               <Tag size={15} color={colors.accentLink} />
@@ -559,8 +560,8 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
           {topics.length > 0 ? (
             <View style={styles.topicChipsWrap}>
               {topics.map((t) => (
-                <View key={t} style={styles.topicChip}>
-                  <Text style={styles.topicChipText}>#{t}</Text>
+                <View key={t} style={[styles.topicChip, { backgroundColor: colors.backgroundCard, borderColor: colors.borderLight }]}>
+                  <Text style={[styles.topicChipText, { color: colors.textPrimary }]}>#{t}</Text>
                   <TouchableOpacity
                     onPress={() => setTopics(topics.filter((x) => x.toLowerCase() !== t.toLowerCase()))}
                     style={styles.topicChipRemove}
@@ -577,7 +578,7 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
               onPress={() => setTopicModalVisible(true)}
               activeOpacity={0.7}
             >
-              <Text style={styles.emptyTopicsPromptText}>
+              <Text style={[styles.emptyTopicsPromptText, { color: colors.textSecondary }]}>
                 Tag 1,200+ academic fields to ensure your article reaches interested researchers and journals.
               </Text>
             </TouchableOpacity>
@@ -585,15 +586,15 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
         </View>
 
         {/* Abstract & Key Findings Card (Matching Screenshot 2) */}
-        <View style={styles.abstractCard}>
+        <View style={[styles.abstractCard, { backgroundColor: colors.backgroundSecondary, borderLeftColor: colors.brandGreen }]}>
           <View style={styles.abstractHeaderRow}>
-            <View style={styles.abstractBullet} />
-            <Text style={styles.abstractLabel}>ABSTRACT & KEY FINDINGS</Text>
+            <View style={[styles.abstractBullet, { backgroundColor: colors.brandGreen }]} />
+            <Text style={[styles.abstractLabel, { color: colors.brandGreen }]}>ABSTRACT & KEY FINDINGS</Text>
           </View>
           <TextInput
-            style={styles.abstractInput}
+            style={[styles.abstractInput, { color: colors.textPrimary }]}
             placeholder="Write a comprehensive abstract summarizing your research rationale, methodology, primary results, and scientific contribution..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.textMuted}
             multiline
             value={abstract}
             onChangeText={(t) => {
@@ -611,9 +612,9 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
             <View key={section.id} style={styles.sectionCard}>
               <View style={styles.sectionHeaderRow}>
                 <TextInput
-                  style={styles.sectionHeadingInput}
+                  style={[styles.sectionHeadingInput, { color: colors.textPrimary }]}
                   placeholder={sIdx === 0 ? 'Section Heading (e.g. Introduction)' : 'Section Heading (e.g. Methodology, Results, Analysis)'}
-                  placeholderTextColor="#A0AEC0"
+                  placeholderTextColor={colors.textMuted}
                   value={section.heading}
                   onChangeText={(text) => handleUpdateSectionHeading(section.id, text)}
                   onFocus={() => setActiveSectionId(section.id)}
@@ -631,9 +632,9 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
 
               {/* Section Paragraph Text */}
               <TextInput
-                style={[styles.sectionBodyInput, isCurrentActive && styles.sectionBodyInputActive]}
+                style={[styles.sectionBodyInput, { color: colors.textPrimary }, isCurrentActive && styles.sectionBodyInputActive]}
                 placeholder="Begin composing section findings, citations, or theoretical discussion..."
-                placeholderTextColor="#CBD5E1"
+                placeholderTextColor={colors.textMuted}
                 multiline
                 value={section.content}
                 onChangeText={(text) => handleUpdateSectionContent(section.id, text)}
@@ -645,11 +646,11 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
               {section.images && section.images.length > 0 && (
                 <View style={styles.inlineImagesContainer}>
                   {section.images.map((img) => (
-                    <View key={img.id} style={styles.figureCard}>
+                    <View key={img.id} style={[styles.figureCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
                       <Image source={{ uri: img.uri }} style={styles.figureImage} contentFit="contain" cachePolicy="disk" />
-                      <View style={styles.captionRow}>
+                      <View style={[styles.captionRow, { backgroundColor: colors.backgroundCard, borderTopColor: colors.borderLight }]}>
                         <TextInput
-                          style={styles.captionInput}
+                          style={[styles.captionInput, { color: colors.textSecondary }]}
                           placeholder={`Figure ${img.figureNumber || ''}: Add scientific figure caption...`}
                           placeholderTextColor={colors.textMuted}
                           value={img.caption}
@@ -672,9 +673,9 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
 
         {/* References Section (Auto-generated in APA Style) */}
         {references.length > 0 && (
-          <View style={styles.referencesCard}>
+          <View style={[styles.referencesCard, { borderTopColor: colors.borderLight }]}>
             <View style={styles.referencesHeaderRow}>
-              <Text style={styles.referencesTitle}>References</Text>
+              <Text style={[styles.referencesTitle, { color: colors.textPrimary }]}>References</Text>
               <Text style={styles.apaStyleBadge}>APA 7th Edition</Text>
             </View>
 
@@ -684,7 +685,7 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
                   <Text style={styles.referenceNumberText}>{idx + 1}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.referenceCitationText}>{ref.apaFullCitation}</Text>
+                  <Text style={[styles.referenceCitationText, { color: colors.textPrimary }]}>{ref.apaFullCitation}</Text>
                   <View style={styles.referenceMetaRow}>
                     <Text style={styles.inTextToken}>Cite: {ref.apaInTextCitation}</Text>
                     {ref.doi && <Text style={styles.referenceDoi}>DOI: {ref.doi}</Text>}
@@ -707,14 +708,14 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
 
       {/* Floating Exit Article Mode Pill (Matching Screenshot 1) */}
       <View style={styles.exitPillWrapper}>
-        <TouchableOpacity style={styles.exitPill} onPress={onExit} activeOpacity={0.85}>
+        <TouchableOpacity style={[styles.exitPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]} onPress={onExit} activeOpacity={0.85}>
           <Undo2 size={14} color={colors.textPrimary} style={{ marginRight: 6 }} />
-          <Text style={styles.exitPillText}>Exit article mode</Text>
+          <Text style={[styles.exitPillText, { color: colors.textPrimary }]}>Exit article mode</Text>
         </TouchableOpacity>
       </View>
 
       {/* Bottom Academic Formatting Toolbar (Matching Screenshot 1) */}
-      <View style={styles.bottomToolbar}>
+      <View style={[styles.bottomToolbar, { backgroundColor: colors.background, borderTopColor: colors.borderLight }]}>
         {/* + Insert Block Button */}
         <TouchableOpacity
           style={styles.toolButton}
@@ -762,13 +763,13 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
 
       {/* Insert Block Quick Menu */}
       {addBlockMenuVisible && (
-        <View style={styles.blockMenuPopover}>
+        <View style={[styles.blockMenuPopover, { backgroundColor: colors.backgroundElevated, borderColor: colors.border }]}>
           <TouchableOpacity
             style={styles.blockMenuItem}
             onPress={() => handleAddSection('Methodology')}
           >
             <FileText size={16} color={colors.accentBlue} />
-            <Text style={styles.blockMenuText}>Add Section Heading</Text>
+            <Text style={[styles.blockMenuText, { color: colors.textPrimary }]}>Add Section Heading</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -777,7 +778,7 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
             disabled={isUploadingImage}
           >
             <ImageIcon size={16} color={colors.accentGreen} />
-            <Text style={styles.blockMenuText}>
+            <Text style={[styles.blockMenuText, { color: colors.textPrimary }]}>
               {isUploadingImage ? 'Uploading Figure...' : 'Insert Figure / Photo'}
             </Text>
           </TouchableOpacity>
@@ -788,7 +789,7 @@ export const ArticleComposer: React.FC<ArticleComposerProps> = ({
             disabled={isUploadingImage}
           >
             <Camera size={16} color={colors.textPrimary} />
-            <Text style={styles.blockMenuText}>Take Lab Camera Photo</Text>
+            <Text style={[styles.blockMenuText, { color: colors.textPrimary }]}>Take Lab Camera Photo</Text>
           </TouchableOpacity>
         </View>
       )}

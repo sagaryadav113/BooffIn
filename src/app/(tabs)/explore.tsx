@@ -21,7 +21,7 @@ import {
   Hash,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { SearchBar } from '../../components/core/SearchBar';
 import { EmptyState } from '../../components/feedback/EmptyState';
@@ -50,6 +50,7 @@ import { TrendingTagsSection } from '../../components/explore/TrendingTagsSectio
 import { useTrendingStore } from '../../store/useTrendingStore';
 
 export default function ExploreScreen() {
+  const { colors, isDark } = useTheme();
   const { isDesktop } = useResponsiveLayout();
   const params = useLocalSearchParams<{ tab?: string }>();
   const {
@@ -400,20 +401,20 @@ export default function ExploreScreen() {
         <View style={styles.hypedSectionHeader}>
           <View style={styles.sectionTitleRow}>
             <View style={styles.sectionTitleLeft}>
-              <TrendingUp size={22} color="#1B4D3E" strokeWidth={2.5} />
-              <Text style={styles.hypedMainTitle}>Most Hyped Papers</Text>
+              <TrendingUp size={22} color={isDark ? '#34D399' : '#1B4D3E'} strokeWidth={2.5} />
+              <Text style={[styles.hypedMainTitle, { color: colors.textPrimary }]}>Most Hyped Papers</Text>
             </View>
             <TouchableOpacity
               onPress={() => handleSearchSubmit(activeTab)}
               style={styles.seeAllAction}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={styles.seeAllActionText}>See all</Text>
-              <ArrowRight size={14} color="#0F172A" />
+              <Text style={[styles.seeAllActionText, { color: isDark ? '#34D399' : '#0F172A' }]}>See all</Text>
+              <ArrowRight size={14} color={isDark ? '#34D399' : '#0F172A'} />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.hypedSubtitle}>
+          <Text style={[styles.hypedSubtitle, { color: colors.textSecondary }]}>
             Top papers in {activeTab === 'For You' ? 'your personalized feed' : activeTab === 'Hyped' ? 'science today' : activeTab} {timeframe === '48h' ? 'in the last 48 hours' : timeframe === 'week' ? 'this week' : 'of all time'}, ranked by HYPE
           </Text>
 
@@ -431,13 +432,15 @@ export default function ExploreScreen() {
                     onPress={() => handleTimeframeSelect(tf)}
                     style={[
                       styles.timeframePill,
-                      isSelected && styles.timeframePillActive,
+                      { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' },
+                      isSelected && { backgroundColor: isDark ? '#10B981' : '#1B4D3E' },
                     ]}
                   >
                     <Text
                       style={[
                         styles.timeframePillText,
-                        isSelected && styles.timeframePillTextActive,
+                        { color: isDark ? '#94A3B8' : '#475569' },
+                        isSelected && { color: '#FFFFFF', fontWeight: '700' },
                       ]}
                     >
                       {label}
@@ -449,11 +452,14 @@ export default function ExploreScreen() {
 
             <TouchableOpacity
               activeOpacity={0.8}
-              style={styles.filterButton}
+              style={[
+                styles.filterButton,
+                { backgroundColor: colors.backgroundCard, borderColor: colors.border },
+              ]}
               onPress={() => setIsAddInterestsVisible(true)}
             >
-              <SlidersHorizontal size={13} color="#334155" />
-              <Text style={styles.filterButtonText}>Filter</Text>
+              <SlidersHorizontal size={13} color={colors.textSecondary} />
+              <Text style={[styles.filterButtonText, { color: colors.textPrimary }]}>Filter</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -520,8 +526,8 @@ export default function ExploreScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Mobile Main App Header */}
       {!isDesktop && <AppHeader title="Explore" />}
@@ -529,17 +535,17 @@ export default function ExploreScreen() {
       {/* Desktop Page Title Banner */}
       {isDesktop && (
         <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 }}>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 }}>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5 }}>
             Explore
           </Text>
-          <Text style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
             Discover research, people and ideas from across science.
           </Text>
         </View>
       )}
 
       {/* Universal Search Bar (Mobile & Desktop) */}
-      <View style={[styles.searchBarContainer, isDesktop && styles.desktopSearchBarContainer]}>
+      <View style={[styles.searchBarContainer, isDesktop && styles.desktopSearchBarContainer, { backgroundColor: colors.background }]}>
         <SearchBar
           value={searchQuery}
           onChangeText={(text) => setSearchQuery(text)}
@@ -567,7 +573,7 @@ export default function ExploreScreen() {
 
       {/* When not searching, show Dynamic Domain Navigation Tabs (Exact Screenshot Match) */}
       {!hasQuery && (
-        <View style={styles.topTabsWrapper}>
+        <View style={[styles.topTabsWrapper, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -586,12 +592,20 @@ export default function ExploreScreen() {
                   <Text
                     style={[
                       styles.topTabText,
-                      isActive && styles.topTabTextActive,
+                      { color: isActive ? colors.textPrimary : colors.textSecondary },
+                      isActive && { fontWeight: '800' },
                     ]}
                   >
                     {tab}
                   </Text>
-                  {isActive && <View style={styles.topTabIndicator} />}
+                  {isActive && (
+                    <View
+                      style={[
+                        styles.topTabIndicator,
+                        { backgroundColor: isDark ? '#10B981' : '#0F172A' },
+                      ]}
+                    />
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -609,12 +623,20 @@ export default function ExploreScreen() {
                   <Text
                     style={[
                       styles.topTabText,
-                      isActive && styles.topTabTextActive,
+                      { color: isActive ? colors.textPrimary : colors.textSecondary },
+                      isActive && { fontWeight: '800' },
                     ]}
                   >
                     {interest}
                   </Text>
-                  {isActive && <View style={styles.topTabIndicator} />}
+                  {isActive && (
+                    <View
+                      style={[
+                        styles.topTabIndicator,
+                        { backgroundColor: isDark ? '#10B981' : '#0F172A' },
+                      ]}
+                    />
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -623,10 +645,10 @@ export default function ExploreScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setIsAddInterestsVisible(true)}
-              style={styles.addInterestsTabBtn}
+              style={[styles.addInterestsTabBtn, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE' }]}
             >
-              <Plus size={14} color="#1B4D3E" strokeWidth={2.5} />
-              <Text style={styles.addInterestsTabText}>Add</Text>
+              <Plus size={14} color={isDark ? '#34D399' : '#1B4D3E'} strokeWidth={2.5} />
+              <Text style={[styles.addInterestsTabText, { color: isDark ? '#34D399' : '#1B4D3E' }]}>Add</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -634,7 +656,7 @@ export default function ExploreScreen() {
 
       {/* Main Scrollable Content Area */}
       <ScrollView
-        style={styles.scrollView}
+        style={[styles.scrollView, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -642,8 +664,8 @@ export default function ExploreScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor="#1B4D3E"
-            colors={['#1B4D3E']}
+            tintColor={isDark ? '#34D399' : '#1B4D3E'}
+            colors={[isDark ? '#34D399' : '#1B4D3E']}
           />
         }
       >
@@ -686,14 +708,33 @@ export default function ExploreScreen() {
 
             {/* Detected Intent Badge */}
             {detectedBadgeText ? (
-              <View style={styles.detectedPill}>
-                <Sparkles size={12} color="#1B4D3E" />
-                <Text style={styles.detectedPillText}>{detectedBadgeText}</Text>
+              <View
+                style={[
+                  styles.detectedPill,
+                  {
+                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE',
+                    borderWidth: isDark ? 1 : 0,
+                    borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : 'transparent',
+                  },
+                ]}
+              >
+                <Sparkles size={12} color={isDark ? '#34D399' : '#1B4D3E'} />
+                <Text style={[styles.detectedPillText, { color: isDark ? '#34D399' : '#1B4D3E' }]}>
+                  {detectedBadgeText}
+                </Text>
               </View>
             ) : scientificIntentBadge ? (
-              <View style={styles.scientificIntentPill}>
-                <Sparkles size={12} color="#1B4D3E" />
-                <Text style={styles.scientificIntentPillText}>
+              <View
+                style={[
+                  styles.scientificIntentPill,
+                  {
+                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE',
+                    borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#C7E2D4',
+                  },
+                ]}
+              >
+                <Sparkles size={12} color={isDark ? '#34D399' : '#1B4D3E'} />
+                <Text style={[styles.scientificIntentPillText, { color: isDark ? '#34D399' : '#1B4D3E' }]}>
                   Research Intent: {scientificIntentBadge}
                 </Text>
               </View>

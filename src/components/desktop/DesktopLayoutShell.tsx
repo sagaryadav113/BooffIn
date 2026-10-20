@@ -10,13 +10,14 @@ import { DesktopProfileRightSidebar } from './DesktopProfileRightSidebar';
 import { DesktopSettingsRightSidebar } from './DesktopSettingsRightSidebar';
 import { DesktopMessagesDock } from './DesktopMessagesDock';
 import { useAuthStore } from '../../store/useAuthStore';
-import { colors } from '../../theme';
+import { useTheme } from '../../theme';
 
 interface DesktopLayoutShellProps {
   children: React.ReactNode;
 }
 
 export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children }) => {
+  const { colors, isDark } = useTheme();
   const { isDesktop } = useResponsiveLayout();
   const pathname = usePathname();
   const currentUser = useAuthStore((s) => s.user);
@@ -67,7 +68,7 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
   };
 
   return (
-    <View style={styles.desktopRoot}>
+    <View style={[styles.desktopRoot, { backgroundColor: colors.background }]}>
       {/* 1. Global Top Header */}
       <DesktopHeader />
 
@@ -78,7 +79,7 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
           justifyContent: 'center',
           width: '100%',
           flex: 1,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.background,
           minHeight: 'calc(100vh - 68px)',
         }}
       >
@@ -106,7 +107,7 @@ export const DesktopLayoutShell: React.FC<DesktopLayoutShellProps> = ({ children
               maxWidth: isWorkspacePage ? 'none' : 700,
               minWidth: isWorkspacePage ? 0 : 540,
               margin: isWorkspacePage ? '0 0 0 16px' : '0 24px',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: colors.background,
               minHeight: 'calc(100vh - 68px)',
               overflow: 'hidden',
             }}
@@ -130,6 +131,5 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     minHeight: '100vh' as any,
-    backgroundColor: '#FFFFFF',
   },
 });

@@ -27,7 +27,7 @@ import {
   FileCheck,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { BooffinLogo } from '../core/BooffinLogo';
 import { Button } from '../core/Button';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
@@ -47,6 +47,9 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
   visible,
   onClose,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   const {
     isInstalled,
     isIOS,
@@ -107,15 +110,15 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.modalCard}>
+        <View style={[styles.modalCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
           {/* Close Button */}
           <TouchableOpacity
-            style={styles.closeButton}
+            style={[styles.closeButton, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9' }]}
             onPress={onClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Close install dialog"
           >
-            <X size={20} color="#64748B" />
+            <X size={20} color={isDark ? colors.textSecondary : '#64748B'} />
           </TouchableOpacity>
 
           <ScrollView
@@ -125,22 +128,30 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
             {/* Header / Brand */}
             <View style={styles.headerSection}>
               <BooffinLogo size={36} variant="wordmark" style={styles.logo} />
-              <Text style={styles.title}>Install BooffIn Application</Text>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.title, { color: colors.textPrimary }]}>Install BooffIn Application</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                 Professional academic & scientific research community platform.
               </Text>
 
               {isRunningInElectron && (
-                <View style={styles.runningDesktopBanner}>
-                  <CheckCircle2 size={16} color="#065F46" />
-                  <Text style={styles.runningDesktopText}>
+                <View
+                  style={[
+                    styles.runningDesktopBanner,
+                    isDark && {
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      borderColor: 'rgba(16, 185, 129, 0.3)',
+                    },
+                  ]}
+                >
+                  <CheckCircle2 size={16} color={isDark ? '#34D399' : '#065F46'} />
+                  <Text style={[styles.runningDesktopText, isDark && { color: '#34D399' }]}>
                     You are currently running BooffIn Desktop (v1.0.0 Stable).
                   </Text>
                 </View>
               )}
 
               {/* Platform Switcher Tabs */}
-              <View style={styles.tabContainer}>
+              <View style={[styles.tabContainer, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9' }]}>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => {
@@ -149,24 +160,25 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                   }}
                   style={[
                     styles.tabButton,
-                    activeTab === 'windows' && styles.tabButtonActive,
+                    activeTab === 'windows' && [styles.tabButtonActive, { backgroundColor: isDark ? '#1F2636' : '#FFFFFF' }],
                   ]}
                 >
                   <Monitor
                     size={16}
-                    color={activeTab === 'windows' ? '#064E3B' : '#64748B'}
+                    color={activeTab === 'windows' ? (isDark ? '#34D399' : '#064E3B') : (isDark ? colors.textSecondary : '#64748B')}
                     strokeWidth={2.2}
                   />
                   <Text
                     style={[
                       styles.tabText,
-                      activeTab === 'windows' && styles.tabTextActive,
+                      { color: colors.textSecondary },
+                      activeTab === 'windows' && [styles.tabTextActive, { color: isDark ? '#34D399' : '#064E3B' }],
                     ]}
                   >
                     Windows (.exe)
                   </Text>
-                  <View style={styles.recommendedBadge}>
-                    <Text style={styles.recommendedBadgeText}>Desktop</Text>
+                  <View style={[styles.recommendedBadge, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}>
+                    <Text style={[styles.recommendedBadgeText, isDark && { color: '#34D399' }]}>Desktop</Text>
                   </View>
                 </TouchableOpacity>
 
@@ -175,18 +187,19 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                   onPress={() => setActiveTab('pwa')}
                   style={[
                     styles.tabButton,
-                    activeTab === 'pwa' && styles.tabButtonActive,
+                    activeTab === 'pwa' && [styles.tabButtonActive, { backgroundColor: isDark ? '#1F2636' : '#FFFFFF' }],
                   ]}
                 >
                   <Smartphone
                     size={16}
-                    color={activeTab === 'pwa' ? '#064E3B' : '#64748B'}
+                    color={activeTab === 'pwa' ? (isDark ? '#34D399' : '#064E3B') : (isDark ? colors.textSecondary : '#64748B')}
                     strokeWidth={2.2}
                   />
                   <Text
                     style={[
                       styles.tabText,
-                      activeTab === 'pwa' && styles.tabTextActive,
+                      { color: colors.textSecondary },
+                      activeTab === 'pwa' && [styles.tabTextActive, { color: isDark ? '#34D399' : '#064E3B' }],
                     ]}
                   >
                     Web & Mobile App
@@ -199,19 +212,19 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
             {activeTab === 'windows' && (
               <View style={styles.tabContent}>
                 {/* Hero Download Card */}
-                <View style={styles.windowsHeroCard}>
+                <View style={[styles.windowsHeroCard, { backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC', borderColor: colors.borderLight }]}>
                   <View style={styles.windowsHeroHeader}>
                     <View style={styles.windowsIconCircle}>
                       <Monitor size={24} color="#FFFFFF" strokeWidth={2.2} />
                     </View>
                     <View style={styles.windowsHeroTitles}>
                       <View style={styles.versionRow}>
-                        <Text style={styles.windowsHeroTitle}>BooffIn Desktop</Text>
-                        <View style={styles.versionTag}>
-                          <Text style={styles.versionTagText}>v1.0.0 Stable</Text>
+                        <Text style={[styles.windowsHeroTitle, { color: colors.textPrimary }]}>BooffIn Desktop</Text>
+                        <View style={[styles.versionTag, isDark && { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                          <Text style={[styles.versionTagText, isDark && { color: '#38BDF8' }]}>v1.0.0 Stable</Text>
                         </View>
                       </View>
-                      <Text style={styles.windowsHeroSubtitle}>
+                      <Text style={[styles.windowsHeroSubtitle, { color: colors.textSecondary }]}>
                         Windows 10 / 11 • 64-bit Architecture (x64)
                       </Text>
                     </View>
@@ -235,33 +248,41 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                   {/* Secondary Mirror & Portable Options */}
                   <View style={styles.secondaryLinksRow}>
                     <TouchableOpacity
-                      style={styles.secondaryOptionBtn}
+                      style={[styles.secondaryOptionBtn, { backgroundColor: isDark ? colors.cardBackground : '#FFFFFF', borderColor: colors.borderLight }]}
                       activeOpacity={0.75}
                       onPress={() => handleOpenExternal(GOOGLE_DRIVE_VIEW_URL)}
                     >
-                      <HardDrive size={13} color="#064E3B" strokeWidth={2} />
-                      <Text style={styles.secondaryOptionText}>Google Drive Mirror</Text>
+                      <HardDrive size={13} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2} />
+                      <Text style={[styles.secondaryOptionText, { color: isDark ? '#34D399' : '#064E3B' }]}>Google Drive Mirror</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={styles.secondaryOptionBtn}
+                      style={[styles.secondaryOptionBtn, { backgroundColor: isDark ? colors.cardBackground : '#FFFFFF', borderColor: colors.borderLight }]}
                       activeOpacity={0.75}
                       onPress={() => handleOpenExternal(GITHUB_RELEASES_URL)}
                     >
-                      <ExternalLink size={13} color="#064E3B" strokeWidth={2} />
-                      <Text style={styles.secondaryOptionText}>GitHub Releases</Text>
+                      <ExternalLink size={13} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2} />
+                      <Text style={[styles.secondaryOptionText, { color: isDark ? '#34D399' : '#064E3B' }]}>GitHub Releases</Text>
                     </TouchableOpacity>
                   </View>
 
                   {/* Download confirmation feedback banner */}
                   {downloadStarted && (
-                    <View style={styles.downloadSuccessBox}>
-                      <CheckCircle2 size={18} color="#065F46" />
+                    <View
+                      style={[
+                        styles.downloadSuccessBox,
+                        isDark && {
+                          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                          borderColor: 'rgba(16, 185, 129, 0.3)',
+                        },
+                      ]}
+                    >
+                      <CheckCircle2 size={18} color={isDark ? '#34D399' : '#065F46'} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.downloadSuccessTitle}>
+                        <Text style={[styles.downloadSuccessTitle, isDark && { color: '#34D399' }]}>
                           Download link opened!
                         </Text>
-                        <Text style={styles.downloadSuccessDesc}>
+                        <Text style={[styles.downloadSuccessDesc, isDark && { color: '#A7F3D0' }]}>
                           Your download from Google Drive is ready. Once downloaded, double-click <Text style={{ fontWeight: '700' }}>BooffIn Setup 1.0.0.exe</Text> to install and launch your desktop app.
                         </Text>
                       </View>
@@ -270,40 +291,40 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                 </View>
 
                 {/* Professional Advantages */}
-                <View style={styles.featuresSection}>
-                  <Text style={styles.sectionHeaderTitle}>Native Desktop Benefits</Text>
+                <View style={[styles.featuresSection, { backgroundColor: isDark ? colors.cardBackground : '#FFFFFF', borderColor: colors.borderLight }]}>
+                  <Text style={[styles.sectionHeaderTitle, { color: colors.textPrimary }]}>Native Desktop Benefits</Text>
 
                   <View style={styles.featureItem}>
-                    <View style={styles.featureIconBadge}>
-                      <ShieldCheck size={16} color="#064E3B" strokeWidth={2.2} />
+                    <View style={[styles.featureIconBadge, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
+                      <ShieldCheck size={16} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
                     </View>
                     <View style={styles.featureTextWrapper}>
-                      <Text style={styles.featureItemTitle}>Dedicated Workspace & Window Controls</Text>
-                      <Text style={styles.featureItemDesc}>
+                      <Text style={[styles.featureItemTitle, { color: colors.textPrimary }]}>Dedicated Workspace & Window Controls</Text>
+                      <Text style={[styles.featureItemDesc, { color: colors.textSecondary }]}>
                         Run research discussions, PDF reading, and live calls without browser tab clutter or accidental tab closes.
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.featureItem}>
-                    <View style={styles.featureIconBadge}>
-                      <Sparkles size={16} color="#064E3B" strokeWidth={2.2} />
+                    <View style={[styles.featureIconBadge, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
+                      <Sparkles size={16} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
                     </View>
                     <View style={styles.featureTextWrapper}>
-                      <Text style={styles.featureItemTitle}>Real-time Desktop Alerts & System Tray</Text>
-                      <Text style={styles.featureItemDesc}>
+                      <Text style={[styles.featureItemTitle, { color: colors.textPrimary }]}>Real-time Desktop Alerts & System Tray</Text>
+                      <Text style={[styles.featureItemDesc, { color: colors.textSecondary }]}>
                         Instant peer-review notices, citations, and inner circle messaging even when minimized.
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.featureItem}>
-                    <View style={styles.featureIconBadge}>
-                      <FileCheck size={16} color="#064E3B" strokeWidth={2.2} />
+                    <View style={[styles.featureIconBadge, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)' }]}>
+                      <FileCheck size={16} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
                     </View>
                     <View style={styles.featureTextWrapper}>
-                      <Text style={styles.featureItemTitle}>Hardware-Accelerated PDF & Graph Engine</Text>
-                      <Text style={styles.featureItemDesc}>
+                      <Text style={[styles.featureItemTitle, { color: colors.textPrimary }]}>Hardware-Accelerated PDF & Graph Engine</Text>
+                      <Text style={[styles.featureItemDesc, { color: colors.textSecondary }]}>
                         High-efficiency Electron runtime with local caching for rapid paper navigation.
                       </Text>
                     </View>
@@ -311,14 +332,14 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                 </View>
 
                 {/* Installation Steps */}
-                <View style={styles.stepsCard}>
-                  <Text style={styles.sectionHeaderTitle}>How to Install on Windows:</Text>
+                <View style={[styles.stepsCard, { backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC', borderColor: colors.borderLight }]}>
+                  <Text style={[styles.sectionHeaderTitle, { color: colors.textPrimary }]}>How to Install on Windows:</Text>
 
                   <View style={styles.stepRow}>
                     <View style={styles.stepNum}>
                       <Text style={styles.stepNumText}>1</Text>
                     </View>
-                    <Text style={styles.stepInstruction}>
+                    <Text style={[styles.stepInstruction, { color: colors.textPrimary }]}>
                       Click <Text style={{ fontWeight: '700' }}>Download for Windows (.exe)</Text> above to get the installer.
                     </Text>
                   </View>
@@ -327,7 +348,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                     <View style={styles.stepNum}>
                       <Text style={styles.stepNumText}>2</Text>
                     </View>
-                    <Text style={styles.stepInstruction}>
+                    <Text style={[styles.stepInstruction, { color: colors.textPrimary }]}>
                       Open the downloaded <Text style={{ fontWeight: '700' }}>BooffIn.exe</Text>. If Windows SmartScreen prompts on first run, click <Text style={{ fontWeight: '700' }}>"More info" → "Run anyway"</Text>.
                     </Text>
                   </View>
@@ -336,7 +357,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                     <View style={styles.stepNum}>
                       <Text style={styles.stepNumText}>3</Text>
                     </View>
-                    <Text style={styles.stepInstruction}>
+                    <Text style={[styles.stepInstruction, { color: colors.textPrimary }]}>
                       Right-click <Text style={{ fontWeight: '700' }}>BooffIn.exe</Text> → <Text style={{ fontWeight: '700' }}>Send to → Desktop</Text> to place an instant shortcut on your desktop, and sign in to your research feed.
                     </Text>
                   </View>
@@ -344,25 +365,25 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
 
                 {/* System Specs Footer Card */}
                 <View style={styles.specsBadgeRow}>
-                  <View style={styles.specPill}>
-                    <Text style={styles.specPillLabel}>OS:</Text>
-                    <Text style={styles.specPillValue}>Windows 10 / 11 (64-bit)</Text>
+                  <View style={[styles.specPill, { backgroundColor: isDark ? '#1F2636' : '#F1F5F9' }]}>
+                    <Text style={[styles.specPillLabel, { color: colors.textSecondary }]}>OS:</Text>
+                    <Text style={[styles.specPillValue, { color: colors.textPrimary }]}>Windows 10 / 11 (64-bit)</Text>
                   </View>
-                  <View style={styles.specPill}>
-                    <Text style={styles.specPillLabel}>Runtime:</Text>
-                    <Text style={styles.specPillValue}>Electron v44.7 (x64)</Text>
+                  <View style={[styles.specPill, { backgroundColor: isDark ? '#1F2636' : '#F1F5F9' }]}>
+                    <Text style={[styles.specPillLabel, { color: colors.textSecondary }]}>Runtime:</Text>
+                    <Text style={[styles.specPillValue, { color: colors.textPrimary }]}>Electron v44.7 (x64)</Text>
                   </View>
-                  <View style={styles.specPill}>
-                    <Text style={styles.specPillLabel}>Checksum:</Text>
-                    <Text style={styles.specPillValue}>SHA-256 Verified</Text>
+                  <View style={[styles.specPill, { backgroundColor: isDark ? '#1F2636' : '#F1F5F9' }]}>
+                    <Text style={[styles.specPillLabel, { color: colors.textSecondary }]}>Checksum:</Text>
+                    <Text style={[styles.specPillValue, { color: colors.textPrimary }]}>SHA-256 Verified</Text>
                   </View>
                 </View>
 
                 {/* Local Dev Launcher Hint */}
-                <View style={styles.localDevCard}>
-                  <Info size={15} color="#065F46" style={{ marginTop: 2 }} />
-                  <Text style={styles.localDevText}>
-                    <Text style={{ fontWeight: '700' }}>Local Desktop Environment:</Text> If you have this repository on your PC, you can also launch the prebuilt binary immediately with <Text style={styles.codeSnippet}>Launch-BooffIn.bat</Text> in the project folder.
+                <View style={[styles.localDevCard, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: 'rgba(16, 185, 129, 0.25)' }]}>
+                  <Info size={15} color={isDark ? '#34D399' : '#065F46'} style={{ marginTop: 2 }} />
+                  <Text style={[styles.localDevText, isDark && { color: '#6EE7B7' }]}>
+                    <Text style={{ fontWeight: '700' }}>Local Desktop Environment:</Text> If you have this repository on your PC, you can also launch the prebuilt binary immediately with <Text style={[styles.codeSnippet, isDark && { backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#A7F3D0' }]}>Launch-BooffIn.bat</Text> in the project folder.
                   </Text>
                 </View>
               </View>
@@ -372,38 +393,38 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
             {activeTab === 'pwa' && (
               <View style={styles.tabContent}>
                 {/* Benefits List */}
-                <View style={styles.benefitsCard}>
+                <View style={[styles.benefitsCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
                   <View style={styles.benefitRow}>
-                    <View style={styles.benefitIconCircle}>
+                    <View style={[styles.benefitIconCircle, { backgroundColor: isDark ? '#1F2636' : colors.backgroundSecondary }]}>
                       <Sparkles size={16} color={colors.textPrimary} />
                     </View>
                     <View style={styles.benefitTextCol}>
-                      <Text style={styles.benefitTitle}>Fast 1-Tap Access</Text>
-                      <Text style={styles.benefitDesc}>
+                      <Text style={[styles.benefitTitle, { color: colors.textPrimary }]}>Fast 1-Tap Access</Text>
+                      <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
                         Launch directly from your mobile home screen or dock without typing a URL.
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.benefitRow}>
-                    <View style={styles.benefitIconCircle}>
+                    <View style={[styles.benefitIconCircle, { backgroundColor: isDark ? '#1F2636' : colors.backgroundSecondary }]}>
                       <Smartphone size={16} color={colors.textPrimary} />
                     </View>
                     <View style={styles.benefitTextCol}>
-                      <Text style={styles.benefitTitle}>Fullscreen Immersion</Text>
-                      <Text style={styles.benefitDesc}>
+                      <Text style={[styles.benefitTitle, { color: colors.textPrimary }]}>Fullscreen Immersion</Text>
+                      <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
                         Distraction-free reading of papers, figures, and discussions without browser navigation bars.
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.benefitRow}>
-                    <View style={styles.benefitIconCircle}>
+                    <View style={[styles.benefitIconCircle, { backgroundColor: isDark ? '#1F2636' : colors.backgroundSecondary }]}>
                       <CheckCircle2 size={16} color={colors.textPrimary} />
                     </View>
                     <View style={styles.benefitTextCol}>
-                      <Text style={styles.benefitTitle}>Instant Updates & Offline Caching</Text>
-                      <Text style={styles.benefitDesc}>
+                      <Text style={[styles.benefitTitle, { color: colors.textPrimary }]}>Instant Updates & Offline Caching</Text>
+                      <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
                         Always up-to-date with peer-reviewed preprints and research replies.
                       </Text>
                     </View>
@@ -432,16 +453,16 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                   </View>
                 ) : isIOS ? (
                   /* iOS Safari Instructions */
-                  <View style={styles.iosInstructionsCard}>
-                    <Text style={styles.instructionsHeading}>How to install on iOS / iPhone:</Text>
+                  <View style={[styles.iosInstructionsCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
+                    <Text style={[styles.instructionsHeading, { color: colors.textPrimary }]}>How to install on iOS / iPhone:</Text>
 
                     <View style={styles.instructionStep}>
                       <View style={styles.stepNumberBadge}>
                         <Text style={styles.stepNumberText}>1</Text>
                       </View>
                       <View style={styles.stepTextWrapper}>
-                        <Text style={styles.stepText}>
-                          Tap the <Text style={{ fontWeight: '700' }}>Share</Text> button in Safari's bottom bar.
+                        <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                          Tap the <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Share</Text> button in Safari's bottom bar.
                         </Text>
                         <Share2 size={16} color={colors.textPrimary} style={{ marginTop: 2 }} />
                       </View>
@@ -452,8 +473,8 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                         <Text style={styles.stepNumberText}>2</Text>
                       </View>
                       <View style={styles.stepTextWrapper}>
-                        <Text style={styles.stepText}>
-                          Scroll down and tap <Text style={{ fontWeight: '700' }}>"Add to Home Screen"</Text>.
+                        <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                          Scroll down and tap <Text style={{ fontWeight: '700', color: colors.textPrimary }}>"Add to Home Screen"</Text>.
                         </Text>
                         <PlusSquare size={16} color={colors.textPrimary} style={{ marginTop: 2 }} />
                       </View>
@@ -464,20 +485,20 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                         <Text style={styles.stepNumberText}>3</Text>
                       </View>
                       <View style={styles.stepTextWrapper}>
-                        <Text style={styles.stepText}>
-                          Tap <Text style={{ fontWeight: '700' }}>"Add"</Text> in the top-right corner.
+                        <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                          Tap <Text style={{ fontWeight: '700', color: colors.textPrimary }}>"Add"</Text> in the top-right corner.
                         </Text>
                       </View>
                     </View>
                   </View>
                 ) : (
                   /* Desktop / Other Browsers */
-                  <View style={styles.iosInstructionsCard}>
-                    <Text style={styles.instructionsHeading}>Install from Browser:</Text>
+                  <View style={[styles.iosInstructionsCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
+                    <Text style={[styles.instructionsHeading, { color: colors.textPrimary }]}>Install from Browser:</Text>
                     <View style={styles.instructionStep}>
                       <Laptop size={20} color={colors.textPrimary} />
-                      <Text style={styles.stepText}>
-                        Click the <Text style={{ fontWeight: '700' }}>Install icon (⊕)</Text> in your browser address bar, or select <Text style={{ fontWeight: '700' }}>"Install BooffIn"</Text> from the browser menu.
+                      <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+                        Click the <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Install icon (⊕)</Text> in your browser address bar, or select <Text style={{ fontWeight: '700', color: colors.textPrimary }}>"Install BooffIn"</Text> from the browser menu.
                       </Text>
                     </View>
                   </View>
@@ -491,7 +512,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
               onPress={onClose}
               activeOpacity={0.7}
             >
-              <Text style={styles.continueLinkText}>Continue in Browser</Text>
+              <Text style={[styles.continueLinkText, { color: colors.textSecondary }]}>Continue in Browser</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>

@@ -13,7 +13,7 @@ import {
   UserPlus,
   MessageSquare,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 import { UserProfile } from '../../types';
 import { fetchUserAnalytics } from '../../api/analyticsService';
 import { UserAnalyticsSummary } from '../../types/analytics';
@@ -30,6 +30,7 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
   onOpenAnalytics,
   onEditProfile,
 }) => {
+  const { colors, isDark } = useTheme();
   const fields = [user?.primaryField, ...(user?.secondaryFields || [])].filter(Boolean);
   const interests = user?.researchInterests || [];
 
@@ -79,13 +80,13 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
     >
       <View style={styles.container}>
         {/* 1. Real Research Impact Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
           <View style={styles.impactHeader}>
             <View style={styles.impactTitleRow}>
-              <View style={styles.impactIconBadge}>
-                <Activity size={16} color="#064E3B" strokeWidth={2.4} />
+              <View style={[styles.impactIconBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE' }]}>
+                <Activity size={16} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.4} />
               </View>
-              <Text style={styles.cardTitle}>Research Impact</Text>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Research Impact</Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -104,10 +105,10 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
           </View>
 
           <View style={styles.impactBody}>
-            <Text style={styles.impactStatNumber}>
+            <Text style={[styles.impactStatNumber, { color: colors.textPrimary }]}>
               {isLoading ? '...' : totalImpressions.toLocaleString()}
             </Text>
-            <Text style={styles.impactStatLabel}>Impressions (last 28d)</Text>
+            <Text style={[styles.impactStatLabel, { color: colors.textSecondary }]}>Impressions (last 28d)</Text>
           </View>
 
           {hasAnyViews ? (
@@ -121,7 +122,7 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
                       styles.sparklineBar,
                       {
                         height: Math.max((views / maxViews) * 28, 4),
-                        backgroundColor: views > 0 ? '#064E3B' : '#E2E8F0',
+                        backgroundColor: views > 0 ? (isDark ? '#10B981' : '#064E3B') : (isDark ? '#334155' : '#E2E8F0'),
                       },
                     ]}
                   />
@@ -130,7 +131,7 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
             </View>
           ) : (
             <View style={styles.emptySparkline}>
-              <Text style={styles.emptySparklineText}>
+              <Text style={[styles.emptySparklineText, { color: colors.textTertiary }]}>
                 {totalImpressions === 0 ? 'No impressions recorded in the last 28 days' : 'Analytics syncing'}
               </Text>
             </View>
@@ -138,32 +139,32 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
         </View>
 
         {/* 2. Real About Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>About</Text>
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>About</Text>
             {onEditProfile && (
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={onEditProfile}
                 style={styles.editAction}
               >
-                <Edit2 size={12} color="#64748B" />
-                <Text style={styles.editText}>Edit</Text>
+                <Edit2 size={12} color={colors.textSecondary} />
+                <Text style={[styles.editText, { color: colors.textSecondary }]}>Edit</Text>
               </TouchableOpacity>
             )}
           </View>
 
           <View style={styles.aboutList}>
             <View style={styles.aboutRow}>
-              <Text style={styles.aboutLabel}>Research Fields</Text>
-              <Text style={styles.aboutValue}>
+              <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>Research Fields</Text>
+              <Text style={[styles.aboutValue, { color: colors.textPrimary }]}>
                 {fields.length > 0 ? fields.join(' · ') : 'Not specified'}
               </Text>
             </View>
 
             <View style={styles.aboutRow}>
-              <Text style={styles.aboutLabel}>Institution</Text>
-              <Text style={styles.aboutValue}>
+              <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>Institution</Text>
+              <Text style={[styles.aboutValue, { color: colors.textPrimary }]}>
                 {user?.institution || 'Academic Institution'}
               </Text>
             </View>
@@ -174,12 +175,12 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
                 onPress={() => handleOpenLink(user.websiteUrl)}
                 style={styles.aboutRowClickable}
               >
-                <Text style={styles.aboutLabel}>Website</Text>
+                <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>Website</Text>
                 <View style={styles.linkValueRow}>
                   <Text style={styles.aboutLinkText} numberOfLines={1}>
                     {user.websiteUrl.replace(/^https?:\/\//, '')}
                   </Text>
-                  <ExternalLink size={11} color="#2563EB" />
+                  <ExternalLink size={11} color="#3B82F6" />
                 </View>
               </TouchableOpacity>
             ) : null}
@@ -190,10 +191,10 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
                 onPress={() => handleOpenLink(`https://orcid.org/${user.orcidId}`)}
                 style={styles.aboutRowClickable}
               >
-                <Text style={styles.aboutLabel}>ORCID</Text>
+                <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>ORCID</Text>
                 <View style={styles.linkValueRow}>
                   <Text style={styles.aboutLinkText}>{user.orcidId}</Text>
-                  <ExternalLink size={11} color="#2563EB" />
+                  <ExternalLink size={11} color="#3B82F6" />
                 </View>
               </TouchableOpacity>
             ) : null}
@@ -204,10 +205,10 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
                 onPress={() => handleOpenLink(user.googleScholarUrl)}
                 style={styles.aboutRowClickable}
               >
-                <Text style={styles.aboutLabel}>Google Scholar</Text>
+                <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>Google Scholar</Text>
                 <View style={styles.linkValueRow}>
                   <Text style={styles.aboutLinkText}>Connected</Text>
-                  <ExternalLink size={11} color="#2563EB" />
+                  <ExternalLink size={11} color="#3B82F6" />
                 </View>
               </TouchableOpacity>
             ) : null}
@@ -218,10 +219,10 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
                 onPress={() => handleOpenLink(user.researchgateUrl)}
                 style={styles.aboutRowClickable}
               >
-                <Text style={styles.aboutLabel}>ResearchGate</Text>
+                <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>ResearchGate</Text>
                 <View style={styles.linkValueRow}>
                   <Text style={styles.aboutLinkText}>Connected</Text>
-                  <ExternalLink size={11} color="#2563EB" />
+                  <ExternalLink size={11} color="#3B82F6" />
                 </View>
               </TouchableOpacity>
             ) : null}
@@ -230,25 +231,25 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
 
         {/* 3. Real Research Interests */}
         {interests.length > 0 && (
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
             <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle}>Research Interests</Text>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Research Interests</Text>
               {onEditProfile && (
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={onEditProfile}
                   style={styles.editAction}
                 >
-                  <Edit2 size={12} color="#64748B" />
-                  <Text style={styles.editText}>Edit</Text>
+                  <Edit2 size={12} color={colors.textSecondary} />
+                  <Text style={[styles.editText, { color: colors.textSecondary }]}>Edit</Text>
                 </TouchableOpacity>
               )}
             </View>
 
             <View style={styles.chipsWrap}>
               {interests.map((interest, idx) => (
-                <View key={idx} style={styles.interestChip}>
-                  <Text style={styles.interestChipText}>{interest}</Text>
+                <View key={idx} style={[styles.interestChip, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
+                  <Text style={[styles.interestChipText, { color: isDark ? '#CBD5E1' : '#334155' }]}>{interest}</Text>
                 </View>
               ))}
             </View>
@@ -256,9 +257,9 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
         )}
 
         {/* 4. Real Recent Activity */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Recent Activity</Text>
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Recent Activity</Text>
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -269,8 +270,8 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
               }}
               style={styles.seeAllRow}
             >
-              <Text style={styles.seeAllText}>View all</Text>
-              <ArrowRight size={12} color="#64748B" />
+              <Text style={[styles.seeAllText, { color: isDark ? '#34D399' : '#064E3B' }]}>View all</Text>
+              <ArrowRight size={12} color={isDark ? '#34D399' : '#064E3B'} />
             </TouchableOpacity>
           </View>
 
@@ -283,19 +284,19 @@ export const DesktopProfileRightSidebar: React.FC<DesktopProfileRightSidebarProp
                   onPress={() => router.push(`/post/${act.postId}`)}
                   style={styles.activityItem}
                 >
-                  <MessageSquare size={14} color="#064E3B" />
+                  <MessageSquare size={14} color={isDark ? '#34D399' : '#064E3B'} />
                   <View style={styles.activityMeta}>
-                    <Text style={styles.activityTitle} numberOfLines={1}>
+                    <Text style={[styles.activityTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                       {act.content}
                     </Text>
-                    <Text style={styles.activityTime}>{act.createdAt}</Text>
+                    <Text style={[styles.activityTime, { color: colors.textTertiary }]}>{act.createdAt}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
             <View style={styles.emptyActivity}>
-              <Text style={styles.emptyActivityText}>No recent public comments or discussions.</Text>
+              <Text style={[styles.emptyActivityText, { color: colors.textTertiary }]}>No recent public comments or discussions.</Text>
             </View>
           )}
         </View>

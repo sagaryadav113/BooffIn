@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing } from '../../theme';
+import { colors, spacing, useTheme } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { TopicChip } from '../../components/core/TopicChip';
 import { NotificationRow } from '../../components/cards/NotificationRow';
@@ -24,6 +24,7 @@ import { NotificationFilter, AppNotification } from '../../types/notification';
 import { filterNotificationList } from '../../api/notificationService';
 
 export default function NotificationsScreen() {
+  const { colors, isDark } = useTheme();
   const notifications = useNotificationStore((s) => s.notifications);
   const activeFilter = useNotificationStore((s) => s.activeFilter);
   const setActiveFilter = useNotificationStore((s) => s.setActiveFilter);
@@ -92,8 +93,8 @@ export default function NotificationsScreen() {
   const emptyInfo = getEmptyStateContent();
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
       <AppHeader
@@ -102,7 +103,7 @@ export default function NotificationsScreen() {
           unreadCount > 0 ? (
             <TouchableOpacity
               onPress={markAllAsRead}
-              style={styles.markAllButton}
+              style={[styles.markAllButton, { backgroundColor: colors.backgroundSecondary }]}
               activeOpacity={0.7}
             >
               <Icon name="Check" size="xs" color={colors.textSecondary} />
@@ -115,7 +116,7 @@ export default function NotificationsScreen() {
       />
 
       {/* Filter Tabs */}
-      <View style={styles.filterSection}>
+      <View style={[styles.filterSection, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -137,15 +138,15 @@ export default function NotificationsScreen() {
         data={filteredNotifications}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <NotificationRow notification={item} />}
-        contentContainerStyle={[styles.listContent, { flexGrow: 1 }]}
+        contentContainerStyle={[styles.listContent, { flexGrow: 1, backgroundColor: colors.background }]}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.3}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={colors.black}
-            colors={[colors.black]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
         ListFooterComponent={

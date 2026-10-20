@@ -31,7 +31,7 @@ import {
   Images,
   Link2,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
 import { Button } from '../../components/core/Button';
 import { PaperCard } from '../../components/cards/PaperCard';
@@ -53,6 +53,7 @@ import { MentionSuggestions } from '../../components/composer/MentionSuggestions
 import { useMentionAutocomplete } from '../../hooks/useMentionAutocomplete';
 
 export default function CreatePostScreen() {
+  const { colors, isDark } = useTheme();
   const user = useAuthStore((s) => s.user);
   const createPost = usePostStore((s) => s.createPost);
 
@@ -434,8 +435,8 @@ export default function CreatePostScreen() {
 
   if (postType === 'article') {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         <ArticleComposer
           currentUser={user}
           onExit={() => setPostType('discussion')}
@@ -447,19 +448,19 @@ export default function CreatePostScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
       >
         {/* Top Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: colors.borderLight }]}>
           <TouchableOpacity onPress={handleCancel} style={styles.closeButton}>
             <X size={22} color={colors.textPrimary} />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Create Post</Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Create Post</Text>
 
           <Button
             title={isPublishing ? 'Posting...' : 'Post'}
@@ -483,13 +484,15 @@ export default function CreatePostScreen() {
                 onPress={() => setPostType(type)}
                 style={[
                   styles.postTypePill,
-                  postType === type && styles.postTypePillActive,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
+                  postType === type && [styles.postTypePillActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                 ]}
               >
                 <Text
                   style={[
                     styles.postTypePillText,
-                    postType === type && styles.postTypePillTextActive,
+                    { color: colors.textSecondary },
+                    postType === type && [styles.postTypePillTextActive, { color: isDark ? colors.black : colors.white }],
                   ]}
                 >
                   {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -517,7 +520,7 @@ export default function CreatePostScreen() {
               )}
 
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.textPrimary }]}
                 placeholder="What research are you thinking about, critiquing, or sharing? Type @ to mention..."
                 placeholderTextColor={colors.textMuted}
                 multiline
@@ -639,7 +642,7 @@ export default function CreatePostScreen() {
         </ScrollView>
 
         {/* Action Toolbar */}
-        <View style={styles.bottomToolbar}>
+        <View style={[styles.bottomToolbar, { backgroundColor: colors.background, borderTopColor: colors.borderLight }]}>
           {/* Media & Research Actions */}
           <View style={styles.actionButtonsRow}>
             <TouchableOpacity

@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Award, GraduationCap, Building2 } from 'lucide-react-native';
 import { Avatar } from '../core/Avatar';
 import { ResearcherSearchResult } from '../../api/search/types';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 
 interface ResearcherResultCardProps {
   researcher: ResearcherSearchResult;
@@ -15,6 +15,9 @@ export const ResearcherResultCard: React.FC<ResearcherResultCardProps> = ({
   researcher,
   style,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   const handlePress = () => {
     if (researcher.isRegisteredUser) {
       router.push({
@@ -43,7 +46,14 @@ export const ResearcherResultCard: React.FC<ResearcherResultCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={handlePress}
-      style={[styles.container, style]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.cardBackground,
+          borderColor: colors.borderLight,
+        },
+        style,
+      ]}
     >
       <Avatar
         uri={researcher.avatarUrl}
@@ -53,18 +63,18 @@ export const ResearcherResultCard: React.FC<ResearcherResultCardProps> = ({
 
       <View style={styles.infoCol}>
         <View style={styles.nameRow}>
-          <Text style={styles.nameText} numberOfLines={1}>
+          <Text style={[styles.nameText, { color: colors.textPrimary }]} numberOfLines={1}>
             {researcher.fullName}
           </Text>
           {researcher.orcidVerified && (
-            <View style={styles.orcidBadge}>
+            <View style={[styles.orcidBadge, { backgroundColor: isDark ? '#065F46' : '#064E3B' }]}>
               <Award size={11} color="#FFFFFF" />
               <Text style={styles.orcidBadgeText}>ORCID</Text>
             </View>
           )}
         </View>
 
-        <Text style={styles.handleText} numberOfLines={1}>
+        <Text style={[styles.handleText, { color: colors.textSecondary }]} numberOfLines={1}>
           @{researcher.handle}
           {researcher.academicTitle ? ` · ${researcher.academicTitle}` : ''}
         </Text>
@@ -72,7 +82,7 @@ export const ResearcherResultCard: React.FC<ResearcherResultCardProps> = ({
         {researcher.institution ? (
           <View style={styles.institutionRow}>
             <Building2 size={12} color={colors.textSecondary} />
-            <Text style={styles.institutionText} numberOfLines={1}>
+            <Text style={[styles.institutionText, { color: colors.textSecondary }]} numberOfLines={1}>
               {researcher.institution}
             </Text>
           </View>
@@ -80,8 +90,8 @@ export const ResearcherResultCard: React.FC<ResearcherResultCardProps> = ({
 
         {researcher.worksCount !== undefined && researcher.worksCount > 0 && (
           <View style={styles.statsRow}>
-            <GraduationCap size={12} color={colors.accentLink} />
-            <Text style={styles.statsText}>
+            <GraduationCap size={12} color={isDark ? '#34D399' : colors.accentLink} />
+            <Text style={[styles.statsText, { color: isDark ? '#34D399' : colors.accentLink }]}>
               {researcher.worksCount} verified publications
             </Text>
           </View>

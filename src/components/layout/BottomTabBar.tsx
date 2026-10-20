@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { colors, layout } from '../../theme';
+import { colors, layout, useTheme } from '../../theme';
 import { Icon, IconName } from '../core/Icon';
 import { Typography } from '../core/Typography';
 import { useNotificationStore } from '../../store/useNotificationStore';
@@ -48,6 +48,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   descriptors,
   navigation,
 }) => {
+  const { colors, isDark } = useTheme();
   const { isDesktop } = useResponsiveLayout();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const insets = useSafeAreaInsets();
@@ -63,6 +64,8 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
       style={[
         styles.tabBarContainer,
         {
+          backgroundColor: colors.background,
+          borderTopColor: colors.border,
           paddingBottom: bottomInset > 0 ? bottomInset + 2 : 6,
           height: layout.tabBarHeight + (bottomInset > 0 ? bottomInset - 4 : 0),
         },
@@ -91,6 +94,8 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
 
         const isCreate = route.name === 'create';
         const isNotifications = route.name === 'notifications';
+        const activeColor = isDark ? colors.textPrimary : colors.black;
+        const inactiveColor = colors.textSecondary;
 
         return (
           <TouchableOpacity
@@ -106,11 +111,11 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
               <Icon
                 name={meta.name}
                 size={isCreate ? 26 : 22}
-                color={isFocused ? colors.black : '#374151'}
+                color={isFocused ? activeColor : inactiveColor}
                 strokeWidth={isFocused ? 2.5 : 2.1}
               />
               {isNotifications && unreadCount > 0 && (
-                <View style={styles.badge}>
+                <View style={[styles.badge, { backgroundColor: colors.brandGreen }]}>
                   <Typography variant="micro" color={colors.white} style={styles.badgeText}>
                     {unreadCount}
                   </Typography>
@@ -119,8 +124,11 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
             </View>
             <Typography
               variant="micro"
-              color={isFocused ? colors.black : '#374151'}
-              style={[styles.label, isFocused && styles.labelFocused]}
+              style={[
+                styles.label,
+                { color: isFocused ? activeColor : inactiveColor },
+                isFocused && styles.labelFocused,
+              ]}
               numberOfLines={1}
             >
               {meta.label}

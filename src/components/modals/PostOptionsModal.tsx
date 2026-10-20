@@ -18,9 +18,10 @@ import * as Clipboard from 'expo-clipboard';
 import { Post } from '../../types';
 import { usePostStore } from '../../store/usePostStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { blockUser } from '../../api/moderationService';
 import { ContentReportModal } from './ContentReportModal';
 import { Popover, PopoverItem, PopoverDivider } from '../core/Popover';
+import { useTheme } from '../../theme';
+import { blockUser } from '../../api/moderationService';
 
 export interface PostOptionsModalProps {
   visible: boolean;
@@ -41,6 +42,8 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
   onDeleteSuccess,
   anchorRef,
 }) => {
+  const { isDark } = useTheme();
+  const iconColor = isDark ? '#94A3B8' : '#475569';
   const currentUser = useAuthStore((s) => s.user);
   const deletePost = usePostStore((s) => s.deletePost);
   const toggleSave = usePostStore((s) => s.toggleSavePost);
@@ -187,19 +190,19 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
         estimatedHeight={isAuthor ? 175 : 210}
       >
         <PopoverItem
-          icon={<LinkIcon size={16} color="#475569" />}
+          icon={<LinkIcon size={16} color={iconColor} />}
           label="Copy link"
           onPress={handleCopyLink}
         />
         <PopoverItem
-          icon={post.isSaved ? <BookmarkCheck size={16} color="#059669" /> : <Bookmark size={16} color="#475569" />}
+          icon={post.isSaved ? <BookmarkCheck size={16} color="#059669" /> : <Bookmark size={16} color={iconColor} />}
           label={post.isSaved ? 'Saved to library' : 'Save post'}
           active={Boolean(post.isSaved)}
           activeColor="#059669"
           onPress={handleSaveToggle}
         />
         <PopoverItem
-          icon={<Share2 size={16} color="#475569" />}
+          icon={<Share2 size={16} color={iconColor} />}
           label="Share via..."
           onPress={handleShare}
         />
@@ -224,7 +227,7 @@ export const PostOptionsModal: React.FC<PostOptionsModalProps> = ({
           <>
             <PopoverDivider />
             <PopoverItem
-              icon={<Flag size={16} color="#475569" />}
+              icon={<Flag size={16} color={iconColor} />}
               label="Report post"
               onPress={() => {
                 setReportModalVisible(true);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Switch, Platform } from 'react-native';
-import { colors, radii, spacing } from '../../theme';
+import { colors as staticColors, radii, spacing, useColors, useIsDark } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
 
@@ -25,10 +25,24 @@ export const ToggleRow: React.FC<ToggleRowProps> = ({
   onValueChange,
   disabled = false,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   return (
-    <View style={[styles.container, disabled && styles.disabled]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.cardBackground },
+        disabled && styles.disabled,
+      ]}
+    >
       {icon ? (
-        <View style={[styles.iconCircle, { backgroundColor: iconBgColor || colors.backgroundSecondary }]}>
+        <View
+          style={[
+            styles.iconCircle,
+            { backgroundColor: iconBgColor || (isDark ? colors.backgroundSecondary : colors.backgroundSecondary) },
+          ]}
+        >
           <Icon
             name={icon}
             size={20}
@@ -54,11 +68,11 @@ export const ToggleRow: React.FC<ToggleRowProps> = ({
         onValueChange={onValueChange}
         disabled={disabled}
         trackColor={{
-          false: Platform.OS === 'web' ? '#E2E8F0' : colors.borderLight,
-          true: colors.black,
+          false: isDark ? '#1F2636' : (Platform.OS === 'web' ? '#E2E8F0' : colors.borderLight),
+          true: isDark ? '#10B981' : staticColors.black,
         }}
-        thumbColor={Platform.OS === 'ios' ? undefined : colors.white}
-        ios_backgroundColor={colors.borderLight}
+        thumbColor={Platform.OS === 'ios' ? undefined : (isDark ? '#FFFFFF' : staticColors.white)}
+        ios_backgroundColor={isDark ? '#1F2636' : colors.borderLight}
       />
     </View>
   );
@@ -70,7 +84,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.cardBackground,
+    backgroundColor: staticColors.cardBackground,
     minHeight: 56,
   },
   disabled: {

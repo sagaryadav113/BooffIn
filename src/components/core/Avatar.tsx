@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { Image } from 'expo-image';
 import { colors, radii, layout } from '../../theme';
 
@@ -18,7 +18,7 @@ interface AvatarProps {
   uri?: string;
   name?: string;
   size?: AvatarSize;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   verified?: boolean;
 }
 

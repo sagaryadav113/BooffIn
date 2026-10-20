@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors, spacing } from '../../theme';
+import { spacing, useColors } from '../../theme';
 
 export interface DividerProps {
   vertical?: boolean;
@@ -12,14 +12,17 @@ export interface DividerProps {
 export const Divider: React.FC<DividerProps> = ({
   vertical = false,
   style,
-  color = colors.borderLight,
+  color,
   marginVertical = spacing.sm,
 }) => {
+  const colors = useColors();
+  const resolvedColor = color || colors.borderLight;
+
   return (
     <View
       style={[
         vertical ? styles.vertical : styles.horizontal,
-        { backgroundColor: color },
+        { backgroundColor: resolvedColor },
         !vertical && { marginVertical },
         style,
       ]}

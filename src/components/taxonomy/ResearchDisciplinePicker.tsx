@@ -20,7 +20,7 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import {
   POPULAR_DISCIPLINES,
   RESEARCH_TAXONOMY_FAMILIES,
@@ -50,6 +50,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
   searchPlaceholder = 'Search 1,000+ fields, subfields, or topics...',
   hint = 'These topics configure your customized home feed tabs and preprint recommendations.',
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState<string>('all');
   const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
@@ -92,10 +94,10 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
   return (
     <View style={styles.container}>
       {/* Search Input Bar */}
-      <View style={styles.searchBarContainer}>
+      <View style={[styles.searchBarContainer, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
         <Search size={17} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.textPrimary }]}
           placeholder={searchPlaceholder}
           placeholderTextColor={colors.textMuted}
           value={searchQuery}
@@ -117,9 +119,9 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
       </View>
 
       {/* Selected Topics Chips Summary */}
-      <View style={styles.selectedContainer}>
+      <View style={[styles.selectedContainer, { backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC', borderColor: colors.borderLight }]}>
         <View style={styles.selectedHeader}>
-          <Text style={styles.selectedHeaderText}>
+          <Text style={[styles.selectedHeaderText, { color: colors.textSecondary }]}>
             SELECTED DISCIPLINES ({selectedTopics.length})
           </Text>
           {selectedTopics.length > 0 && onClearAll && (
@@ -135,16 +137,19 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
               <TouchableOpacity
                 key={topic}
                 onPress={() => handleRemove(topic)}
-                style={styles.selectedPill}
+                style={[
+                  styles.selectedPill,
+                  { backgroundColor: isDark ? '#1F2636' : staticColors.black, borderColor: isDark ? '#2E384D' : staticColors.black, borderWidth: 1 },
+                ]}
                 activeOpacity={0.8}
               >
                 <Text style={styles.selectedPillText}>{topic}</Text>
-                <X size={13} color={colors.white} style={{ marginLeft: 4 }} />
+                <X size={13} color="#FFFFFF" style={{ marginLeft: 4 }} />
               </TouchableOpacity>
             ))}
           </View>
         ) : (
-          <Text style={styles.emptySelectedText}>
+          <Text style={[styles.emptySelectedText, { color: colors.textMuted }]}>
             No topics selected yet. Search above or select popular fields below.
           </Text>
         )}
@@ -153,7 +158,7 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
       {/* ACTIVE SEARCH RESULTS LIST */}
       {searchQuery.trim().length > 0 ? (
         <View style={styles.searchResultsBox}>
-          <Text style={styles.sectionHeaderTitle}>
+          <Text style={[styles.sectionHeaderTitle, { color: colors.textSecondary }]}>
             SEARCH RESULTS ({searchResults.length})
           </Text>
 
@@ -166,7 +171,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                     key={item.id}
                     style={[
                       styles.searchResultCard,
-                      isSelected && styles.searchResultCardSelected,
+                      { backgroundColor: colors.cardBackground, borderColor: colors.borderLight },
+                      isSelected && [styles.searchResultCardSelected, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#F0FDF4', borderColor: isDark ? '#10B981' : '#86EFAC' }],
                     ]}
                     onPress={() => handleToggle(item.name)}
                     activeOpacity={0.7}
@@ -175,23 +181,25 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                       <Text
                         style={[
                           styles.searchResultName,
-                          isSelected && styles.searchResultNameSelected,
+                          { color: colors.textPrimary },
+                          isSelected && [styles.searchResultNameSelected, { color: isDark ? '#34D399' : '#166534' }],
                         ]}
                       >
                         {item.name}
                       </Text>
-                      <Text style={styles.searchResultHierarchy}>
+                      <Text style={[styles.searchResultHierarchy, { color: colors.textSecondary }]}>
                         {item.hierarchy}
                       </Text>
                     </View>
                     <View
                       style={[
                         styles.searchResultActionCircle,
-                        isSelected && styles.searchResultActionCircleActive,
+                        { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
+                        isSelected && [styles.searchResultActionCircleActive, { backgroundColor: isDark ? '#10B981' : '#16A34A', borderColor: isDark ? '#10B981' : '#16A34A' }],
                       ]}
                     >
                       {isSelected ? (
-                        <Check size={13} color={colors.white} />
+                        <Check size={13} color="#FFFFFF" />
                       ) : (
                         <Plus size={13} color={colors.textSecondary} />
                       )}
@@ -201,19 +209,19 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
               })}
             </View>
           ) : (
-            <View style={styles.noResultsContainer}>
-              <Text style={styles.noResultsText}>
+            <View style={[styles.noResultsContainer, { backgroundColor: colors.backgroundSecondary }]}>
+              <Text style={[styles.noResultsText, { color: colors.textSecondary }]}>
                 No standardized taxonomy field found for "{searchQuery}".
               </Text>
               <TouchableOpacity
-                style={styles.addCustomTopicBtn}
+                style={[styles.addCustomTopicBtn, { backgroundColor: isDark ? '#059669' : staticColors.black }]}
                 onPress={() => {
                   handleToggle(searchQuery.trim());
                   setSearchQuery('');
                 }}
                 activeOpacity={0.8}
               >
-                <Plus size={14} color={colors.white} />
+                <Plus size={14} color="#FFFFFF" />
                 <Text style={styles.addCustomTopicText}>
                   Add "{searchQuery.trim()}" as custom topic
                 </Text>
@@ -229,7 +237,7 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
             <View style={styles.popularSection}>
               <View style={styles.sectionTitleRow}>
                 <Sparkles size={15} color={colors.accentBlue} />
-                <Text style={styles.sectionHeaderTitle}>POPULAR RESEARCH FIELDS</Text>
+                <Text style={[styles.sectionHeaderTitle, { color: colors.textSecondary }]}>POPULAR RESEARCH FIELDS</Text>
               </View>
 
               <View style={styles.popularGrid}>
@@ -242,7 +250,9 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                       onPress={() => handleToggle(topic)}
                       style={[
                         styles.popularChip,
-                        isSelected ? styles.popularChipActive : styles.popularChipInactive,
+                        isSelected
+                          ? [styles.popularChipActive, { backgroundColor: isDark ? '#059669' : staticColors.black, borderColor: isDark ? '#10B981' : staticColors.black }]
+                          : [styles.popularChipInactive, { backgroundColor: isDark ? colors.cardBackground : colors.backgroundSecondary, borderColor: colors.borderLight }],
                       ]}
                     >
                       <Text
@@ -250,7 +260,7 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                           styles.popularChipText,
                           isSelected
                             ? styles.popularChipTextActive
-                            : styles.popularChipTextInactive,
+                            : [styles.popularChipTextInactive, { color: colors.textPrimary }],
                         ]}
                       >
                         {topic}
@@ -258,7 +268,7 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                       {isSelected && (
                         <CheckCircle2
                           size={13}
-                          color={colors.white}
+                          color="#FFFFFF"
                           style={{ marginLeft: 4 }}
                         />
                       )}
@@ -274,7 +284,7 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
             <View style={styles.browseSection}>
               <View style={styles.sectionTitleRow}>
                 <Compass size={15} color={colors.textPrimary} />
-                <Text style={styles.sectionHeaderTitle}>EXPLORE BY RESEARCH DOMAIN</Text>
+                <Text style={[styles.sectionHeaderTitle, { color: colors.textSecondary }]}>EXPLORE BY RESEARCH DOMAIN</Text>
               </View>
 
               {/* Horizontal Domain Filter Tabs */}
@@ -286,7 +296,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                 <TouchableOpacity
                   style={[
                     styles.filterTab,
-                    selectedFamilyFilter === 'all' && styles.filterTabActive,
+                    { backgroundColor: isDark ? colors.cardBackground : colors.backgroundSecondary, borderColor: colors.borderLight },
+                    selectedFamilyFilter === 'all' && [styles.filterTabActive, { backgroundColor: isDark ? '#10B981' : colors.textPrimary, borderColor: isDark ? '#10B981' : colors.textPrimary }],
                   ]}
                   onPress={() => setSelectedFamilyFilter('all')}
                   activeOpacity={0.7}
@@ -294,7 +305,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                   <Text
                     style={[
                       styles.filterTabText,
-                      selectedFamilyFilter === 'all' && styles.filterTabTextActive,
+                      { color: colors.textSecondary },
+                      selectedFamilyFilter === 'all' && [styles.filterTabTextActive, { color: '#FFFFFF' }],
                     ]}
                   >
                     All Domains
@@ -306,7 +318,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                     key={family.id}
                     style={[
                       styles.filterTab,
-                      selectedFamilyFilter === family.id && styles.filterTabActive,
+                      { backgroundColor: isDark ? colors.cardBackground : colors.backgroundSecondary, borderColor: colors.borderLight },
+                      selectedFamilyFilter === family.id && [styles.filterTabActive, { backgroundColor: isDark ? '#10B981' : colors.textPrimary, borderColor: isDark ? '#10B981' : colors.textPrimary }],
                     ]}
                     onPress={() => setSelectedFamilyFilter(family.id)}
                     activeOpacity={0.7}
@@ -314,7 +327,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                     <Text
                       style={[
                         styles.filterTabText,
-                        selectedFamilyFilter === family.id && styles.filterTabTextActive,
+                        { color: colors.textSecondary },
+                        selectedFamilyFilter === family.id && [styles.filterTabTextActive, { color: '#FFFFFF' }],
                       ]}
                     >
                       {family.shortName}
@@ -325,7 +339,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                 <TouchableOpacity
                   style={[
                     styles.filterTab,
-                    selectedFamilyFilter === 'interdisciplinary' && styles.filterTabActive,
+                    { backgroundColor: isDark ? colors.cardBackground : colors.backgroundSecondary, borderColor: colors.borderLight },
+                    selectedFamilyFilter === 'interdisciplinary' && [styles.filterTabActive, { backgroundColor: isDark ? '#10B981' : colors.textPrimary, borderColor: isDark ? '#10B981' : colors.textPrimary }],
                   ]}
                   onPress={() => setSelectedFamilyFilter('interdisciplinary')}
                   activeOpacity={0.7}
@@ -333,7 +348,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                   <Text
                     style={[
                       styles.filterTabText,
-                      selectedFamilyFilter === 'interdisciplinary' && styles.filterTabTextActive,
+                      { color: colors.textSecondary },
+                      selectedFamilyFilter === 'interdisciplinary' && [styles.filterTabTextActive, { color: '#FFFFFF' }],
                     ]}
                   >
                     Cross-Domain
@@ -345,8 +361,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
               {selectedFamilyFilter === 'interdisciplinary' ? (
                 <View style={styles.interdisciplinaryContainer}>
                   {INTERDISCIPLINARY_GROUPS.map((group) => (
-                    <View key={group.name} style={styles.fieldCard}>
-                      <Text style={styles.fieldCardTitle}>{group.name}</Text>
+                    <View key={group.name} style={[styles.fieldCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
+                      <Text style={[styles.fieldCardTitle, { color: colors.textPrimary, padding: spacing.sm + 2 }]}>{group.name}</Text>
                       <View style={styles.subfieldGrid}>
                         {group.topics.map((topic) => {
                           const isSelected = isTopicSelected(topic);
@@ -356,14 +372,16 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                               onPress={() => handleToggle(topic)}
                               style={[
                                 styles.subfieldChip,
-                                isSelected && styles.subfieldChipActive,
+                                { backgroundColor: isDark ? '#111622' : colors.backgroundSecondary, borderColor: colors.borderLight },
+                                isSelected && [styles.subfieldChipActive, { backgroundColor: isDark ? '#059669' : staticColors.black, borderColor: isDark ? '#10B981' : staticColors.black }],
                               ]}
                               activeOpacity={0.75}
                             >
                               <Text
                                 style={[
                                   styles.subfieldChipText,
-                                  isSelected && styles.subfieldChipTextActive,
+                                  { color: colors.textSecondary },
+                                  isSelected && [styles.subfieldChipTextActive, { color: '#FFFFFF' }],
                                 ]}
                               >
                                 {topic}
@@ -379,14 +397,17 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                 <View style={styles.familiesList}>
                   {displayedFamilies.map((family) => (
                     <View key={family.id} style={styles.familyGroup}>
-                      <Text style={styles.familyGroupName}>{family.name}</Text>
+                      <Text style={[styles.familyGroupName, { color: isDark ? '#34D399' : colors.accentBlue }]}>{family.name}</Text>
                       {family.fields.map((field) => {
                         const isExpanded =
                           expandedFieldId === field.id || selectedFamilyFilter !== 'all';
                         return (
-                          <View key={field.id} style={styles.fieldCard}>
+                          <View key={field.id} style={[styles.fieldCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
                             <TouchableOpacity
-                              style={styles.fieldCardHeader}
+                              style={[
+                                styles.fieldCardHeader,
+                                { backgroundColor: isDark ? colors.cardBackground : '#FAFAFA' },
+                              ]}
                               onPress={() =>
                                 setExpandedFieldId(
                                   expandedFieldId === field.id ? null : field.id
@@ -395,8 +416,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                               activeOpacity={0.7}
                             >
                               <View style={styles.fieldCardHeaderLeft}>
-                                <Text style={styles.fieldCode}>{field.id}</Text>
-                                <Text style={styles.fieldCardTitle}>{field.name}</Text>
+                                <Text style={[styles.fieldCode, { backgroundColor: isDark ? '#1F2636' : staticColors.borderLight, color: colors.textSecondary }]}>{field.id}</Text>
+                                <Text style={[styles.fieldCardTitle, { color: colors.textPrimary }]}>{field.name}</Text>
                               </View>
                               {isExpanded ? (
                                 <ChevronDown size={17} color={colors.textSecondary} />
@@ -406,7 +427,7 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                             </TouchableOpacity>
 
                             {isExpanded && (
-                              <View style={styles.disciplinesContainer}>
+                              <View style={[styles.disciplinesContainer, { borderTopColor: colors.borderLight }]}>
                                 {field.disciplines.map((discipline) => (
                                   <View key={discipline.id} style={styles.disciplineBlock}>
                                     <TouchableOpacity
@@ -417,14 +438,15 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                                       <Text
                                         style={[
                                           styles.disciplineName,
+                                          { color: colors.textSecondary },
                                           isTopicSelected(discipline.name) &&
-                                            styles.disciplineNameSelected,
+                                            [styles.disciplineNameSelected, { color: isDark ? '#34D399' : '#16A34A' }],
                                         ]}
                                       >
                                         {discipline.name}
                                       </Text>
                                       {isTopicSelected(discipline.name) && (
-                                        <Check size={13} color="#16a34a" />
+                                        <Check size={13} color={isDark ? "#34D399" : "#16a34a"} />
                                       )}
                                     </TouchableOpacity>
 
@@ -437,14 +459,16 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
                                             onPress={() => handleToggle(subfield)}
                                             style={[
                                               styles.subfieldChip,
-                                              isSelected && styles.subfieldChipActive,
+                                              { backgroundColor: isDark ? '#111622' : colors.backgroundSecondary, borderColor: colors.borderLight },
+                                              isSelected && [styles.subfieldChipActive, { backgroundColor: isDark ? '#059669' : staticColors.black, borderColor: isDark ? '#10B981' : staticColors.black }],
                                             ]}
                                             activeOpacity={0.75}
                                           >
                                             <Text
                                               style={[
                                                 styles.subfieldChipText,
-                                                isSelected && styles.subfieldChipTextActive,
+                                                { color: colors.textSecondary },
+                                                isSelected && [styles.subfieldChipTextActive, { color: '#FFFFFF' }],
                                               ]}
                                             >
                                               {subfield}
@@ -470,7 +494,7 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
       )}
 
       {/* Helper hint */}
-      {Boolean(hint) && <Text style={styles.hintText}>{hint}</Text>}
+      {Boolean(hint) && <Text style={[styles.hintText, { color: colors.textMuted }]}>{hint}</Text>}
     </View>
   );
 };
@@ -485,9 +509,9 @@ const styles = StyleSheet.create({
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     height: 44,
@@ -500,7 +524,7 @@ const styles = StyleSheet.create({
     height: '100%',
     ...typography.body,
     fontSize: 13.5,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     paddingVertical: 0,
   },
   clearSearchBtn: {
@@ -524,12 +548,12 @@ const styles = StyleSheet.create({
   selectedHeaderText: {
     ...typography.micro,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     letterSpacing: 0.6,
   },
   clearAllLink: {
     ...typography.micro,
-    color: colors.accentRed,
+    color: staticColors.accentRed,
     fontWeight: '600',
   },
   selectedChipsWrap: {
@@ -541,7 +565,7 @@ const styles = StyleSheet.create({
   selectedPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.black,
+    backgroundColor: staticColors.black,
     paddingLeft: spacing.sm + 2,
     paddingRight: 6,
     paddingVertical: 4,
@@ -550,12 +574,12 @@ const styles = StyleSheet.create({
   selectedPillText: {
     ...typography.micro,
     fontWeight: '600',
-    color: colors.white,
+    color: staticColors.white,
     fontSize: 12,
   },
   emptySelectedText: {
     ...typography.micro,
-    color: colors.textMuted,
+    color: staticColors.textMuted,
     lineHeight: 16,
     marginTop: 2,
   },
@@ -569,7 +593,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '700',
     letterSpacing: 0.7,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     textTransform: 'uppercase',
   },
   searchResultsList: {
@@ -579,9 +603,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.cardBackground,
+    backgroundColor: staticColors.cardBackground,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
@@ -597,14 +621,14 @@ const styles = StyleSheet.create({
   searchResultName: {
     ...typography.captionBold,
     fontSize: 13.5,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
   },
   searchResultNameSelected: {
     color: '#166534',
   },
   searchResultHierarchy: {
     ...typography.micro,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 11,
     marginTop: 2,
   },
@@ -612,9 +636,9 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -623,7 +647,7 @@ const styles = StyleSheet.create({
     borderColor: '#16A34A',
   },
   noResultsContainer: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderRadius: radii.md,
     padding: spacing.lg,
     alignItems: 'center',
@@ -632,7 +656,7 @@ const styles = StyleSheet.create({
   },
   noResultsText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     textAlign: 'center',
     fontSize: 13,
   },
@@ -640,14 +664,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.black,
+    backgroundColor: staticColors.black,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: radii.full,
   },
   addCustomTopicText: {
     ...typography.captionBold,
-    color: colors.white,
+    color: staticColors.white,
     fontSize: 12,
   },
 
@@ -678,22 +702,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   popularChipActive: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
+    backgroundColor: staticColors.black,
+    borderColor: staticColors.black,
   },
   popularChipInactive: {
-    backgroundColor: colors.backgroundSecondary,
-    borderColor: colors.borderLight,
+    backgroundColor: staticColors.backgroundSecondary,
+    borderColor: staticColors.borderLight,
   },
   popularChipText: {
     ...typography.captionBold,
     fontSize: 12.5,
   },
   popularChipTextActive: {
-    color: colors.white,
+    color: staticColors.white,
   },
   popularChipTextInactive: {
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
   },
 
   /* Taxonomy Browse Section */
@@ -706,24 +730,24 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   filterTab: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: 5,
     borderRadius: radii.full,
   },
   filterTabActive: {
-    backgroundColor: colors.textPrimary,
-    borderColor: colors.textPrimary,
+    backgroundColor: staticColors.textPrimary,
+    borderColor: staticColors.textPrimary,
   },
   filterTabText: {
     ...typography.micro,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 11.5,
   },
   filterTabTextActive: {
-    color: colors.white,
+    color: staticColors.white,
     fontWeight: '700',
   },
   familiesList: {
@@ -735,16 +759,16 @@ const styles = StyleSheet.create({
   },
   familyGroupName: {
     ...typography.captionBold,
-    color: colors.accentBlue,
+    color: staticColors.accentBlue,
     fontSize: 11.5,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginTop: 2,
   },
   fieldCard: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: staticColors.cardBackground,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     borderRadius: radii.md,
     overflow: 'hidden',
   },
@@ -764,8 +788,8 @@ const styles = StyleSheet.create({
   fieldCode: {
     ...typography.micro,
     fontWeight: '700',
-    color: colors.textMuted,
-    backgroundColor: colors.borderLight,
+    color: staticColors.textMuted,
+    backgroundColor: staticColors.borderLight,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
@@ -774,14 +798,14 @@ const styles = StyleSheet.create({
   fieldCardTitle: {
     ...typography.captionBold,
     fontSize: 13,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     flex: 1,
   },
   disciplinesContainer: {
     padding: spacing.sm + 2,
     gap: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: staticColors.borderLight,
   },
   disciplineBlock: {
     gap: 4,
@@ -793,7 +817,7 @@ const styles = StyleSheet.create({
   },
   disciplineName: {
     ...typography.captionBold,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 12,
   },
   disciplineNameSelected: {
@@ -806,24 +830,24 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   subfieldChip: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radii.sm,
   },
   subfieldChipActive: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
+    backgroundColor: staticColors.black,
+    borderColor: staticColors.black,
   },
   subfieldChipText: {
     ...typography.micro,
     fontSize: 11,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
   },
   subfieldChipTextActive: {
-    color: colors.white,
+    color: staticColors.white,
     fontWeight: '600',
   },
   interdisciplinaryContainer: {
@@ -833,7 +857,7 @@ const styles = StyleSheet.create({
 
   hintText: {
     ...typography.micro,
-    color: colors.textMuted,
+    color: staticColors.textMuted,
     lineHeight: 16,
   },
 });

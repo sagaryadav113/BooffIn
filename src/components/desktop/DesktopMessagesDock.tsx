@@ -21,7 +21,7 @@ import {
   ExternalLink,
   Shield,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
@@ -31,6 +31,8 @@ import { Workspace } from '../../types/workspace';
 type DockTab = 'all' | 'dms' | 'communities' | 'inner_circles';
 
 export const DesktopMessagesDock: React.FC = () => {
+  const dynamicColors = useColors();
+  const isDark = useIsDark();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<DockTab>('all');
@@ -91,21 +93,21 @@ export const DesktopMessagesDock: React.FC = () => {
         zIndex: 9999,
       }}
     >
-      <View style={styles.dockContainer}>
+      <View style={[styles.dockContainer, { backgroundColor: dynamicColors.backgroundElevated, borderColor: dynamicColors.borderLight }]}>
         {/* Header Bar */}
         <TouchableOpacity
           id="booffin-desktop-messages-toggle"
           activeOpacity={0.9}
           onPress={() => setIsOpen(!isOpen)}
-          style={styles.headerBar}
+          style={[styles.headerBar, { backgroundColor: dynamicColors.backgroundElevated, borderBottomColor: isOpen ? dynamicColors.borderLight : 'transparent' }]}
         >
           <View style={styles.headerLeft}>
-            <View style={styles.headerIconWrapper}>
-              <Layers size={14} color="#064E3B" />
+            <View style={[styles.headerIconWrapper, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0' }]}>
+              <Layers size={14} color={dynamicColors.brandGreen} />
             </View>
-            <Text style={styles.headerTitle}>Community & DMs</Text>
+            <Text style={[styles.headerTitle, { color: dynamicColors.textPrimary }]}>Community & DMs</Text>
             {unreadTotal > 0 && (
-              <View style={styles.unreadBadge}>
+              <View style={[styles.unreadBadge, { backgroundColor: dynamicColors.brandGreen }]}>
                 <Text style={styles.unreadBadgeText}>
                   {unreadTotal > 99 ? '99+' : unreadTotal}
                 </Text>
@@ -123,54 +125,78 @@ export const DesktopMessagesDock: React.FC = () => {
               style={styles.expandHeaderBtn}
               accessibilityLabel="Open Full Workspace"
             >
-              <ExternalLink size={14} color="#64748B" />
+              <ExternalLink size={14} color={dynamicColors.textSecondary} />
             </TouchableOpacity>
             {isOpen ? (
-              <ChevronDown size={18} color="#475569" />
+              <ChevronDown size={18} color={dynamicColors.textSecondary} />
             ) : (
-              <ChevronUp size={18} color="#475569" />
+              <ChevronUp size={18} color={dynamicColors.textSecondary} />
             )}
           </View>
         </TouchableOpacity>
 
         {/* Expanded Body */}
         {isOpen && (
-          <View style={styles.expandedBody}>
+          <View style={[styles.expandedBody, { backgroundColor: dynamicColors.backgroundElevated }]}>
             {/* Quick Navigation Tabs & New Button */}
-            <View style={styles.tabNavRow}>
+            <View style={[styles.tabNavRow, { backgroundColor: dynamicColors.backgroundSecondary, borderBottomColor: dynamicColors.borderLight }]}>
               <View style={styles.tabPillsGroup}>
                 <TouchableOpacity
                   onPress={() => setActiveTab('all')}
-                  style={[styles.tabPill, activeTab === 'all' && styles.tabPillActive]}
+                  style={[
+                    styles.tabPill,
+                    activeTab === 'all' && [
+                      styles.tabPillActive,
+                      { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0' },
+                    ],
+                  ]}
                 >
-                  <Text style={[styles.tabPillText, activeTab === 'all' && styles.tabPillTextActive]}>
+                  <Text style={[styles.tabPillText, { color: activeTab === 'all' ? dynamicColors.brandGreen : dynamicColors.textSecondary }]}>
                     All
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setActiveTab('dms')}
-                  style={[styles.tabPill, activeTab === 'dms' && styles.tabPillActive]}
+                  style={[
+                    styles.tabPill,
+                    activeTab === 'dms' && [
+                      styles.tabPillActive,
+                      { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0' },
+                    ],
+                  ]}
                 >
-                  <Text style={[styles.tabPillText, activeTab === 'dms' && styles.tabPillTextActive]}>
+                  <Text style={[styles.tabPillText, { color: activeTab === 'dms' ? dynamicColors.brandGreen : dynamicColors.textSecondary }]}>
                     DMs ({dms.length})
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setActiveTab('inner_circles')}
-                  style={[styles.tabPill, activeTab === 'inner_circles' && styles.tabPillActive]}
+                  style={[
+                    styles.tabPill,
+                    activeTab === 'inner_circles' && [
+                      styles.tabPillActive,
+                      { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0' },
+                    ],
+                  ]}
                 >
-                  <Text style={[styles.tabPillText, activeTab === 'inner_circles' && styles.tabPillTextActive]}>
+                  <Text style={[styles.tabPillText, { color: activeTab === 'inner_circles' ? dynamicColors.brandGreen : dynamicColors.textSecondary }]}>
                     Pods ({innerCircles.length})
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => setActiveTab('communities')}
-                  style={[styles.tabPill, activeTab === 'communities' && styles.tabPillActive]}
+                  style={[
+                    styles.tabPill,
+                    activeTab === 'communities' && [
+                      styles.tabPillActive,
+                      { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0' },
+                    ],
+                  ]}
                 >
-                  <Text style={[styles.tabPillText, activeTab === 'communities' && styles.tabPillTextActive]}>
+                  <Text style={[styles.tabPillText, { color: activeTab === 'communities' ? dynamicColors.brandGreen : dynamicColors.textSecondary }]}>
                     Communities
                   </Text>
                 </TouchableOpacity>
@@ -178,7 +204,7 @@ export const DesktopMessagesDock: React.FC = () => {
 
               <TouchableOpacity
                 onPress={() => setShowCreateModal(true)}
-                style={styles.quickCreateBtn}
+                style={[styles.quickCreateBtn, { backgroundColor: dynamicColors.brandGreen }]}
                 accessibilityLabel="Create Workspace"
               >
                 <Plus size={14} color="#FFFFFF" />
@@ -186,25 +212,25 @@ export const DesktopMessagesDock: React.FC = () => {
             </View>
 
             {/* Search Input */}
-            <View style={styles.searchRow}>
-              <Search size={14} color="#94A3B8" />
+            <View style={[styles.searchRow, { backgroundColor: dynamicColors.backgroundSecondary, borderBottomColor: dynamicColors.borderLight }]}>
+              <Search size={14} color={dynamicColors.textMuted} />
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder="Search messages, pods, or topics..."
-                placeholderTextColor="#94A3B8"
-                style={styles.searchInput}
+                placeholderTextColor={dynamicColors.textMuted}
+                style={[styles.searchInput, { color: dynamicColors.textPrimary }]}
               />
             </View>
 
             {/* Workspaces List */}
             {isLoading && displayedList.length === 0 ? (
               <View style={styles.centerContainer}>
-                <ActivityIndicator size="small" color="#064E3B" />
-                <Text style={styles.loadingText}>Syncing workspaces...</Text>
+                <ActivityIndicator size="small" color={dynamicColors.brandGreen} />
+                <Text style={[styles.loadingText, { color: dynamicColors.textSecondary }]}>Syncing workspaces...</Text>
               </View>
             ) : displayedList.length > 0 ? (
-              <ScrollView style={styles.conversationsList} showsVerticalScrollIndicator={false}>
+              <ScrollView style={[styles.conversationsList, { backgroundColor: dynamicColors.backgroundElevated }]} showsVerticalScrollIndicator={false}>
                 {displayedList.map((ws) => {
                   const isDM = ws.type === 'dm';
                   const isInnerCircle = ws.type === 'inner_circle';
@@ -219,7 +245,8 @@ export const DesktopMessagesDock: React.FC = () => {
                       onPress={() => handleOpenWorkspace(ws.id)}
                       style={[
                         styles.conversationItem,
-                        unread > 0 && styles.conversationItemUnread,
+                        { borderBottomColor: dynamicColors.borderLight },
+                        unread > 0 && { backgroundColor: isDark ? dynamicColors.backgroundTertiary : '#F0FDF4' },
                       ]}
                     >
                       {/* Avatar */}
@@ -227,12 +254,12 @@ export const DesktopMessagesDock: React.FC = () => {
                         {isDM ? (
                           <Avatar uri={avatar || undefined} name={name} size="sm" />
                         ) : isInnerCircle ? (
-                          <View style={styles.innerCircleIcon}>
-                            <Lock size={14} color="#064E3B" />
+                          <View style={[styles.innerCircleIcon, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0' }]}>
+                            <Lock size={14} color={dynamicColors.brandGreen} />
                           </View>
                         ) : (
-                          <View style={styles.communityIcon}>
-                            <Users size={14} color="#1D4ED8" />
+                          <View style={[styles.communityIcon, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF', borderColor: isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE' }]}>
+                            <Users size={14} color={dynamicColors.accentBlue} />
                           </View>
                         )}
                       </View>
@@ -240,17 +267,17 @@ export const DesktopMessagesDock: React.FC = () => {
                       {/* Info Meta */}
                       <View style={styles.convMeta}>
                         <View style={styles.convNameRow}>
-                          <Text style={styles.convName} numberOfLines={1}>
+                          <Text style={[styles.convName, { color: dynamicColors.textPrimary }]} numberOfLines={1}>
                             {name}
                           </Text>
                           {unread > 0 && (
-                            <View style={styles.itemUnreadDot}>
+                            <View style={[styles.itemUnreadDot, { backgroundColor: dynamicColors.brandGreen }]}>
                               <Text style={styles.itemUnreadText}>{unread}</Text>
                             </View>
                           )}
                         </View>
 
-                        <Text style={styles.convSubtitle} numberOfLines={1}>
+                        <Text style={[styles.convSubtitle, { color: dynamicColors.textSecondary }]} numberOfLines={1}>
                           {isDM
                             ? ws.other_user?.academicTitle || ws.other_user?.institution || 'Mutual Follow Direct Message'
                             : isInnerCircle
@@ -264,14 +291,14 @@ export const DesktopMessagesDock: React.FC = () => {
               </ScrollView>
             ) : (
               <View style={styles.emptyContainer}>
-                <Layers size={28} color="#CBD5E1" strokeWidth={1.5} />
-                <Text style={styles.emptyTitle}>No active workspaces</Text>
-                <Text style={styles.emptySub}>
+                <Layers size={28} color={dynamicColors.textMuted} strokeWidth={1.5} />
+                <Text style={[styles.emptyTitle, { color: dynamicColors.textPrimary }]}>No active workspaces</Text>
+                <Text style={[styles.emptySub, { color: dynamicColors.textSecondary }]}>
                   Follow researchers mutually for 1-on-1 DMs, or create a community or private pod.
                 </Text>
                 <TouchableOpacity
                   onPress={() => setShowCreateModal(true)}
-                  style={styles.emptyActionBtn}
+                  style={[styles.emptyActionBtn, { backgroundColor: dynamicColors.brandGreen }]}
                 >
                   <Plus size={13} color="#FFFFFF" />
                   <Text style={styles.emptyActionBtnText}>Create Workspace</Text>
@@ -280,15 +307,15 @@ export const DesktopMessagesDock: React.FC = () => {
             )}
 
             {/* Footer */}
-            <View style={styles.footerNote}>
+            <View style={[styles.footerNote, { backgroundColor: dynamicColors.backgroundSecondary, borderTopColor: dynamicColors.borderLight }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Shield size={12} color="#064E3B" />
-                <Text style={styles.footerNoteText}>
+                <Shield size={12} color={dynamicColors.brandGreen} />
+                <Text style={[styles.footerNoteText, { color: dynamicColors.brandGreen }]}>
                   Encrypted BooffIn Academic Workspace
                 </Text>
               </View>
               <TouchableOpacity onPress={handleOpenFullHub}>
-                <Text style={styles.viewAllLink}>Open Hub →</Text>
+                <Text style={[styles.viewAllLink, { color: dynamicColors.brandGreen }]}>Open Hub →</Text>
               </TouchableOpacity>
             </View>
           </View>

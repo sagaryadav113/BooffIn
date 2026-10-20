@@ -2791,7 +2791,12 @@ export const workspaceService = {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+      let activeUser = user;
+      if (!activeUser) {
+        const { data: { session } } = await supabase.auth.getSession();
+        activeUser = session?.user ?? null;
+      }
+      effectiveUserId = activeUser?.id || useAuthStore.getState().user?.id;
       if (!effectiveUserId) return { event: null, error: 'User not authenticated' };
 
       const currentUser = useAuthStore.getState().user;
@@ -2866,7 +2871,21 @@ export const workspaceService = {
           .select()
           .maybeSingle();
 
-        if (data && !error) {
+        if (error) {
+          console.error('[workspaceService] Supabase DB event insert error:', error.message);
+          // Roll back optimistic local write
+          try {
+            const stored = await AsyncStorage.getItem(localKey);
+            if (stored) {
+              const list: WorkspaceEvent[] = JSON.parse(stored);
+              const rolledBack = list.filter((item) => item.id !== localEventId);
+              await AsyncStorage.setItem(localKey, JSON.stringify(rolledBack));
+            }
+          } catch {}
+          return { event: null, error: error.message };
+        }
+
+        if (data) {
           // Update local cache with DB id
           eventResult = {
             ...eventResult,
@@ -2880,11 +2899,10 @@ export const workspaceService = {
               await AsyncStorage.setItem(localKey, JSON.stringify(updated));
             }
           } catch {}
-        } else if (error) {
-          console.warn('[workspaceService] Supabase DB event insert note (local cache active):', error.message);
         }
       } catch (dbErr: any) {
-        console.warn('[workspaceService] Supabase DB event insert note (local cache active):', dbErr.message);
+        console.error('[workspaceService] Supabase DB event insert failed:', dbErr.message);
+        return { event: null, error: dbErr.message || 'Database insert failed' };
       }
 
       return { event: eventResult, error: null };
@@ -3105,7 +3123,12 @@ export const workspaceService = {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      effectiveUserId = user?.id || useAuthStore.getState().user?.id;
+      let activeUser = user;
+      if (!activeUser) {
+        const { data: { session } } = await supabase.auth.getSession();
+        activeUser = session?.user ?? null;
+      }
+      effectiveUserId = activeUser?.id || useAuthStore.getState().user?.id;
       if (!effectiveUserId) return { task: null, error: 'User not authenticated' };
 
       const currentUser = useAuthStore.getState().user;
@@ -3175,10 +3198,27 @@ export const workspaceService = {
           .select()
           .maybeSingle();
 
-        if (data && !error) {
+        if (error) {
+          console.error('[workspaceService] Supabase DB task insert error:', error.message);
+          // Roll back optimistic local write
+          try {
+            const stored = await AsyncStorage.getItem(localKey);
+            if (stored) {
+              const list: WorkspaceTask[] = JSON.parse(stored);
+              const rolledBack = list.filter((t) => t.id !== localTaskId);
+              await AsyncStorage.setItem(localKey, JSON.stringify(rolledBack));
+            }
+          } catch {}
+          return { task: null, error: error.message };
+        }
+
+        if (data) {
           newTask.id = data.id;
         }
-      } catch {}
+      } catch (dbErr: any) {
+        console.error('[workspaceService] Supabase DB task insert failed:', dbErr.message);
+        return { task: null, error: dbErr.message || 'Database insert failed' };
+      }
 
       return { task: newTask, error: null };
     } catch (err: any) {
@@ -3216,14 +3256,19 @@ export const workspaceService = {
 
       // Sync to Supabase table
       try {
-        await supabase
+        const { error } = await supabase
           .from('workspace_tasks')
           .update({
             ...updates,
             updated_at: new Date().toISOString(),
           })
           .eq('id', taskId);
-      } catch {}
+        if (error) {
+          console.error('[workspaceService] updateWorkspaceTask DB error:', error.message);
+        }
+      } catch (err: any) {
+        console.error('[workspaceService] updateWorkspaceTask DB error:', err.message);
+      }
 
       return { task: updatedTask, error: null };
     } catch (err: any) {
@@ -3249,8 +3294,13 @@ export const workspaceService = {
       }
 
       try {
-        await supabase.from('workspace_tasks').delete().eq('id', taskId);
-      } catch {}
+        const { error } = await supabase.from('workspace_tasks').delete().eq('id', taskId);
+        if (error) {
+          console.error('[workspaceService] deleteWorkspaceTask DB error:', error.message);
+        }
+      } catch (err: any) {
+        console.error('[workspaceService] deleteWorkspaceTask DB error:', err.message);
+      }
 
       return { success: true, error: null };
     } catch (err: any) {

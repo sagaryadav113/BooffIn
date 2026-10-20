@@ -11,6 +11,8 @@ import {
   Platform,
 } from 'react-native';
 
+import { useTheme } from '../../theme';
+
 export interface PopoverProps {
   visible: boolean;
   onClose: () => void;
@@ -46,6 +48,7 @@ export const Popover: React.FC<PopoverProps> = ({
   children,
   style,
 }) => {
+  const { colors, isDark } = useTheme();
   const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
 
   useEffect(() => {
@@ -129,7 +132,11 @@ export const Popover: React.FC<PopoverProps> = ({
             <View
               style={[
                 styles.popoverCard,
-                { width: estimatedWidth },
+                {
+                  width: estimatedWidth,
+                  backgroundColor: colors.backgroundElevated,
+                  borderColor: colors.border,
+                },
                 coords?.bottom !== undefined
                   ? { bottom: coords.bottom, left: coords.left }
                   : coords?.top !== undefined
@@ -166,6 +173,8 @@ export const PopoverItem: React.FC<PopoverItemProps> = ({
   active = false,
   activeColor = '#10B981',
 }) => {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -177,6 +186,7 @@ export const PopoverItem: React.FC<PopoverItemProps> = ({
         <Text
           style={[
             styles.itemLabel,
+            { color: colors.textPrimary },
             destructive && styles.destructiveLabel,
             active && { color: activeColor, fontWeight: '700' },
           ]}
@@ -185,7 +195,7 @@ export const PopoverItem: React.FC<PopoverItemProps> = ({
           {label}
         </Text>
         {subtitle ? (
-          <Text style={styles.itemSubtitle} numberOfLines={1}>
+          <Text style={[styles.itemSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
@@ -194,7 +204,10 @@ export const PopoverItem: React.FC<PopoverItemProps> = ({
   );
 };
 
-export const PopoverDivider: React.FC = () => <View style={styles.divider} />;
+export const PopoverDivider: React.FC = () => {
+  const { colors } = useTheme();
+  return <View style={[styles.divider, { backgroundColor: colors.border }]} />;
+};
 
 const styles = StyleSheet.create({
   overlay: {

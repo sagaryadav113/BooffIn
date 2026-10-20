@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, layout, typography } from '../../theme';
+import { colors, radii, spacing, layout, typography, useTheme } from '../../theme';
 import { AppNotification } from '../../types/notification';
 import { Avatar } from '../core/Avatar';
 import { Typography } from '../core/Typography';
@@ -23,9 +23,14 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
   onPress,
   style,
 }) => {
+  const { colors, isDark } = useTheme();
   const markAsRead = useNotificationStore((s) => s.markAsRead);
   const currentUser = useAuthStore((s) => s.user);
   const refreshCurrentUserProfile = useAuthStore((s) => s.refreshCurrentUserProfile);
+  const isFollowingActor = useAuthStore((s) => s.followingIds.has(notification.actor.id));
+  const isRequestedActor = useAuthStore((s) => s.requestedUserIds.has(notification.actor.id));
+  const isFollowLoading = useAuthStore((s) => s.followLoadingIds.has(notification.actor.id));
+  const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
   const [requestStatus, setRequestStatus] = useState<'idle' | 'accepting' | 'accepted' | 'declining' | 'declined'>('idle');
 
   const handlePress = () => {
@@ -44,6 +49,16 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
       pathname: pathname as any,
       params,
     });
+  };
+
+  const handleFollowBack = async (e: any) => {
+    e?.stopPropagation?.();
+    if (isFollowLoading) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    markAsRead(notification.id);
+    await toggleFollowUser(notification.actor.id);
   };
 
   const handleAcceptRequest = async (e: any) => {
@@ -125,7 +140,14 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
       onPress={handlePress}
       style={[
         styles.container,
-        !notification.isRead && styles.unread,
+        {
+          backgroundColor: notification.isRead
+            ? colors.backgroundCard
+            : isDark
+            ? '#111622'
+            : '#F8FAFC',
+          borderBottomColor: colors.borderLight,
+        },
         style,
       ]}
     >
@@ -136,8 +158,8 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
           size="md"
           verified={notification.actor.orcidVerified}
         />
-        <View style={[styles.badgeCircle, { backgroundColor: badge.bg }]}>
-          <Icon name={badge.icon} size="xs" color={colors.white} />
+        <View style={[styles.badgeCircle, { backgroundColor: badge.bg, borderColor: colors.backgroundCard }]}>
+          <Icon name={badge.icon} size="xs" color={isDark && badge.bg === colors.white ? colors.black : colors.white} />
         </View>
       </View>
 
@@ -168,14 +190,14 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
               <>
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  style={styles.confirmBtn}
+                  style={[styles.confirmBtn, { backgroundColor: colors.primary }]}
                   onPress={handleAcceptRequest}
                   disabled={requestStatus !== 'idle'}
                 >
                   {requestStatus === 'accepting' ? (
-                    <ActivityIndicator size="small" color={colors.white} />
+                    <ActivityIndicator size="small" color={isDark ? colors.black : colors.white} />
                   ) : (
-                    <Typography variant="captionBold" color={colors.white}>
+                    <Typography variant="captionBold" color={isDark ? colors.black : colors.white}>
                       Confirm
                     </Typography>
                   )}
@@ -183,7 +205,13 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
 
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  style={styles.deleteBtn}
+                  style={[
+                    styles.deleteBtn,
+                    {
+                      backgroundColor: colors.backgroundSecondary,
+                      borderColor: colors.border,
+                    },
+                  ]}
                   onPress={handleDeclineRequest}
                   disabled={requestStatus !== 'idle'}
                 >
@@ -196,6 +224,40 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
                   )}
                 </TouchableOpacity>
               </>
+            )}
+          </View>
+        )}
+
+        {/* Quick Follow Back Button for Follow Notifications */}
+        {notification.type === 'follow' && notification.actor?.id && notification.actor.id !== currentUser?.id && (
+          <View style={styles.requestActionsRow}>
+            {isFollowingActor ? (
+              <View style={[styles.followingPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Typography variant="captionBold" color={colors.textSecondary}>
+                  Following
+                </Typography>
+              </View>
+            ) : isRequestedActor ? (
+              <View style={[styles.followingPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Typography variant="captionBold" color={colors.textSecondary}>
+                  Requested
+                </Typography>
+              </View>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.followBackBtn, { backgroundColor: colors.primary }]}
+                onPress={handleFollowBack}
+                disabled={isFollowLoading}
+              >
+                {isFollowLoading ? (
+                  <ActivityIndicator size="small" color={isDark ? colors.black : colors.white} />
+                ) : (
+                  <Typography variant="captionBold" color={isDark ? colors.black : colors.white}>
+                    Follow Back
+                  </Typography>
+                )}
+              </TouchableOpacity>
             )}
           </View>
         )}
@@ -302,5 +364,23 @@ const styles = StyleSheet.create({
   resolvedTag: {
     paddingVertical: 2,
     paddingHorizontal: spacing.xs,
+  },
+  followBackBtn: {
+    backgroundColor: colors.black,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+    minHeight: 28,
+    minWidth: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followingPill: {
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
+    borderRadius: radii.full,
   },
 });

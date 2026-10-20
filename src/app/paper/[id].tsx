@@ -42,7 +42,7 @@ import { InAppPaperPdfViewer } from '../../components/paper/InAppPaperPdfViewer'
 import { ArticleStatsView } from '../../components/paper/ArticleStatsView';
 import { HypeScoreBadge } from '../../components/paper/HypeScoreBadge';
 import { getPaperMetrics, recordPaperView, PaperMetrics } from '../../api/hypeScoreService';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Badge } from '../../components/core/Badge';
 import { TopicChip } from '../../components/core/TopicChip';
@@ -98,6 +98,8 @@ function createPaperFromReference(ref: any): Paper {
 }
 
 export default function PaperDetailScreen() {
+  const dynamicColors = useColors();
+  const isDark = useIsDark();
   const { id, fromPostId, doi, title, url, pdfUrl, refId, mode } = useLocalSearchParams<{
     id: string;
     fromPostId?: string;
@@ -944,10 +946,10 @@ export default function PaperDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: dynamicColors.background }]} edges={['top', 'left', 'right']}>
         <AppHeader showBack title="Research Article" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Typography variant="caption" color={colors.textSecondary}>
+          <Typography variant="caption" color={dynamicColors.textSecondary}>
             Loading article details...
           </Typography>
         </View>
@@ -957,7 +959,7 @@ export default function PaperDetailScreen() {
 
   if (!paper) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: dynamicColors.background }]} edges={['top', 'left', 'right']}>
         <AppHeader showBack title="Research Article" />
         <EmptyState
           icon="FileText"
@@ -987,8 +989,8 @@ export default function PaperDetailScreen() {
   }, [isClosedPaper, viewMode]);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: dynamicColors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={dynamicColors.background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -1130,8 +1132,8 @@ export default function PaperDetailScreen() {
               <RefreshControl
                 refreshing={isRefreshing}
                 onRefresh={handleRefresh}
-                tintColor={colors.black}
-                colors={[colors.black]}
+                tintColor={dynamicColors.primary}
+                colors={[dynamicColors.primary]}
               />
             }
           >

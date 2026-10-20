@@ -8,7 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing, typography, layout } from '../../theme';
+import { colors, spacing, typography, layout, useTheme } from '../../theme';
 
 export interface FeedNavigationProps {
   tabs: string[];
@@ -23,6 +23,8 @@ export const FeedNavigation: React.FC<FeedNavigationProps> = ({
   onTabChange,
   style,
 }) => {
+  const { colors, isDark } = useTheme();
+
   const handlePress = (tab: string) => {
     try {
       Haptics.selectionAsync();
@@ -31,7 +33,7 @@ export const FeedNavigation: React.FC<FeedNavigationProps> = ({
   };
 
   return (
-    <View style={[styles.wrapper, style]}>
+    <View style={[styles.wrapper, { backgroundColor: colors.background, borderBottomColor: colors.border }, style]}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -53,12 +55,21 @@ export const FeedNavigation: React.FC<FeedNavigationProps> = ({
               <Text
                 style={[
                   styles.tabText,
-                  isActive ? styles.tabTextActive : styles.tabTextInactive,
+                  isActive
+                    ? { color: colors.textPrimary, fontWeight: '700' }
+                    : { color: colors.textSecondary, fontWeight: '500' },
                 ]}
               >
                 {tab}
               </Text>
-              {isActive && <View style={styles.activeIndicator} />}
+              {isActive && (
+                <View
+                  style={[
+                    styles.activeIndicator,
+                    { backgroundColor: isDark ? '#10B981' : colors.black },
+                  ]}
+                />
+              )}
             </TouchableOpacity>
           );
         })}

@@ -13,7 +13,7 @@ import { ArrowRight, ExternalLink, X, Quote, Copy, Check, GraduationCap } from '
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { Paper } from '../../types';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors, radii, spacing, typography, layout, useTheme } from '../../theme';
 import { Badge } from '../core/Badge';
 import { SaveButton } from '../core/SaveButton';
 import { Popover, PopoverItem, PopoverDivider } from '../core/Popover';
@@ -37,6 +37,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({
   compact = false,
   fromPostId,
 }) => {
+  const { colors, isDark } = useTheme();
   const [isCitePopoverOpen, setIsCitePopoverOpen] = useState(false);
   const [copiedType, setCopiedType] = useState<'apa' | 'bibtex' | null>(null);
   const citeBtnRef = useRef<View>(null);
@@ -145,13 +146,27 @@ export const PaperCard: React.FC<PaperCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.88}
       onPress={handleCardPress}
-      style={[styles.container, compact && styles.compactContainer, style]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: isDark ? '#111622' : colors.background,
+          borderColor: colors.border,
+        },
+        compact && styles.compactContainer,
+        style,
+      ]}
     >
       {/* Optional Remove Button for Composer */}
       {onRemove && (
         <TouchableOpacity
           onPress={onRemove}
-          style={styles.removeButton}
+          style={[
+            styles.removeButton,
+            {
+              backgroundColor: isDark ? '#1F2636' : 'rgba(255, 255, 255, 0.95)',
+              borderColor: colors.border,
+            },
+          ]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <X size={14} color={colors.textSecondary} />
@@ -160,7 +175,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({
 
       {/* Scientific Figure Preview Collage (1 or 2 Figures) */}
       {!compact && primaryFigure && (
-        <View style={styles.imageContainer}>
+        <View style={[styles.imageContainer, { backgroundColor: isDark ? '#161B26' : colors.backgroundTertiary, borderBottomColor: colors.border }]}>
           {secondaryFigure ? (
             <View style={styles.multiFigureRow}>
               <View style={styles.multiFigureCol}>
@@ -176,7 +191,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({
                   <Text style={styles.figBadgeText}>Fig. 1</Text>
                 </View>
               </View>
-              <View style={styles.multiFigureDivider} />
+              <View style={[styles.multiFigureDivider, { backgroundColor: colors.border }]} />
               <View style={styles.multiFigureCol}>
                 <Image
                   source={{ uri: secondaryFigure }}
@@ -223,7 +238,11 @@ export const PaperCard: React.FC<PaperCardProps> = ({
           {/* Paper Title (16–18px semibold) */}
           <Text
             numberOfLines={compact ? 2 : 3}
-            style={[styles.title, compact && styles.compactTitle]}
+            style={[
+              styles.title,
+              { color: colors.textPrimary },
+              compact && styles.compactTitle,
+            ]}
           >
             {paper.title}
           </Text>
@@ -249,11 +268,17 @@ export const PaperCard: React.FC<PaperCardProps> = ({
                     setIsCitePopoverOpen(true);
                   }}
                   hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-                  style={styles.citeButton}
+                  style={[
+                    styles.citeButton,
+                    {
+                      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#F0FDFA',
+                      borderColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#CCFBF1',
+                    },
+                  ]}
                   activeOpacity={0.7}
                 >
-                  <Quote size={12} color="#0D9488" strokeWidth={2.4} />
-                  <Text style={styles.citeButtonText}>Cite</Text>
+                  <Quote size={12} color={isDark ? '#34D399' : '#0D9488'} strokeWidth={2.4} />
+                  <Text style={[styles.citeButtonText, { color: isDark ? '#34D399' : '#0F766E' }]}>Cite</Text>
                 </TouchableOpacity>
               </View>
 

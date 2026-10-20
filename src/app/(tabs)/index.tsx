@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing, typography, radii } from '../../theme';
+import { colors, spacing, typography, radii, useTheme } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { FeedNavigation } from '../../components/layout/FeedNavigation';
 import { PostCard } from '../../components/cards/PostCard';
@@ -33,6 +33,7 @@ import { DesktopWritePostCard } from '../../components/desktop/DesktopWritePostC
 import { Post } from '../../types';
 
 export default function HomeScreen() {
+  const { colors, isDark } = useTheme();
   const { isDesktop } = useResponsiveLayout();
   const posts = usePostStore((s) => s.posts);
   const activeTab = usePostStore((s) => s.activeTab);
@@ -210,8 +211,8 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Mobile-only Header */}
       {!isDesktop && (
@@ -247,11 +248,11 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={colors.black}
+            tintColor={isDark ? '#34D399' : colors.black}
             title="Pull to refresh..."
             titleColor={colors.textSecondary}
-            colors={[colors.black, colors.accentBlue]}
-            progressBackgroundColor={colors.white}
+            colors={[isDark ? '#34D399' : colors.black, colors.accentBlue]}
+            progressBackgroundColor={isDark ? colors.backgroundElevated : colors.white}
             progressViewOffset={Platform.OS === 'android' ? 20 : 0}
           />
         }
@@ -262,7 +263,7 @@ export default function HomeScreen() {
         ListEmptyComponent={
           isLoading && filteredPosts.length === 0 ? (
             <View style={styles.centerLoader}>
-              <ActivityIndicator size="large" color={colors.black} />
+              <ActivityIndicator size="large" color={isDark ? '#34D399' : colors.black} />
             </View>
           ) : (
             <EmptyState

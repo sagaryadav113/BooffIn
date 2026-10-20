@@ -33,7 +33,7 @@ import {
   TrendingUp,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import {
   fetchOpenAlexAuthorDetails,
   fetchOpenAlexAuthorWorks,
@@ -57,6 +57,9 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
   initialOrcid,
   onBack,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   const [profile, setProfile] = useState<OpenAlexAuthorDetails | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [copiedId, setCopiedId] = useState(false);
@@ -271,18 +274,21 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
 
   if (isLoadingProfile) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.textPrimary} />
-        <Text style={styles.loadingText}>Loading researcher profile & metrics...</Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading researcher profile & metrics...</Text>
       </View>
     );
   }
 
   if (!profile) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>Could not load researcher profile</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={onBack || (() => router.back())}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.textPrimary }]}>Could not load researcher profile</Text>
+        <TouchableOpacity
+          style={[styles.retryBtn, { backgroundColor: isDark ? '#10B981' : colors.textPrimary }]}
+          onPress={onBack || (() => router.back())}
+        >
           <Text style={styles.retryBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -310,7 +316,7 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
@@ -318,7 +324,7 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
       <View style={styles.navBar}>
         <TouchableOpacity
           onPress={onBack || (() => router.back())}
-          style={styles.navIconButton}
+          style={[styles.navIconButton, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <ArrowLeft size={20} color={colors.textPrimary} />
@@ -326,7 +332,7 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
         <View style={styles.navActions}>
           <TouchableOpacity
             onPress={handleShare}
-            style={styles.navIconButton}
+            style={[styles.navIconButton, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Share2 size={19} color={colors.textPrimary} />
@@ -334,7 +340,7 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
           {profile.openAlexUrl && (
             <TouchableOpacity
               onPress={() => Linking.openURL(profile.openAlexUrl)}
-              style={styles.navIconButton}
+              style={[styles.navIconButton, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <ExternalLink size={19} color={colors.textPrimary} />
@@ -344,14 +350,14 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
       </View>
 
       {/* ── CARD 1: AUTHOR INFO CARD (OpenAlex Style) ── */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
         <View style={styles.authorHeaderRow}>
-          <View style={styles.avatarPlaceholder}>
+          <View style={[styles.avatarPlaceholder, { backgroundColor: isDark ? '#1F2636' : '#0F172A' }]}>
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
           <View style={styles.authorHeaderTextWrap}>
             <View style={styles.nameBadgeRow}>
-              <Text style={styles.authorName} numberOfLines={2}>
+              <Text style={[styles.authorName, { color: colors.textPrimary }]} numberOfLines={2}>
                 {profile.displayName}
               </Text>
             </View>
@@ -359,26 +365,36 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
             {/* Observed Name from OpenAlex */}
             {profile.observedName && profile.observedName !== profile.displayName && (
               <View style={styles.observedNameRow}>
-                <Text style={styles.observedNameLabel}>Observed name: </Text>
-                <Text style={styles.observedNameVal}>{profile.observedName}</Text>
+                <Text style={[styles.observedNameLabel, { color: colors.textSecondary }]}>Observed name: </Text>
+                <Text style={[styles.observedNameVal, { color: colors.textPrimary }]}>{profile.observedName}</Text>
               </View>
             )}
 
             {/* Verification Status */}
-            <View style={styles.sourcePill}>
+            <View style={[styles.sourcePill, { backgroundColor: isDark ? '#065F46' : '#064E3B' }]}>
               <Text style={styles.sourcePillText}>OpenAlex Verified Scholar Index</Text>
             </View>
           </View>
 
           {/* Claim Profile Option or Claimed by Author Badge */}
           {isClaimedByAuthor ? (
-            <View style={styles.claimedProfileTopBadge}>
-              <CheckCircle2 size={12} color="#15803D" />
-              <Text style={styles.claimedProfileTopText}>Claimed by Author</Text>
+            <View
+              style={[
+                styles.claimedProfileTopBadge,
+                {
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7',
+                  borderColor: isDark ? '#10B981' : '#BBF7D0',
+                },
+              ]}
+            >
+              <CheckCircle2 size={12} color={isDark ? '#34D399' : '#15803D'} />
+              <Text style={[styles.claimedProfileTopText, { color: isDark ? '#34D399' : '#15803D' }]}>
+                Claimed by Author
+              </Text>
             </View>
           ) : (
             <TouchableOpacity
-              style={styles.claimProfileTopBtn}
+              style={[styles.claimProfileTopBtn, { backgroundColor: isDark ? '#065F46' : '#064E3B' }]}
               onPress={handleClaimProfile}
               activeOpacity={0.8}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -390,12 +406,12 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
 
         {/* Current & Historical Affiliations */}
         {visibleInstitutions.length > 0 && (
-          <View style={styles.affiliationsWrap}>
-            <Text style={styles.sectionMiniTitle}>AFFILIATIONS & INSTITUTIONS</Text>
+          <View style={[styles.affiliationsWrap, { borderTopColor: colors.borderLight }]}>
+            <Text style={[styles.sectionMiniTitle, { color: colors.textSecondary }]}>AFFILIATIONS & INSTITUTIONS</Text>
             {visibleInstitutions.map((inst, index) => (
               <View key={`${inst}-${index}`} style={styles.institutionRow}>
                 <Building2 size={14} color={colors.textSecondary} style={{ marginTop: 2 }} />
-                <Text style={styles.institutionText}>{inst}</Text>
+                <Text style={[styles.institutionText, { color: colors.textPrimary }]}>{inst}</Text>
               </View>
             ))}
 
@@ -405,15 +421,15 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
                 style={styles.toggleInstitutionsBtn}
                 activeOpacity={0.7}
               >
-                <Text style={styles.toggleInstitutionsText}>
+                <Text style={[styles.toggleInstitutionsText, { color: isDark ? '#34D399' : colors.accentLink }]}>
                   {showAllInstitutions
                     ? 'Show fewer affiliations'
                     : `+${hiddenCount} more observed institution${hiddenCount > 1 ? 's' : ''}`}
                 </Text>
                 {showAllInstitutions ? (
-                  <ChevronUp size={14} color={colors.accentLink} />
+                  <ChevronUp size={14} color={isDark ? '#34D399' : colors.accentLink} />
                 ) : (
-                  <ChevronDown size={14} color={colors.accentLink} />
+                  <ChevronDown size={14} color={isDark ? '#34D399' : colors.accentLink} />
                 )}
               </TouchableOpacity>
             )}
@@ -421,12 +437,12 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
         )}
 
         {/* Identifiers Row (ORCID & OpenAlex ID) */}
-        <View style={styles.identifiersRow}>
+        <View style={[styles.identifiersRow, { borderTopColor: colors.borderLight }]}>
           {/* ORCID */}
           {profile.orcid ? (
             <TouchableOpacity
               onPress={() => profile.orcidUrl && Linking.openURL(profile.orcidUrl)}
-              style={styles.orcidBadgeBtn}
+              style={[styles.orcidBadgeBtn, { backgroundColor: isDark ? '#065F46' : '#064E3B' }]}
               activeOpacity={0.8}
             >
               <Award size={13} color="#FFFFFF" />
@@ -439,13 +455,19 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
           {profile.openAlexId && !profile.openAlexId.includes('-') && (profile.openAlexId.startsWith('A') || profile.openAlexId.length > 4) ? (
             <TouchableOpacity
               onPress={() => handleCopyId(profile.openAlexId)}
-              style={styles.openAlexIdBtn}
+              style={[
+                styles.openAlexIdBtn,
+                {
+                  backgroundColor: isDark ? colors.backgroundSecondary : colors.surfaceHover,
+                  borderColor: colors.borderLight,
+                },
+              ]}
               activeOpacity={0.8}
             >
-              <Text style={styles.openAlexIdLabel}>OpenAlex ID:</Text>
-              <Text style={styles.openAlexIdText}>{profile.openAlexId}</Text>
+              <Text style={[styles.openAlexIdLabel, { color: colors.textSecondary }]}>OpenAlex ID:</Text>
+              <Text style={[styles.openAlexIdText, { color: colors.textPrimary }]}>{profile.openAlexId}</Text>
               {copiedId ? (
-                <Check size={12} color="#16A34A" />
+                <Check size={12} color={isDark ? '#34D399' : '#16A34A'} />
               ) : (
                 <Copy size={12} color={colors.textSecondary} />
               )}
@@ -455,52 +477,52 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
       </View>
 
       {/* ── CARD 2: STATS & METRICS (OpenAlex Snapshot Structure) ── */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
         <View style={styles.cardHeaderRow}>
           <BarChart2 size={16} color={colors.textPrimary} />
-          <Text style={styles.cardHeaderTitle}>SCHOLARLY IMPACT & METRICS</Text>
+          <Text style={[styles.cardHeaderTitle, { color: colors.textPrimary }]}>SCHOLARLY IMPACT & METRICS</Text>
         </View>
 
         {/* 4 Primary Stats Cards Grid */}
         <View style={styles.metricsGrid}>
-          <View style={styles.metricCell}>
-            <Text style={styles.metricVal}>{profile.worksCount.toLocaleString()}</Text>
-            <Text style={styles.metricLbl}>Works Published</Text>
+          <View style={[styles.metricCell, { backgroundColor: isDark ? colors.backgroundSecondary : colors.surfaceHover, borderColor: colors.borderLight }]}>
+            <Text style={[styles.metricVal, { color: colors.textPrimary }]}>{profile.worksCount.toLocaleString()}</Text>
+            <Text style={[styles.metricLbl, { color: colors.textSecondary }]}>Works Published</Text>
           </View>
 
-          <View style={styles.metricCell}>
-            <Text style={styles.metricVal}>{profile.citationCount.toLocaleString()}</Text>
-            <Text style={styles.metricLbl}>Total Citations</Text>
+          <View style={[styles.metricCell, { backgroundColor: isDark ? colors.backgroundSecondary : colors.surfaceHover, borderColor: colors.borderLight }]}>
+            <Text style={[styles.metricVal, { color: colors.textPrimary }]}>{profile.citationCount.toLocaleString()}</Text>
+            <Text style={[styles.metricLbl, { color: colors.textSecondary }]}>Total Citations</Text>
           </View>
 
-          <View style={styles.metricCell}>
-            <Text style={styles.metricVal}>{profile.hIndex}</Text>
-            <Text style={styles.metricLbl}>h-index</Text>
+          <View style={[styles.metricCell, { backgroundColor: isDark ? colors.backgroundSecondary : colors.surfaceHover, borderColor: colors.borderLight }]}>
+            <Text style={[styles.metricVal, { color: colors.textPrimary }]}>{profile.hIndex}</Text>
+            <Text style={[styles.metricLbl, { color: colors.textSecondary }]}>h-index</Text>
           </View>
 
-          <View style={styles.metricCell}>
-            <Text style={styles.metricVal}>{profile.i10Index}</Text>
-            <Text style={styles.metricLbl}>i10-index</Text>
+          <View style={[styles.metricCell, { backgroundColor: isDark ? colors.backgroundSecondary : colors.surfaceHover, borderColor: colors.borderLight }]}>
+            <Text style={[styles.metricVal, { color: colors.textPrimary }]}>{profile.i10Index}</Text>
+            <Text style={[styles.metricLbl, { color: colors.textSecondary }]}>i10-index</Text>
           </View>
         </View>
 
         {/* 2-Year Mean Citedness if present */}
         {profile.twoYearMeanCitedness !== undefined && profile.twoYearMeanCitedness > 0 && (
           <View style={styles.meanCitednessRow}>
-            <TrendingUp size={13} color={colors.accentLink} />
-            <Text style={styles.meanCitednessText}>
-              2-Year Mean Citedness: <Text style={styles.boldText}>{profile.twoYearMeanCitedness.toFixed(2)}</Text> citations/work
+            <TrendingUp size={13} color={isDark ? '#34D399' : colors.accentLink} />
+            <Text style={[styles.meanCitednessText, { color: colors.textSecondary }]}>
+              2-Year Mean Citedness: <Text style={[styles.boldText, { color: colors.textPrimary }]}>{profile.twoYearMeanCitedness.toFixed(2)}</Text> citations/work
             </Text>
           </View>
         )}
 
         {/* Yearly Works & Citations Bar Chart */}
         {profile.countsByYear && profile.countsByYear.length > 0 && (
-          <View style={styles.chartContainer}>
+          <View style={[styles.chartContainer, { borderTopColor: colors.borderLight }]}>
             <View style={styles.chartHeaderRow}>
-              <Text style={styles.chartTitle}>ANNUAL PUBLICATIONS TREND</Text>
+              <Text style={[styles.chartTitle, { color: colors.textSecondary }]}>ANNUAL PUBLICATIONS TREND</Text>
               {selectedYear && (
-                <Text style={styles.chartSelectedYearText}>
+                <Text style={[styles.chartSelectedYearText, { color: isDark ? '#34D399' : colors.accentLink }]}>
                   {selectedYear}:{' '}
                   {profile.countsByYear.find((c) => c.year === selectedYear)?.worksCount || 0} works ·{' '}
                   {profile.countsByYear.find((c) => c.year === selectedYear)?.citedByCount || 0} citations
@@ -520,17 +542,35 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
                       style={styles.barColumn}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.barCountText, isSelected && styles.barCountTextActive]}>
+                      <Text
+                        style={[
+                          styles.barCountText,
+                          { color: colors.textSecondary },
+                          isSelected && { color: colors.textPrimary, fontWeight: '700' },
+                        ]}
+                      >
                         {item.worksCount}
                       </Text>
                       <View
                         style={[
                           styles.barFill,
-                          { height: barHeight },
-                          isSelected && styles.barFillActive,
+                          {
+                            height: barHeight,
+                            backgroundColor: isDark ? '#334155' : '#CBD5E1',
+                          },
+                          isSelected && {
+                            backgroundColor: isDark ? '#10B981' : colors.textPrimary,
+                            width: 16,
+                          },
                         ]}
                       />
-                      <Text style={[styles.barYearText, isSelected && styles.barYearTextActive]}>
+                      <Text
+                        style={[
+                          styles.barYearText,
+                          { color: colors.textSecondary },
+                          isSelected && { color: colors.textPrimary, fontWeight: '700' },
+                        ]}
+                      >
                         {String(item.year).slice(-2)}
                       </Text>
                     </TouchableOpacity>
@@ -538,21 +578,34 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
                 })}
               </View>
             </ScrollView>
-            <Text style={styles.chartFooterHint}>Tap on any year to inspect citations and output</Text>
+            <Text style={[styles.chartFooterHint, { color: colors.textSecondary }]}>
+              Tap on any year to inspect citations and output
+            </Text>
           </View>
         )}
 
         {/* Research Topics Breakdown */}
         {profile.topics && profile.topics.length > 0 && (
-          <View style={styles.topicsSection}>
-            <Text style={styles.sectionMiniTitle}>KEY RESEARCH TOPICS</Text>
+          <View style={[styles.topicsSection, { borderTopColor: colors.borderLight }]}>
+            <Text style={[styles.sectionMiniTitle, { color: colors.textSecondary }]}>KEY RESEARCH TOPICS</Text>
             <View style={styles.topicsCloud}>
               {profile.topics.map((t) => (
-                <View key={t.id} style={styles.topicChip}>
-                  <Text style={styles.topicChipName}>{t.displayName}</Text>
+                <View
+                  key={t.id}
+                  style={[
+                    styles.topicChip,
+                    {
+                      backgroundColor: isDark ? colors.backgroundSecondary : colors.surfaceHover,
+                      borderColor: colors.borderLight,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.topicChipName, { color: colors.textPrimary }]}>{t.displayName}</Text>
                   {t.count > 0 && (
-                    <View style={styles.topicCountBadge}>
-                      <Text style={styles.topicCountText}>{t.count}</Text>
+                    <View style={[styles.topicCountBadge, { backgroundColor: isDark ? '#1F2636' : '#E2E8F0' }]}>
+                      <Text style={[styles.topicCountText, { color: isDark ? '#94A3B8' : colors.textSecondary }]}>
+                        {t.count}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -563,14 +616,23 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
 
         {/* Publication Types Breakdown */}
         {profile.typeBreakdown && profile.typeBreakdown.length > 0 && (
-          <View style={styles.typesSection}>
-            <Text style={styles.sectionMiniTitle}>PUBLICATION TYPES</Text>
+          <View style={[styles.typesSection, { borderTopColor: colors.borderLight }]}>
+            <Text style={[styles.sectionMiniTitle, { color: colors.textSecondary }]}>PUBLICATION TYPES</Text>
             <View style={styles.typesRow}>
               {profile.typeBreakdown.map((tb) => (
-                <View key={tb.type} style={styles.typeBadge}>
+                <View
+                  key={tb.type}
+                  style={[
+                    styles.typeBadge,
+                    {
+                      backgroundColor: isDark ? colors.backgroundSecondary : colors.surfaceHover,
+                      borderColor: colors.borderLight,
+                    },
+                  ]}
+                >
                   <Layers size={11} color={colors.textSecondary} />
-                  <Text style={styles.typeBadgeText}>
-                    {tb.type.toUpperCase()}: <Text style={styles.boldText}>{tb.count.toLocaleString()}</Text>
+                  <Text style={[styles.typeBadgeText, { color: colors.textSecondary }]}>
+                    {tb.type.toUpperCase()}: <Text style={[styles.boldText, { color: colors.textPrimary }]}>{tb.count.toLocaleString()}</Text>
                   </Text>
                 </View>
               ))}
@@ -580,36 +642,58 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
       </View>
 
       {/* ── CARD 3: PUBLICATIONS CATALOG (WITH OA / CLOSED FILTER) ── */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
         <View style={styles.cardHeaderRow}>
           <GraduationCap size={16} color={colors.textPrimary} />
-          <Text style={styles.cardHeaderTitle}>
+          <Text style={[styles.cardHeaderTitle, { color: colors.textPrimary }]}>
             PUBLICATIONS ({totalWorksCount > 0 ? totalWorksCount.toLocaleString() : works.length})
           </Text>
         </View>
 
         {/* Filter Tabs: All | Open Access (PDF) | Closed */}
-        <View style={styles.filterTabsRow}>
+        <View style={[styles.filterTabsRow, { backgroundColor: isDark ? colors.backgroundSecondary : colors.surfaceHover }]}>
           <TouchableOpacity
             onPress={() => handleFilterChange('all')}
-            style={[styles.filterTab, accessFilter === 'all' && styles.filterTabActive]}
+            style={[
+              styles.filterTab,
+              accessFilter === 'all' && [styles.filterTabActive, { backgroundColor: colors.cardBackground }],
+            ]}
             activeOpacity={0.7}
           >
-            <Text style={[styles.filterTabText, accessFilter === 'all' && styles.filterTabTextActive]}>
+            <Text
+              style={[
+                styles.filterTabText,
+                { color: colors.textSecondary },
+                accessFilter === 'all' && [styles.filterTabTextActive, { color: colors.textPrimary }],
+              ]}
+            >
               All Works
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => handleFilterChange('oa')}
-            style={[styles.filterTab, accessFilter === 'oa' && styles.filterTabActiveGreen]}
+            style={[
+              styles.filterTab,
+              accessFilter === 'oa' && [
+                styles.filterTabActiveGreen,
+                {
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
+                  borderColor: isDark ? '#10B981' : '#86EFAC',
+                },
+              ],
+            ]}
             activeOpacity={0.7}
           >
-            <Unlock size={12} color={accessFilter === 'oa' ? '#15803D' : colors.textSecondary} />
+            <Unlock size={12} color={accessFilter === 'oa' ? (isDark ? '#34D399' : '#15803D') : colors.textSecondary} />
             <Text
               style={[
                 styles.filterTabText,
-                accessFilter === 'oa' && styles.filterTabTextActiveGreen,
+                { color: colors.textSecondary },
+                accessFilter === 'oa' && [
+                  styles.filterTabTextActiveGreen,
+                  { color: isDark ? '#34D399' : '#15803D' },
+                ],
               ]}
             >
               Open Access (PDF)
@@ -618,14 +702,18 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
 
           <TouchableOpacity
             onPress={() => handleFilterChange('closed')}
-            style={[styles.filterTab, accessFilter === 'closed' && styles.filterTabActive]}
+            style={[
+              styles.filterTab,
+              accessFilter === 'closed' && [styles.filterTabActive, { backgroundColor: colors.cardBackground }],
+            ]}
             activeOpacity={0.7}
           >
             <Lock size={12} color={accessFilter === 'closed' ? colors.textPrimary : colors.textSecondary} />
             <Text
               style={[
                 styles.filterTabText,
-                accessFilter === 'closed' && styles.filterTabTextActive,
+                { color: colors.textSecondary },
+                accessFilter === 'closed' && [styles.filterTabTextActive, { color: colors.textPrimary }],
               ]}
             >
               Closed
@@ -637,13 +725,13 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
         {isLoadingWorks ? (
           <View style={styles.worksLoadingContainer}>
             <ActivityIndicator size="small" color={colors.textPrimary} />
-            <Text style={styles.worksLoadingText}>Fetching publication catalog...</Text>
+            <Text style={[styles.worksLoadingText, { color: colors.textSecondary }]}>Fetching publication catalog...</Text>
           </View>
         ) : works.length === 0 ? (
           <View style={styles.emptyWorksContainer}>
             <BookOpen size={24} color={colors.textSecondary} />
-            <Text style={styles.emptyWorksTitle}>No publications found</Text>
-            <Text style={styles.emptyWorksDesc}>
+            <Text style={[styles.emptyWorksTitle, { color: colors.textPrimary }]}>No publications found</Text>
+            <Text style={[styles.emptyWorksDesc, { color: colors.textSecondary }]}>
               {accessFilter === 'oa'
                 ? 'No free Open Access PDFs indexed for this author under this filter.'
                 : 'No works recorded for this author.'}
@@ -656,28 +744,45 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
               const authorNames = paper.authors.map((a) => a.name).join(', ');
 
               return (
-                <View key={paper.id} style={styles.paperItemCard}>
+                <View
+                  key={paper.id}
+                  style={[
+                    styles.paperItemCard,
+                    {
+                      backgroundColor: isDark ? colors.backgroundSecondary : colors.background,
+                      borderColor: colors.borderLight,
+                    },
+                  ]}
+                >
                   {/* Paper Title */}
                   <TouchableOpacity
                     onPress={() => handleOpenPaper(paper, false)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.paperTitle}>{paper.title}</Text>
+                    <Text style={[styles.paperTitle, { color: colors.textPrimary }]}>{paper.title}</Text>
                   </TouchableOpacity>
 
                   {/* Authors line */}
-                  <Text style={styles.paperAuthors} numberOfLines={2}>
+                  <Text style={[styles.paperAuthors, { color: colors.textSecondary }]} numberOfLines={2}>
                     {authorNames}
                   </Text>
 
                   {/* Journal & Year & Citations row */}
                   <View style={styles.paperMetaRow}>
-                    <Text style={styles.paperJournal} numberOfLines={1}>
+                    <Text style={[styles.paperJournal, { color: colors.textSecondary }]} numberOfLines={1}>
                       {paper.journal} · {paper.publicationYear}
                     </Text>
                     {paper.citationCount > 0 && (
-                      <View style={styles.citationsPill}>
-                        <Text style={styles.citationsPillText}>
+                      <View
+                        style={[
+                          styles.citationsPill,
+                          {
+                            backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
+                            borderColor: colors.borderLight,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.citationsPillText, { color: isDark ? '#94A3B8' : '#64748B' }]}>
                           Cited by {paper.citationCount}
                         </Text>
                       </View>
@@ -687,23 +792,43 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
                   {/* Open Access vs Closed Badge */}
                   <View style={styles.badgesRow}>
                     {paper.isOpenAccess ? (
-                      <View style={styles.oaBadge}>
-                        <FileText size={11} color="#15803D" />
-                        <Text style={styles.oaBadgeText}>Open Access · PDF Available</Text>
+                      <View
+                        style={[
+                          styles.oaBadge,
+                          isDark && {
+                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                            borderColor: 'rgba(16, 185, 129, 0.3)',
+                          },
+                        ]}
+                      >
+                        <FileText size={11} color={isDark ? '#34D399' : '#15803D'} />
+                        <Text style={[styles.oaBadgeText, isDark && { color: '#34D399' }]}>
+                          Open Access · PDF Available
+                        </Text>
                       </View>
                     ) : (
-                      <View style={styles.closedBadge}>
+                      <View
+                        style={[
+                          styles.closedBadge,
+                          {
+                            backgroundColor: isDark ? '#1F2636' : colors.surfaceHover,
+                            borderColor: colors.borderLight,
+                          },
+                        ]}
+                      >
                         <Lock size={11} color={colors.textSecondary} />
-                        <Text style={styles.closedBadgeText}>Subscription / Closed</Text>
+                        <Text style={[styles.closedBadgeText, { color: isDark ? '#94A3B8' : colors.textSecondary }]}>
+                          Subscription / Closed
+                        </Text>
                       </View>
                     )}
                   </View>
 
                   {/* Abstract preview if available */}
                   {paper.abstract ? (
-                    <View style={styles.abstractContainer}>
+                    <View style={[styles.abstractContainer, { borderTopColor: colors.borderLight }]}>
                       <Text
-                        style={styles.abstractText}
+                        style={[styles.abstractText, { color: colors.textSecondary }]}
                         numberOfLines={isExpanded ? undefined : 3}
                       >
                         {paper.abstract}
@@ -713,7 +838,7 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
                         style={styles.toggleAbstractBtn}
                         hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                       >
-                        <Text style={styles.toggleAbstractText}>
+                        <Text style={[styles.toggleAbstractText, { color: isDark ? '#34D399' : colors.accentLink }]}>
                           {isExpanded ? 'Show less' : 'Read abstract'}
                         </Text>
                       </TouchableOpacity>
@@ -721,11 +846,11 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
                   ) : null}
 
                   {/* Actions Row */}
-                  <View style={styles.paperActionsRow}>
+                  <View style={[styles.paperActionsRow, { borderTopColor: colors.borderLight }]}>
                     {paper.isOpenAccess && paper.openAccessUrl ? (
                       <TouchableOpacity
                         onPress={() => handleOpenPaper(paper, true)}
-                        style={styles.readPdfBtn}
+                        style={[styles.readPdfBtn, { backgroundColor: isDark ? '#065F46' : '#064E3B' }]}
                         activeOpacity={0.8}
                       >
                         <BookOpen size={13} color="#FFFFFF" />
@@ -735,10 +860,16 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
 
                     <TouchableOpacity
                       onPress={() => handleOpenPaper(paper, false)}
-                      style={styles.discussBtn}
+                      style={[
+                        styles.discussBtn,
+                        {
+                          backgroundColor: colors.cardBackground,
+                          borderColor: colors.borderLight,
+                        },
+                      ]}
                       activeOpacity={0.8}
                     >
-                      <Text style={styles.discussBtnText}>View Details & Discussion</Text>
+                      <Text style={[styles.discussBtnText, { color: colors.textPrimary }]}>View Details & Discussion</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -750,7 +881,13 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
               <TouchableOpacity
                 onPress={() => loadWorks(worksPage + 1, true)}
                 disabled={isLoadingMoreWorks}
-                style={styles.loadMoreWorksBtn}
+                style={[
+                  styles.loadMoreWorksBtn,
+                  {
+                    backgroundColor: colors.cardBackground,
+                    borderColor: colors.borderLight,
+                  },
+                ]}
                 activeOpacity={0.8}
               >
                 {isLoadingMoreWorks ? (
@@ -758,7 +895,7 @@ export const OpenAlexAuthorProfileView: React.FC<OpenAlexAuthorProfileViewProps>
                 ) : (
                   <>
                     <GraduationCap size={14} color={colors.textPrimary} />
-                    <Text style={styles.loadMoreWorksBtnText}>Load more publications</Text>
+                    <Text style={[styles.loadMoreWorksBtnText, { color: colors.textPrimary }]}>Load more publications</Text>
                   </>
                 )}
               </TouchableOpacity>

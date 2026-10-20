@@ -25,7 +25,7 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Post } from '../../types';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors, radii, spacing, typography, layout, useTheme } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { ReshareButton } from '../core/ReshareButton';
 import { DiscussionButton } from '../core/DiscussionButton';
@@ -59,6 +59,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
   onUpdated,
   isDetailView = false,
 }) => {
+  const { colors, isDark } = useTheme();
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -291,7 +292,14 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
       activeOpacity={isCurrentlyOnThisPost ? 1 : 0.95}
       delayPressIn={50}
       onPress={isCurrentlyOnThisPost ? undefined : handlePostPress}
-      style={[styles.container, style]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.backgroundCard,
+          borderBottomColor: colors.border,
+        },
+        style,
+      ]}
     >
       {/* Repost Attribution Header */}
       {post.repostedBy && (
@@ -309,7 +317,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           style={styles.repostBanner}
         >
           <Repeat2 size={13} color={colors.textSecondary} />
-          <Text style={styles.repostBannerText}>
+          <Text style={[styles.repostBannerText, { color: colors.textSecondary }]}>
             {currentUser?.id === post.repostedBy.id
               ? 'You reposted'
               : `${post.repostedBy.fullName || post.repostedBy.handle || 'Researcher'} reposted`}
@@ -332,13 +340,13 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           />
           <View style={styles.authorMeta}>
             <View style={styles.nameHandleRow}>
-              <Text style={styles.authorName}>{post.author.fullName}</Text>
-              <Text style={styles.handleText}>
+              <Text style={[styles.authorName, { color: colors.textPrimary }]}>{post.author.fullName}</Text>
+              <Text style={[styles.handleText, { color: colors.textSecondary }]}>
                 @{post.author.handle} · {post.createdAt}
               </Text>
             </View>
             {authorRole.length > 0 && (
-              <Text style={styles.affiliationText} numberOfLines={1}>
+              <Text style={[styles.affiliationText, { color: colors.textTertiary }]} numberOfLines={1}>
                 {authorRole}
               </Text>
             )}
@@ -353,20 +361,25 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
               disabled={isFollowLoading}
               style={[
                 styles.postFollowBtn,
-                isFollowing && styles.postFollowingBtn,
+                { backgroundColor: isDark ? '#10B981' : '#064E3B' },
+                isFollowing && {
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#EAF3EE',
+                  borderColor: isDark ? '#10B981' : '#A7F3D0',
+                  borderWidth: 1,
+                },
               ]}
               hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             >
               {isFollowLoading ? (
                 <ActivityIndicator
                   size="small"
-                  color={isFollowing ? '#064E3B' : '#FFFFFF'}
+                  color={isFollowing ? (isDark ? '#34D399' : '#064E3B') : '#FFFFFF'}
                   style={{ transform: [{ scale: 0.7 }] }}
                 />
               ) : isFollowing ? (
                 <View style={styles.followBtnContent}>
-                  <Check size={11} color="#064E3B" strokeWidth={2.5} />
-                  <Text style={styles.postFollowingBtnText}>Following</Text>
+                  <Check size={11} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.5} />
+                  <Text style={[styles.postFollowingBtnText, { color: isDark ? '#34D399' : '#064E3B' }]}>Following</Text>
                 </View>
               ) : (
                 <View style={styles.followBtnContent}>
@@ -400,7 +413,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
         <TouchableOpacity
           onPress={isCurrentlyOnThisPost ? undefined : handlePostPress}
           activeOpacity={isCurrentlyOnThisPost ? 1 : 0.88}
-          style={styles.articleCardPreview}
+          style={[styles.articleCardPreview, { backgroundColor: isDark ? '#111622' : '#F8FAFC', borderColor: colors.border }]}
         >
           <View style={styles.articleBadgeRow}>
             <View style={styles.articleBadge}>
@@ -414,22 +427,22 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
             )}
           </View>
 
-          <Text style={styles.articleCardTitle}>{post.article.title}</Text>
+          <Text style={[styles.articleCardTitle, { color: colors.textPrimary }]}>{post.article.title}</Text>
 
           {post.article.subheading ? (
-            <Text style={styles.articleCardSubheading}>{post.article.subheading}</Text>
+            <Text style={[styles.articleCardSubheading, { color: colors.textSecondary }]}>{post.article.subheading}</Text>
           ) : null}
 
           {post.article.abstract ? (
-            <View style={styles.articleAbstractPreview}>
-              <Text style={styles.articleAbstractText} numberOfLines={3}>
+            <View style={[styles.articleAbstractPreview, { backgroundColor: isDark ? '#161B26' : '#FFFFFF', borderLeftColor: isDark ? '#10B981' : '#0F172A' }]}>
+              <Text style={[styles.articleAbstractText, { color: colors.textSecondary }]} numberOfLines={3}>
                 {post.article.abstract}
               </Text>
             </View>
           ) : null}
 
-          <View style={styles.articleFooterRow}>
-            <Text style={styles.articleRefPill}>
+          <View style={[styles.articleFooterRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.articleRefPill, { color: colors.textSecondary }]}>
               {post.article.references?.length || 0} References (APA)
             </Text>
             <View style={styles.readArticleLink}>
@@ -439,7 +452,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           </View>
         </TouchableOpacity>
       ) : post.content ? (
-        <Text style={styles.postBody}>
+        <Text style={[styles.postBody, { color: colors.textPrimary }]}>
           {renderFormattedContent(post.content)}
         </Text>
       ) : null}
@@ -455,8 +468,8 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
 
       {/* Attached Poll */}
       {post.poll ? (
-        <View style={styles.pollCard}>
-          <Text style={styles.pollQuestion}>{post.poll.question}</Text>
+        <View style={[styles.pollCard, { backgroundColor: isDark ? '#111622' : colors.backgroundSecondary, borderColor: colors.border }]}>
+          <Text style={[styles.pollQuestion, { color: colors.textPrimary }]}>{post.poll.question}</Text>
           <View style={styles.pollOptionsList}>
             {post.poll.options.map((opt) => {
               const total = post.poll?.totalVotes || 0;
@@ -476,23 +489,33 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
                   }}
                   style={[
                     styles.pollOptionRow,
-                    isSelected && styles.pollOptionRowSelected,
+                    { backgroundColor: isDark ? '#161B26' : colors.white, borderColor: colors.border },
+                    isSelected && {
+                      borderColor: isDark ? '#10B981' : colors.textPrimary,
+                      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.08)' : 'rgba(17, 24, 39, 0.02)',
+                    },
                   ]}
                 >
                   <View
                     style={[
                       styles.pollProgressFill,
-                      { width: `${percent}%` },
-                      isSelected && styles.pollProgressFillSelected,
+                      {
+                        width: `${percent}%`,
+                        backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(17, 24, 39, 0.08)',
+                      },
+                      isSelected && {
+                        backgroundColor: isDark ? 'rgba(16, 185, 129, 0.25)' : 'rgba(17, 24, 39, 0.16)',
+                      },
                     ]}
                   />
                   <View style={styles.pollOptionLeft}>
                     {isSelected && (
-                      <Check size={16} color={colors.textPrimary} style={styles.pollCheckIcon} />
+                      <Check size={16} color={isDark ? '#34D399' : colors.textPrimary} style={styles.pollCheckIcon} />
                     )}
                     <Text
                       style={[
                         styles.pollOptionText,
+                        { color: colors.textPrimary },
                         isSelected && styles.pollOptionTextSelected,
                       ]}
                     >
@@ -502,7 +525,8 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
                   <Text
                     style={[
                       styles.pollOptionPercent,
-                      isSelected && styles.pollOptionPercentSelected,
+                      { color: colors.textSecondary },
+                      isSelected && { color: colors.textPrimary, fontWeight: '700' },
                     ]}
                   >
                     {percent}%
@@ -512,7 +536,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
             })}
           </View>
           <View style={styles.pollFooterRow}>
-            <Text style={styles.pollVotesFooter}>
+            <Text style={[styles.pollVotesFooter, { color: colors.textSecondary }]}>
               {post.poll.totalVotes} {post.poll.totalVotes === 1 ? 'vote' : 'votes'}
               {post.poll.userVotedOptionId ? ' · Voted' : ''}
             </Text>
@@ -548,7 +572,7 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
               });
             }
           }}
-          style={styles.quotedPostCard}
+          style={[styles.quotedPostCard, { backgroundColor: isDark ? '#111622' : '#F8FAFC', borderColor: colors.border }]}
         >
           <View style={styles.quotedPostHeader}>
             <Avatar
@@ -556,32 +580,32 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
               name={post.quotedPost.author?.fullName || post.quotedPost.author?.handle || 'Researcher'}
               size="xs"
             />
-            <Text style={styles.quotedAuthorName} numberOfLines={1}>
+            <Text style={[styles.quotedAuthorName, { color: colors.textPrimary }]} numberOfLines={1}>
               {post.quotedPost.author?.fullName || 'Researcher'}
             </Text>
             {post.quotedPost.author?.handle ? (
-              <Text style={styles.quotedAuthorHandle} numberOfLines={1}>
+              <Text style={[styles.quotedAuthorHandle, { color: colors.textSecondary }]} numberOfLines={1}>
                 @{post.quotedPost.author.handle}
               </Text>
             ) : null}
             {post.quotedPost.createdAt ? (
               <>
-                <Text style={styles.quotedDot}>·</Text>
-                <Text style={styles.quotedTime}>{post.quotedPost.createdAt}</Text>
+                <Text style={[styles.quotedDot, { color: colors.textTertiary }]}>·</Text>
+                <Text style={[styles.quotedTime, { color: colors.textTertiary }]}>{post.quotedPost.createdAt}</Text>
               </>
             ) : null}
           </View>
 
           {post.quotedPost.content ? (
-            <Text style={styles.quotedContentText} numberOfLines={3}>
+            <Text style={[styles.quotedContentText, { color: colors.textPrimary }]} numberOfLines={3}>
               {renderFormattedContent(post.quotedPost.content)}
             </Text>
           ) : null}
 
           {post.quotedPost.paper && (
-            <View style={styles.quotedPaperPill}>
+            <View style={[styles.quotedPaperPill, { backgroundColor: isDark ? '#161B26' : '#FFFFFF', borderColor: colors.border }]}>
               <Text style={styles.quotedPaperIcon}>🔬</Text>
-              <Text style={styles.quotedPaperTitle} numberOfLines={1}>
+              <Text style={[styles.quotedPaperTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                 {post.quotedPost.paper.title}
               </Text>
             </View>
@@ -605,8 +629,8 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
           {post.topics
             .filter((t) => typeof t === 'string' && t.trim().length > 0)
             .map((t) => (
-              <View key={t} style={styles.topicChip}>
-                <Text style={styles.topicChipText}>#{t.trim()}</Text>
+              <View key={t} style={[styles.topicChip, { backgroundColor: isDark ? '#161B26' : colors.backgroundSecondary, borderColor: colors.border }]}>
+                <Text style={[styles.topicChipText, { color: colors.textSecondary }]}>#{t.trim()}</Text>
               </View>
             ))}
         </View>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { colors, spacing } from '../../theme';
+import { spacing, useColors } from '../../theme';
 import { Typography } from '../core/Typography';
 
 interface SettingsSectionHeaderProps {
@@ -12,6 +12,8 @@ export const SettingsSectionHeader: React.FC<SettingsSectionHeaderProps> = ({
   title,
   description,
 }) => {
+  const colors = useColors();
+
   return (
     <View style={styles.container}>
       <Typography variant="labelBold" color={colors.textSecondary} style={styles.title}>

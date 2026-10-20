@@ -258,14 +258,14 @@ export async function fetchTopicPageData(
         ),
         paper:papers!paper_id (*),
         post_topics!inner (
-          topic:topics!inner ( slug, name )
+          topic_id
         ),
         likes!left ( user_id ),
         reposts!left ( user_id ),
         bookmarks!left ( user_id )
       `)
       .eq('post_type', 'research_share')
-      .or(`post_topics.topic.slug.eq.${slugOrId},post_topics.topic.id.eq.${slugOrId}`)
+      .eq('post_topics.topic_id', topic.id)
       .order('created_at', { ascending: false })
       .limit(10);
 
@@ -297,14 +297,14 @@ export async function fetchTopicPageData(
         ),
         paper:papers!paper_id (*),
         post_topics!inner (
-          topic:topics!inner ( slug, name )
+          topic_id
         ),
         likes!left ( user_id ),
         reposts!left ( user_id ),
         bookmarks!left ( user_id )
       `)
       .neq('post_type', 'research_share')
-      .or(`post_topics.topic.slug.eq.${slugOrId},post_topics.topic.id.eq.${slugOrId}`)
+      .eq('post_topics.topic_id', topic.id)
       .order('likes_count', { ascending: false })
       .limit(10);
 

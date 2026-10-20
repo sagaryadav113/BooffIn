@@ -24,7 +24,7 @@ import {
   Compass,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { SearchBar } from '../../components/core/SearchBar';
 import { TopicChip } from '../../components/core/TopicChip';
 import { Typography } from '../../components/core/Typography';
@@ -57,6 +57,8 @@ const FILTER_TABS: FilterTabOption[] = [
 ];
 
 export default function SearchScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
   const params = useLocalSearchParams<{ q?: string; category?: SearchCategory }>();
 
   const [inputQuery, setInputQuery] = useState(params.q || '');
@@ -130,11 +132,11 @@ export default function SearchScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header with Search Input */}
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, { backgroundColor: colors.background }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
@@ -161,7 +163,7 @@ export default function SearchScreen() {
       </View>
 
       {/* Filter Category Chips with Count Badges */}
-      <View style={styles.filterSection}>
+      <View style={[styles.filterSection, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -179,13 +181,23 @@ export default function SearchScreen() {
                 onPress={() => handleCategoryPress(tab.key)}
                 style={[
                   styles.filterPill,
-                  isSelected ? styles.filterPillActive : styles.filterPillInactive,
+                  isSelected
+                    ? {
+                        backgroundColor: isDark ? '#10B981' : colors.black,
+                        borderColor: isDark ? '#10B981' : colors.black,
+                      }
+                    : {
+                        backgroundColor: colors.cardBackground,
+                        borderColor: colors.borderLight,
+                      },
                 ]}
               >
                 <Text
                   style={[
                     styles.filterPillText,
-                    isSelected ? styles.filterPillTextActive : styles.filterPillTextInactive,
+                    isSelected
+                      ? { color: '#FFFFFF', fontWeight: '700' }
+                      : { color: colors.textSecondary },
                   ]}
                 >
                   {tab.label}
@@ -194,13 +206,17 @@ export default function SearchScreen() {
                   <View
                     style={[
                       styles.countBadge,
-                      isSelected ? styles.countBadgeActive : styles.countBadgeInactive,
+                      isSelected
+                        ? styles.countBadgeActive
+                        : { backgroundColor: colors.backgroundSecondary },
                     ]}
                   >
                     <Text
                       style={[
                         styles.countBadgeText,
-                        isSelected ? styles.countBadgeTextActive : styles.countBadgeTextInactive,
+                        isSelected
+                          ? styles.countBadgeTextActive
+                          : { color: colors.textSecondary },
                       ]}
                     >
                       {count}
@@ -256,10 +272,16 @@ export default function SearchScreen() {
                   <TouchableOpacity
                     key={item.query}
                     activeOpacity={0.78}
-                    style={styles.suggestionCard}
+                    style={[
+                      styles.suggestionCard,
+                      {
+                        backgroundColor: colors.cardBackground,
+                        borderColor: colors.borderLight,
+                      },
+                    ]}
                     onPress={() => handleSelectDiscovery(item.query, item.category)}
                   >
-                    <View style={styles.suggestionBadge}>
+                    <View style={[styles.suggestionBadge, { backgroundColor: colors.backgroundSecondary }]}>
                       <Typography variant="micro" color={colors.textSecondary} style={{ fontWeight: '700', textTransform: 'uppercase' }}>
                         {item.category}
                       </Typography>
@@ -292,9 +314,9 @@ export default function SearchScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.recentList}>
+                <View style={[styles.recentList, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
                   {recentSearches.map((term) => (
-                    <View key={term} style={styles.recentRow}>
+                    <View key={term} style={[styles.recentRow, { borderBottomColor: colors.borderLight }]}>
                       <TouchableOpacity
                         style={styles.recentTextWrapper}
                         onPress={() => handleSelectDiscovery(term)}

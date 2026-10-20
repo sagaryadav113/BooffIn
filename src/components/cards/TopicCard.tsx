@@ -19,7 +19,7 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Topic } from '../../types';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, layout, useColors, useIsDark } from '../../theme';
 import { Button } from '../core/Button';
 import { useTopicStore } from '../../store/useTopicStore';
 
@@ -29,6 +29,8 @@ interface TopicCardProps {
 }
 
 export const TopicCard: React.FC<TopicCardProps> = ({ topic, style }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const toggleFollow = useTopicStore((s) => s.toggleFollowTopic);
 
   const getIcon = (name: string) => {
@@ -80,13 +82,30 @@ export const TopicCard: React.FC<TopicCardProps> = ({ topic, style }) => {
     <TouchableOpacity
       activeOpacity={0.88}
       onPress={handleTopicPress}
-      style={[styles.container, style]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.cardBackground,
+          borderBottomColor: colors.borderLight,
+        },
+        style,
+      ]}
     >
-      <View style={styles.iconContainer}>{getIcon(topic.iconName)}</View>
+      <View
+        style={[
+          styles.iconContainer,
+          {
+            backgroundColor: colors.backgroundSecondary,
+            borderColor: colors.borderLight,
+          },
+        ]}
+      >
+        {getIcon(topic.iconName)}
+      </View>
 
       <View style={styles.metaContainer}>
-        <Text style={styles.name}>{topic.name}</Text>
-        <Text style={styles.followers}>{formatFollowers(topic.followersCount)}</Text>
+        <Text style={[styles.name, { color: colors.textPrimary }]}>{topic.name}</Text>
+        <Text style={[styles.followers, { color: colors.textSecondary }]}>{formatFollowers(topic.followersCount)}</Text>
       </View>
 
       <Button
@@ -107,19 +126,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md + 2,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    backgroundColor: colors.cardBackground,
+    borderBottomColor: staticColors.borderLight,
+    backgroundColor: staticColors.cardBackground,
     minHeight: layout.touchTargetMin + 16,
   },
   iconContainer: {
     width: 48,
     height: 48,
     borderRadius: radii.full,
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     marginRight: spacing.md,
   },
   metaContainer: {
@@ -128,13 +147,13 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     fontSize: 15.5,
     fontWeight: '700',
   },
   followers: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 13,
     marginTop: 2,
   },

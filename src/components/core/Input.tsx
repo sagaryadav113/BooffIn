@@ -7,7 +7,7 @@ import {
   ViewStyle,
   TouchableOpacity,
 } from 'react-native';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, layout, useColors, useIsDark } from '../../theme';
 import { Typography } from './Typography';
 import { Icon, IconName } from './Icon';
 
@@ -32,6 +32,8 @@ export const Input: React.FC<InputProps> = ({
   style,
   ...props
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -45,8 +47,9 @@ export const Input: React.FC<InputProps> = ({
       <View
         style={[
           styles.inputWrapper,
+          { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
           props.multiline && { alignItems: 'flex-start', paddingTop: spacing.xs, paddingBottom: spacing.xs },
-          isFocused && styles.inputWrapperFocused,
+          isFocused && [styles.inputWrapperFocused, { backgroundColor: isDark ? colors.backgroundSecondary : colors.white, borderColor: isDark ? '#10B981' : colors.primary }],
           error ? styles.inputWrapperError : null,
         ]}
       >
@@ -59,6 +62,7 @@ export const Input: React.FC<InputProps> = ({
         <TextInput
           style={[
             styles.input,
+            { color: colors.textPrimary },
             props.multiline && { minHeight: 68, textAlignVertical: 'top' },
             style,
           ]}
@@ -106,19 +110,19 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: staticColors.border,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md + 2,
     minHeight: layout.inputHeights.md,
   },
   inputWrapperFocused: {
-    borderColor: colors.black,
-    backgroundColor: colors.white,
+    borderColor: staticColors.black,
+    backgroundColor: staticColors.white,
   },
   inputWrapperError: {
-    borderColor: colors.accentRed,
+    borderColor: staticColors.accentRed,
   },
   leftIconWrapper: {
     marginRight: spacing.sm,
@@ -133,7 +137,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     ...typography.body,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     paddingVertical: spacing.sm + 2,
     fontSize: 15,
   },

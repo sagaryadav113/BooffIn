@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Modal, TouchableOpacity, TextInput, ActivityIndicator, TouchableWithoutFeedback } from 'react-native';
-import { colors, radii, spacing } from '../../theme';
+import { colors, radii, spacing, useColors, useIsDark } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Icon } from '../core/Icon';
 
@@ -29,6 +29,8 @@ export const DangerActionModal: React.FC<DangerActionModalProps> = ({
   confirmationMatchText = 'DELETE',
   isLoading = false,
 }) => {
+  const dynamicColors = useColors();
+  const isDark = useIsDark();
   const [typedValue, setTypedValue] = useState('');
 
   const isConfirmed = requiresTyping
@@ -50,28 +52,28 @@ export const DangerActionModal: React.FC<DangerActionModalProps> = ({
       <TouchableWithoutFeedback onPress={handleClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.modalCard}>
-              <View style={styles.warningIcon}>
-                <Icon name="AlertTriangle" size="md" color={colors.error} />
+            <View style={[styles.modalCard, { backgroundColor: dynamicColors.backgroundElevated, borderColor: dynamicColors.borderLight, borderWidth: isDark ? 1 : 0 }]}>
+              <View style={[styles.warningIcon, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2' }]}>
+                <Icon name="AlertTriangle" size="md" color={dynamicColors.error} />
               </View>
 
-              <Typography variant="h3" color={colors.textPrimary} align="center" style={styles.title}>
+              <Typography variant="h3" color={dynamicColors.textPrimary} align="center" style={styles.title}>
                 {title}
               </Typography>
 
-              <Typography variant="body" color={colors.textSecondary} align="center" style={styles.description}>
+              <Typography variant="body" color={dynamicColors.textSecondary} align="center" style={styles.description}>
                 {description}
               </Typography>
 
               {requiresTyping ? (
                 <View style={styles.inputContainer}>
-                  <Typography variant="micro" color={colors.textMuted} style={{ marginBottom: 6 }}>
-                    Type <Typography variant="captionBold" color={colors.error}>{confirmationMatchText}</Typography> to confirm:
+                  <Typography variant="micro" color={dynamicColors.textMuted} style={{ marginBottom: 6 }}>
+                    Type <Typography variant="captionBold" color={dynamicColors.error}>{confirmationMatchText}</Typography> to confirm:
                   </Typography>
                   <TextInput
-                    style={styles.textInput}
+                    style={[styles.textInput, { backgroundColor: dynamicColors.background, color: dynamicColors.textPrimary, borderColor: dynamicColors.error }]}
                     placeholder={confirmationMatchText}
-                    placeholderTextColor={colors.textMuted}
+                    placeholderTextColor={dynamicColors.textMuted}
                     value={typedValue}
                     onChangeText={setTypedValue}
                     autoCapitalize="characters"
@@ -82,11 +84,11 @@ export const DangerActionModal: React.FC<DangerActionModalProps> = ({
               <View style={styles.btnRow}>
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  style={styles.cancelBtn}
+                  style={[styles.cancelBtn, { backgroundColor: dynamicColors.backgroundSecondary }]}
                   onPress={handleClose}
                   disabled={isLoading}
                 >
-                  <Typography variant="captionBold" color={colors.textSecondary}>
+                  <Typography variant="captionBold" color={dynamicColors.textSecondary}>
                     {cancelText}
                   </Typography>
                 </TouchableOpacity>
@@ -95,15 +97,16 @@ export const DangerActionModal: React.FC<DangerActionModalProps> = ({
                   activeOpacity={0.8}
                   style={[
                     styles.confirmBtn,
+                    { backgroundColor: dynamicColors.error },
                     (!isConfirmed || isLoading) && styles.disabledBtn,
                   ]}
                   onPress={onConfirm}
                   disabled={!isConfirmed || isLoading}
                 >
                   {isLoading ? (
-                    <ActivityIndicator size="small" color={colors.white} />
+                    <ActivityIndicator size="small" color={dynamicColors.white} />
                   ) : (
-                    <Typography variant="captionBold" color={colors.white}>
+                    <Typography variant="captionBold" color={dynamicColors.white}>
                       {confirmText}
                     </Typography>
                   )}

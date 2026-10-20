@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { colors, spacing } from '../../theme';
+import { colors, spacing, useColors, useIsDark } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { SearchBar } from '../../components/core/SearchBar';
 import { FilterPills } from '../../components/core/FilterPills';
@@ -16,6 +16,8 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { useTopicStore } from '../../store/useTopicStore';
 
 export default function TopicsDirectoryScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
   const [activeTab, setActiveTab] = useState<'All Topics' | 'My Topics'>('All Topics');
   const [searchQuery, setSearchQuery] = useState('');
   const topics = useTopicStore((s) => s.topics);
@@ -32,8 +34,8 @@ export default function TopicsDirectoryScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
       <AppHeader
@@ -44,7 +46,7 @@ export default function TopicsDirectoryScreen() {
       />
 
       {/* Filter Tabs */}
-      <View style={styles.pillsContainer}>
+      <View style={[styles.pillsContainer, { backgroundColor: colors.background }]}>
         <FilterPills
           tabs={['All Topics', 'My Topics']}
           activeTab={activeTab}
@@ -53,7 +55,7 @@ export default function TopicsDirectoryScreen() {
       </View>
 
       {/* Search Filter Input */}
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.background }]}>
         <SearchBar
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -67,6 +69,7 @@ export default function TopicsDirectoryScreen() {
         data={filteredTopics}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <TopicCard topic={item} />}
+        style={{ backgroundColor: colors.background }}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <EmptyState

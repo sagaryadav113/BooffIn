@@ -15,7 +15,7 @@ import {
   BellOff,
   Archive,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { GroupCollageAvatar } from './GroupCollageAvatar';
 import { Workspace } from '../../types/workspace';
@@ -36,6 +36,8 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   onPress,
   showDividers = true,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
 
@@ -245,8 +247,12 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
       onPress={handlePress}
       style={[
         styles.container,
-        unreadCount > 0 && styles.unreadContainer,
-        isPinned && styles.pinnedContainer,
+        {
+          backgroundColor: colors.background,
+          borderBottomColor: colors.borderLight,
+        },
+        unreadCount > 0 && { backgroundColor: isDark ? '#111622' : '#FFFFFF' },
+        isPinned && { backgroundColor: isDark ? '#161B26' : '#F8FAF9' },
       ]}
     >
       {/* Left Avatar (48px) */}
@@ -275,17 +281,17 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
           <View style={styles.nameRow}>
             {isPinned && (
               <View style={styles.pinnedBadgeIcon}>
-                <Pin size={12} color="#164E3F" fill="#164E3F" />
+                <Pin size={12} color={isDark ? '#34D399' : '#164E3F'} fill={isDark ? '#34D399' : '#164E3F'} />
               </View>
             )}
-            <Text style={[styles.name, isPinned && styles.pinnedNameText]} numberOfLines={1}>
+            <Text style={[styles.name, { color: colors.textPrimary }, isPinned && { color: isDark ? '#34D399' : '#0F172A' }]} numberOfLines={1}>
               {displayName}
             </Text>
           </View>
 
           {/* Right Timestamp & Icons */}
           <View style={styles.timestampCol}>
-            {timeText ? <Text style={styles.timeText}>{timeText}</Text> : null}
+            {timeText ? <Text style={[styles.timeText, { color: colors.textMuted }]}>{timeText}</Text> : null}
           </View>
         </View>
 
@@ -294,7 +300,8 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
           <Text
             style={[
               styles.snippetText,
-              unreadCount > 0 && styles.unreadSnippetText,
+              { color: colors.textSecondary },
+              unreadCount > 0 && { color: colors.textPrimary, fontWeight: '600' },
             ]}
             numberOfLines={1}
           >
@@ -307,7 +314,7 @@ export const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
               <BellOff size={13} color="#94A3B8" style={{ marginRight: 4 }} />
             )}
             {unreadCount > 0 ? (
-              <View style={styles.unreadBadge}>
+              <View style={[styles.unreadBadge, { backgroundColor: isDark ? '#059669' : '#064E3F' }]}>
                 <Text style={styles.unreadBadgeText}>
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </Text>

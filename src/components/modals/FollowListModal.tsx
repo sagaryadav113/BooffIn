@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Users } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 import { UserProfile } from '../../types';
 import { ResearcherCard } from '../cards/ResearcherCard';
 import { EmptyState } from '../feedback/EmptyState';
@@ -35,6 +35,7 @@ export const FollowListModal: React.FC<FollowListModalProps> = ({
   type,
   userName = 'Researcher',
 }) => {
+  const { colors, isDark } = useTheme();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
   const removeFollowerUser = useAuthStore((s) => s.removeFollowerUser);
@@ -124,20 +125,20 @@ export const FollowListModal: React.FC<FollowListModalProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.backgroundCard, borderBottomColor: colors.border }]}>
           <View style={styles.titleContainer}>
-            <Text style={styles.headerTitle}>{title}</Text>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{title}</Text>
             {userName ? (
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
                 {userName}
               </Text>
             ) : null}
           </View>
           <TouchableOpacity
             onPress={onClose}
-            style={styles.closeButton}
+            style={[styles.closeButton, { backgroundColor: isDark ? '#1F2636' : colors.surfaceHover }]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             activeOpacity={0.7}
           >

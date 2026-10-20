@@ -14,7 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { TrendingTag } from '../../types/trending';
 
 interface TrendingTagsSectionProps {
@@ -28,6 +28,8 @@ export const TrendingTagsSection: React.FC<TrendingTagsSectionProps> = ({
   isLoading = false,
   onSelectTag,
 }) => {
+  const dynamicColors = useColors();
+  const isDark = useIsDark();
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!isLoading && (!tags || tags.length === 0)) {
@@ -51,18 +53,18 @@ export const TrendingTagsSection: React.FC<TrendingTagsSectionProps> = ({
       {/* Header Row */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
-          <View style={styles.iconContainer}>
+          <View style={[styles.iconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7' }]}>
             <Flame size={18} color="#D97706" />
           </View>
           <View>
             <View style={styles.titleWithBadge}>
-              <Text style={styles.mainTitle}>Trending in Science</Text>
-              <View style={styles.timeBadge}>
-                <Sparkles size={10} color="#1B4D3E" />
-                <Text style={styles.timeBadgeText}>Past 24h</Text>
+              <Text style={[styles.mainTitle, { color: dynamicColors.textPrimary }]}>Trending in Science</Text>
+              <View style={[styles.timeBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE' }]}>
+                <Sparkles size={10} color={dynamicColors.brandGreen} />
+                <Text style={[styles.timeBadgeText, { color: dynamicColors.brandGreen }]}>Past 24h</Text>
               </View>
             </View>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: dynamicColors.textSecondary }]}>
               Fastest-accelerating research topics & tags on BoffIn
             </Text>
           </View>
@@ -71,12 +73,12 @@ export const TrendingTagsSection: React.FC<TrendingTagsSectionProps> = ({
 
       {/* Loading Skeleton */}
       {isLoading && tags.length === 0 ? (
-        <View style={styles.loadingWrapper}>
-          <ActivityIndicator size="small" color="#1B4D3E" />
-          <Text style={styles.loadingText}>Calculating 24-hour trending velocity...</Text>
+        <View style={[styles.loadingWrapper, { backgroundColor: dynamicColors.cardBackground }]}>
+          <ActivityIndicator size="small" color={dynamicColors.brandGreen} />
+          <Text style={[styles.loadingText, { color: dynamicColors.textSecondary }]}>Calculating 24-hour trending velocity...</Text>
         </View>
       ) : (
-        <View style={styles.cardContainer}>
+        <View style={[styles.cardContainer, { backgroundColor: dynamicColors.cardBackground, borderColor: dynamicColors.borderLight }]}>
           {displayedTags.map((item, index) => {
             const isLast = index === displayedTags.length - 1;
             return (
@@ -84,24 +86,24 @@ export const TrendingTagsSection: React.FC<TrendingTagsSectionProps> = ({
                 key={item.id || item.tag}
                 activeOpacity={0.7}
                 onPress={() => handlePressTag(item.tag)}
-                style={[styles.trendItem, !isLast && styles.trendItemDivider]}
+                style={[styles.trendItem, !isLast && [styles.trendItemDivider, { borderBottomColor: dynamicColors.borderLight }]]}
               >
                 <View style={styles.trendItemContent}>
                   {/* Category & Rank Line */}
                   <View style={styles.metaRow}>
-                    <Text style={styles.rankText}>
+                    <Text style={[styles.rankText, { color: dynamicColors.textSecondary }]}>
                       {item.rank} · {item.category}
                     </Text>
                   </View>
 
                   {/* Main Tag Line */}
                   <View style={styles.tagRow}>
-                    <Text style={styles.tagName}>{item.tag}</Text>
+                    <Text style={[styles.tagName, { color: dynamicColors.textPrimary }]}>{item.tag}</Text>
                   </View>
 
                   {/* Discussion Volume Subtitle */}
                   <View style={styles.statsRow}>
-                    <Text style={styles.statsText}>
+                    <Text style={[styles.statsText, { color: dynamicColors.textMuted }]}>
                       {item.postsCount24h.toLocaleString()} {item.postsCount24h === 1 ? 'discussion' : 'discussions'}
                       {item.authorsCount24h > 1
                         ? ` · ${item.authorsCount24h} researchers`
@@ -114,7 +116,7 @@ export const TrendingTagsSection: React.FC<TrendingTagsSectionProps> = ({
 
                 {/* Right Action Icon */}
                 <View style={styles.trendArrow}>
-                  <Hash size={16} color="#94A3B8" />
+                  <Hash size={16} color={dynamicColors.textMuted} />
                 </View>
               </TouchableOpacity>
             );
@@ -125,15 +127,15 @@ export const TrendingTagsSection: React.FC<TrendingTagsSectionProps> = ({
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleToggleExpand}
-              style={styles.expandButton}
+              style={[styles.expandButton, { backgroundColor: dynamicColors.backgroundSecondary, borderTopColor: dynamicColors.borderLight }]}
             >
-              <Text style={styles.expandButtonText}>
+              <Text style={[styles.expandButtonText, { color: dynamicColors.brandGreen }]}>
                 {isExpanded ? 'Show less' : `Show ${tags.length - 5} more trends`}
               </Text>
               {isExpanded ? (
-                <ChevronUp size={16} color="#1B4D3E" />
+                <ChevronUp size={16} color={dynamicColors.brandGreen} />
               ) : (
-                <ChevronDown size={16} color="#1B4D3E" />
+                <ChevronDown size={16} color={dynamicColors.brandGreen} />
               )}
             </TouchableOpacity>
           )}

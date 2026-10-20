@@ -17,7 +17,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { Users, Eye, Zap, MessageSquare, TrendingUp } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { DayDataPoint } from '../../types/analytics';
 
 export type ChartMetricType = 'followers' | 'views' | 'engagement' | 'discussions';
@@ -31,6 +31,8 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
   data,
   timeframeLabel,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const [selectedMetric, setSelectedMetric] = useState<ChartMetricType>('followers');
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(
@@ -171,9 +173,9 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
   }, [data, selectedMetric, points]);
 
   return (
-    <View style={styles.card} onLayout={onLayout}>
+    <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]} onLayout={onLayout}>
       {/* Metric Selector Pills */}
-      <View style={styles.metricTabs}>
+      <View style={[styles.metricTabs, { backgroundColor: colors.backgroundSecondary }]}>
         {(
           [
             { key: 'followers', label: 'Followers' },
@@ -186,7 +188,13 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
           return (
             <TouchableOpacity
               key={tab.key}
-              style={[styles.tabChip, isActive && styles.tabChipActive]}
+              style={[
+                styles.tabChip,
+                isActive && [
+                  styles.tabChipActive,
+                  { backgroundColor: isDark ? '#1F2636' : colors.white },
+                ],
+              ]}
               onPress={() => {
                 setSelectedMetric(tab.key);
                 setActivePointIndex(null);
@@ -196,7 +204,11 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
               <Text
                 style={[
                   styles.tabChipText,
-                  isActive && styles.tabChipTextActive,
+                  { color: colors.textSecondary },
+                  isActive && [
+                    styles.tabChipTextActive,
+                    { color: colors.textPrimary },
+                  ],
                 ]}
               >
                 {tab.label}
@@ -209,18 +221,18 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
       {/* Selected Metric Callout Header */}
       <View style={styles.chartHeader}>
         <View>
-          <Text style={styles.chartSubTitle}>
+          <Text style={[styles.chartSubTitle, { color: colors.textSecondary }]}>
             {metricConfig.title} ({timeframeLabel})
           </Text>
           <View style={styles.valueRow}>
             <Text style={[styles.mainValue, { color: metricConfig.color }]}>
               {activeData ? activeData.value : points[points.length - 1] || 0}
             </Text>
-            <Text style={styles.unitText}>{metricConfig.unit}</Text>
+            <Text style={[styles.unitText, { color: colors.textSecondary }]}>{metricConfig.unit}</Text>
             {selectedMetric === 'followers' && (
-              <View style={styles.growthBadge}>
-                <TrendingUp size={11} color={colors.accentGreen} />
-                <Text style={styles.growthBadgeText}>
+              <View style={[styles.growthBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)' }]}>
+                <TrendingUp size={11} color={isDark ? '#34D399' : colors.accentGreen} />
+                <Text style={[styles.growthBadgeText, { color: isDark ? '#34D399' : colors.accentGreen }]}>
                   +{totalGrowthOrSum} in period
                 </Text>
               </View>
@@ -229,9 +241,9 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
         </View>
 
         {activeData && (
-          <View style={styles.dateBadge}>
-            <Text style={styles.dateBadgeText}>{activeData.dataPoint.label}</Text>
-            <Text style={styles.dateBadgeSubText}>
+          <View style={[styles.dateBadge, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+            <Text style={[styles.dateBadgeText, { color: colors.textPrimary }]}>{activeData.dataPoint.label}</Text>
+            <Text style={[styles.dateBadgeSubText, { color: colors.textSecondary }]}>
               {metricConfig.getSubValue(activeData.dataPoint)}
             </Text>
           </View>
@@ -249,7 +261,7 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
               x2="0"
               y2="1"
             >
-              <Stop offset="0%" stopColor={metricConfig.color} stopOpacity="0.25" />
+              <Stop offset="0%" stopColor={metricConfig.color} stopOpacity={isDark ? '0.35' : '0.25'} />
               <Stop offset="100%" stopColor={metricConfig.color} stopOpacity="0.0" />
             </LinearGradient>
           </Defs>
@@ -313,7 +325,7 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
                 cx={coord.x}
                 cy={coord.y}
                 r={isSelected ? 5.5 : 2.5}
-                fill={isSelected ? metricConfig.color : colors.white}
+                fill={isSelected ? metricConfig.color : (isDark ? colors.cardBackground : colors.white)}
                 stroke={metricConfig.color}
                 strokeWidth={isSelected ? 2.5 : 1.5}
                 onPress={() => setActivePointIndex(idx)}
@@ -358,7 +370,7 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
         </Svg>
       </View>
 
-      <Text style={styles.hintText}>
+      <Text style={[styles.hintText, { color: colors.textSecondary }]}>
         Tap any point on the chart to inspect daily metrics
       </Text>
     </View>

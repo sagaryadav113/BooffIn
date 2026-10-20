@@ -73,7 +73,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import {
   Workspace,
@@ -202,6 +202,8 @@ interface WorkspaceDMViewProps {
 }
 
 export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const currentUser = useAuthStore((s) => s.user);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const messages = useWorkspaceStore((s) => s.messages);
@@ -1795,11 +1797,11 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
       <View key={item.id} style={{ width: '100%' }}>
         {isFirstOfDateGroup && (
           <View style={styles.dateSeparatorRow}>
-            <View style={styles.dateSeparatorLine} />
-            <View style={styles.dateSeparatorPill}>
-              <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
+            <View style={[styles.dateSeparatorLine, { backgroundColor: colors.borderLight }]} />
+            <View style={[styles.dateSeparatorPill, { backgroundColor: isDark ? '#1F2636' : '#F1F5F9', borderColor: colors.borderLight }]}>
+              <Text style={[styles.dateSeparatorText, { color: colors.textSecondary }]}>{getDateLabel(item.created_at)}</Text>
             </View>
-            <View style={styles.dateSeparatorLine} />
+            <View style={[styles.dateSeparatorLine, { backgroundColor: colors.borderLight }]} />
           </View>
         )}
 
@@ -1845,7 +1847,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 : isAudio
                 ? isMe
                   ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
-                  : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }]
+                  : [styles.otherBubble, { backgroundColor: activeThemeConfig.id === 'default' && isDark ? '#1F2636' : activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' || isDark ? 1 : 0, borderColor: isDark ? colors.borderLight : 'rgba(0,0,0,0.06)' }]
                 : isMe
                 ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
                 : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }],
@@ -2169,7 +2171,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                           styles.messageText,
                           isMe
                             ? [styles.myMessageText, { color: activeThemeConfig.myBubbleTextColor }]
-                            : [styles.otherMessageText, { color: activeThemeConfig.otherBubbleTextColor }],
+                            : [styles.otherMessageText, { color: activeThemeConfig.id === 'default' && isDark ? '#FFFFFF' : activeThemeConfig.otherBubbleTextColor }],
                         ]}
                       >
                         {displayMessageText}
@@ -2202,7 +2204,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                     ? styles.doiTimestamp
                     : isMe
                     ? [styles.myTimestamp, { color: activeThemeConfig.timestampMyColor }]
-                    : [styles.otherTimestamp, { color: activeThemeConfig.timestampOtherColor }],
+                    : [styles.otherTimestamp, { color: activeThemeConfig.id === 'default' && isDark ? '#94A3B8' : activeThemeConfig.timestampOtherColor }],
                 ]}
               >
                 {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -2287,18 +2289,18 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Top Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.cardBackground, borderBottomColor: colors.borderLight }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <ArrowLeft size={20} color="#164E3F" />
+          <ArrowLeft size={20} color={isDark ? "#34D399" : "#164E3F"} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -2317,7 +2319,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
           <View style={styles.headerTitleCol}>
             <View style={styles.headerTitleRow}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
+              <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                 {partner?.fullName || workspace.name || 'Researcher'}
               </Text>
               {isPinned && (
@@ -2334,6 +2336,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <Text
               style={[
                 styles.headerSubtext,
+                { color: colors.textSecondary },
                 isPartnerOnline && styles.headerSubtextActive,
               ]}
               numberOfLines={1}
@@ -2375,7 +2378,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             style={styles.headerActionBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Search size={18} color={showSearchBar ? '#164E3F' : '#64748B'} />
+            <Search size={18} color={showSearchBar ? (isDark ? '#34D399' : '#164E3F') : colors.textSecondary} />
           </TouchableOpacity>
 
           {/* Media & Papers Gallery Trigger */}
@@ -2385,7 +2388,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             style={styles.headerActionBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <FolderOpen size={18} color="#64748B" />
+            <FolderOpen size={18} color={colors.textSecondary} />
           </TouchableOpacity>
 
           {/* 3-dot Options Menu */}
@@ -2395,22 +2398,22 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             style={styles.headerActionBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <MoreVertical size={20} color="#164E3F" />
+            <MoreVertical size={20} color={isDark ? "#34D399" : "#164E3F"} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* In-Chat Search & Filter Strip */}
       {showSearchBar && (
-        <View style={styles.chatSearchContainer}>
-          <View style={styles.chatSearchInputRow}>
+        <View style={[styles.chatSearchContainer, { backgroundColor: colors.backgroundSecondary, borderBottomColor: colors.borderLight }]}>
+          <View style={[styles.chatSearchInputRow, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
             <Search size={15} color="#64748B" />
             <TextInput
               value={chatSearchQuery}
               onChangeText={setChatSearchQuery}
               placeholder="Search conversation..."
-              placeholderTextColor="#94A3B8"
-              style={styles.chatSearchInput}
+              placeholderTextColor={colors.textMuted}
+              style={[styles.chatSearchInput, { color: colors.textPrimary }]}
               autoFocus
             />
             {chatSearchQuery.trim() ? (
@@ -2468,7 +2471,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           style={[
             StyleSheet.absoluteFill,
             {
-              backgroundColor: activeThemeConfig.backgroundColor,
+              backgroundColor: activeThemeConfig.id === "default" && isDark ? colors.background : activeThemeConfig.backgroundColor,
               overflow: 'hidden',
               width: '100%',
               height: '100%',
@@ -2699,7 +2702,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
 
       {/* Live Voice Note Recorder Dock */}
       {isRecordingVoice ? (
-        <View style={{ paddingBottom: bottomInset > 0 ? bottomInset + 8 : 0, backgroundColor: '#FFFFFF' }}>
+        <View style={{ paddingBottom: bottomInset > 0 ? bottomInset + 8 : 0, backgroundColor: colors.cardBackground }}>
           <VoiceNoteRecorder
             onSendVoiceNote={handleSendVoiceNote}
             onCancel={() => setIsRecordingVoice(false)}
@@ -2707,13 +2710,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         </View>
       ) : (
         /* Bottom Input Dock with Photo, Voice Note (Mic), Attachment Menu, and Send */
-        <View style={[styles.bottomDockContainer, { paddingBottom: bottomInset > 0 ? bottomInset + 8 : 8 }]}>
+        <View style={[styles.bottomDockContainer, { backgroundColor: colors.cardBackground, borderTopColor: colors.borderLight, paddingBottom: bottomInset > 0 ? bottomInset + 8 : 8 }]}>
           {/* Capsule Input */}
           <View
             style={[
               styles.inputCapsule,
+              { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
               (isInputFocused || Boolean(inputText.trim())) && [
                 styles.inputCapsuleFocused,
+                { backgroundColor: isDark ? '#161B26' : '#FFFFFF', borderColor: isDark ? '#10B981' : '#164E3F' },
                 activeThemeConfig?.accentColor ? { borderColor: activeThemeConfig.accentColor } : null,
               ],
             ]}
@@ -2724,7 +2729,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               onPress={handlePickImage}
               style={styles.mediaIconBtn}
             >
-              <Camera size={19} color="#64748B" />
+              <Camera size={19} color={colors.textSecondary} />
             </TouchableOpacity>
 
             <TextInput
@@ -2737,8 +2742,8 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
               placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
-              placeholderTextColor="#94A3B8"
-              style={styles.textInput}
+              placeholderTextColor={colors.textMuted}
+              style={[styles.textInput, { color: colors.textPrimary }]}
               multiline
               maxLength={2000}
             />
@@ -2750,7 +2755,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 onPress={() => setShowAttachMenu(true)}
                 style={styles.mediaIconBtn}
               >
-                <Paperclip size={19} color="#64748B" />
+                <Paperclip size={19} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -2760,7 +2765,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setIsRecordingVoice(true)}
-              style={styles.detachedMicBtn}
+              style={[styles.detachedMicBtn, { backgroundColor: isDark ? '#059669' : '#164E3F' }]}
             >
               <Mic size={18} color="#FFFFFF" />
             </TouchableOpacity>
@@ -2768,7 +2773,7 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleSend}
-              style={styles.detachedSendBtn}
+              style={[styles.detachedSendBtn, { backgroundColor: isDark ? '#059669' : '#164E3F' }]}
             >
               <Send size={16} color="#FFFFFF" />
             </TouchableOpacity>

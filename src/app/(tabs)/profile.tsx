@@ -44,7 +44,7 @@ import {
   Repeat,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors, radii, spacing, typography, layout, useTheme } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
 import { Button } from '../../components/core/Button';
 import { IconButton } from '../../components/core/IconButton';
@@ -92,6 +92,7 @@ import { fetchUserAnalytics } from '../../api/analyticsService';
 export const DEFAULT_PROFILE_BANNER = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
 export default function CurrentUserProfileScreen() {
+  const { colors, isDark } = useTheme();
   const storeUser = useAuthStore((s) => s.user);
   const user = storeUser;
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -759,8 +760,8 @@ export default function CurrentUserProfileScreen() {
 
   if (!isAuthenticated || !user?.id) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         <AppHeader title="Research Profile" />
         <EmptyState
           icon="Users"
@@ -774,8 +775,8 @@ export default function CurrentUserProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -839,7 +840,7 @@ export default function CurrentUserProfileScreen() {
         </View>
 
         {/* Profile Info Header */}
-        <View style={styles.profileHeader}>
+        <View style={[styles.profileHeader, { backgroundColor: colors.background }]}>
           {/* Avatar & Edit Profile Action */}
           <View style={styles.avatarActionRow}>
             <View style={styles.avatarContainerWrapper}>
@@ -848,7 +849,7 @@ export default function CurrentUserProfileScreen() {
                 name={user.fullName}
                 size={84}
                 verified={user.orcidVerified}
-                style={styles.avatarOverBanner}
+                style={[styles.avatarOverBanner, { borderColor: colors.background }]}
               />
 
               {isUploadingAvatar && (
@@ -890,7 +891,7 @@ export default function CurrentUserProfileScreen() {
           {/* Name & Handle */}
           <View style={styles.nameSection}>
             <View style={styles.nameRow}>
-              <Text style={styles.fullName}>{user.fullName}</Text>
+              <Text style={[styles.fullName, { color: colors.textPrimary }]}>{user.fullName}</Text>
               {user.orcidVerified && (
                 <View style={styles.verifiedTag}>
                   <CheckCircle2 size={15} color={colors.accentGreen} />
@@ -898,20 +899,20 @@ export default function CurrentUserProfileScreen() {
                 </View>
               )}
             </View>
-            <Text style={styles.handle}>@{user.handle}</Text>
+            <Text style={[styles.handle, { color: colors.textSecondary }]}>@{user.handle}</Text>
           </View>
 
           {/* Academic Role & Institution */}
           <View style={styles.roleBox}>
-            <Text style={styles.roleTitle}>{user.academicTitle}</Text>
+            <Text style={[styles.roleTitle, { color: colors.textPrimary }]}>{user.academicTitle}</Text>
             {user.institution ? (
-              <Text style={styles.institutionText}>{user.institution}</Text>
+              <Text style={[styles.institutionText, { color: colors.textSecondary }]}>{user.institution}</Text>
             ) : null}
           </View>
 
           {/* Bio / Description */}
           {user.bio ? (
-            <Text style={styles.bio}>{user.bio}</Text>
+            <Text style={[styles.bio, { color: colors.textPrimary }]}>{user.bio}</Text>
           ) : null}
 
           {/* RESEARCH IMPACT & ANALYTICS BAR (Compact Single Row, Private to Owner) */}
@@ -925,7 +926,7 @@ export default function CurrentUserProfileScreen() {
             {(user.location || user.country) && (
               <View style={styles.metaItem}>
                 <MapPin size={14} color={colors.textSecondary} />
-                <Text style={styles.metaText}>
+                <Text style={[styles.metaText, { color: colors.textSecondary }]}>
                   {[user.location, user.country].filter(Boolean).join(', ')}
                 </Text>
               </View>
@@ -955,7 +956,7 @@ export default function CurrentUserProfileScreen() {
 
             <View style={styles.metaItem}>
               <Calendar size={14} color={colors.textSecondary} />
-              <Text style={styles.metaText}>Joined {user.joinedDate || 'Recently'}</Text>
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>Joined {user.joinedDate || 'Recently'}</Text>
             </View>
           </View>
 
@@ -986,8 +987,8 @@ export default function CurrentUserProfileScreen() {
               style={styles.statItem}
               activeOpacity={0.7}
             >
-              <Text style={styles.statNumber}>{user.followingCount || 0}</Text>
-              <Text style={styles.statLabel}>Following</Text>
+              <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{user.followingCount || 0}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Following</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -998,19 +999,19 @@ export default function CurrentUserProfileScreen() {
               style={styles.statItem}
               activeOpacity={0.7}
             >
-              <Text style={styles.statNumber}>{formatCount(user.followersCount)}</Text>
-              <Text style={styles.statLabel}>Followers</Text>
+              <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{formatCount(user.followersCount)}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Followers</Text>
             </TouchableOpacity>
 
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{posts.length}</Text>
-              <Text style={styles.statLabel}>Posts & Shares</Text>
+              <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{posts.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Posts & Shares</Text>
             </View>
           </View>
         </View>
 
         {/* Sub-Tabs: Posts | Saved | Scholars | Cited | Activity */}
-        <View style={styles.tabsRow}>
+        <View style={[styles.tabsRow, { backgroundColor: colors.background, borderBottomColor: colors.borderLight, borderTopColor: colors.borderLight }]}>
           {(['Posts', 'Saved', 'Scholars', 'Cited', 'Activity'] as const).map((tab) => {
             return (
               <TouchableOpacity
@@ -1018,7 +1019,7 @@ export default function CurrentUserProfileScreen() {
                 onPress={() => setActiveSubTab(tab)}
                 style={[
                   styles.tabButton,
-                  activeSubTab === tab && styles.tabButtonActive,
+                  activeSubTab === tab && [styles.tabButtonActive, { borderBottomColor: colors.primary }],
                 ]}
                 activeOpacity={0.7}
               >
@@ -1026,7 +1027,8 @@ export default function CurrentUserProfileScreen() {
                   <Text
                     style={[
                       styles.tabText,
-                      activeSubTab === tab && styles.tabTextActive,
+                      { color: colors.textSecondary },
+                      activeSubTab === tab && [styles.tabTextActive, { color: colors.textPrimary }],
                     ]}
                   >
                     {tab === 'Scholars' ? 'Scholars' : tab}
@@ -1060,7 +1062,7 @@ export default function CurrentUserProfileScreen() {
         {activeSubTab === 'Posts' && (
           <View style={styles.postsList}>
             {/* Filter Chips: All | Hyped | Articles | Shared */}
-            <View style={styles.savedFilterRow}>
+            <View style={[styles.savedFilterRow, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
               {(['All', 'Hyped', 'Articles', 'Shared'] as const).map((filter) => {
                 const count =
                   filter === 'All'
@@ -1075,7 +1077,8 @@ export default function CurrentUserProfileScreen() {
                     key={filter}
                     style={[
                       styles.savedFilterChip,
-                      postsSubFilter === filter && styles.savedFilterChipActive,
+                      { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
+                      postsSubFilter === filter && [styles.savedFilterChipActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                     ]}
                     onPress={() => setPostsSubFilter(filter)}
                     activeOpacity={0.7}
@@ -1083,7 +1086,8 @@ export default function CurrentUserProfileScreen() {
                     <Text
                       style={[
                         styles.savedFilterChipText,
-                        postsSubFilter === filter && styles.savedFilterChipTextActive,
+                        { color: colors.textSecondary },
+                        postsSubFilter === filter && [styles.savedFilterChipTextActive, { color: isDark ? colors.black : colors.white }],
                       ]}
                     >
                       {filter}
@@ -1091,13 +1095,15 @@ export default function CurrentUserProfileScreen() {
                     <View
                       style={[
                         styles.savedFilterCountBadge,
-                        postsSubFilter === filter && styles.savedFilterCountBadgeActive,
+                        { backgroundColor: colors.backgroundCard, borderColor: colors.borderDark },
+                        postsSubFilter === filter && [styles.savedFilterCountBadgeActive, { backgroundColor: isDark ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.25)' }],
                       ]}
                     >
                       <Text
                         style={[
                           styles.savedFilterCountText,
-                          postsSubFilter === filter && styles.savedFilterCountTextActive,
+                          { color: colors.textSecondary },
+                          postsSubFilter === filter && [styles.savedFilterCountTextActive, { color: isDark ? colors.black : colors.white }],
                         ]}
                       >
                         {count}
@@ -1161,7 +1167,7 @@ export default function CurrentUserProfileScreen() {
         {activeSubTab === 'Saved' && (
           <View style={styles.savedSection}>
             {/* Filter Chips: All | Posts | Papers */}
-            <View style={styles.savedFilterRow}>
+            <View style={[styles.savedFilterRow, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
               {(['All', 'Posts', 'Papers'] as const).map((filter) => {
                 const count =
                   filter === 'All'
@@ -1174,7 +1180,8 @@ export default function CurrentUserProfileScreen() {
                     key={filter}
                     style={[
                       styles.savedFilterChip,
-                      savedSubFilter === filter && styles.savedFilterChipActive,
+                      { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
+                      savedSubFilter === filter && [styles.savedFilterChipActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                     ]}
                     onPress={() => setSavedSubFilter(filter)}
                     activeOpacity={0.7}
@@ -1182,7 +1189,8 @@ export default function CurrentUserProfileScreen() {
                     <Text
                       style={[
                         styles.savedFilterChipText,
-                        savedSubFilter === filter && styles.savedFilterChipTextActive,
+                        { color: colors.textSecondary },
+                        savedSubFilter === filter && [styles.savedFilterChipTextActive, { color: isDark ? colors.black : colors.white }],
                       ]}
                     >
                       {filter}
@@ -1190,13 +1198,15 @@ export default function CurrentUserProfileScreen() {
                     <View
                       style={[
                         styles.savedFilterCountBadge,
-                        savedSubFilter === filter && styles.savedFilterCountBadgeActive,
+                        { backgroundColor: colors.backgroundCard, borderColor: colors.borderDark },
+                        savedSubFilter === filter && [styles.savedFilterCountBadgeActive, { backgroundColor: isDark ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.25)' }],
                       ]}
                     >
                       <Text
                         style={[
                           styles.savedFilterCountText,
-                          savedSubFilter === filter && styles.savedFilterCountTextActive,
+                          { color: colors.textSecondary },
+                          savedSubFilter === filter && [styles.savedFilterCountTextActive, { color: isDark ? colors.black : colors.white }],
                         ]}
                       >
                         {count}
@@ -1300,7 +1310,7 @@ export default function CurrentUserProfileScreen() {
         {activeSubTab === 'Activity' && (
           <View style={styles.activityList}>
             {/* Filter Chips: All | Discussions | Questions | Replies */}
-            <View style={styles.savedFilterRow}>
+            <View style={[styles.savedFilterRow, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
               {(['All', 'Discussions', 'Questions', 'Replies'] as const).map((filter) => {
                 const count = activityCounts[filter];
                 return (
@@ -1308,7 +1318,8 @@ export default function CurrentUserProfileScreen() {
                     key={filter}
                     style={[
                       styles.savedFilterChip,
-                      activitySubFilter === filter && styles.savedFilterChipActive,
+                      { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
+                      activitySubFilter === filter && [styles.savedFilterChipActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                     ]}
                     onPress={() => {
                       try {
@@ -1321,7 +1332,8 @@ export default function CurrentUserProfileScreen() {
                     <Text
                       style={[
                         styles.savedFilterChipText,
-                        activitySubFilter === filter && styles.savedFilterChipTextActive,
+                        { color: colors.textSecondary },
+                        activitySubFilter === filter && [styles.savedFilterChipTextActive, { color: isDark ? colors.black : colors.white }],
                       ]}
                     >
                       {filter}
@@ -1329,13 +1341,15 @@ export default function CurrentUserProfileScreen() {
                     <View
                       style={[
                         styles.savedFilterCountBadge,
-                        activitySubFilter === filter && styles.savedFilterCountBadgeActive,
+                        { backgroundColor: colors.backgroundCard, borderColor: colors.borderDark },
+                        activitySubFilter === filter && [styles.savedFilterCountBadgeActive, { backgroundColor: isDark ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.25)' }],
                       ]}
                     >
                       <Text
                         style={[
                           styles.savedFilterCountText,
-                          activitySubFilter === filter && styles.savedFilterCountTextActive,
+                          { color: colors.textSecondary },
+                          activitySubFilter === filter && [styles.savedFilterCountTextActive, { color: isDark ? colors.black : colors.white }],
                         ]}
                       >
                         {count}
@@ -1381,7 +1395,7 @@ export default function CurrentUserProfileScreen() {
                     return (
                       <TouchableOpacity
                         key={item.id}
-                        style={styles.activityCard}
+                        style={[styles.activityCard, { backgroundColor: colors.backgroundCard, borderColor: colors.borderLight }]}
                         onPress={() => {
                           try {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1456,7 +1470,7 @@ export default function CurrentUserProfileScreen() {
                   return (
                     <TouchableOpacity
                       key={item.id}
-                      style={styles.activityCard}
+                      style={[styles.activityCard, { backgroundColor: colors.backgroundCard, borderColor: colors.borderLight }]}
                       onPress={() => {
                         try {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1523,21 +1537,21 @@ export default function CurrentUserProfileScreen() {
 
                       {/* Title if present */}
                       {p.article?.title ? (
-                        <Text style={styles.activityPostTitle} numberOfLines={2}>
+                        <Text style={[styles.activityPostTitle, { color: colors.textPrimary }]} numberOfLines={2}>
                           {p.article.title}
                         </Text>
                       ) : null}
 
                       {/* Content snippet */}
-                      <Text style={styles.activityPostContent} numberOfLines={3}>
+                      <Text style={[styles.activityPostContent, { color: colors.textPrimary }]} numberOfLines={3}>
                         {p.content}
                       </Text>
 
                       {/* Paper snippet if attached */}
                       {p.paper && (
-                        <View style={styles.activityPaperSnippet}>
+                        <View style={[styles.activityPaperSnippet, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
                           <FileText size={14} color={colors.textSecondary} style={{ marginRight: 6 }} />
-                          <Text style={styles.activityPaperTitle} numberOfLines={1}>
+                          <Text style={[styles.activityPaperTitle, { color: colors.textSecondary }]} numberOfLines={1}>
                             {p.paper.title}
                           </Text>
                         </View>
@@ -1594,58 +1608,58 @@ export default function CurrentUserProfileScreen() {
             activeOpacity={1}
             onPress={() => setAvatarModalOpen(false)}
           >
-            <View style={styles.actionModalSheet}>
+            <View style={[styles.actionModalSheet, { backgroundColor: colors.backgroundElevated }]}>
               <View style={styles.actionModalHeader}>
-                <Text style={styles.actionModalTitle}>Profile Photo</Text>
+                <Text style={[styles.actionModalTitle, { color: colors.textPrimary }]}>Profile Photo</Text>
                 <TouchableOpacity onPress={() => setAvatarModalOpen(false)}>
                   <XIcon size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.actionModalSubtitle}>
+              <Text style={[styles.actionModalSubtitle, { color: colors.textSecondary }]}>
                 Upload a clear academic headshot or avatar. (JPG, PNG, WebP, max 5MB)
               </Text>
 
               <TouchableOpacity
-                style={styles.actionModalOption}
+                style={[styles.actionModalOption, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}
                 onPress={handlePickAndUploadAvatar}
                 activeOpacity={0.7}
               >
-                <View style={styles.actionModalOptionIcon}>
+                <View style={[styles.actionModalOptionIcon, { backgroundColor: colors.backgroundCard }]}>
                   <Upload size={18} color={colors.textPrimary} />
                 </View>
                 <View style={styles.actionModalOptionText}>
-                  <Text style={styles.actionOptionTitle}>
+                  <Text style={[styles.actionOptionTitle, { color: colors.textPrimary }]}>
                     {user.avatarUrl ? 'Upload New Photo' : 'Upload Profile Photo'}
                   </Text>
-                  <Text style={styles.actionOptionDesc}>Choose from photo gallery / library</Text>
+                  <Text style={[styles.actionOptionDesc, { color: colors.textSecondary }]}>Choose from photo gallery / library</Text>
                 </View>
               </TouchableOpacity>
 
               {user.avatarUrl ? (
                 <TouchableOpacity
-                  style={[styles.actionModalOption, styles.actionModalOptionDanger]}
+                  style={[styles.actionModalOption, styles.actionModalOptionDanger, isDark && { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.25)' }]}
                   onPress={handleRemoveAvatar}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.actionModalOptionIcon, { backgroundColor: '#FEE2E2' }]}>
+                  <View style={[styles.actionModalOptionIcon, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }]}>
                     <Trash2 size={18} color={colors.accentRed} />
                   </View>
                   <View style={styles.actionModalOptionText}>
                     <Text style={[styles.actionOptionTitle, { color: colors.accentRed }]}>
                       Remove Profile Photo
                     </Text>
-                    <Text style={styles.actionOptionDesc}>Reset to default initials</Text>
+                    <Text style={[styles.actionOptionDesc, { color: colors.textSecondary }]}>Reset to default initials</Text>
                   </View>
                 </TouchableOpacity>
               ) : null}
 
               <TouchableOpacity
-                style={styles.actionModalCancelBtn}
+                style={[styles.actionModalCancelBtn, { backgroundColor: colors.backgroundSecondary }]}
                 onPress={() => setAvatarModalOpen(false)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.actionModalCancelText}>Cancel</Text>
+                <Text style={[styles.actionModalCancelText, { color: colors.textPrimary }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -1665,58 +1679,58 @@ export default function CurrentUserProfileScreen() {
             activeOpacity={1}
             onPress={() => setBannerModalOpen(false)}
           >
-            <View style={styles.actionModalSheet}>
+            <View style={[styles.actionModalSheet, { backgroundColor: colors.backgroundElevated }]}>
               <View style={styles.actionModalHeader}>
-                <Text style={styles.actionModalTitle}>Profile Banner Image</Text>
+                <Text style={[styles.actionModalTitle, { color: colors.textPrimary }]}>Profile Banner Image</Text>
                 <TouchableOpacity onPress={() => setBannerModalOpen(false)}>
                   <XIcon size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.actionModalSubtitle}>
+              <Text style={[styles.actionModalSubtitle, { color: colors.textSecondary }]}>
                 Customize your profile header cover image. (Panoramic 3:1 aspect ratio, max 5MB)
               </Text>
 
               <TouchableOpacity
-                style={styles.actionModalOption}
+                style={[styles.actionModalOption, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}
                 onPress={handlePickAndUploadBanner}
                 activeOpacity={0.7}
               >
-                <View style={styles.actionModalOptionIcon}>
+                <View style={[styles.actionModalOptionIcon, { backgroundColor: colors.backgroundCard }]}>
                   <ImageIcon size={18} color={colors.textPrimary} />
                 </View>
                 <View style={styles.actionModalOptionText}>
-                  <Text style={styles.actionOptionTitle}>
+                  <Text style={[styles.actionOptionTitle, { color: colors.textPrimary }]}>
                     {user.bannerUrl ? 'Upload New Banner' : 'Upload Banner Image'}
                   </Text>
-                  <Text style={styles.actionOptionDesc}>Choose panoramic cover image from library</Text>
+                  <Text style={[styles.actionOptionDesc, { color: colors.textSecondary }]}>Choose panoramic cover image from library</Text>
                 </View>
               </TouchableOpacity>
 
               {user.bannerUrl ? (
                 <TouchableOpacity
-                  style={[styles.actionModalOption, styles.actionModalOptionDanger]}
+                  style={[styles.actionModalOption, styles.actionModalOptionDanger, isDark && { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.25)' }]}
                   onPress={handleRemoveBanner}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.actionModalOptionIcon, { backgroundColor: '#FEE2E2' }]}>
+                  <View style={[styles.actionModalOptionIcon, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }]}>
                     <Trash2 size={18} color={colors.accentRed} />
                   </View>
                   <View style={styles.actionModalOptionText}>
                     <Text style={[styles.actionOptionTitle, { color: colors.accentRed }]}>
                       Remove Custom Banner
                     </Text>
-                    <Text style={styles.actionOptionDesc}>Reset to default scientific background</Text>
+                    <Text style={[styles.actionOptionDesc, { color: colors.textSecondary }]}>Reset to default scientific background</Text>
                   </View>
                 </TouchableOpacity>
               ) : null}
 
               <TouchableOpacity
-                style={styles.actionModalCancelBtn}
+                style={[styles.actionModalCancelBtn, { backgroundColor: colors.backgroundSecondary }]}
                 onPress={() => setBannerModalOpen(false)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.actionModalCancelText}>Cancel</Text>
+                <Text style={[styles.actionModalCancelText, { color: colors.textPrimary }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>

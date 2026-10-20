@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { router } from 'expo-router';
-import { colors, radii, spacing } from '../../theme';
+import { colors, radii, spacing, useTheme } from '../../theme';
 import { SettingsLayout } from '../../components/settings/SettingsLayout';
 import { SettingsCardGroup } from '../../components/settings/SettingsCardGroup';
 import { SettingsRow } from '../../components/settings/SettingsRow';
@@ -18,6 +18,7 @@ import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { env } from '../../config/env';
 
 export default function SettingsMainScreen() {
+  const { colors, isDark, themeMode } = useTheme();
   const { user, signOut } = useAuthStore();
   const { settings, fetchSettings } = useSettingsStore();
 
@@ -65,7 +66,7 @@ export default function SettingsMainScreen() {
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => router.push('/settings/profile' as any)}
-        style={styles.profileSummaryCard}
+        style={[styles.profileSummaryCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}
       >
         <Avatar
           uri={user?.avatarUrl}
@@ -89,7 +90,7 @@ export default function SettingsMainScreen() {
           ) : null}
         </View>
 
-        <View style={styles.editProfileBtn}>
+        <View style={[styles.editProfileBtn, { backgroundColor: colors.backgroundSecondary }]}>
           <Typography variant="captionBold" color={colors.textPrimary}>
             Edit profile
           </Typography>
@@ -181,9 +182,9 @@ export default function SettingsMainScreen() {
       <SettingsSectionHeader title="Appearance & Display" />
       <SettingsCardGroup>
         <SettingsRow
-          icon="Sun"
+          icon={isDark ? "Moon" : "Sun"}
           title="Display & Theme"
-          subtitle={`Default tab: ${settings.defaultTab} · Monochrome Light`}
+          subtitle={`Theme: ${themeMode === 'system' ? 'System (' + (isDark ? 'Dark' : 'Light') + ')' : isDark ? 'Obsidian Dark' : 'Monochrome Light'} · Tab: ${settings.defaultTab}`}
           onPress={() => router.push('/settings/appearance' as any)}
         />
         <Divider />

@@ -23,8 +23,10 @@ import {
   ArrowRight,
   Sparkles,
   X,
+  Sun,
+  Moon,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
@@ -37,6 +39,7 @@ interface DesktopHeaderProps {
 }
 
 export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
+  const { colors, isDark, toggleTheme } = useTheme();
   const currentUser = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
@@ -168,8 +171,8 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
 
   if (isAuthPage) {
     return (
-      <header style={{ width: '100%', backgroundColor: '#FFFFFF', borderBottom: '1px solid #F1F5F9', zIndex: 999 }}>
-        <View style={styles.authContainer}>
+      <header style={{ width: '100%', backgroundColor: colors.background, borderBottom: `1px solid ${colors.border}`, zIndex: 999 }}>
+        <View style={[styles.authContainer, { backgroundColor: colors.background }]}>
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => router.push('/(tabs)')}
@@ -177,7 +180,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
           >
             <Image
               source={require('../../../assets/images/booffin-wordmark.svg')}
-              style={styles.brandLogoImage}
+              style={[styles.brandLogoImage, isDark && ({ filter: 'invert(1)' } as any)]}
               contentFit="contain"
               accessibilityLabel="BooffIn"
             />
@@ -188,8 +191,8 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
   }
 
   return (
-    <header style={{ width: '100%', backgroundColor: '#FFFFFF', zIndex: 999 }}>
-      <View style={styles.container}>
+    <header style={{ width: '100%', backgroundColor: colors.background, borderBottom: `1px solid ${colors.border}`, zIndex: 999 }}>
+      <View style={[styles.container, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         {/* Left: Official Brand Wordmark Logo */}
         <TouchableOpacity
           activeOpacity={0.85}
@@ -198,7 +201,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
         >
           <Image
             source={require('../../../assets/images/booffin-wordmark.svg')}
-            style={styles.brandLogoImage}
+            style={[styles.brandLogoImage, isDark && ({ filter: 'invert(1)' } as any)]}
             contentFit="contain"
             accessibilityLabel="BooffIn"
           />
@@ -209,8 +212,14 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
           ref={searchContainerRef}
           style={{ position: 'relative', width: 520, maxWidth: '48%' }}
         >
-          <View style={[styles.searchContainer, isSearchOpen && styles.searchContainerActive]}>
-            <Search size={18} color={isSearchOpen ? '#064E3B' : '#94A3B8'} strokeWidth={2.2} />
+          <View
+            style={[
+              styles.searchContainer,
+              { backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC', borderColor: colors.border },
+              isSearchOpen && styles.searchContainerActive,
+            ]}
+          >
+            <Search size={18} color={isSearchOpen ? colors.brandGreen : colors.textMuted} strokeWidth={2.2} />
             <TextInput
               nativeID="desktop-global-search-input"
               value={searchQuery}
@@ -223,8 +232,8 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                 if (!isExplorePage) setIsSearchOpen(true);
               }}
               placeholder="Search papers, researchers, topics, methods..."
-              placeholderTextColor="#94A3B8"
-              style={styles.searchInput}
+              placeholderTextColor={colors.textMuted}
+              style={[styles.searchInput, { color: colors.textPrimary }]}
               onSubmitEditing={handleSearchSubmit}
               returnKeyType="search"
             />
@@ -249,10 +258,12 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                 top: 50,
                 left: 0,
                 right: 0,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: isDark ? colors.cardBackground : '#FFFFFF',
                 borderRadius: 14,
-                boxShadow: '0 12px 32px -4px rgba(15, 23, 42, 0.15), 0 4px 12px -2px rgba(15, 23, 42, 0.08)',
-                border: '1px solid #E2E8F0',
+                boxShadow: isDark
+                  ? '0 16px 36px -4px rgba(0, 0, 0, 0.5), 0 4px 16px -2px rgba(0, 0, 0, 0.35)'
+                  : '0 12px 32px -4px rgba(15, 23, 42, 0.15), 0 4px 12px -2px rgba(15, 23, 42, 0.08)',
+                border: `1px solid ${isDark ? colors.borderLight : '#E2E8F0'}`,
                 overflow: 'hidden',
                 zIndex: 1000,
                 maxHeight: 520,
@@ -261,7 +272,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
               }}
             >
               {/* Filter Tabs */}
-              <View style={styles.dropdownFilterRow}>
+              <View style={[styles.dropdownFilterRow, { backgroundColor: isDark ? colors.backgroundSecondary : '#FAFAFA', borderBottomColor: colors.borderLight }]}>
                 {(
                   [
                     { key: 'all', label: 'All' },
@@ -276,13 +287,21 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                     onPress={() => setActiveCategory(tab.key)}
                     style={[
                       styles.filterTab,
-                      activeCategory === tab.key && styles.filterTabActive,
+                      { backgroundColor: isDark ? colors.cardBackground : '#F1F5F9', borderWidth: 1, borderColor: isDark ? colors.borderLight : 'transparent' },
+                      activeCategory === tab.key && [
+                        styles.filterTabActive,
+                        { backgroundColor: isDark ? '#10B981' : '#064E3B', borderColor: isDark ? '#10B981' : '#064E3B' },
+                      ],
                     ]}
                   >
                     <Text
                       style={[
                         styles.filterTabText,
-                        activeCategory === tab.key && styles.filterTabTextActive,
+                        { color: colors.textSecondary },
+                        activeCategory === tab.key && [
+                          styles.filterTabTextActive,
+                          { color: '#FFFFFF' },
+                        ],
                       ]}
                     >
                       {tab.label}
@@ -299,18 +318,18 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
               >
                 {isSearching ? (
                   <View style={styles.dropdownLoading}>
-                    <ActivityIndicator size="small" color="#064E3B" />
-                    <Text style={styles.dropdownLoadingText}>Searching research database...</Text>
+                    <ActivityIndicator size="small" color={isDark ? "#34D399" : "#064E3B"} />
+                    <Text style={[styles.dropdownLoadingText, { color: colors.textSecondary }]}>Searching research database...</Text>
                   </View>
                 ) : searchQuery.trim().length > 0 ? (
                   hasResults ? (
                     <View style={styles.dropdownResultsSection}>
                       {/* Researchers Section */}
                       {searchResults?.researchers && searchResults.researchers.length > 0 && (
-                        <View style={styles.resultGroup}>
+                        <View style={[styles.resultGroup, { borderBottomColor: colors.borderLight }]}>
                           <View style={styles.groupHeader}>
-                            <Users size={14} color="#64748B" />
-                            <Text style={styles.groupTitle}>Researchers</Text>
+                            <Users size={14} color={colors.textSecondary} />
+                            <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>Researchers</Text>
                           </View>
                           {searchResults.researchers.map((res) => (
                             <TouchableOpacity
@@ -325,14 +344,14 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                                 size="sm"
                               />
                               <View style={{ flex: 1, marginLeft: 10 }}>
-                                <Text style={styles.researcherName} numberOfLines={1}>
+                                <Text style={[styles.researcherName, { color: colors.textPrimary }]} numberOfLines={1}>
                                   {res.fullName}
                                 </Text>
-                                <Text style={styles.researcherMeta} numberOfLines={1}>
+                                <Text style={[styles.researcherMeta, { color: colors.textSecondary }]} numberOfLines={1}>
                                   @{res.handle} {res.institution ? `· ${res.institution}` : ''}
                                 </Text>
                               </View>
-                              <ArrowRight size={14} color="#94A3B8" />
+                              <ArrowRight size={14} color={colors.textMuted} />
                             </TouchableOpacity>
                           ))}
                         </View>
@@ -340,10 +359,10 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
 
                       {/* Papers Section */}
                       {searchResults?.papers && searchResults.papers.length > 0 && (
-                        <View style={styles.resultGroup}>
+                        <View style={[styles.resultGroup, { borderBottomColor: colors.borderLight }]}>
                           <View style={styles.groupHeader}>
-                            <FileText size={14} color="#64748B" />
-                            <Text style={styles.groupTitle}>Papers</Text>
+                            <FileText size={14} color={colors.textSecondary} />
+                            <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>Papers</Text>
                           </View>
                           {searchResults.papers.map((paper) => (
                             <TouchableOpacity
@@ -352,14 +371,14 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                               onPress={() => handleSelectPaper(paper.id)}
                               style={styles.paperRow}
                             >
-                              <View style={styles.paperIconWrap}>
-                                <FileText size={16} color="#064E3B" />
+                              <View style={[styles.paperIconWrap, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE' }]}>
+                                <FileText size={16} color={isDark ? "#34D399" : "#064E3B"} />
                               </View>
                               <View style={{ flex: 1, marginLeft: 10 }}>
-                                <Text style={styles.paperTitle} numberOfLines={1}>
+                                <Text style={[styles.paperTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                                   {paper.title}
                                 </Text>
-                                <Text style={styles.paperMeta} numberOfLines={1}>
+                                <Text style={[styles.paperMeta, { color: colors.textSecondary }]} numberOfLines={1}>
                                   {[
                                     paper.journal,
                                     paper.publicationYear,
@@ -369,7 +388,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                                     .join(' · ')}
                                 </Text>
                               </View>
-                              <ArrowRight size={14} color="#94A3B8" />
+                              <ArrowRight size={14} color={colors.textMuted} />
                             </TouchableOpacity>
                           ))}
                         </View>
@@ -377,10 +396,10 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
 
                       {/* Topics Section */}
                       {searchResults?.topics && searchResults.topics.length > 0 && (
-                        <View style={styles.resultGroup}>
+                        <View style={[styles.resultGroup, { borderBottomColor: colors.borderLight }]}>
                           <View style={styles.groupHeader}>
-                            <Tag size={14} color="#64748B" />
-                            <Text style={styles.groupTitle}>Topics</Text>
+                            <Tag size={14} color={colors.textSecondary} />
+                            <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>Topics</Text>
                           </View>
                           <View style={styles.topicChipGrid}>
                             {searchResults.topics.map((t) => (
@@ -388,9 +407,9 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                                 key={t.id}
                                 activeOpacity={0.7}
                                 onPress={() => handleSelectTopic(t.slug || t.name)}
-                                style={styles.topicChip}
+                                style={[styles.topicChip, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE', borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#C8E1D5' }]}
                               >
-                                <Text style={styles.topicChipText}>#{t.name}</Text>
+                                <Text style={[styles.topicChipText, { color: isDark ? '#34D399' : '#064E3B' }]}>#{t.name}</Text>
                               </TouchableOpacity>
                             ))}
                           </View>
@@ -399,8 +418,8 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                     </View>
                   ) : (
                     <View style={styles.dropdownEmpty}>
-                      <Text style={styles.dropdownEmptyTitle}>No results for "{searchQuery}"</Text>
-                      <Text style={styles.dropdownEmptySub}>
+                      <Text style={[styles.dropdownEmptyTitle, { color: colors.textPrimary }]}>No results for "{searchQuery}"</Text>
+                      <Text style={[styles.dropdownEmptySub, { color: colors.textSecondary }]}>
                         Try searching by DOI, paper title, author name, or research keywords.
                       </Text>
                     </View>
@@ -409,8 +428,8 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                   /* Popular Discoveries Prompt when empty */
                   <View style={styles.discoveriesPrompt}>
                     <View style={styles.discoveriesHeader}>
-                      <Sparkles size={14} color="#064E3B" />
-                      <Text style={styles.discoveriesTitle}>Popular Research Topics</Text>
+                      <Sparkles size={14} color={isDark ? "#34D399" : "#064E3B"} />
+                      <Text style={[styles.discoveriesTitle, { color: isDark ? "#34D399" : "#064E3B" }]}>Popular Research Topics</Text>
                     </View>
                     <View style={styles.topicChipGrid}>
                       {POPULAR_DISCOVERIES.map((disc, idx) => (
@@ -424,9 +443,9 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                             setIsSearchOpen(false);
                             if (!isExplorePage) router.push('/(tabs)/explore');
                           }}
-                          style={styles.popularTopicChip}
+                          style={[styles.popularTopicChip, { backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC', borderColor: colors.borderLight }]}
                         >
-                          <Text style={styles.popularTopicChipText}>{disc.label}</Text>
+                          <Text style={[styles.popularTopicChipText, { color: colors.textPrimary }]}>{disc.label}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -438,9 +457,9 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={handleSearchSubmit}
-                style={styles.dropdownFooter}
+                style={[styles.dropdownFooter, { backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC', borderTopColor: colors.borderLight }]}
               >
-                <Text style={styles.dropdownFooterText}>
+                <Text style={[styles.dropdownFooterText, { color: isDark ? "#34D399" : "#064E3B" }]}>
                   {searchQuery.trim()
                     ? `See all results for "${searchQuery.trim()}" in Explore →`
                     : 'Open Full Explore & Search Page →'}
@@ -452,11 +471,32 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
 
         {/* Right: Quick Actions & Profile */}
         <View style={styles.rightActions}>
+          {/* Quick Theme Toggle Button (Desktop Only, to the left of New Post) */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={toggleTheme}
+            style={[
+              styles.iconBtn,
+              {
+                backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC',
+                borderColor: colors.border,
+              },
+            ]}
+            accessibilityLabel={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            accessibilityRole="button"
+          >
+            {isDark ? (
+              <Sun size={18} color="#FBBF24" strokeWidth={2.2} />
+            ) : (
+              <Moon size={18} color="#475569" strokeWidth={2.2} />
+            )}
+          </TouchableOpacity>
+
           {/* Create / Share Post Button */}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => router.push('/(tabs)/create')}
-            style={styles.createBtn}
+            style={[styles.createBtn, { backgroundColor: colors.brandGreen }]}
           >
             <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
             <Text style={styles.createBtnText}>New Post</Text>
@@ -466,9 +506,15 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => router.push('/(tabs)/notifications')}
-            style={styles.iconBtn}
+            style={[
+              styles.iconBtn,
+              {
+                backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC',
+                borderColor: colors.border,
+              },
+            ]}
           >
-            <Bell size={20} color="#334155" strokeWidth={2} />
+            <Bell size={20} color={isDark ? colors.textPrimary : '#334155'} strokeWidth={2} />
             {unreadCount > 0 && (
               <View style={styles.notificationBadge}>
                 <Text style={styles.notificationBadgeText}>
@@ -483,7 +529,13 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => router.push('/(tabs)/profile')}
-              style={styles.userProfileBtn}
+              style={[
+                styles.userProfileBtn,
+                {
+                  backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC',
+                  borderColor: colors.border,
+                },
+              ]}
             >
               <Avatar
                 uri={currentUser.avatarUrl}
@@ -491,10 +543,10 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                 size="sm"
               />
               <View style={styles.userMeta}>
-                <Text style={styles.userName} numberOfLines={1}>
+                <Text style={[styles.userName, { color: colors.textPrimary }]} numberOfLines={1}>
                   {currentUser.fullName || currentUser.handle}
                 </Text>
-                <Text style={styles.userHandle} numberOfLines={1}>
+                <Text style={[styles.userHandle, { color: colors.textSecondary }]} numberOfLines={1}>
                   @{currentUser.handle || 'scholar'}
                 </Text>
               </View>

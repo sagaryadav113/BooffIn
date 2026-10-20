@@ -75,7 +75,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import {
   Workspace,
@@ -206,6 +206,8 @@ interface WorkspaceCommunityViewProps {
 }
 
 export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ workspace }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const currentUser = useAuthStore((s) => s.user);
   const [activeTab, setActiveTab] = useState<CommunityTab>('discussion');
 
@@ -1305,18 +1307,18 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Community Header matching modern BooffIn academic aesthetic */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.cardBackground, borderBottomColor: colors.borderLight }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <ArrowLeft size={20} color="#164E3F" />
+          <ArrowLeft size={20} color={isDark ? "#34D399" : "#164E3F"} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1330,12 +1332,12 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             size="sm"
           />
           <View style={{ marginLeft: 8, flex: 1 }}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
               {workspace.name}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               {onlineCount > 0 && <View style={styles.onlineDot} />}
-              <Text style={styles.headerTelemetry} numberOfLines={1}>
+              <Text style={[styles.headerTelemetry, { color: colors.textSecondary }]} numberOfLines={1}>
                 {realMemberCount} {realMemberCount === 1 ? 'member' : 'members'}
                 {onlineCount > 0 ? ` • ${onlineCount} online` : ''}
               </Text>
@@ -1349,19 +1351,19 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             onPress={() => setShowSearchBar((v) => !v)}
             style={[styles.headerIconBtn, showSearchBar && styles.headerIconBtnActive]}
           >
-            <Search size={18} color={showSearchBar ? '#164E3F' : '#64748B'} />
+            <Search size={18} color={showSearchBar ? (isDark ? "#34D399" : "#164E3F") : colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setShowGalleryModal(true)}
             style={styles.headerIconBtn}
           >
-            <FolderOpen size={19} color="#64748B" />
+            <FolderOpen size={19} color={colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setShowOptionsMenu(true)}
             style={styles.headerIconBtn}
           >
-            <MoreVertical size={19} color="#64748B" />
+            <MoreVertical size={19} color={isDark ? "#34D399" : colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -1477,7 +1479,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
       )}
 
       {/* Horizontally Scrolling Segment Pill Strip */}
-      <View style={styles.segmentStripContainer}>
+      <View style={[styles.segmentStripContainer, { backgroundColor: colors.cardBackground, borderBottomColor: colors.borderLight }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1486,9 +1488,9 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setActiveTab('papers')}
-            style={[styles.segmentPill, activeTab === 'papers' && styles.segmentPillActive]}
+            style={[styles.segmentPill, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9' }, activeTab === 'papers' && [styles.segmentPillActive, { backgroundColor: isDark ? '#059669' : '#164E3F' }]]}
           >
-            <Text style={[styles.segmentPillText, activeTab === 'papers' && styles.segmentPillTextActive]}>
+            <Text style={[styles.segmentPillText, { color: isDark ? colors.textSecondary : '#475569' }, activeTab === 'papers' && styles.segmentPillTextActive]}>
               Papers ({paperMessages.length})
             </Text>
           </TouchableOpacity>
@@ -1496,9 +1498,9 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setActiveTab('discussion')}
-            style={[styles.segmentPill, activeTab === 'discussion' && styles.segmentPillActive]}
+            style={[styles.segmentPill, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9' }, activeTab === 'discussion' && [styles.segmentPillActive, { backgroundColor: isDark ? '#059669' : '#164E3F' }]]}
           >
-            <Text style={[styles.segmentPillText, activeTab === 'discussion' && styles.segmentPillTextActive]}>
+            <Text style={[styles.segmentPillText, { color: isDark ? colors.textSecondary : '#475569' }, activeTab === 'discussion' && styles.segmentPillTextActive]}>
               Discussion
             </Text>
           </TouchableOpacity>
@@ -1509,9 +1511,9 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
       {/* Tab 1: Papers Feed */}
       {activeTab === 'papers' && (
-        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-          <View style={styles.tabActionBar}>
-            <Text style={styles.tabActionTitle}>Community Papers</Text>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={[styles.tabActionBar, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
+            <Text style={[styles.tabActionTitle, { color: colors.textPrimary }]}>Community Papers</Text>
             {!isCommunityDisabled && (
               <TouchableOpacity
                 onPress={() => setShowDoiModal(true)}
@@ -1566,7 +1568,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
             style={[
               StyleSheet.absoluteFill,
               {
-                backgroundColor: activeThemeConfig.backgroundColor,
+                backgroundColor: activeThemeConfig.id === "default" && isDark ? colors.background : activeThemeConfig.backgroundColor,
                 overflow: 'hidden',
                 width: '100%',
                 height: '100%',
@@ -1726,11 +1728,11 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                     <View key={item.id} style={{ width: '100%' }}>
                       {isFirstOfDateGroup && (
                         <View style={styles.dateSeparatorRow}>
-                          <View style={styles.dateSeparatorLine} />
-                          <View style={styles.dateSeparatorPill}>
-                            <Text style={styles.dateSeparatorText}>{getDateLabel(item.created_at)}</Text>
+                          <View style={[styles.dateSeparatorLine, { backgroundColor: colors.borderLight }]} />
+                          <View style={[styles.dateSeparatorPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+                            <Text style={[styles.dateSeparatorText, { color: colors.textSecondary }]}>{getDateLabel(item.created_at)}</Text>
                           </View>
-                          <View style={styles.dateSeparatorLine} />
+                          <View style={[styles.dateSeparatorLine, { backgroundColor: colors.borderLight }]} />
                         </View>
                       )}
 
@@ -1762,7 +1764,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                               styles.messageBubble,
                               isMe
                                 ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
-                                : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }],
+                                : [styles.otherBubble, { backgroundColor: activeThemeConfig.id === 'default' && isDark ? '#1F2636' : activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' || isDark ? 1 : 0, borderColor: isDark ? colors.borderLight : 'rgba(0,0,0,0.06)' }],
                               isDeleted && styles.deletedBubble,
                               hasMediaContent && styles.bubbleWithMedia,
                             ]}
@@ -1779,7 +1781,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
 
                       {/* Sender Name in Group Chat */}
                       {!isMe && !isDeleted && (
-                        <Text style={styles.senderName}>
+                        <Text style={[styles.senderName, { color: isDark ? '#34D399' : '#164E3F' }]}>
                           {item.sender?.fullName || item.sender?.handle || 'Researcher'}
                         </Text>
                       )}
@@ -1998,7 +2000,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                                 styles.messageText,
                                 isMe
                                   ? [styles.myMessageText, { color: activeThemeConfig.myBubbleTextColor }]
-                                  : [styles.otherMessageText, { color: activeThemeConfig.otherBubbleTextColor }],
+                                  : [styles.otherMessageText, { color: activeThemeConfig.id === 'default' && isDark ? '#FFFFFF' : activeThemeConfig.otherBubbleTextColor }],
                               ]}
                             >
                               {item.content}
@@ -2017,7 +2019,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                                 styles.timestamp,
                                 isMe
                                   ? [styles.myTimestamp, { color: activeThemeConfig.timestampMyColor }]
-                                  : [styles.otherTimestamp, { color: activeThemeConfig.timestampOtherColor }],
+                                  : [styles.otherTimestamp, { color: activeThemeConfig.id === 'default' && isDark ? '#94A3B8' : activeThemeConfig.timestampOtherColor }],
                               ]}
                             >
                               {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -2199,13 +2201,15 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                   />
                 </View>
               ) : (
-                <View style={[styles.bottomDockContainer, { paddingBottom: bottomInset > 0 ? bottomInset + 8 : 8 }]}>
+                <View style={[styles.bottomDockContainer, { backgroundColor: colors.cardBackground, borderTopColor: colors.borderLight, paddingBottom: bottomInset > 0 ? bottomInset + 8 : 8 }]}>
                   {/* Capsule Input */}
                   <View
                     style={[
                       styles.inputCapsule,
+                      { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
                       (isInputFocused || Boolean(inputText.trim())) && [
                         styles.inputCapsuleFocused,
+                        { borderColor: isDark ? '#10B981' : '#164E3F', backgroundColor: isDark ? colors.backgroundSecondary : '#FFFFFF' },
                         activeThemeConfig?.accentColor ? { borderColor: activeThemeConfig.accentColor } : null,
                       ],
                     ]}
@@ -2216,7 +2220,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                       onPress={handlePickImage}
                       style={styles.mediaIconBtn}
                     >
-                      <Camera size={19} color="#64748B" />
+                      <Camera size={19} color={colors.textSecondary} />
                     </TouchableOpacity>
 
                     <TextInput
@@ -2225,8 +2229,8 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => setIsInputFocused(false)}
                       placeholder={replyingTo ? 'Write a reply...' : 'Message...'}
-                      placeholderTextColor="#94A3B8"
-                      style={styles.textInput}
+                      placeholderTextColor={colors.textMuted}
+                      style={[styles.textInput, { color: colors.textPrimary }]}
                       multiline
                       maxLength={2000}
                     />
@@ -2238,7 +2242,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                         onPress={() => setShowAttachMenu(true)}
                         style={styles.mediaIconBtn}
                       >
-                        <Paperclip size={19} color="#64748B" />
+                        <Paperclip size={19} color={colors.textSecondary} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -2248,7 +2252,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                     <TouchableOpacity
                       activeOpacity={0.8}
                       onPress={() => setIsRecordingVoice(true)}
-                      style={styles.detachedMicBtn}
+                      style={[styles.detachedMicBtn, { backgroundColor: isDark ? '#059669' : '#164E3F' }]}
                     >
                       <Mic size={18} color="#FFFFFF" />
                     </TouchableOpacity>
@@ -2256,7 +2260,7 @@ export const WorkspaceCommunityView: React.FC<WorkspaceCommunityViewProps> = ({ 
                     <TouchableOpacity
                       activeOpacity={0.8}
                       onPress={handleSendMessage}
-                      style={styles.detachedSendBtn}
+                      style={[styles.detachedSendBtn, { backgroundColor: isDark ? '#059669' : '#164E3F' }]}
                     >
                       <Send size={16} color="#FFFFFF" />
                     </TouchableOpacity>

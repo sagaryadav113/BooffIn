@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors, radii, spacing } from '../../theme';
+import { colors, radii, spacing, useTheme } from '../../theme';
 
 interface SettingsCardGroupProps {
   children: React.ReactNode;
@@ -8,7 +8,8 @@ interface SettingsCardGroupProps {
 }
 
 export const SettingsCardGroup: React.FC<SettingsCardGroupProps> = ({ children, style }) => {
-  return <View style={[styles.card, style]}>{children}</View>;
+  const { colors } = useTheme();
+  return <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }, style]}>{children}</View>;
 };
 
 const styles = StyleSheet.create({

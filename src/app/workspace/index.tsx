@@ -42,7 +42,7 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { WorkspaceCard } from '../../components/workspace/WorkspaceCard';
 import { Avatar } from '../../components/core/Avatar';
 import { CreateWorkspaceModal } from '../../components/workspace/CreateWorkspaceModal';
@@ -61,6 +61,8 @@ import { Workspace } from '../../types/workspace';
 export type WorkspaceTabType = 'dm' | 'community' | 'inner_circle' | 'settings';
 
 export default function WorkspaceHubScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
   const { isDesktop } = useResponsiveLayout();
   const currentUser = useAuthStore((s) => s.user);
   const insets = useSafeAreaInsets();
@@ -252,11 +254,12 @@ export default function WorkspaceHubScreen() {
   }, [activeTab, dmFilter, communitySubFilter, dms, communities, innerCircles, discoverableCommunities, currentUser?.id, searchQuery]);
 
   const selectedWorkspace = useMemo(() => {
-    if (!selectedWorkspaceId) return activeItems[0] || null;
-    return [...dms, ...communities, ...innerCircles, ...discoverableCommunities].find(
-      (w) => w.id === selectedWorkspaceId
-    ) || activeItems[0] || null;
-  }, [selectedWorkspaceId, dms, communities, innerCircles, discoverableCommunities, activeItems]);
+    if (selectedWorkspaceId) {
+      const matchInActive = activeItems.find((w) => w.id === selectedWorkspaceId);
+      if (matchInActive) return matchInActive;
+    }
+    return activeItems[0] || null;
+  }, [selectedWorkspaceId, activeItems]);
 
   const totalDMsUnread = dms.reduce((acc, d) => acc + (d.unread_count || 0), 0);
   const totalCommsUnread = communities.reduce((acc, c) => acc + (c.unread_count || 0), 0);
@@ -304,7 +307,7 @@ export default function WorkspaceHubScreen() {
 
     if (activeTab === 'dm') {
       return (
-        <View style={styles.topAppBar}>
+        <View style={[styles.topAppBar, { backgroundColor: colors.background }]}>
           <View style={styles.appBarLeft}>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -314,7 +317,7 @@ export default function WorkspaceHubScreen() {
             >
               <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
             </TouchableOpacity>
-            <Text style={styles.appBarTitle}>Messages</Text>
+            <Text style={[styles.appBarTitle, { color: colors.textPrimary }]}>Messages</Text>
           </View>
           <View style={styles.appBarRightActions}>
             <TouchableOpacity
@@ -333,7 +336,7 @@ export default function WorkspaceHubScreen() {
               {isDMsMuted ? (
                 <BellOff size={22} color="#DC2626" strokeWidth={2.2} />
               ) : (
-                <Bell size={22} color="#164E3F" strokeWidth={2.2} />
+                <Bell size={22} color={isDark ? "#34D399" : "#164E3F"} strokeWidth={2.2} />
               )}
             </TouchableOpacity>
             {isDesktop && (
@@ -353,7 +356,7 @@ export default function WorkspaceHubScreen() {
 
     if (activeTab === 'community') {
       return (
-        <View style={styles.topAppBar}>
+        <View style={[styles.topAppBar, { backgroundColor: colors.background }]}>
           <View style={styles.appBarLeft}>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -363,7 +366,7 @@ export default function WorkspaceHubScreen() {
             >
               <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
             </TouchableOpacity>
-            <Text style={styles.appBarTitle}>Community</Text>
+            <Text style={[styles.appBarTitle, { color: colors.textPrimary }]}>Community</Text>
           </View>
           <View style={styles.appBarRightActions}>
             <TouchableOpacity
@@ -371,7 +374,7 @@ export default function WorkspaceHubScreen() {
               onPress={() => setShowCreateCommunityModal(true)}
               style={styles.headerIconBtn}
             >
-              <Plus size={22} color="#164E3F" strokeWidth={2.5} />
+              <Plus size={22} color={isDark ? "#34D399" : "#164E3F"} strokeWidth={2.5} />
             </TouchableOpacity>
             {isDesktop && (
               <TouchableOpacity
@@ -390,7 +393,7 @@ export default function WorkspaceHubScreen() {
 
     if (activeTab === 'settings') {
       return (
-        <View style={styles.topAppBar}>
+        <View style={[styles.topAppBar, { backgroundColor: colors.background }]}>
           <View style={styles.appBarLeft}>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -400,7 +403,7 @@ export default function WorkspaceHubScreen() {
             >
               <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
             </TouchableOpacity>
-            <Text style={styles.appBarTitle}>Settings</Text>
+            <Text style={[styles.appBarTitle, { color: colors.textPrimary }]}>Settings</Text>
           </View>
           {isDesktop && (
             <TouchableOpacity
@@ -417,7 +420,7 @@ export default function WorkspaceHubScreen() {
     }
 
     return (
-      <View style={styles.topAppBar}>
+      <View style={[styles.topAppBar, { backgroundColor: colors.background }]}>
         <View style={styles.appBarLeft}>
           <TouchableOpacity
             activeOpacity={0.7}
@@ -427,7 +430,7 @@ export default function WorkspaceHubScreen() {
           >
             <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
           </TouchableOpacity>
-          <Text style={styles.appBarTitle}>Inner Circle</Text>
+          <Text style={[styles.appBarTitle, { color: colors.textPrimary }]}>Inner Circle</Text>
         </View>
         <View style={styles.appBarRightActions}>
           <TouchableOpacity
@@ -454,31 +457,31 @@ export default function WorkspaceHubScreen() {
 
   // Search Bar
   const renderSearchBar = () => (
-    <View style={styles.searchBarContainer}>
-      <View style={styles.searchBar}>
-        <Search size={17} color="#94A3B8" />
+    <View style={[styles.searchBarContainer, { backgroundColor: colors.background }]}>
+      <View style={[styles.searchBar, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight, borderWidth: 1 }]}>
+        <Search size={17} color={colors.textMuted} />
         <TextInput
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholder="Search"
-          placeholderTextColor="#94A3B8"
-          style={styles.searchInput}
+          placeholderTextColor={colors.textMuted}
+          style={[styles.searchInput, { color: colors.textPrimary }]}
           returnKeyType="search"
         />
         {searchQuery.trim().length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
-            <X size={15} color="#94A3B8" />
+            <X size={15} color={colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>
 
       {/* DM Sub-Toggle: All vs Archived (Phase 4) */}
       {activeTab === 'dm' && dms.some((d) => d.is_archived) && (
-        <View style={styles.subToggleContainer}>
+        <View style={[styles.subToggleContainer, { backgroundColor: colors.backgroundSecondary }]}>
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setDmFilter('all')}
-            style={[styles.subToggleBtn, dmFilter === 'all' && styles.subToggleBtnActive]}
+            style={[styles.subToggleBtn, dmFilter === 'all' && [styles.subToggleBtnActive, { backgroundColor: colors.cardBackground }]]}
           >
             <Text style={[styles.subToggleText, dmFilter === 'all' && styles.subToggleTextActive]}>
               All Messages ({dms.filter((d) => !d.is_archived).length})
@@ -487,7 +490,7 @@ export default function WorkspaceHubScreen() {
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setDmFilter('archived')}
-            style={[styles.subToggleBtn, dmFilter === 'archived' && styles.subToggleBtnActive]}
+            style={[styles.subToggleBtn, dmFilter === 'archived' && [styles.subToggleBtnActive, { backgroundColor: colors.cardBackground }]]}
           >
             <Text style={[styles.subToggleText, dmFilter === 'archived' && styles.subToggleTextActive]}>
               Archived ({dms.filter((d) => Boolean(d.is_archived)).length})
@@ -498,7 +501,7 @@ export default function WorkspaceHubScreen() {
 
       {/* Community Sub-Toggle: Your Community vs Joined Community */}
       {activeTab === 'community' && (
-        <View style={styles.subToggleContainer}>
+        <View style={[styles.subToggleContainer, { backgroundColor: colors.backgroundSecondary }]}>
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => {
@@ -507,7 +510,7 @@ export default function WorkspaceHubScreen() {
               } catch {}
               setCommunitySubFilter('your');
             }}
-            style={[styles.subToggleBtn, communitySubFilter === 'your' && styles.subToggleBtnActive]}
+            style={[styles.subToggleBtn, communitySubFilter === 'your' && [styles.subToggleBtnActive, { backgroundColor: colors.cardBackground }]]}
           >
             <Text style={[styles.subToggleText, communitySubFilter === 'your' && styles.subToggleTextActive]}>
               Your Community
@@ -521,7 +524,7 @@ export default function WorkspaceHubScreen() {
               } catch {}
               setCommunitySubFilter('joined');
             }}
-            style={[styles.subToggleBtn, communitySubFilter === 'joined' && styles.subToggleBtnActive]}
+            style={[styles.subToggleBtn, communitySubFilter === 'joined' && [styles.subToggleBtnActive, { backgroundColor: colors.cardBackground }]]}
           >
             <Text style={[styles.subToggleText, communitySubFilter === 'joined' && styles.subToggleTextActive]}>
               Joined Community
@@ -541,7 +544,7 @@ export default function WorkspaceHubScreen() {
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => handleSelectWorkspace(item.id)}
-        style={[styles.communityRow, isDisabled && styles.communityRowDisabled]}
+        style={[styles.communityRow, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }, isDisabled && styles.communityRowDisabled]}
       >
         <Avatar
           uri={item.avatar_url || undefined}
@@ -551,7 +554,7 @@ export default function WorkspaceHubScreen() {
 
         <View style={styles.communityBody}>
           <View style={styles.communityTitleRow}>
-            <Text style={[styles.communityTitle, isDisabled && styles.communityTitleDisabled]} numberOfLines={1}>
+            <Text style={[styles.communityTitle, { color: colors.textPrimary }, isDisabled && styles.communityTitleDisabled]} numberOfLines={1}>
               {item.name}
             </Text>
             {isDisabled && (
@@ -560,11 +563,11 @@ export default function WorkspaceHubScreen() {
               </View>
             )}
           </View>
-          <Text style={[styles.communitySnippet, isDisabled && styles.communitySnippetDisabled]} numberOfLines={2}>
+          <Text style={[styles.communitySnippet, { color: colors.textSecondary }, isDisabled && styles.communitySnippetDisabled]} numberOfLines={2}>
             {item.description || 'Join our research group discussion and paper reviews.'}
           </Text>
           <View style={styles.communityMetaRow}>
-            <Text style={[styles.communityMeta, isDisabled && styles.communityMetaDisabled]}>
+            <Text style={[styles.communityMeta, { color: colors.textMuted }, isDisabled && styles.communityMetaDisabled]}>
               {item.members_count || 1} {item.members_count === 1 ? 'member' : 'members'}
             </Text>
             {isJoined && item.unread_count !== undefined && item.unread_count > 0 && (
@@ -590,8 +593,8 @@ export default function WorkspaceHubScreen() {
             <Text style={styles.joinPillText}>Join</Text>
           </TouchableOpacity>
         ) : (
-          <View style={styles.joinedPill}>
-            <Text style={styles.joinedPillText}>Joined</Text>
+          <View style={[styles.joinedPill, { backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9', borderWidth: isDark ? 1 : 0, borderColor: colors.borderLight }]}>
+            <Text style={[styles.joinedPillText, { color: isDark ? colors.textSecondary : '#64748B' }]}>Joined</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -626,32 +629,32 @@ export default function WorkspaceHubScreen() {
     if (activeTab !== 'community') return null;
 
     return (
-      <View style={styles.suggestedSectionContainer}>
+      <View style={[styles.suggestedSectionContainer, { borderTopColor: colors.borderLight }]}>
         <View style={styles.suggestedHeaderRow}>
           <View style={styles.suggestedHeaderTitleGroup}>
-            <View style={styles.suggestedIconWrap}>
+            <View style={[styles.suggestedIconWrap, { backgroundColor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ECFDF5" }]}>
               <Sparkles size={13} color="#059669" />
             </View>
-            <Text style={styles.suggestedSectionTitle}>Suggested Communities</Text>
+            <Text style={[styles.suggestedSectionTitle, { color: colors.textPrimary }]}>Suggested Communities</Text>
           </View>
           {userInterests.length > 0 && suggestedCommunities.length > 0 && (
-            <View style={styles.interestCountPill}>
-              <Text style={styles.interestCountPillText}>
+            <View style={[styles.interestCountPill, { backgroundColor: isDark ? "rgba(16, 185, 129, 0.15)" : "#ECFDF5", borderColor: isDark ? "rgba(16, 185, 129, 0.3)" : "#A7F3D0" }]}>
+              <Text style={[styles.interestCountPillText, { color: isDark ? "#34D399" : "#065F46" }]}>
                 {suggestedCommunities.length} {suggestedCommunities.length === 1 ? 'match' : 'matches'}
               </Text>
             </View>
           )}
         </View>
 
-        <Text style={styles.suggestedSectionSub}>
+        <Text style={[styles.suggestedSectionSub, { color: colors.textSecondary }]}>
           {userInterests.length > 0
             ? `Based on your research in ${userInterests.slice(0, 2).join(' & ')}`
             : 'Based on your fields of study & research interests'}
         </Text>
 
         {userInterests.length === 0 ? (
-          <View style={styles.suggestedEmptyCard}>
-            <Text style={styles.suggestedEmptyCardText}>
+          <View style={[styles.suggestedEmptyCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+            <Text style={[styles.suggestedEmptyCardText, { color: colors.textSecondary }]}>
               Add research interests to your profile to discover communities tailored to your field.
             </Text>
             <TouchableOpacity
@@ -664,8 +667,8 @@ export default function WorkspaceHubScreen() {
             </TouchableOpacity>
           </View>
         ) : suggestedCommunities.length === 0 ? (
-          <View style={styles.suggestedEmptyCard}>
-            <Text style={styles.suggestedEmptyCardText}>
+          <View style={[styles.suggestedEmptyCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+            <Text style={[styles.suggestedEmptyCardText, { color: colors.textSecondary }]}>
               No other communities matching {userInterests.slice(0, 2).join(', ')} right now. Check back as new research groups are created!
             </Text>
           </View>
@@ -675,7 +678,7 @@ export default function WorkspaceHubScreen() {
               const isJoining = joiningCommunityId === community.id;
 
               return (
-                <View key={`suggested-${community.id}`} style={styles.suggestedCard}>
+                <View key={`suggested-${community.id}`} style={[styles.suggestedCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => handleSelectWorkspace(community.id)}
@@ -687,10 +690,10 @@ export default function WorkspaceHubScreen() {
                       size="md"
                     />
                     <View style={styles.suggestedCardBody}>
-                      <Text style={styles.suggestedCardTitle} numberOfLines={1}>
+                      <Text style={[styles.suggestedCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                         {community.name}
                       </Text>
-                      <Text style={styles.suggestedCardDesc} numberOfLines={2}>
+                      <Text style={[styles.suggestedCardDesc, { color: colors.textSecondary }]} numberOfLines={2}>
                         {community.description || 'Collaborative research group discussion and paper reviews.'}
                       </Text>
                       <View style={styles.suggestedCardMetaRow}>
@@ -796,13 +799,13 @@ export default function WorkspaceHubScreen() {
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => handleSelectWorkspace(item.id)}
-        style={styles.innerCircleRow}
+        style={[styles.innerCircleRow, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}
       >
         <Avatar uri={item.avatar_url || undefined} name={item.name} size="md" />
 
         <View style={styles.innerCircleBody}>
           <View style={styles.innerCircleTitleRow}>
-            <Text style={styles.innerCircleTitle} numberOfLines={1}>
+            <Text style={[styles.innerCircleTitle, { color: colors.textPrimary }]} numberOfLines={1}>
               {item.name}
             </Text>
             {timeFormatted ? (
@@ -813,7 +816,7 @@ export default function WorkspaceHubScreen() {
           </View>
 
           <View style={styles.innerCircleSnippetRow}>
-            <Text style={styles.innerCircleSnippet} numberOfLines={1}>
+            <Text style={[styles.innerCircleSnippet, { color: colors.textSecondary }]} numberOfLines={1}>
               {getInnerCircleSnippet()}
             </Text>
             {unreadCount > 0 && (
@@ -835,6 +838,8 @@ export default function WorkspaceHubScreen() {
       style={[
         styles.bottomTabBar,
         {
+          backgroundColor: colors.backgroundSecondary,
+          borderTopColor: colors.borderLight,
           height: 56 + (bottomInset > 0 ? bottomInset : 0),
           paddingBottom: bottomInset > 0 ? bottomInset : 4,
         },
@@ -928,17 +933,17 @@ export default function WorkspaceHubScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
 
       {/* Desktop 3-Pane Layout vs Mobile Full View */}
       {isDesktop ? (
-        <View style={styles.desktopContainer}>
+        <View style={[styles.desktopContainer, { backgroundColor: colors.background }]}>
           {/* Left Rail (Collapsible: 220px vs 60px) */}
-          <View style={[styles.desktopLeftRail, isLeftRailCollapsed && styles.desktopLeftRailCollapsed]}>
+          <View style={[styles.desktopLeftRail, isLeftRailCollapsed && styles.desktopLeftRailCollapsed, { backgroundColor: colors.backgroundSecondary, borderRightColor: colors.borderLight }]}>
             <View style={[styles.desktopRailHeader, isLeftRailCollapsed && styles.desktopRailHeaderCollapsed]}>
               {!isLeftRailCollapsed && (
-                <Text style={styles.desktopRailTitle} numberOfLines={1}>
+                <Text style={[styles.desktopRailTitle, { color: isDark ? "#34D399" : "#164E3F" }]} numberOfLines={1}>
                   BooffIn Workspace
                 </Text>
               )}
@@ -949,24 +954,27 @@ export default function WorkspaceHubScreen() {
                 activeOpacity={0.7}
               >
                 {isLeftRailCollapsed ? (
-                  <PanelLeftOpen size={18} color="#164E3F" />
+                  <PanelLeftOpen size={18} color={isDark ? "#34D399" : "#164E3F"} />
                 ) : (
-                  <PanelLeftClose size={18} color="#64748B" />
+                  <PanelLeftClose size={18} color={colors.textSecondary} />
                 )}
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              onPress={() => setActiveTab('dm')}
+              onPress={() => {
+                setActiveTab('dm');
+                setSelectedWorkspaceId(null);
+              }}
               style={[
                 styles.desktopRailTab,
                 isLeftRailCollapsed && styles.desktopRailTabCollapsed,
-                activeTab === 'dm' && styles.desktopRailTabActive,
+                activeTab === 'dm' && [styles.desktopRailTabActive, { backgroundColor: isDark ? '#1F2636' : '#ECFDF5' }],
               ]}
               accessibilityLabel="Direct Messages"
             >
               <View style={styles.railIconWrap}>
-                <MessageSquare size={18} color={activeTab === 'dm' ? '#064E3B' : '#64748B'} />
+                <MessageSquare size={18} color={activeTab === 'dm' ? (isDark ? '#34D399' : '#064E3B') : colors.textSecondary} />
                 {isLeftRailCollapsed && totalDMsUnread > 0 && (
                   <View style={styles.railBadgeCollapsed}>
                     <Text style={styles.railBadgeTextCollapsed}>{totalDMsUnread > 99 ? '99+' : totalDMsUnread}</Text>
@@ -975,7 +983,7 @@ export default function WorkspaceHubScreen() {
               </View>
               {!isLeftRailCollapsed && (
                 <View style={styles.railTabLabelRow}>
-                  <Text style={[styles.desktopRailTabText, activeTab === 'dm' && styles.desktopRailTabTextActive]}>
+                  <Text style={[styles.desktopRailTabText, { color: colors.textSecondary }, activeTab === 'dm' && [styles.desktopRailTabTextActive, { color: isDark ? '#34D399' : '#064E3B' }]]}>
                     Direct Messages
                   </Text>
                   {totalDMsUnread > 0 && (
@@ -988,16 +996,19 @@ export default function WorkspaceHubScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setActiveTab('community')}
+              onPress={() => {
+                setActiveTab('community');
+                setSelectedWorkspaceId(null);
+              }}
               style={[
                 styles.desktopRailTab,
                 isLeftRailCollapsed && styles.desktopRailTabCollapsed,
-                activeTab === 'community' && styles.desktopRailTabActive,
+                activeTab === 'community' && [styles.desktopRailTabActive, { backgroundColor: isDark ? '#1F2636' : '#ECFDF5' }],
               ]}
               accessibilityLabel="Communities"
             >
               <View style={styles.railIconWrap}>
-                <Users size={18} color={activeTab === 'community' ? '#064E3B' : '#64748B'} />
+                <Users size={18} color={activeTab === 'community' ? (isDark ? '#34D399' : '#064E3B') : colors.textSecondary} />
                 {isLeftRailCollapsed && totalCommsUnread > 0 && (
                   <View style={styles.railBadgeCollapsed}>
                     <Text style={styles.railBadgeTextCollapsed}>{totalCommsUnread > 99 ? '99+' : totalCommsUnread}</Text>
@@ -1006,7 +1017,7 @@ export default function WorkspaceHubScreen() {
               </View>
               {!isLeftRailCollapsed && (
                 <View style={styles.railTabLabelRow}>
-                  <Text style={[styles.desktopRailTabText, activeTab === 'community' && styles.desktopRailTabTextActive]}>
+                  <Text style={[styles.desktopRailTabText, { color: colors.textSecondary }, activeTab === 'community' && [styles.desktopRailTabTextActive, { color: isDark ? '#34D399' : '#064E3B' }]]}>
                     Communities
                   </Text>
                   {totalCommsUnread > 0 && (
@@ -1019,16 +1030,19 @@ export default function WorkspaceHubScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setActiveTab('inner_circle')}
+              onPress={() => {
+                setActiveTab('inner_circle');
+                setSelectedWorkspaceId(null);
+              }}
               style={[
                 styles.desktopRailTab,
                 isLeftRailCollapsed && styles.desktopRailTabCollapsed,
-                activeTab === 'inner_circle' && styles.desktopRailTabActive,
+                activeTab === 'inner_circle' && [styles.desktopRailTabActive, { backgroundColor: isDark ? '#1F2636' : '#ECFDF5' }],
               ]}
               accessibilityLabel="Inner Circles"
             >
               <View style={styles.railIconWrap}>
-                <Shield size={18} color={activeTab === 'inner_circle' ? '#064E3B' : '#64748B'} />
+                <Shield size={18} color={activeTab === 'inner_circle' ? (isDark ? '#34D399' : '#064E3B') : colors.textSecondary} />
                 {isLeftRailCollapsed && totalInnersUnread > 0 && (
                   <View style={styles.railBadgeCollapsed}>
                     <Text style={styles.railBadgeTextCollapsed}>{totalInnersUnread > 99 ? '99+' : totalInnersUnread}</Text>
@@ -1037,7 +1051,7 @@ export default function WorkspaceHubScreen() {
               </View>
               {!isLeftRailCollapsed && (
                 <View style={styles.railTabLabelRow}>
-                  <Text style={[styles.desktopRailTabText, activeTab === 'inner_circle' && styles.desktopRailTabTextActive]}>
+                  <Text style={[styles.desktopRailTabText, { color: colors.textSecondary }, activeTab === 'inner_circle' && [styles.desktopRailTabTextActive, { color: isDark ? '#34D399' : '#064E3B' }]]}>
                     Inner Circles
                   </Text>
                   {totalInnersUnread > 0 && (
@@ -1050,19 +1064,22 @@ export default function WorkspaceHubScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setActiveTab('settings')}
+              onPress={() => {
+                setActiveTab('settings');
+                setSelectedWorkspaceId(null);
+              }}
               style={[
                 styles.desktopRailTab,
                 isLeftRailCollapsed && styles.desktopRailTabCollapsed,
-                activeTab === 'settings' && styles.desktopRailTabActive,
+                activeTab === 'settings' && [styles.desktopRailTabActive, { backgroundColor: isDark ? '#1F2636' : '#ECFDF5' }],
               ]}
               accessibilityLabel="Settings"
             >
               <View style={styles.railIconWrap}>
-                <Settings size={18} color={activeTab === 'settings' ? '#164E3F' : '#64748B'} />
+                <Settings size={18} color={activeTab === 'settings' ? (isDark ? '#34D399' : '#164E3F') : colors.textSecondary} />
               </View>
               {!isLeftRailCollapsed && (
-                <Text style={[styles.desktopRailTabText, activeTab === 'settings' && styles.desktopRailTabTextActive]}>
+                <Text style={[styles.desktopRailTabText, { color: colors.textSecondary }, activeTab === 'settings' && [styles.desktopRailTabTextActive, { color: isDark ? '#34D399' : '#064E3B' }]]}>
                   Settings
                 </Text>
               )}
@@ -1074,6 +1091,7 @@ export default function WorkspaceHubScreen() {
               style={[
                 styles.desktopNewBtn,
                 isLeftRailCollapsed && styles.desktopNewBtnCollapsed,
+                { backgroundColor: isDark ? '#059669' : '#164E3F' },
               ]}
               accessibilityLabel="New Workspace"
             >
@@ -1086,7 +1104,7 @@ export default function WorkspaceHubScreen() {
 
           {/* Middle List Column (Collapsible: 340px vs Hidden) */}
           {!isMiddleColCollapsed && (
-            <View style={styles.desktopMiddleCol}>
+            <View style={[styles.desktopMiddleCol, { backgroundColor: colors.background, borderRightColor: colors.borderLight }]}>
               {renderTopAppBar()}
               {renderSearchBar()}
 
@@ -1112,27 +1130,27 @@ export default function WorkspaceHubScreen() {
           )}
 
           {/* Main Workstation Canvas (Flexible, with restore bar when collapsed) */}
-          <View style={styles.desktopMainCanvas}>
+          <View style={[styles.desktopMainCanvas, { backgroundColor: colors.background }]}>
             {(isLeftRailCollapsed || isMiddleColCollapsed) && (
-              <View style={styles.desktopCanvasRestoreBar}>
+              <View style={[styles.desktopCanvasRestoreBar, { backgroundColor: colors.backgroundSecondary, borderBottomColor: colors.borderLight }]}>
                 {isLeftRailCollapsed && (
                   <TouchableOpacity
                     onPress={() => setIsLeftRailCollapsed(false)}
-                    style={styles.restorePill}
+                    style={[styles.restorePill, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}
                     activeOpacity={0.8}
                   >
                     <PanelLeftOpen size={14} color="#064E3B" />
-                    <Text style={styles.restorePillText}>Expand Navigation</Text>
+                    <Text style={[styles.restorePillText, { color: isDark ? "#34D399" : "#064E3B" }]}>Expand Navigation</Text>
                   </TouchableOpacity>
                 )}
                 {isMiddleColCollapsed && (
                   <TouchableOpacity
                     onPress={() => setIsMiddleColCollapsed(false)}
-                    style={styles.restorePill}
+                    style={[styles.restorePill, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}
                     activeOpacity={0.8}
                   >
                     <Menu size={14} color="#064E3B" />
-                    <Text style={styles.restorePillText}>
+                    <Text style={[styles.restorePillText, { color: isDark ? "#34D399" : "#064E3B" }]}>
                       Show {activeTab === 'dm' ? 'Messages' : activeTab === 'community' ? 'Communities' : activeTab === 'inner_circle' ? 'Pods' : 'List'}
                     </Text>
                   </TouchableOpacity>
@@ -1144,17 +1162,17 @@ export default function WorkspaceHubScreen() {
               <WorkspaceSettingsView />
             ) : selectedWorkspace ? (
               selectedWorkspace.type === 'dm' ? (
-                <WorkspaceDMView workspace={selectedWorkspace} />
+                <WorkspaceDMView workspace={selectedWorkspace} key={selectedWorkspace.id} />
               ) : selectedWorkspace.type === 'community' ? (
-                <WorkspaceCommunityView workspace={selectedWorkspace} />
+                <WorkspaceCommunityView workspace={selectedWorkspace} key={selectedWorkspace.id} />
               ) : (
-                <WorkspaceInnerCircleView workspace={selectedWorkspace} />
+                <WorkspaceInnerCircleView workspace={selectedWorkspace} key={selectedWorkspace.id} />
               )
             ) : (
               <View style={styles.emptyDesktopCanvas}>
-                <MessageSquare size={48} color="#CBD5E1" />
-                <Text style={styles.emptyDesktopTitle}>Select a Conversation</Text>
-                <Text style={styles.emptyDesktopSub}>
+                <MessageSquare size={48} color={colors.borderDark || "#334155"} />
+                <Text style={[styles.emptyDesktopTitle, { color: colors.textPrimary }]}>Select a Conversation</Text>
+                <Text style={[styles.emptyDesktopSub, { color: colors.textSecondary }]}>
                   Choose a direct message, community channel, or inner circle pod to start collaborating.
                 </Text>
               </View>
@@ -1163,7 +1181,7 @@ export default function WorkspaceHubScreen() {
         </View>
       ) : (
         /* Mobile Layout */
-        <View style={styles.mobileContainer}>
+        <View style={[styles.mobileContainer, { backgroundColor: colors.background }]}>
           {renderTopAppBar()}
           {activeTab === 'settings' ? (
             <WorkspaceSettingsView />

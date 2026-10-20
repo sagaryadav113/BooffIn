@@ -21,7 +21,7 @@ import {
   Share2,
   Trash2,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Comment, DiscussionType, UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
 import { DiscussionIcon } from '../core/DiscussionIcon';
@@ -56,6 +56,8 @@ export const CommentCard: React.FC<CommentCardProps> = ({
   highlighted = false,
   style,
 }) => {
+  const dynamicColors = useColors();
+  const isDark = useIsDark();
   const [isInlineReplying, setIsInlineReplying] = useState(false);
   const [replyText, setReplyText] = useState('');
 
@@ -144,7 +146,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
     const parts = cleanedText.split(tokenRegex);
 
     return (
-      <Text style={styles.bodyText}>
+      <Text style={[styles.bodyText, { color: dynamicColors.textPrimary }]}>
         {parts.map((part, index) => {
           if (!part) return null;
           if (part.startsWith('@')) {
@@ -152,7 +154,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
             return (
               <Text
                 key={index}
-                style={styles.mentionText}
+                style={[styles.mentionText, { color: dynamicColors.accentBlue }]}
                 onPress={() => {
                   router.push({
                     pathname: '/profile/[id]',
@@ -172,7 +174,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
             return (
               <React.Fragment key={index}>
                 <Text
-                  style={styles.linkText}
+                  style={[styles.linkText, { color: dynamicColors.accentBlue }]}
                   onPress={() => {
                     try {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -184,11 +186,11 @@ export const CommentCard: React.FC<CommentCardProps> = ({
                 >
                   {cleanUrl}
                 </Text>
-                {trailingPunctuation ? <Text>{trailingPunctuation}</Text> : null}
+                {trailingPunctuation ? <Text style={{ color: dynamicColors.textPrimary }}>{trailingPunctuation}</Text> : null}
               </React.Fragment>
             );
           }
-          return <Text key={index}>{part}</Text>;
+          return <Text key={index} style={{ color: dynamicColors.textPrimary }}>{part}</Text>;
         })}
       </Text>
     );
@@ -201,7 +203,17 @@ export const CommentCard: React.FC<CommentCardProps> = ({
     <View
       style={[
         isRoot ? styles.rootCardContainer : styles.replyCardContainer,
-        highlighted && styles.highlightedCard,
+        {
+          backgroundColor: isRoot ? dynamicColors.cardBackground : dynamicColors.backgroundSecondary,
+          borderColor: dynamicColors.borderLight,
+        },
+        highlighted && [
+          styles.highlightedCard,
+          {
+            backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#F0F9FF',
+            borderColor: dynamicColors.accentBlue,
+          },
+        ],
         depth > 1 && { marginLeft: Math.min(depth - 1, 3) * 10 },
         style,
       ]}
@@ -221,27 +233,27 @@ export const CommentCard: React.FC<CommentCardProps> = ({
           />
           <View style={styles.authorMeta}>
             <View style={styles.authorNameRow}>
-              <Text style={isRoot ? styles.authorName : styles.replyAuthorName}>
+              <Text style={[isRoot ? styles.authorName : styles.replyAuthorName, { color: dynamicColors.textPrimary }]}>
                 {comment.author?.fullName || 'Researcher'}
               </Text>
-              <Text style={isRoot ? styles.authorHandle : styles.replyAuthorHandle}>
+              <Text style={[isRoot ? styles.authorHandle : styles.replyAuthorHandle, { color: dynamicColors.textSecondary }]}>
                 @{comment.author?.handle || 'scholar'}
               </Text>
             </View>
             {isRoot ? (
-              <Text style={styles.authorTitle} numberOfLines={1}>
+              <Text style={[styles.authorTitle, { color: dynamicColors.textSecondary }]} numberOfLines={1}>
                 {comment.author?.academicTitle || 'Student researcher'}
                 {comment.author?.institution ? ` · ${comment.author.institution}` : ''}
               </Text>
             ) : (
-              <Text style={styles.replyTimestamp}>{comment.createdAt}</Text>
+              <Text style={[styles.replyTimestamp, { color: dynamicColors.textMuted }]}>{comment.createdAt}</Text>
             )}
           </View>
         </TouchableOpacity>
 
         {/* Timestamp on root comment or like button on sub-reply */}
         {isRoot ? (
-          <Text style={styles.timestampText}>{comment.createdAt}</Text>
+          <Text style={[styles.timestampText, { color: dynamicColors.textMuted }]}>{comment.createdAt}</Text>
         ) : (
           <TouchableOpacity
             onPress={handleLike}
@@ -251,13 +263,14 @@ export const CommentCard: React.FC<CommentCardProps> = ({
             <LikeIcon
               size={13}
               isLiked={Boolean(comment.isLiked)}
-              color={comment.isLiked ? colors.textPrimary : colors.textMuted}
+              color={comment.isLiked ? dynamicColors.textPrimary : dynamicColors.textMuted}
             />
             {comment.likesCount > 0 && (
               <Text
                 style={[
                   styles.replyLikeCount,
-                  comment.isLiked && { color: colors.textPrimary, fontWeight: '700' },
+                  { color: dynamicColors.textSecondary },
+                  comment.isLiked && { color: dynamicColors.textPrimary, fontWeight: '700' },
                 ]}
               >
                 {comment.likesCount}
@@ -273,7 +286,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
       </View>
 
       {/* Bottom Action Row */}
-      <View style={isRoot ? styles.actionRow : styles.replyActionRow}>
+      <View style={[isRoot ? styles.actionRow : styles.replyActionRow, isRoot && { borderTopColor: dynamicColors.borderLight }]}>
         {/* Like Button */}
         <TouchableOpacity
           onPress={handleLike}
@@ -284,13 +297,14 @@ export const CommentCard: React.FC<CommentCardProps> = ({
           <LikeIcon
             size={isRoot ? 15 : 13}
             isLiked={Boolean(comment.isLiked)}
-            color={comment.isLiked ? colors.textPrimary : colors.textSecondary}
+            color={comment.isLiked ? dynamicColors.textPrimary : dynamicColors.textSecondary}
           />
           <Text
             style={[
               styles.actionLabel,
+              { color: dynamicColors.textSecondary },
               !isRoot && { fontSize: 11 },
-              comment.isLiked && { color: colors.textPrimary, fontWeight: '700' },
+              comment.isLiked && { color: dynamicColors.textPrimary, fontWeight: '700' },
             ]}
           >
             {comment.likesCount > 0 ? comment.likesCount : 'Helpful'}
@@ -304,8 +318,8 @@ export const CommentCard: React.FC<CommentCardProps> = ({
           style={styles.actionButton}
           activeOpacity={0.7}
         >
-          <CornerDownRight size={isRoot ? 15 : 13} color={colors.textSecondary} />
-          <Text style={[styles.actionLabel, !isRoot && { fontSize: 11 }]}>
+          <CornerDownRight size={isRoot ? 15 : 13} color={dynamicColors.textSecondary} />
+          <Text style={[styles.actionLabel, { color: dynamicColors.textSecondary }, !isRoot && { fontSize: 11 }]}>
             {repliesCount > 0
               ? `${repliesCount} ${repliesCount === 1 ? 'Reply' : 'Replies'}`
               : 'Reply'}
@@ -319,7 +333,7 @@ export const CommentCard: React.FC<CommentCardProps> = ({
             style={styles.actionButton}
             activeOpacity={0.7}
           >
-            <Share2 size={15} color={colors.textSecondary} />
+            <Share2 size={15} color={dynamicColors.textSecondary} />
           </TouchableOpacity>
         )}
 
@@ -330,16 +344,16 @@ export const CommentCard: React.FC<CommentCardProps> = ({
             style={styles.actionButton}
             activeOpacity={0.7}
           >
-            <Trash2 size={isRoot ? 14 : 12} color={colors.textMuted} />
+            <Trash2 size={isRoot ? 14 : 12} color={dynamicColors.textMuted} />
           </TouchableOpacity>
         )}
 
-        {isRoot && <Text style={styles.timestamp}>{comment.createdAt}</Text>}
+        {isRoot && <Text style={[styles.timestamp, { color: dynamicColors.textMuted }]}>{comment.createdAt}</Text>}
       </View>
 
       {/* Inline Reply Composer for this specific comment / reply */}
       {isInlineReplying && (
-        <View style={styles.replyComposerContainer}>
+        <View style={[styles.replyComposerContainer, { backgroundColor: dynamicColors.cardBackground, borderColor: dynamicColors.borderLight }]}>
           <Avatar
             url={currentUser?.avatarUrl}
             name={currentUser?.fullName || 'Me'}
@@ -347,10 +361,10 @@ export const CommentCard: React.FC<CommentCardProps> = ({
           />
           <TextInput
             placeholder={`Reply to @${comment.author?.handle || 'scholar'}...`}
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={dynamicColors.textMuted}
             value={replyText}
             onChangeText={setReplyText}
-            style={styles.replyInput}
+            style={[styles.replyInput, { color: dynamicColors.textPrimary }]}
             multiline
             autoFocus
           />
@@ -359,10 +373,11 @@ export const CommentCard: React.FC<CommentCardProps> = ({
             disabled={!replyText.trim()}
             style={[
               styles.replySendButton,
+              { backgroundColor: dynamicColors.primary },
               !replyText.trim() && styles.replySendButtonDisabled,
             ]}
           >
-            <Send size={12} color={colors.white} />
+            <Send size={12} color={dynamicColors.white} />
           </TouchableOpacity>
         </View>
       )}

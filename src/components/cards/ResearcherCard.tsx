@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
-import { colors, spacing, layout, typography } from '../../theme';
+import { colors, spacing, layout, typography, useTheme } from '../../theme';
 import { UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
 import { Typography } from '../core/Typography';
@@ -27,6 +27,7 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
   style,
   showMutualInterests = true,
 }) => {
+  const { colors, isDark } = useTheme();
   const currentUser = useAuthStore((s) => s.user);
   const isFollowing = useAuthStore((s) => s.followingIds.has(researcher.id));
   const isRequested = useAuthStore((s) => s.requestedUserIds.has(researcher.id));
@@ -72,7 +73,14 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.88}
       onPress={handlePress}
-      style={[styles.container, style]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.backgroundCard,
+          borderBottomColor: colors.border,
+        },
+        style,
+      ]}
     >
       <Avatar
         url={researcher.avatarUrl}
@@ -97,8 +105,8 @@ export const ResearcherCard: React.FC<ResearcherCardProps> = ({
 
         {mutualInterests.length > 0 && (
           <View style={styles.mutualRow}>
-            <Sparkles size={12} color="#2563EB" style={{ marginRight: 4 }} />
-            <Typography variant="metadata" color="#1E40AF" style={{ fontWeight: '600' }} numberOfLines={1}>
+            <Sparkles size={12} color={isDark ? '#60A5FA' : '#2563EB'} style={{ marginRight: 4 }} />
+            <Typography variant="metadata" color={isDark ? '#93C5FD' : '#1E40AF'} style={{ fontWeight: '600' }} numberOfLines={1}>
               Mutual: {mutualInterests.slice(0, 2).join(', ')}{mutualInterests.length > 2 ? ` +${mutualInterests.length - 2}` : ''}
             </Typography>
           </View>

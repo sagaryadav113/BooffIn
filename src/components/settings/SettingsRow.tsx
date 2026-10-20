@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
-import { colors, radii, spacing } from '../../theme';
+import { colors, radii, spacing, useTheme } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
 import { Avatar } from '../core/Avatar';
@@ -38,10 +38,15 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
   disabled = false,
   style,
 }) => {
+  const { colors, isDark } = useTheme();
   const isInteractive = Boolean(onPress) && !disabled;
 
   const defaultIconColor = destructive ? colors.error : colors.textPrimary;
-  const defaultIconBg = destructive ? '#FEE2E2' : colors.backgroundSecondary;
+  const defaultIconBg = destructive
+    ? isDark
+      ? 'rgba(239, 68, 68, 0.2)'
+      : '#FEE2E2'
+    : colors.backgroundSecondary;
 
   return (
     <TouchableOpacity
@@ -50,6 +55,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
       disabled={!isInteractive}
       style={[
         styles.container,
+        { backgroundColor: colors.cardBackground },
         disabled && styles.disabled,
         style,
       ]}

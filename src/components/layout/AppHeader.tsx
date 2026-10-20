@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ViewStyle, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { colors, spacing, layout, typography } from '../../theme';
+import { colors, spacing, layout, typography, useTheme } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
@@ -48,6 +48,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   rightAction,
   style,
 }) => {
+  const { colors, isDark } = useTheme();
   const workspaceUnread = useWorkspaceStore((s) => s.unreadTotal);
   const handleBack = () => {
     if (onBack) {
@@ -62,7 +63,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const searchHandler = onSearch || onSearchPress || (() => router.push('/search'));
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }, style]}>
       {/* Left side */}
       <TouchableOpacity
         disabled={!onTitlePress}
@@ -84,7 +85,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {isBrandTitle ? (
           <Image
             source={require('../../../assets/images/booffin-wordmark.svg')}
-            style={styles.brandLogoImage}
+            style={[styles.brandLogoImage, isDark && ({ filter: 'invert(1)' } as any)]}
             contentFit="contain"
             accessibilityLabel="BooffIn"
           />
@@ -93,6 +94,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             variant="sectionTitle"
             style={[
               styles.title,
+              { color: colors.textPrimary },
               showBack && { marginLeft: spacing.xs + 2 },
             ]}
             numberOfLines={1}

@@ -4,6 +4,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaInsetsContext, EdgeInsets } from 'react-native-safe-area-context';
 import { colors, shadows } from '../theme';
+import { useThemeStore } from '../store/useThemeStore';
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNotificationStore } from '../store/useNotificationStore';
@@ -22,6 +23,14 @@ export default function RootLayout() {
   const { isDesktop } = useResponsiveLayout();
   const segments = useSegments();
   const router = useRouter();
+
+  // Dynamic Theme state
+  const isDark = useThemeStore((s) => s.isDark);
+  const currentColors = useThemeStore((s) => s.colors);
+
+  useEffect(() => {
+    useThemeStore.getState().initTheme();
+  }, []);
 
   // Track live user presence across all active sessions in real-time
   useUserPresence();
@@ -72,7 +81,7 @@ export default function RootLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: isDesktop ? '#FFFFFF' : colors.background },
+        contentStyle: { backgroundColor: currentColors.background },
         animation: 'slide_from_right',
       }}
     >
@@ -152,13 +161,34 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <WebSafeAreaInsetsWrapper>
-        <StatusBar style="dark" />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
         <ErrorBoundary>
           {isDesktop ? (
             <DesktopLayoutShell>{stackContent}</DesktopLayoutShell>
           ) : (
-            <View style={styles.outerContainer}>
-              <View style={styles.mobileFrame}>
+            <View
+              style={[
+                styles.outerContainer,
+                {
+                  backgroundColor: isDark
+                    ? Platform.OS === 'web'
+                      ? '#04070B'
+                      : currentColors.background
+                    : Platform.OS === 'web'
+                    ? '#F3F4F6'
+                    : currentColors.background,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.mobileFrame,
+                  {
+                    backgroundColor: currentColors.background,
+                    borderColor: currentColors.border,
+                  },
+                ]}
+              >
                 {stackContent}
               </View>
             </View>

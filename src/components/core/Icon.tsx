@@ -82,6 +82,7 @@ export type IconName =
   | 'Database'
   | 'AtSign'
   | 'Link'
+  | 'Laptop'
   | 'Slash';
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;

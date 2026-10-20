@@ -10,7 +10,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Paper } from '../../types';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, layout, useColors, useIsDark } from '../../theme';
 import { Badge } from '../core/Badge';
 import { DiscussionIcon } from '../core/DiscussionIcon';
 import { LikeIcon } from '../core/LikeIcon';
@@ -26,6 +26,8 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
   paper,
   style,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const isSavedInStore = usePaperStore(
     (s) =>
       s.savedPaperIds.has(paper.id) ||
@@ -63,13 +65,13 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.88}
       onPress={handleCardPress}
-      style={[styles.container, style]}
+      style={[styles.container, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }, style]}
     >
       {/* Thumbnail */}
       {figureUrl && (
         <Image
           source={{ uri: figureUrl }}
-          style={styles.thumbnail}
+          style={[styles.thumbnail, { backgroundColor: colors.backgroundSecondary }]}
           contentFit="cover"
           transition={200}
         />
@@ -77,7 +79,7 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
 
       {/* Info */}
       <View style={styles.content}>
-        <Text numberOfLines={2} style={styles.title}>
+        <Text numberOfLines={2} style={[styles.title, { color: colors.textPrimary }]}>
           {paper.title}
         </Text>
 
@@ -86,18 +88,18 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
             label={paper.journal}
             variant={getJournalVariant(paper.journal)}
           />
-          <Text style={styles.yearText}>({paper.publicationYear})</Text>
+          <Text style={[styles.yearText, { color: colors.textSecondary }]}>({paper.publicationYear})</Text>
         </View>
 
         <View style={styles.actionsRow}>
           <View style={styles.metricsRow}>
             <View style={styles.metricItem}>
               <LikeIcon size={15} isLiked={Boolean(paper.isLiked)} color={colors.textSecondary} />
-              <Text style={styles.metricText}>{paper.likesCount}</Text>
+              <Text style={[styles.metricText, { color: colors.textSecondary }]}>{paper.likesCount}</Text>
             </View>
             <View style={styles.metricItem}>
               <DiscussionIcon size={15} color={colors.textSecondary} />
-              <Text style={styles.metricText}>{paper.discussionCount}</Text>
+              <Text style={[styles.metricText, { color: colors.textSecondary }]}>{paper.discussionCount}</Text>
             </View>
           </View>
 
@@ -115,10 +117,10 @@ export const TrendingPaperCard: React.FC<TrendingPaperCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: staticColors.cardBackground,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     padding: spacing.md + 2,
     flexDirection: 'row',
     marginBottom: spacing.md,
@@ -127,7 +129,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: radii.sm + 2,
-    backgroundColor: colors.backgroundTertiary,
+    backgroundColor: staticColors.backgroundTertiary,
     marginRight: spacing.md,
   },
   content: {
@@ -136,7 +138,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     fontSize: 15,
     lineHeight: 20,
     marginBottom: spacing.xs,
@@ -150,7 +152,7 @@ const styles = StyleSheet.create({
   },
   yearText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 12.5,
   },
   actionsRow: {
@@ -171,7 +173,7 @@ const styles = StyleSheet.create({
   },
   metricText: {
     ...typography.metadata,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
   },

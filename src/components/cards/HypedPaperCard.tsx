@@ -11,7 +11,7 @@ import { router } from 'expo-router';
 import { Share2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Paper } from '../../types';
-import { radii, typography } from '../../theme';
+import { radii, typography, useColors, useIsDark } from '../../theme';
 import { SaveButton } from '../core/SaveButton';
 import { DiscussionIcon } from '../core/DiscussionIcon';
 import { ReadBookIcon } from '../core/ReadBookIcon';
@@ -45,6 +45,8 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
   timeframe = 'week',
   style,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const isSavedInStore = usePaperStore(
     (s) =>
       s.savedPaperIds.has(paper.id) ||
@@ -134,6 +136,12 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
 
   // Rank badge styling
   const getRankBadgeStyle = (r: number) => {
+    if (isDark) {
+      if (r === 1) return { bg: 'rgba(245, 158, 11, 0.2)', text: '#FBBF24', border: 'rgba(245, 158, 11, 0.4)' };
+      if (r === 2) return { bg: 'rgba(148, 163, 184, 0.2)', text: '#E2E8F0', border: 'rgba(148, 163, 184, 0.3)' };
+      if (r === 3) return { bg: 'rgba(249, 115, 22, 0.2)', text: '#FB923C', border: 'rgba(249, 115, 22, 0.4)' };
+      return { bg: colors.backgroundSecondary, text: colors.textSecondary, border: colors.borderLight };
+    }
     if (r === 1) return { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A' };
     if (r === 2) return { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1' };
     if (r === 3) return { bg: '#FFEDD5', text: '#C2410C', border: '#FED7AA' };
@@ -180,7 +188,7 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
       <TouchableOpacity
         activeOpacity={0.88}
         onPress={handleCardPress}
-        style={[styles.container, style]}
+        style={[styles.container, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }, style]}
       >
       {/* Top Left Floating Rank Badge */}
       <View
@@ -198,20 +206,20 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
       <View style={styles.cardContent}>
         {/* Paper Details */}
         <View style={styles.centerDetails}>
-          <Text style={styles.titleText} numberOfLines={2} ellipsizeMode="tail">
+          <Text style={[styles.titleText, { color: colors.textPrimary }]} numberOfLines={2} ellipsizeMode="tail">
             {paper.title}
           </Text>
 
-          <Text style={styles.metaText} numberOfLines={1}>
+          <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
             {metaLine}
           </Text>
 
           {/* Topic Tags */}
           <View style={styles.tagsRow}>
             {cleanedTopics.map((topic, i) => (
-              <View key={`${topic}-${i}`} style={styles.tagChip}>
+              <View key={`${topic}-${i}`} style={[styles.tagChip, { backgroundColor: isDark ? "rgba(16, 185, 129, 0.15)" : "#EAF3EE" }]}>
                 <Text
-                  style={styles.tagText}
+                  style={[styles.tagText, { color: isDark ? "#34D399" : "#1B4D3E" }]}
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
@@ -225,16 +233,16 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
           <View style={styles.metricsRow}>
             {/* Reads (Synchronized with custom radiant book icon) */}
             <View style={styles.metricItem}>
-              <ReadBookIcon size={14} color="#64748B" />
-              <Text style={styles.metricValue}>
+              <ReadBookIcon size={14} color={colors.textSecondary} />
+              <Text style={[styles.metricValue, { color: colors.textSecondary }]}>
                 {formatCompactNumber(readCount)}
               </Text>
             </View>
 
             {/* Discussions / Comments */}
             <View style={styles.metricItem}>
-              <DiscussionIcon size={14} color="#64748B" />
-              <Text style={styles.metricValue}>
+              <DiscussionIcon size={14} color={colors.textSecondary} />
+              <Text style={[styles.metricValue, { color: colors.textSecondary }]}>
                 {formatCompactNumber(discussionCount)}
               </Text>
             </View>
@@ -243,7 +251,7 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
             <ShareToChatButton
               onPress={() => setIsShareToWorkspaceOpen(true)}
               size={14}
-              color="#64748B"
+              color={colors.textSecondary}
               style={styles.shareChatBtn}
             />
 
@@ -254,8 +262,8 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
               style={styles.metricItem}
               activeOpacity={0.7}
             >
-              <Share2 size={13} color="#64748B" strokeWidth={2} />
-              <Text style={styles.metricValue}>
+              <Share2 size={13} color={colors.textSecondary} strokeWidth={2} />
+              <Text style={[styles.metricValue, { color: colors.textSecondary }]}>
                 {formatCompactNumber(shareCount)}
               </Text>
             </TouchableOpacity>
@@ -271,20 +279,20 @@ export const HypedPaperCard: React.FC<HypedPaperCardProps> = ({
         </View>
 
         {/* Right HYPE Score Rating Box */}
-        <View style={[styles.hypeScoreBox, isUnrated && styles.unratedHypeBox]}>
-          <Text style={styles.hypeScoreLabel}>HYPE</Text>
+        <View style={[styles.hypeScoreBox, { backgroundColor: isDark ? colors.backgroundSecondary : "#F8FAFC", borderColor: colors.borderLight }, isUnrated && styles.unratedHypeBox]}>
+          <Text style={[styles.hypeScoreLabel, { color: colors.textSecondary }]}>HYPE</Text>
           {isUnrated ? (
-            <Text style={styles.unratedText}>Unrated</Text>
+            <Text style={[styles.unratedText, { color: colors.textTertiary || "#94A3B8" }]}>Unrated</Text>
           ) : (
             <>
-              <Text style={styles.hypeScoreNumber}>{hypeScoreFormatted}</Text>
+              <Text style={[styles.hypeScoreNumber, { color: colors.textPrimary }]}>{hypeScoreFormatted}</Text>
 
               {/* Solid Forest Green Score Progress Indicator */}
-              <View style={styles.progressTrack}>
+              <View style={[styles.progressTrack, { backgroundColor: isDark ? "#2D3748" : "#E2E8F0" }]}>
                 <View
                   style={[
                     styles.progressBar,
-                    { width: `${progressPercent}%` },
+                    { backgroundColor: isDark ? "#10B981" : "#1B4D3E", width: `${progressPercent}%` },
                   ]}
                 />
               </View>

@@ -1063,6 +1063,10 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
           tags: parsedTags,
           syncWithCalendar: formSyncCalendar,
         });
+        if (res.error || !res.task) {
+          Alert.alert('Save Error', res.error || 'Failed to save task to cloud');
+          return;
+        }
         if (res.task) {
           setNewlyArrivedTaskId(res.task.id);
           setTimeout(() => setNewlyArrivedTaskId(null), 1800);

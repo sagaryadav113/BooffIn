@@ -47,7 +47,7 @@ export function formatNotificationContent(
 ): string {
   switch (type) {
     case 'follow':
-      return 'started following you';
+      return snippet || 'started following you';
     case 'follow_request':
       return 'requested to follow you';
     case 'follow_accept':
@@ -83,7 +83,7 @@ export function formatNotificationContent(
     case 'subscription_active':
       return 'workspace subscription is now active';
     default:
-      return 'shared an update';
+      return snippet || 'shared an update';
   }
 }
 
@@ -300,25 +300,34 @@ export function filterNotificationList(
 export function mapNotificationRow(row: any): AppNotification {
   const actor = mapSupabaseProfile(row.actor);
   const metadata = row.metadata || {};
-  const type = row.notification_type as NotificationType;
-  const topicName = metadata.topic_name || (row.entity_type === 'topic' ? row.message_snippet : undefined);
+  // Dual-column compatibility: support both modern and legacy schemas
+  const rawType = row.type || row.notification_type || 'follow';
+  const type = rawType as NotificationType;
+  const snippet = row.message_snippet || row.content || null;
+  const topicName = metadata.topic_name || (row.entity_type === 'topic' ? snippet : undefined);
   
-  const content = formatNotificationContent(type, row.message_snippet, topicName);
+  const content = row.content || formatNotificationContent(type, snippet, topicName);
+
+  const entityType = (row.entity_type || (row.post_id ? 'post' : row.paper_id ? 'paper' : 'profile')) as NotificationEntityType;
+  const entityId = row.entity_id || row.post_id || row.paper_id || null;
 
   return {
     id: row.id,
     type,
     actor,
     content,
-    entityType: row.entity_type as NotificationEntityType,
-    entityId: row.entity_id,
-    targetPostId: row.entity_type === 'post' ? row.entity_id : metadata.post_id,
-    targetPaperId: row.entity_type === 'paper' ? row.entity_id : metadata.paper_id,
+    entityType,
+    entityId,
+    targetPostId: row.post_id || (row.entity_type === 'post' ? row.entity_id : metadata.post_id),
+    targetPaperId: row.paper_id || (row.entity_type === 'paper' ? row.entity_id : metadata.paper_id),
     targetTopicName: topicName,
-    targetCommentId: metadata.comment_id,
-    messageSnippet: row.message_snippet,
+    targetCommentId: row.comment_id || metadata.comment_id,
+    messageSnippet: snippet,
     metadata: {
       ...metadata,
+      post_id: row.post_id || metadata.post_id,
+      paper_id: row.paper_id || metadata.paper_id,
+      comment_id: row.comment_id || metadata.comment_id,
       raw_created_at: row.created_at,
     },
     createdAt: formatNotificationTime(row.created_at),
@@ -335,16 +344,7 @@ export async function fetchNotificationById(notificationId: string): Promise<App
       .from('notifications')
       .select(
         `
-        id,
-        recipient_id,
-        actor_id,
-        notification_type,
-        entity_type,
-        entity_id,
-        message_snippet,
-        metadata,
-        read_status,
-        created_at,
+        *,
         actor:profiles!actor_id (
           id,
           username,
@@ -386,16 +386,7 @@ export async function fetchNotifications(
       .from('notifications')
       .select(
         `
-        id,
-        recipient_id,
-        actor_id,
-        notification_type,
-        entity_type,
-        entity_id,
-        message_snippet,
-        metadata,
-        read_status,
-        created_at,
+        *,
         actor:profiles!actor_id (
           id,
           username,
@@ -411,11 +402,11 @@ export async function fetchNotifications(
       .eq('recipient_id', userId);
 
     if (filter === 'Mentions') {
-      query = query.in('notification_type', ['comment', 'reply', 'mention']);
+      query = query.in('type', ['comment', 'reply', 'mention']);
     } else if (filter === 'Follows') {
-      query = query.in('notification_type', ['follow', 'follow_request', 'follow_accept']);
+      query = query.in('type', ['follow', 'follow_request', 'follow_accept']);
     } else if (filter === 'Discussions') {
-      query = query.in('notification_type', [
+      query = query.in('type', [
         'comment',
         'reply',
         'like',
@@ -426,7 +417,7 @@ export async function fetchNotifications(
         'workspace_invitation',
       ]);
     } else if (filter === 'Updates') {
-      query = query.in('notification_type', [
+      query = query.in('type', [
         'researcher_post',
         'topic_activity',
         'trending',
@@ -450,15 +441,15 @@ export async function fetchNotifications(
     // 3. On page 1, ensure pending follow requests from private profile requests are included
     if (page === 1 && (filter === 'All' || filter === 'Follows') && userId) {
       try {
-        const { data: pendingColReqs } = await supabase
-          .from('collaboration_requests')
+        const { data: pendingReqs } = await supabase
+          .from('follow_requests')
           .select(`
             id,
-            sender_id,
-            recipient_id,
+            requester_id,
+            target_id,
             status,
             created_at,
-            sender:profiles!collaboration_requests_sender_id_fkey (
+            requester:profiles!requester_id (
               id,
               username,
               full_name,
@@ -469,31 +460,30 @@ export async function fetchNotifications(
               orcid_verified
             )
           `)
-          .eq('recipient_id', userId)
-          .eq('topic', 'follow_request')
+          .eq('target_id', userId)
           .eq('status', 'pending')
           .limit(20);
 
-        if (Array.isArray(pendingColReqs)) {
-          for (const req of pendingColReqs) {
+        if (Array.isArray(pendingReqs)) {
+          for (const req of pendingReqs) {
             const alreadyPresent = mappedNotifications.some(
-              (n) => n.actor.id === req.sender_id && n.type === 'follow_request' && !n.isRead
+              (n) => n.actor.id === req.requester_id && n.type === 'follow_request' && !n.isRead
             );
-            if (!alreadyPresent && req.sender) {
-              const actor = mapSupabaseProfile(req.sender);
+            if (!alreadyPresent && req.requester) {
+              const actor = mapSupabaseProfile(req.requester);
               mappedNotifications.unshift({
-                id: `col_follow_${req.id}`,
+                id: `follow_req_${req.id}`,
                 type: 'follow_request',
                 actor,
                 content: 'requested to follow you',
                 entityType: 'profile',
-                entityId: req.sender_id,
+                entityId: req.requester_id,
                 messageSnippet: 'requested to follow you',
                 metadata: {
                   request_type: 'follow_request',
-                  requester_id: req.sender_id,
-                  target_id: req.recipient_id,
-                  collaboration_request_id: req.id,
+                  requester_id: req.requester_id,
+                  target_id: req.target_id,
+                  follow_request_id: req.id,
                 },
                 createdAt: formatNotificationTime(req.created_at),
                 isRead: false,
@@ -501,7 +491,9 @@ export async function fetchNotifications(
             }
           }
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[notificationService] Failed to load pending follow requests:', e);
+      }
     }
 
     if (mappedNotifications.length === 0) {

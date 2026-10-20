@@ -1346,7 +1346,6 @@ export async function fetchComments(
         id,
         post_id,
         parent_id,
-        path,
         content,
         likes_count,
         created_at,
@@ -1636,37 +1635,23 @@ export async function checkTargetIsPrivate(targetUserId: string): Promise<boolea
   if (!targetUserId) return false;
   const targetId = (await resolveTargetProfileId(targetUserId)) || targetUserId;
   try {
-    // 1. Database-level security definer visibility check
+    // 1. Direct profiles table column (is_private)
+    const { data: profData } = await supabase
+      .from('profiles')
+      .select('is_private')
+      .eq('id', targetId)
+      .maybeSingle();
+
+    if (profData && typeof (profData as any).is_private === 'boolean') {
+      return Boolean((profData as any).is_private);
+    }
+
+    // 2. Database-level security definer visibility check if available
     const { data: rpcVis, error: rpcErr } = await supabase.rpc('get_user_profile_visibility', {
       p_user_id: targetId,
     });
     if (!rpcErr && rpcVis) {
       return rpcVis === 'private';
-    }
-
-    // 2. Direct profiles table columns (is_private, visibility_level)
-    const { data: profData } = await supabase
-      .from('profiles')
-      .select('visibility_level, is_private')
-      .eq('id', targetId)
-      .maybeSingle();
-
-    if (
-      (profData as any)?.visibility_level === 'private' ||
-      Boolean((profData as any)?.is_private)
-    ) {
-      return true;
-    }
-
-    // 3. User settings fallback (works if caller is owner or admin)
-    const { data: settingsData } = await supabase
-      .from('user_settings')
-      .select('profile_visibility')
-      .eq('user_id', targetId)
-      .maybeSingle();
-
-    if (settingsData?.profile_visibility === 'private') {
-      return true;
     }
 
     return false;
@@ -1698,32 +1683,7 @@ export async function checkHasFollowRequest(
     }
   } catch {}
 
-  // 2. Check collaboration_requests (exists in Supabase and permitted by RLS)
-  try {
-    const { data: colData } = await supabase
-      .from('collaboration_requests')
-      .select('id')
-      .eq('sender_id', verifiedUserId)
-      .eq('recipient_id', targetId)
-      .eq('topic', 'follow_request')
-      .eq('status', 'pending')
-      .maybeSingle();
-
-    if (colData?.id) {
-      // Sync into local storage
-      try {
-        const cached = await appStorage.getItem(`booffin_outgoing_follow_requests_${verifiedUserId}`);
-        const list: string[] = cached ? JSON.parse(cached) : [];
-        if (!list.includes(targetId)) {
-          list.push(targetId);
-          await appStorage.setItem(`booffin_outgoing_follow_requests_${verifiedUserId}`, JSON.stringify(list));
-        }
-      } catch {}
-      return true;
-    }
-  } catch {}
-
-  // 3. Fallback: check follow_requests table if present
+  // 2. Check follow_requests table
   try {
     const { data, error } = await supabase
       .from('follow_requests')
@@ -1734,6 +1694,14 @@ export async function checkHasFollowRequest(
       .maybeSingle();
 
     if (!error && data?.id) {
+      try {
+        const cached = await appStorage.getItem(`booffin_outgoing_follow_requests_${verifiedUserId}`);
+        const list: string[] = cached ? JSON.parse(cached) : [];
+        if (!list.includes(targetId)) {
+          list.push(targetId);
+          await appStorage.setItem(`booffin_outgoing_follow_requests_${verifiedUserId}`, JSON.stringify(list));
+        }
+      } catch {}
       return true;
     }
   } catch {}
@@ -1761,23 +1729,7 @@ export async function fetchOutgoingFollowRequestIds(callerId?: string): Promise<
     }
   } catch {}
 
-  // 2. Query collaboration_requests where sender is caller and topic is 'follow_request' and status is 'pending'
-  try {
-    const { data: colData } = await supabase
-      .from('collaboration_requests')
-      .select('recipient_id')
-      .eq('sender_id', verifiedUserId)
-      .eq('topic', 'follow_request')
-      .eq('status', 'pending');
-
-    if (Array.isArray(colData)) {
-      colData.forEach((row) => {
-        if (row.recipient_id) requestedIds.add(row.recipient_id);
-      });
-    }
-  } catch {}
-
-  // 3. Query follow_requests if table exists
+  // 2. Query follow_requests
   try {
     const { data, error } = await supabase
       .from('follow_requests')
@@ -1812,50 +1764,7 @@ export async function fetchIncomingFollowRequests(
   const requests: FollowRequest[] = [];
   const seenRequesters = new Set<string>();
 
-  // 1. Query collaboration_requests with topic = 'follow_request'
-  try {
-    const { data: colData } = await supabase
-      .from('collaboration_requests')
-      .select(`
-        id,
-        sender_id,
-        recipient_id,
-        status,
-        created_at,
-        sender:profiles!collaboration_requests_sender_id_fkey (
-          id,
-          username,
-          full_name,
-          avatar_url,
-          academic_title,
-          institution,
-          orcid_id,
-          orcid_verified
-        )
-      `)
-      .eq('recipient_id', verifiedUserId)
-      .eq('topic', 'follow_request')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-
-    if (Array.isArray(colData)) {
-      colData.forEach((row: any) => {
-        if (row.sender && !seenRequesters.has(row.sender_id)) {
-          seenRequesters.add(row.sender_id);
-          requests.push({
-            id: row.id,
-            requesterId: row.sender_id,
-            requester: mapSupabaseProfile(row.sender),
-            targetId: row.recipient_id,
-            status: row.status,
-            createdAt: row.created_at,
-          });
-        }
-      });
-    }
-  } catch {}
-
-  // 2. Query follow_requests if table exists
+  // Query follow_requests table
   try {
     const { data, error } = await supabase
       .from('follow_requests')
@@ -1933,45 +1842,35 @@ export async function sendFollowRequest(
       }
     } catch {}
 
-    // 2. Insert/upsert into collaboration_requests
-    try {
-      await supabase
-        .from('collaboration_requests')
-        .upsert(
-          {
-            sender_id: verifiedUserId,
-            recipient_id: targetId,
-            topic: 'follow_request',
-            message: 'Follow request for private profile',
-            status: 'pending',
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'sender_id,recipient_id,topic' }
-        );
-    } catch {}
-
-    // 3. Insert into follow_requests if table exists
-    try {
-      await supabase
-        .from('follow_requests')
-        .insert({
+    // 2. Insert into follow_requests
+    const { error: frError } = await supabase
+      .from('follow_requests')
+      .upsert(
+        {
           requester_id: verifiedUserId,
           target_id: targetId,
           status: 'pending',
-        });
-    } catch {}
+        },
+        { onConflict: 'requester_id,target_id' }
+      );
 
-    // 4. Insert notification to the target user
+    if (frError && frError.code !== '23505') {
+      return { success: false, error: frError.message };
+    }
+
+    // 3. Insert notification to the target user (dual column support for backward compatibility)
     try {
       await supabase
         .from('notifications')
         .insert({
           recipient_id: targetId,
           actor_id: verifiedUserId,
+          type: 'follow_request',
           notification_type: 'follow_request',
+          content: 'requested to follow you',
+          message_snippet: 'requested to follow you',
           entity_type: 'profile',
           entity_id: verifiedUserId,
-          message_snippet: 'requested to follow you',
           metadata: {
             request_type: 'follow_request',
             requester_id: verifiedUserId,
@@ -2012,17 +1911,7 @@ export async function cancelFollowRequest(
       }
     } catch {}
 
-    // 2. Delete from collaboration_requests
-    try {
-      await supabase
-        .from('collaboration_requests')
-        .delete()
-        .eq('sender_id', verifiedUserId)
-        .eq('recipient_id', targetId)
-        .eq('topic', 'follow_request');
-    } catch {}
-
-    // 3. Remove from follow_requests table
+    // 2. Remove from follow_requests table
     try {
       await supabase
         .from('follow_requests')
@@ -2031,14 +1920,14 @@ export async function cancelFollowRequest(
         .eq('target_id', targetId);
     } catch {}
 
-    // 4. Remove pending notification
+    // 3. Remove pending notification
     try {
       await supabase
         .from('notifications')
         .delete()
         .eq('actor_id', verifiedUserId)
         .eq('recipient_id', targetId)
-        .eq('notification_type', 'follow_request');
+        .in('type', ['follow_request']);
     } catch {}
 
     return { success: true, error: null };
@@ -2050,7 +1939,7 @@ export async function cancelFollowRequest(
 /**
  * Accepts an incoming follow request:
  * - Adds the requester to target's followers in `follows`
- * - Updates collaboration_requests / follow_requests status to 'accepted'
+ * - Updates follow_requests status to 'accepted'
  * - Cleans up requester's outgoing cache
  * - Notifies requester with `follow_accept`
  * - Marks incoming follow request notification as read
@@ -2077,26 +1966,16 @@ export async function acceptFollowRequest(
       return { success: false, error: followError.message };
     }
 
-    // 2. Update collaboration_requests status
-    try {
-      await supabase
-        .from('collaboration_requests')
-        .update({ status: 'accepted', updated_at: new Date().toISOString() })
-        .eq('sender_id', requesterId)
-        .eq('recipient_id', verifiedUserId)
-        .eq('topic', 'follow_request');
-    } catch {}
-
-    // 3. Update follow_requests status if table exists
+    // 2. Update follow_requests status
     try {
       await supabase
         .from('follow_requests')
-        .update({ status: 'accepted', updated_at: new Date().toISOString() })
+        .update({ status: 'accepted' })
         .eq('requester_id', requesterId)
         .eq('target_id', verifiedUserId);
     } catch {}
 
-    // 4. Clean up requester's local storage cache
+    // 3. Clean up requester's local storage cache
     try {
       const cached = await appStorage.getItem(`booffin_outgoing_follow_requests_${requesterId}`);
       if (cached) {
@@ -2106,27 +1985,29 @@ export async function acceptFollowRequest(
       }
     } catch {}
 
-    // 5. Mark the follow_request notification as read
+    // 4. Mark the follow_request notification as read
     try {
       await supabase
         .from('notifications')
         .update({ read_status: true })
         .eq('recipient_id', verifiedUserId)
         .eq('actor_id', requesterId)
-        .eq('notification_type', 'follow_request');
+        .in('type', ['follow_request']);
     } catch {}
 
-    // 6. Send follow_accept notification to the requester
+    // 5. Send follow_accept notification to the requester (dual column support)
     try {
       await supabase
         .from('notifications')
         .insert({
           recipient_id: requesterId,
           actor_id: verifiedUserId,
+          type: 'follow_accept',
           notification_type: 'follow_accept',
+          content: 'accepted your follow request',
+          message_snippet: 'accepted your follow request',
           entity_type: 'profile',
           entity_id: verifiedUserId,
-          message_snippet: 'accepted your follow request',
           metadata: {
             accepted_by: verifiedUserId,
           },
@@ -2142,7 +2023,7 @@ export async function acceptFollowRequest(
 
 /**
  * Declines an incoming follow request:
- * - Updates collaboration_requests / follow_requests status to 'declined'
+ * - Updates follow_requests status to 'declined'
  * - Cleans up requester's outgoing cache
  * - Marks incoming notification as read
  */
@@ -2156,26 +2037,16 @@ export async function declineFollowRequest(
   }
 
   try {
-    // 1. Update collaboration_requests status
-    try {
-      await supabase
-        .from('collaboration_requests')
-        .update({ status: 'declined', updated_at: new Date().toISOString() })
-        .eq('sender_id', requesterId)
-        .eq('recipient_id', verifiedUserId)
-        .eq('topic', 'follow_request');
-    } catch {}
-
-    // 2. Remove or decline from follow_requests
+    // 1. Update follow_requests status
     try {
       await supabase
         .from('follow_requests')
-        .update({ status: 'declined', updated_at: new Date().toISOString() })
+        .update({ status: 'declined' })
         .eq('requester_id', requesterId)
         .eq('target_id', verifiedUserId);
     } catch {}
 
-    // 3. Clean up requester's local storage cache
+    // 2. Clean up requester's local storage cache
     try {
       const cached = await appStorage.getItem(`booffin_outgoing_follow_requests_${requesterId}`);
       if (cached) {
@@ -2185,14 +2056,14 @@ export async function declineFollowRequest(
       }
     } catch {}
 
-    // 4. Mark incoming notification as read
+    // 3. Clean up incoming notification
     try {
       await supabase
         .from('notifications')
-        .update({ read_status: true })
+        .delete()
         .eq('recipient_id', verifiedUserId)
         .eq('actor_id', requesterId)
-        .eq('notification_type', 'follow_request');
+        .in('type', ['follow_request']);
     } catch {}
 
     return { success: true, error: null };
@@ -2346,6 +2217,26 @@ export async function followUser(
       return { success: false, error: error.message };
     }
 
+    // Ensure notification is created (dual column support, noop if trigger handles it)
+    try {
+      const isFollowBack = await checkTargetFollowsCaller(verifiedUserId, targetId);
+      const followMessage = isFollowBack ? 'followed you back' : 'started following you';
+      await supabase
+        .from('notifications')
+        .insert({
+          recipient_id: targetId,
+          actor_id: verifiedUserId,
+          type: 'follow',
+          notification_type: 'follow',
+          content: followMessage,
+          message_snippet: followMessage,
+          entity_type: 'profile',
+          entity_id: verifiedUserId,
+          metadata: { follower_id: verifiedUserId, is_follow_back: isFollowBack },
+          read_status: false,
+        });
+    } catch {}
+
     return { success: true, error: null };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Failed to follow user.' };
@@ -2373,6 +2264,16 @@ export async function unfollowUser(
     if (error && !error.message.includes('not found')) {
       return { success: false, error: error.message };
     }
+
+    // Clean up follow notification
+    try {
+      await supabase
+        .from('notifications')
+        .delete()
+        .eq('actor_id', verifiedUserId)
+        .eq('recipient_id', targetId)
+        .in('type', ['follow', 'follow_accept']);
+    } catch {}
 
     return { success: true, error: null };
   } catch (err: any) {

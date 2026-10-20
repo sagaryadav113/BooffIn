@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
-import { colors, radii, spacing } from '../../theme';
+import { colors, radii, spacing, useColors, useIsDark } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Icon, IconName } from '../core/Icon';
 
@@ -30,6 +30,9 @@ export const SelectModal: React.FC<SelectModalProps> = ({
   selectedValue,
   onSelect,
 }) => {
+  const dynamicColors = useColors();
+  const isDark = useIsDark();
+
   return (
     <Modal
       visible={visible}
@@ -40,19 +43,19 @@ export const SelectModal: React.FC<SelectModalProps> = ({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.modalCard}>
+            <View style={[styles.modalCard, { backgroundColor: dynamicColors.backgroundElevated, borderColor: dynamicColors.borderLight, borderWidth: isDark ? 1 : 0 }]}>
               <View style={styles.header}>
-                <Typography variant="h3" color={colors.textPrimary}>
+                <Typography variant="h3" color={dynamicColors.textPrimary}>
                   {title}
                 </Typography>
                 {subtitle ? (
-                  <Typography variant="caption" color={colors.textSecondary} style={{ marginTop: 4 }}>
+                  <Typography variant="caption" color={dynamicColors.textSecondary} style={{ marginTop: 4 }}>
                     {subtitle}
                   </Typography>
                 ) : null}
               </View>
 
-              <View style={styles.optionsList}>
+              <View style={[styles.optionsList, { backgroundColor: dynamicColors.backgroundSecondary, borderColor: dynamicColors.borderLight }]}>
                 {options.map((option, index) => {
                   const isSelected = option.value === selectedValue;
                   return (
@@ -61,8 +64,8 @@ export const SelectModal: React.FC<SelectModalProps> = ({
                       activeOpacity={0.7}
                       style={[
                         styles.optionRow,
-                        index !== options.length - 1 && styles.optionBorder,
-                        isSelected && styles.selectedRow,
+                        { backgroundColor: isSelected ? (isDark ? dynamicColors.backgroundTertiary : '#F8FAFC') : dynamicColors.cardBackground },
+                        index !== options.length - 1 && [styles.optionBorder, { borderBottomColor: dynamicColors.borderLight }],
                       ]}
                       onPress={() => {
                         onSelect(option.value);
@@ -70,29 +73,29 @@ export const SelectModal: React.FC<SelectModalProps> = ({
                       }}
                     >
                       {option.icon ? (
-                        <View style={styles.optionIconCircle}>
-                          <Icon name={option.icon} size="sm" color={colors.textPrimary} />
+                        <View style={[styles.optionIconCircle, { backgroundColor: dynamicColors.backgroundSecondary }]}>
+                          <Icon name={option.icon} size="sm" color={isSelected ? dynamicColors.primary : dynamicColors.textPrimary} />
                         </View>
                       ) : null}
 
                       <View style={styles.optionMeta}>
                         <Typography
                           variant="captionBold"
-                          color={isSelected ? colors.black : colors.textPrimary}
+                          color={isSelected ? dynamicColors.primary : dynamicColors.textPrimary}
                         >
                           {option.label}
                         </Typography>
                         {option.description ? (
-                          <Typography variant="micro" color={colors.textSecondary} style={{ marginTop: 2 }}>
+                          <Typography variant="micro" color={dynamicColors.textSecondary} style={{ marginTop: 2 }}>
                             {option.description}
                           </Typography>
                         ) : null}
                       </View>
 
                       {isSelected ? (
-                        <Icon name="Check" size="sm" color={colors.black} />
+                        <Icon name="Check" size="sm" color={dynamicColors.primary} />
                       ) : (
-                        <View style={styles.radioEmpty} />
+                        <View style={[styles.radioEmpty, { borderColor: dynamicColors.borderDark }]} />
                       )}
                     </TouchableOpacity>
                   );
@@ -104,7 +107,7 @@ export const SelectModal: React.FC<SelectModalProps> = ({
                 style={styles.cancelBtn}
                 onPress={onClose}
               >
-                <Typography variant="captionBold" color={colors.textSecondary}>
+                <Typography variant="captionBold" color={dynamicColors.textSecondary}>
                   Cancel
                 </Typography>
               </TouchableOpacity>

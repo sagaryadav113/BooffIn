@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Activity } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { DiscussionIcon } from '../../components/core/DiscussionIcon';
 import { PostCard } from '../../components/cards/PostCard';
@@ -31,6 +31,8 @@ import { supabase } from '../../api/client';
 import { mapSupabasePost, populatePollVotes } from '../../api/socialService';
 
 export default function PostDetailScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
   const { id, commentId } = useLocalSearchParams<{ id: string; commentId?: string }>();
   const rawId = Array.isArray(id) ? id[0] : (id || '');
   const targetCommentId = Array.isArray(commentId) ? commentId[0] : commentId;
@@ -290,8 +292,8 @@ export default function PostDetailScreen() {
 
   if (activePost.postType === 'article' && activePost.article) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         <ResearchArticleView
           post={activePost}
           currentUser={currentUser}
@@ -325,8 +327,8 @@ export default function PostDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
       <AppHeader title="Discussion" showBack />
@@ -343,8 +345,8 @@ export default function PostDetailScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              tintColor={colors.black}
-              colors={[colors.black]}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
         >
@@ -363,19 +365,19 @@ export default function PostDetailScreen() {
           />
 
           {/* Section Header */}
-          <View style={styles.discussionHeader}>
+          <View style={[styles.discussionHeader, { backgroundColor: colors.background }]}>
             <View style={styles.discussionHeaderMainRow}>
               <View style={styles.discussionTitleCol}>
                 <View style={styles.discussionTitleRow}>
                   <DiscussionIcon size={20} color={colors.textPrimary} />
-                  <Text style={styles.discussionTitleText}>Discussion</Text>
-                  <View style={styles.discussionCountBadge}>
-                    <Text style={styles.discussionCountBadgeText}>
+                  <Text style={[styles.discussionTitleText, { color: colors.textPrimary }]}>Discussion</Text>
+                  <View style={[styles.discussionCountBadge, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+                    <Text style={[styles.discussionCountBadgeText, { color: colors.textSecondary }]}>
                       {totalDiscussionCount}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.discussionSubtitleText}>
+                <Text style={[styles.discussionSubtitleText, { color: colors.textSecondary }]}>
                   Constructive scientific inquiry & insights
                 </Text>
               </View>

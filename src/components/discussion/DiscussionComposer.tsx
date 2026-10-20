@@ -18,7 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors as staticColors, radii, spacing, typography, layout, useColors, useIsDark } from '../../theme';
 import { DiscussionType, UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
 import { DiscussionIcon } from '../core/DiscussionIcon';
@@ -40,6 +40,8 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
   isSubmitting = false,
   availableMentions = [],
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const [content, setContent] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMentionBar, setShowMentionBar] = useState(false);
@@ -71,10 +73,10 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
 
   if (!currentUser) {
     return (
-      <View style={[styles.container, styles.guestContainer]}>
+      <View style={[styles.container, styles.guestContainer, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
         <View style={styles.guestContent}>
-          <Text style={styles.guestTitle}>Join the Scientific Discussion</Text>
-          <Text style={styles.guestSubtitle}>
+          <Text style={[styles.guestTitle, { color: colors.textPrimary }]}>Join the Scientific Discussion</Text>
+          <Text style={[styles.guestSubtitle, { color: colors.textSecondary }]}>
             Sign in to share your inquiries, insights, or methodologies with researchers.
           </Text>
         </View>
@@ -90,7 +92,7 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
       {/* Header with user avatar and name */}
       <View style={styles.headerRow}>
         <Avatar
@@ -100,8 +102,8 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
           verified={currentUser.orcidVerified}
         />
         <View style={styles.headerMeta}>
-          <Text style={styles.authorName}>{currentUser.fullName}</Text>
-          <Text style={styles.authorTitle}>
+          <Text style={[styles.authorName, { color: colors.textPrimary }]}>{currentUser.fullName}</Text>
+          <Text style={[styles.authorTitle, { color: colors.textSecondary }]}>
             {currentUser.academicTitle || 'Researcher'}
           </Text>
         </View>
@@ -120,7 +122,7 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
         }}
         onFocus={() => setIsExpanded(true)}
         multiline
-        style={[styles.contentInput, isExpanded && styles.contentInputExpanded]}
+        style={[styles.contentInput, { color: colors.textPrimary }, isExpanded && styles.contentInputExpanded]}
       />
 
       {/* Quick Mention Toolbar */}
@@ -151,7 +153,7 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
       )}
 
       {/* Footer / Action Bar */}
-      <View style={styles.footerRow}>
+      <View style={[styles.footerRow, { borderTopColor: colors.borderLight }]}>
         <View style={styles.footerLeft}>
           <TouchableOpacity
             onPress={() => setShowMentionBar(!showMentionBar)}
@@ -192,14 +194,14 @@ export const DiscussionComposer: React.FC<DiscussionComposerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.backgroundCard,
+    backgroundColor: staticColors.backgroundCard,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     borderRadius: radii.lg,
     padding: spacing.md,
     marginHorizontal: spacing.lg,
     marginVertical: spacing.md,
-    shadowColor: colors.black,
+    shadowColor: staticColors.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
@@ -216,12 +218,12 @@ const styles = StyleSheet.create({
   },
   authorName: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     fontSize: 15,
   },
   authorTitle: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 12.5,
     marginTop: 1,
   },
@@ -237,26 +239,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: radii.md,
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     gap: 6,
     minHeight: layout.touchTargetMin - 10,
   },
   typeButtonText: {
     ...typography.captionMedium,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontWeight: '600',
     fontSize: 13,
   },
   typeButtonTextSelected: {
-    color: colors.white,
+    color: staticColors.white,
     fontWeight: '700',
   },
   titleInput: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
-    backgroundColor: colors.backgroundSecondary,
+    color: staticColors.textPrimary,
+    backgroundColor: staticColors.backgroundSecondary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radii.sm + 2,
@@ -265,7 +267,7 @@ const styles = StyleSheet.create({
   },
   contentInput: {
     ...typography.body,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     minHeight: 64,
     maxHeight: 200,
     lineHeight: 22,
@@ -277,13 +279,13 @@ const styles = StyleSheet.create({
     minHeight: 96,
   },
   mentionBar: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: staticColors.backgroundSecondary,
     borderRadius: radii.sm,
     padding: spacing.xs + 2,
     marginTop: spacing.xs,
     marginBottom: spacing.xs,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
   },
   mentionBarHeader: {
     flexDirection: 'row',
@@ -294,7 +296,7 @@ const styles = StyleSheet.create({
   },
   mentionBarTitle: {
     ...typography.captionBold,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -308,15 +310,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 5,
-    backgroundColor: colors.backgroundCard,
+    backgroundColor: staticColors.backgroundCard,
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: staticColors.borderLight,
     gap: 6,
   },
   mentionChipText: {
     ...typography.captionMedium,
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     fontWeight: '600',
     fontSize: 12,
   },
@@ -326,7 +328,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: spacing.sm + 2,
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    borderTopColor: staticColors.borderLight,
     marginTop: spacing.xs,
   },
   footerLeft: {
@@ -348,14 +350,14 @@ const styles = StyleSheet.create({
   },
   iconButtonText: {
     ...typography.captionMedium,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontWeight: '600',
     fontSize: 12.5,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.black,
+    backgroundColor: staticColors.black,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radii.md,
@@ -363,12 +365,12 @@ const styles = StyleSheet.create({
     minHeight: layout.touchTargetMin - 4,
   },
   submitButtonDisabled: {
-    backgroundColor: colors.textMuted,
+    backgroundColor: staticColors.textMuted,
     opacity: 0.6,
   },
   submitButtonText: {
     ...typography.labelBold,
-    color: colors.white,
+    color: staticColors.white,
     fontSize: 14,
   },
   guestContainer: {
@@ -387,13 +389,13 @@ const styles = StyleSheet.create({
     ...typography.contentTitle,
     fontSize: 16,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     textAlign: 'center',
   },
   guestSubtitle: {
     ...typography.body,
     fontSize: 13,
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     textAlign: 'center',
     maxWidth: 380,
   },

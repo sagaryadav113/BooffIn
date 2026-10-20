@@ -37,7 +37,7 @@ import { blockUser, unblockUser } from '../../api/moderationService';
 import { workspaceService } from '../../api/workspaceService';
 import { supabase } from '../../api/client';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Avatar } from '../../components/core/Avatar';
 import { Button } from '../../components/core/Button';
 import { IconButton } from '../../components/core/IconButton';
@@ -86,6 +86,9 @@ function isOpenAlexOrOrcidIdentifier(
 }
 
 export default function OtherResearcherProfileScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   const { id, openAlexId, orcidId } = useLocalSearchParams<{
     id: string;
     openAlexId?: string;
@@ -613,8 +616,8 @@ export default function OtherResearcherProfileScreen() {
         : '');
 
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         <OpenAlexAuthorProfileView
           authorId={cleanOaId}
           initialOrcid={orcidId}
@@ -626,8 +629,8 @@ export default function OtherResearcherProfileScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         <AppHeader showBack title="Researcher Profile" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ ...typography.caption, color: colors.textSecondary }}>Loading researcher profile...</Text>
@@ -649,8 +652,8 @@ export default function OtherResearcherProfileScreen() {
           : '');
 
       return (
-        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-          <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+          <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
           <OpenAlexAuthorProfileView
             authorId={fallbackAuthorId}
             initialOrcid={orcidId}
@@ -661,8 +664,8 @@ export default function OtherResearcherProfileScreen() {
     }
 
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         <AppHeader showBack title="Researcher Profile" />
         <EmptyState
           icon="Users"

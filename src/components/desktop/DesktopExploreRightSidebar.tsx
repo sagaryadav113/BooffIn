@@ -14,7 +14,7 @@ import {
   Plus,
   Check,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { useTopicStore } from '../../store/useTopicStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -38,6 +38,7 @@ interface DesktopExploreRightSidebarProps {
 export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProps> = ({
   onSelectField,
 }) => {
+  const { colors, isDark } = useTheme();
   const currentUser = useAuthStore((s) => s.user);
   const topics = useTopicStore((s) => s.topics);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
@@ -111,16 +112,16 @@ export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProp
     >
       <View style={styles.container}>
         {/* 1. Real Research Topics / Fields */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardTitle}>Research Topics</Text>
+            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Research Topics</Text>
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => router.push('/topic')}
               style={styles.seeAllRow}
             >
-              <Text style={styles.seeAllText}>See all</Text>
-              <ArrowRight size={12} color="#64748B" />
+              <Text style={[styles.seeAllText, { color: isDark ? '#34D399' : '#064E3B' }]}>See all</Text>
+              <ArrowRight size={12} color={isDark ? '#34D399' : '#064E3B'} />
             </TouchableOpacity>
           </View>
 
@@ -133,15 +134,21 @@ export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProp
                   onPress={() =>
                     onSelectField ? onSelectField(t.name) : router.push(`/topic/${t.slug}`)
                   }
-                  style={styles.fieldTile}
+                  style={[
+                    styles.fieldTile,
+                    {
+                      backgroundColor: isDark ? '#111622' : '#F8FAFC',
+                      borderColor: colors.border,
+                    },
+                  ]}
                 >
-                  <View style={styles.fieldIconWrap}>
-                    <Brain size={17} color="#064E3B" strokeWidth={2.2} />
+                  <View style={[styles.fieldIconWrap, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE' }]}>
+                    <Brain size={17} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
                   </View>
-                  <Text style={styles.fieldTileName} numberOfLines={2}>
+                  <Text style={[styles.fieldTileName, { color: colors.textPrimary }]} numberOfLines={2}>
                     {t.name}
                   </Text>
-                  <Text style={styles.fieldTileCount}>
+                  <Text style={[styles.fieldTileCount, { color: colors.textSecondary }]}>
                     {t.postsCount > 0 ? `${t.postsCount} posts` : 'Active'}
                   </Text>
                 </TouchableOpacity>
@@ -149,26 +156,26 @@ export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProp
             </View>
           ) : (
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>Loading scientific topics...</Text>
+              <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Loading scientific topics...</Text>
             </View>
           )}
         </View>
 
         {/* 2. Trending Topics */}
         {topics.length > 0 && (
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.headerLeft}>
                 <TrendingUp size={16} color="#D97706" />
-                <Text style={styles.cardTitle}>Trending Topics</Text>
+                <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Trending Topics</Text>
               </View>
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => router.push('/topic')}
                 style={styles.seeAllRow}
               >
-                <Text style={styles.seeAllText}>See all</Text>
-                <ArrowRight size={12} color="#64748B" />
+                <Text style={[styles.seeAllText, { color: isDark ? '#34D399' : '#064E3B' }]}>See all</Text>
+                <ArrowRight size={12} color={isDark ? '#34D399' : '#064E3B'} />
               </TouchableOpacity>
             </View>
 
@@ -180,12 +187,12 @@ export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProp
                   onPress={() => router.push(`/topic/${topic.slug}`)}
                   style={styles.topicRow}
                 >
-                  <Text style={styles.topicRank}>{idx + 1}</Text>
+                  <Text style={[styles.topicRank, { color: colors.textTertiary }]}>{idx + 1}</Text>
                   <View style={styles.topicMeta}>
-                    <Text style={styles.topicName} numberOfLines={1}>
+                    <Text style={[styles.topicName, { color: colors.textPrimary }]} numberOfLines={1}>
                       {topic.name}
                     </Text>
-                    <Text style={styles.topicCount}>
+                    <Text style={[styles.topicCount, { color: colors.textSecondary }]}>
                       {topic.followersCount > 0 ? `${topic.followersCount} followers` : 'Trending'}
                     </Text>
                   </View>
@@ -197,16 +204,16 @@ export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProp
 
         {/* 3. Real Suggested Researchers from Database */}
         {suggestedResearchers.length > 0 && (
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
             <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle}>Suggested Researchers</Text>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Suggested Researchers</Text>
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => router.push('/search?tab=researchers')}
                 style={styles.seeAllRow}
               >
-                <Text style={styles.seeAllText}>See all</Text>
-                <ArrowRight size={12} color="#64748B" />
+                <Text style={[styles.seeAllText, { color: isDark ? '#34D399' : '#064E3B' }]}>See all</Text>
+                <ArrowRight size={12} color={isDark ? '#34D399' : '#064E3B'} />
               </TouchableOpacity>
             </View>
 
@@ -222,10 +229,10 @@ export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProp
                     >
                       <Avatar uri={res.avatarUrl} name={res.fullName} size="sm" />
                       <View style={styles.scholarMeta}>
-                        <Text style={styles.scholarName} numberOfLines={1}>
+                        <Text style={[styles.scholarName, { color: colors.textPrimary }]} numberOfLines={1}>
                           {res.fullName}
                         </Text>
-                        <Text style={styles.scholarSub} numberOfLines={1}>
+                        <Text style={[styles.scholarSub, { color: colors.textSecondary }]} numberOfLines={1}>
                           {[res.academicTitle, res.institution].filter(Boolean).join(' · ') || `@${res.handle}`}
                         </Text>
                       </View>
@@ -233,12 +240,22 @@ export const DesktopExploreRightSidebar: React.FC<DesktopExploreRightSidebarProp
                     <TouchableOpacity
                       activeOpacity={0.8}
                       onPress={() => handleFollowToggle(res.id)}
-                      style={[styles.followBtn, isFollowing && styles.followingBtn]}
+                      style={[
+                        styles.followBtn,
+                        {
+                          borderColor: isDark ? '#10B981' : '#064E3B',
+                          backgroundColor: colors.backgroundCard,
+                        },
+                        isFollowing && {
+                          backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#EAF3EE',
+                          borderColor: isDark ? '#10B981' : '#064E3B',
+                        },
+                      ]}
                     >
                       {isFollowing ? (
-                        <Check size={14} color="#064E3B" strokeWidth={2.5} />
+                        <Check size={14} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.5} />
                       ) : (
-                        <Plus size={14} color="#064E3B" strokeWidth={2.5} />
+                        <Plus size={14} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.5} />
                       )}
                     </TouchableOpacity>
                   </View>

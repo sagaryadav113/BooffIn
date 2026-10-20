@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { colors, spacing, radii } from '../../theme';
+import { colors, spacing, radii, useTheme } from '../../theme';
 import { Header } from '../layout/Header';
 import { Typography } from '../core/Typography';
 import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
@@ -27,6 +27,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = ({
   isLoading = false,
   rightAction,
 }) => {
+  const { colors } = useTheme();
   const { isDesktop } = useResponsiveLayout();
 
   const handleBack = () => {
@@ -40,7 +41,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {!isDesktop && (
         <Header
           title={title}
