@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { radii, spacing, typography, useTheme } from '../../theme';
 import { Typography } from './Typography';
 
 export interface TopicChipProps {
@@ -19,6 +19,8 @@ export const TopicChip: React.FC<TopicChipProps> = ({
   size = 'md',
   style,
 }) => {
+  const { colors, isDark } = useTheme();
+
   const handlePress = () => {
     if (!onPress) return;
     try {
@@ -26,6 +28,14 @@ export const TopicChip: React.FC<TopicChipProps> = ({
     } catch {}
     onPress();
   };
+
+  const selectedBg = isDark ? '#F1F5F9' : '#000000';
+  const selectedBorder = isDark ? '#F1F5F9' : '#000000';
+  const selectedTextColor = isDark ? '#0B0F17' : '#FFFFFF';
+
+  const unselectedBg = colors.backgroundSecondary;
+  const unselectedBorder = colors.borderLight;
+  const unselectedTextColor = colors.textSecondary;
 
   return (
     <TouchableOpacity
@@ -38,14 +48,17 @@ export const TopicChip: React.FC<TopicChipProps> = ({
       style={[
         styles.base,
         size === 'sm' ? styles.smSize : styles.mdSize,
-        selected ? styles.selected : styles.unselected,
+        {
+          backgroundColor: selected ? selectedBg : unselectedBg,
+          borderColor: selected ? selectedBorder : unselectedBorder,
+        },
         style,
       ]}
       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
     >
       <Typography
         variant={size === 'sm' ? 'caption' : 'captionMedium'}
-        color={selected ? colors.white : colors.textSecondary}
+        color={selected ? selectedTextColor : unselectedTextColor}
         style={[
           styles.text,
           size === 'sm' && styles.textSm,
@@ -75,14 +88,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
-  selected: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  unselected: {
-    backgroundColor: colors.backgroundSecondary,
-    borderColor: colors.borderLight,
-  },
   text: {
     fontSize: 13.5,
     fontWeight: '500',
@@ -91,7 +96,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
   },
   textSelected: {
-    color: colors.white,
     fontWeight: '700',
   },
 });
+
