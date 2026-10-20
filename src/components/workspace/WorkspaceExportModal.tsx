@@ -23,6 +23,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Workspace, WorkspaceMessage, WorkspaceMember } from '../../types/workspace';
+import { useColors, useIsDark } from '../../theme';
 
 interface WorkspaceExportModalProps {
   visible: boolean;
@@ -41,6 +42,10 @@ export const WorkspaceExportModal: React.FC<WorkspaceExportModalProps> = ({
   messages,
   members,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('lab_record');
   const [isCopied, setIsCopied] = useState(false);
 
@@ -203,7 +208,7 @@ export const WorkspaceExportModal: React.FC<WorkspaceExportModalProps> = ({
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <BookOpen size={20} color="#164E3F" strokeWidth={2.2} />
+              <BookOpen size={20} color={isDark ? '#10B981' : '#164E3F'} strokeWidth={2.2} />
               <Text style={styles.modalTitle}>Export Pod Record</Text>
             </View>
             <TouchableOpacity
@@ -211,7 +216,7 @@ export const WorkspaceExportModal: React.FC<WorkspaceExportModalProps> = ({
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={styles.closeBtn}
             >
-              <X size={20} color="#64748B" />
+              <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
             </TouchableOpacity>
           </View>
 
@@ -231,7 +236,7 @@ export const WorkspaceExportModal: React.FC<WorkspaceExportModalProps> = ({
             >
               <Scroll
                 size={14}
-                color={selectedFormat === 'lab_record' ? '#FFFFFF' : '#164E3F'}
+                color={selectedFormat === 'lab_record' ? (isDark ? '#06281E' : '#FFFFFF') : (isDark ? '#94A3B8' : '#164E3F')}
               />
               <Text
                 style={[
@@ -253,7 +258,7 @@ export const WorkspaceExportModal: React.FC<WorkspaceExportModalProps> = ({
             >
               <FileText
                 size={14}
-                color={selectedFormat === 'markdown' ? '#FFFFFF' : '#164E3F'}
+                color={selectedFormat === 'markdown' ? (isDark ? '#06281E' : '#FFFFFF') : (isDark ? '#94A3B8' : '#164E3F')}
               />
               <Text
                 style={[
@@ -275,7 +280,7 @@ export const WorkspaceExportModal: React.FC<WorkspaceExportModalProps> = ({
             >
               <Code
                 size={14}
-                color={selectedFormat === 'json' ? '#FFFFFF' : '#164E3F'}
+                color={selectedFormat === 'json' ? (isDark ? '#06281E' : '#FFFFFF') : (isDark ? '#94A3B8' : '#164E3F')}
               />
               <Text
                 style={[
@@ -312,12 +317,12 @@ export const WorkspaceExportModal: React.FC<WorkspaceExportModalProps> = ({
             >
               {isCopied ? (
                 <>
-                  <Check size={16} color="#164E3F" strokeWidth={2.5} />
+                  <Check size={16} color={isDark ? '#34D399' : '#164E3F'} strokeWidth={2.5} />
                   <Text style={styles.copyBtnTextActive}>Copied!</Text>
                 </>
               ) : (
                 <>
-                  <Copy size={16} color="#164E3F" />
+                  <Copy size={16} color={isDark ? '#34D399' : '#164E3F'} />
                   <Text style={styles.copyBtnText}>Copy Text</Text>
                 </>
               )}
@@ -328,7 +333,7 @@ export const WorkspaceExportModal: React.FC<WorkspaceExportModalProps> = ({
               onPress={handleShare}
               style={[styles.actionBtn, styles.shareBtn]}
             >
-              <Share2 size={16} color="#FFFFFF" strokeWidth={2.2} />
+              <Share2 size={16} color={isDark ? '#06281E' : '#FFFFFF'} strokeWidth={2.2} />
               <Text style={styles.shareBtnText}>Share Record</Text>
             </TouchableOpacity>
           </View>
@@ -338,147 +343,152 @@ export const WorkspaceExportModal: React.FC<WorkspaceExportModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 520,
-    maxHeight: '85%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-  closeBtn: {
-    padding: 4,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  formatPillsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-  },
-  formatPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  formatPillActive: {
-    backgroundColor: '#164E3F',
-    borderColor: '#164E3F',
-  },
-  formatPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#164E3F',
-  },
-  formatPillTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  previewContainer: {
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    maxHeight: 280,
-  },
-  previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-    paddingBottom: 8,
-    marginBottom: 8,
-  },
-  previewTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  previewLength: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  previewScroll: {
-    maxHeight: 220,
-  },
-  previewText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 11,
-    lineHeight: 17,
-    color: '#E2E8F0',
-  },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  copyBtn: {
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1.5,
-    borderColor: '#A7F3D0',
-  },
-  copyBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#164E3F',
-  },
-  copyBtnTextActive: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#164E3F',
-  },
-  shareBtn: {
-    backgroundColor: '#164E3F',
-  },
-  shareBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-});
+const createStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 16,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: 520,
+      maxHeight: '85%',
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+      borderWidth: isDark ? 1 : 0,
+      borderColor: isDark ? '#2E384D' : 'transparent',
+      borderRadius: 20,
+      padding: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+      letterSpacing: -0.3,
+    },
+    closeBtn: {
+      padding: 4,
+    },
+    modalSubtitle: {
+      fontSize: 13,
+      color: isDark ? '#94A3B8' : '#64748B',
+      lineHeight: 18,
+      marginBottom: 16,
+    },
+    formatPillsRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 14,
+    },
+    formatPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E2E8F0',
+    },
+    formatPillActive: {
+      backgroundColor: isDark ? '#10B981' : '#164E3F',
+      borderColor: isDark ? '#10B981' : '#164E3F',
+    },
+    formatPillText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDark ? '#94A3B8' : '#164E3F',
+    },
+    formatPillTextActive: {
+      color: isDark ? '#06281E' : '#FFFFFF',
+      fontWeight: '700',
+    },
+    previewContainer: {
+      backgroundColor: isDark ? '#0B0F17' : '#0F172A',
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 16,
+      maxHeight: 280,
+      borderWidth: isDark ? 1 : 0,
+      borderColor: isDark ? '#1F2636' : 'transparent',
+    },
+    previewHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : '#334155',
+      paddingBottom: 8,
+      marginBottom: 8,
+    },
+    previewTitle: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: '#94A3B8',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    previewLength: {
+      fontSize: 11,
+      color: '#64748B',
+    },
+    previewScroll: {
+      maxHeight: 220,
+    },
+    previewText: {
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+      fontSize: 11,
+      lineHeight: 17,
+      color: '#E2E8F0',
+    },
+    actionButtonsRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    actionBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    copyBtn: {
+      backgroundColor: isDark ? '#10B9811A' : '#F0FDF4',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#10B981' : '#A7F3D0',
+    },
+    copyBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#34D399' : '#164E3F',
+    },
+    copyBtnTextActive: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: isDark ? '#34D399' : '#164E3F',
+    },
+    shareBtn: {
+      backgroundColor: isDark ? '#10B981' : '#164E3F',
+    },
+    shareBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#06281E' : '#FFFFFF',
+    },
+  });

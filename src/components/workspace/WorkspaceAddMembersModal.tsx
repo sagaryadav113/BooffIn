@@ -27,7 +27,7 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Workspace, WorkspaceMember } from '../../types/workspace';
-import { colors, radii, spacing, typography } from '../../theme';
+import { useColors, useIsDark, radii, spacing, typography } from '../../theme';
 import { Avatar } from '../core/Avatar';
 import { workspaceService } from '../../api/workspaceService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -63,6 +63,10 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
   existingMembers = [],
   onMemberAdded,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const currentUser = useAuthStore((s) => s.user);
   const loadWorkspaceDetails = useWorkspaceStore((s) => s.loadWorkspaceDetails);
   const loadMembers = useWorkspaceStore((s) => s.loadMembers);
@@ -394,21 +398,21 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
               style={styles.closeBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <X size={18} color="#64748B" />
+              <X size={18} color={isDark ? '#94A3B8' : '#64748B'} />
             </TouchableOpacity>
           </View>
 
           {/* Status / Success Banner */}
           {statusMessage ? (
             <View style={styles.statusBanner}>
-              <CheckCircle2 size={16} color="#059669" />
+              <CheckCircle2 size={16} color={isDark ? '#34D399' : '#059669'} />
               <Text style={styles.statusBannerText}>{statusMessage}</Text>
             </View>
           ) : null}
 
           {!canAddMembers ? (
             <View style={styles.adminOnlyBanner}>
-              <Shield size={16} color="#B45309" />
+              <Shield size={16} color={isDark ? '#FBBF24' : '#B45309'} />
               <Text style={styles.adminOnlyBannerText}>
                 Admin-Only Invitations are active. Only workspace creators and admins can add or invite members.
               </Text>
@@ -417,11 +421,11 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
 
           {/* Search Bar at Top */}
           <View style={styles.searchBar}>
-            <Search size={15} color="#94A3B8" style={styles.searchIcon} />
+            <Search size={15} color={isDark ? '#64748B' : '#94A3B8'} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search followers & following..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCorrect={false}
@@ -432,7 +436,7 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
                 onPress={() => setSearchQuery('')}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <X size={15} color="#94A3B8" />
+                <X size={15} color={isDark ? '#94A3B8' : '#94A3B8'} />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -479,7 +483,7 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
           {/* Connections List */}
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#064E3B" />
+              <ActivityIndicator size="small" color={isDark ? '#10B981' : '#064E3B'} />
               <Text style={styles.loadingText}>Loading your connections...</Text>
             </View>
           ) : (
@@ -491,7 +495,7 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
               keyboardShouldPersistTaps="handled"
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Users size={32} color="#CBD5E1" />
+                  <Users size={32} color={isDark ? '#334155' : '#CBD5E1'} />
                   <Text style={styles.emptyTitle}>
                     {searchQuery ? 'No matching researchers' : 'No followers or following found'}
                   </Text>
@@ -532,7 +536,7 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <UserPlus size={16} color="#FFFFFF" strokeWidth={2.4} />
+                  <UserPlus size={16} color={isDark ? '#06281E' : '#FFFFFF'} strokeWidth={2.4} />
                   <Text style={styles.addSubmitBtnText}>
                     Add {selectedCounts.total > 0 ? `(${selectedCounts.total})` : ''}
                   </Text>
@@ -548,322 +552,324 @@ export const WorkspaceAddMembersModal: React.FC<WorkspaceAddMembersModalProps> =
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-  },
-  sheetWrapper: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  sheetContainer: {
-    width: '100%',
-    maxWidth: 640,
-    maxHeight: SCREEN_HEIGHT * 0.88,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    elevation: 24,
-  },
-  dragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#CBD5E1',
-    alignSelf: 'center',
-    marginTop: 4,
-    marginBottom: 6,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  headerTitleCol: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  headerPillRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 4,
-  },
-  headerPillText: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    color: '#064E3B',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  subtitle: {
-    fontSize: 12.5,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    backgroundColor: '#ECFDF5',
-    borderLeftWidth: 3,
-    borderLeftColor: '#059669',
-    borderRadius: 8,
-  },
-  statusBannerText: {
-    fontSize: 12.5,
-    color: '#065F46',
-    fontWeight: '600',
-    flex: 1,
-  },
-  adminOnlyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    backgroundColor: '#FEF3C7',
-    borderLeftWidth: 3,
-    borderLeftColor: '#D97706',
-    borderRadius: 8,
-  },
-  adminOnlyBannerText: {
-    fontSize: 12.5,
-    color: '#92400E',
-    fontWeight: '500',
-    flex: 1,
-    lineHeight: 16,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 8,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    height: 38,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#0F172A',
-    paddingVertical: 0,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 8,
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  filterPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: '#F1F5F9',
-  },
-  filterPillActive: {
-    backgroundColor: '#064E3B',
-  },
-  filterPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  filterPillTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F1F5F9',
-  },
-  itemRowSelected: {
-    backgroundColor: 'rgba(6, 78, 59, 0.04)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-  },
-  itemRowDisabled: {
-    opacity: 0.55,
-  },
-  itemInfo: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 10,
-  },
-  itemNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  itemFullName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-    flexShrink: 1,
-  },
-  badge: {
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 4,
-  },
-  badgeMutual: {
-    backgroundColor: '#ECFDF5',
-  },
-  badgeTextMutual: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#065F46',
-  },
-  badgeInvite: {
-    backgroundColor: '#EFF6FF',
-  },
-  badgeTextInvite: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#1D4ED8',
-  },
-  badgeDisabled: {
-    backgroundColor: '#F1F5F9',
-  },
-  badgeTextDisabled: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  itemSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  checkboxCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.8,
-    borderColor: '#CBD5E1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxCircleSelected: {
-    backgroundColor: '#064E3B',
-    borderColor: '#064E3B',
-  },
-  checkboxCircleDisabled: {
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-  },
-  bottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
-  },
-  bottomMetaCol: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  bottomSelectedCount: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  bottomBreakdown: {
-    fontSize: 11.5,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  addSubmitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#064E3B', // dark green option requested
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 999,
-    minWidth: 100,
-    justifyContent: 'center',
-  },
-  addSubmitBtnDisabled: {
-    opacity: 0.5,
-  },
-  addSubmitBtnText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 10,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: '#64748B',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 36,
-    gap: 6,
-  },
-  emptyTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#475569',
-    marginTop: 6,
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-});
+const createStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    backdrop: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    },
+    sheetWrapper: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+    },
+    sheetContainer: {
+      width: '100%',
+      maxWidth: 640,
+      maxHeight: SCREEN_HEIGHT * 0.88,
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingTop: 8,
+      paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.14,
+      shadowRadius: 18,
+      elevation: 24,
+    },
+    dragHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: isDark ? '#334155' : '#CBD5E1',
+      alignSelf: 'center',
+      marginTop: 4,
+      marginBottom: 6,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    headerTitleCol: {
+      flex: 1,
+      paddingRight: 12,
+    },
+    headerPillRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginBottom: 4,
+    },
+    headerPillText: {
+      fontSize: 10.5,
+      fontWeight: '800',
+      letterSpacing: 0.8,
+      color: isDark ? '#34D399' : '#064E3B',
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+    },
+    subtitle: {
+      fontSize: 12.5,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: 2,
+    },
+    closeBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statusBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: 20,
+      marginBottom: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      backgroundColor: isDark ? '#064E3B33' : '#ECFDF5',
+      borderLeftWidth: 3,
+      borderLeftColor: isDark ? '#10B981' : '#059669',
+      borderRadius: 8,
+    },
+    statusBannerText: {
+      fontSize: 12.5,
+      color: isDark ? '#34D399' : '#065F46',
+      fontWeight: '600',
+      flex: 1,
+    },
+    adminOnlyBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: 20,
+      marginBottom: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      backgroundColor: isDark ? '#78350F33' : '#FEF3C7',
+      borderLeftWidth: 3,
+      borderLeftColor: isDark ? '#D97706' : '#D97706',
+      borderRadius: 8,
+    },
+    adminOnlyBannerText: {
+      fontSize: 12.5,
+      color: isDark ? '#FCD34D' : '#92400E',
+      fontWeight: '500',
+      flex: 1,
+      lineHeight: 16,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 20,
+      marginBottom: 8,
+      backgroundColor: isDark ? '#0B0F17' : '#F8FAFC',
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E2E8F0',
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      height: 38,
+    },
+    searchIcon: {
+      marginRight: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 13,
+      color: isDark ? '#F8FAFC' : '#0F172A',
+      paddingVertical: 0,
+    },
+    filterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      marginBottom: 8,
+      gap: 6,
+      flexWrap: 'wrap',
+    },
+    filterPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 999,
+      backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
+    },
+    filterPillActive: {
+      backgroundColor: isDark ? '#10B981' : '#064E3B',
+    },
+    filterPillText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDark ? '#94A3B8' : '#64748B',
+    },
+    filterPillTextActive: {
+      color: isDark ? '#06281E' : '#FFFFFF',
+      fontWeight: '700',
+    },
+    listContent: {
+      paddingHorizontal: 20,
+      paddingBottom: 16,
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
+    },
+    itemRowSelected: {
+      backgroundColor: isDark ? '#10B9811A' : 'rgba(6, 78, 59, 0.04)',
+      borderRadius: 12,
+      paddingHorizontal: 8,
+    },
+    itemRowDisabled: {
+      opacity: 0.55,
+    },
+    itemInfo: {
+      flex: 1,
+      marginLeft: 12,
+      marginRight: 10,
+    },
+    itemNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    itemFullName: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+      flexShrink: 1,
+    },
+    badge: {
+      paddingHorizontal: 6,
+      paddingVertical: 1.5,
+      borderRadius: 4,
+    },
+    badgeMutual: {
+      backgroundColor: isDark ? '#064E3B33' : '#ECFDF5',
+    },
+    badgeTextMutual: {
+      fontSize: 9.5,
+      fontWeight: '700',
+      color: isDark ? '#34D399' : '#065F46',
+    },
+    badgeInvite: {
+      backgroundColor: isDark ? '#1E3A8A33' : '#EFF6FF',
+    },
+    badgeTextInvite: {
+      fontSize: 9.5,
+      fontWeight: '700',
+      color: isDark ? '#60A5FA' : '#1D4ED8',
+    },
+    badgeDisabled: {
+      backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
+    },
+    badgeTextDisabled: {
+      fontSize: 9.5,
+      fontWeight: '600',
+      color: isDark ? '#64748B' : '#64748B',
+    },
+    itemSub: {
+      fontSize: 12,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: 2,
+    },
+    checkboxCircle: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1.8,
+      borderColor: isDark ? '#3B4861' : '#CBD5E1',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+    },
+    checkboxCircleSelected: {
+      backgroundColor: isDark ? '#10B981' : '#064E3B',
+      borderColor: isDark ? '#10B981' : '#064E3B',
+    },
+    checkboxCircleDisabled: {
+      borderColor: isDark ? '#263042' : '#E2E8F0',
+      backgroundColor: isDark ? '#1A2130' : '#F8FAFC',
+    },
+    bottomBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? '#1F2636' : '#F1F5F9',
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+    },
+    bottomMetaCol: {
+      flex: 1,
+      paddingRight: 12,
+    },
+    bottomSelectedCount: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+    },
+    bottomBreakdown: {
+      fontSize: 11.5,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: 1,
+    },
+    addSubmitBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: isDark ? '#10B981' : '#064E3B',
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: 999,
+      minWidth: 100,
+      justifyContent: 'center',
+    },
+    addSubmitBtnDisabled: {
+      opacity: 0.5,
+    },
+    addSubmitBtnText: {
+      fontSize: 13.5,
+      fontWeight: '700',
+      color: isDark ? '#06281E' : '#FFFFFF',
+    },
+    loadingContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 48,
+      gap: 10,
+    },
+    loadingText: {
+      fontSize: 13,
+      color: isDark ? '#94A3B8' : '#64748B',
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 36,
+      gap: 6,
+    },
+    emptyTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#94A3B8' : '#475569',
+      marginTop: 6,
+    },
+    emptySubtitle: {
+      fontSize: 12,
+      color: isDark ? '#64748B' : '#94A3B8',
+      textAlign: 'center',
+      paddingHorizontal: 20,
+    },
+  });

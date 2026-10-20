@@ -42,6 +42,7 @@ import { supabase } from '../../api/client';
 import { UserProfile, WorkspaceSubscriptionTier } from '../../types';
 import { Workspace } from '../../types/workspace';
 import { Avatar } from '../core/Avatar';
+import { useColors, useIsDark } from '../../theme';
 
 interface CreateCommunityModalProps {
   visible: boolean;
@@ -52,6 +53,10 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
   visible,
   onClose,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const currentUser = useAuthStore((s) => s.user);
   const createCommunity = useWorkspaceStore((s) => s.createCommunity);
   const disableCommunity = useWorkspaceStore((s) => s.disableCommunity);
@@ -339,7 +344,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
             style={styles.backBtn}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
+            <ArrowLeft size={22} color={isDark ? '#F1F5F9' : '#0F172A'} strokeWidth={2.2} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>New community</Text>
           <View style={{ width: 32 }} />
@@ -357,7 +362,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
               {hasReachedLimit ? (
                 <View style={styles.limitInfoCard}>
                   <View style={styles.limitInfoHeader}>
-                    <Info size={17} color="#0F172A" strokeWidth={2.2} />
+                    <Info size={17} color={isDark ? '#F1F5F9' : '#0F172A'} strokeWidth={2.2} />
                     <Text style={styles.limitInfoTitle}>Community Limit (2/2 Active)</Text>
                   </View>
                   <Text style={styles.limitInfoSub}>
@@ -421,12 +426,12 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                     style={styles.avatarPickerBtn}
                   >
                     {isUploadingAvatar ? (
-                      <ActivityIndicator size="small" color="#164E3F" />
+                      <ActivityIndicator size="small" color={isDark ? '#34D399' : '#164E3F'} />
                     ) : avatarUri ? (
                       <Avatar uri={avatarUri} name={name || 'Community'} size={46} />
                     ) : (
                       <View style={styles.avatarPickerPlaceholder}>
-                        <Camera size={20} color="#164E3F" strokeWidth={2} />
+                        <Camera size={20} color={isDark ? '#34D399' : '#164E3F'} strokeWidth={2} />
                       </View>
                     )}
                     <View style={styles.avatarCameraBadge}>
@@ -439,7 +444,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                       value={name}
                       onChangeText={setName}
                       placeholder="Community name (e.g. Synthetic Biology Hub)"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                       style={styles.textInput}
                       autoCapitalize="words"
                     />
@@ -449,7 +454,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                         onPress={() => setName('')}
                         style={styles.clearInputBtn}
                       >
-                        <X size={14} color="#64748B" />
+                        <X size={14} color={isDark ? '#94A3B8' : '#64748B'} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -463,7 +468,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                     value={description}
                     onChangeText={setDescription}
                     placeholder="Research focus & goals (optional)"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                     style={[styles.textInput, { height: 48, textAlignVertical: 'top' }]}
                     multiline
                   />
@@ -473,7 +478,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                       onPress={() => setDescription('')}
                       style={styles.clearInputBtn}
                     >
-                      <X size={14} color="#64748B" />
+                      <X size={14} color={isDark ? '#94A3B8' : '#64748B'} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -483,7 +488,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
               <View style={styles.fieldsSection}>
                 <View style={styles.fieldsSectionHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Compass size={17} color="#164E3F" strokeWidth={2.2} />
+                    <Compass size={17} color={isDark ? '#34D399' : '#164E3F'} strokeWidth={2.2} />
                     <Text style={styles.fieldsSectionTitle}>Fields of Interest</Text>
                   </View>
                   <Text style={styles.fieldsCounter}>
@@ -513,18 +518,18 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
 
                 {/* Topic Search Input */}
                 <View style={styles.topicSearchBar}>
-                  <Search size={16} color="#94A3B8" />
+                  <Search size={16} color={isDark ? '#64748B' : '#94A3B8'} />
                   <TextInput
                     value={topicSearchQuery}
                     onChangeText={setTopicSearchQuery}
                     placeholder="Search 1,200+ disciplines (e.g. Neuroscience, AI, CRISPR)"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                     style={styles.topicSearchInput}
                     returnKeyType="search"
                   />
                   {topicSearchQuery.length > 0 && (
                     <TouchableOpacity onPress={() => setTopicSearchQuery('')}>
-                      <X size={15} color="#94A3B8" />
+                      <X size={15} color={isDark ? '#94A3B8' : '#64748B'} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -553,7 +558,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                               <Text
                                 style={[
                                   styles.topicDropdownItemName,
-                                  isSelected && { color: '#164E3F', fontWeight: '700' },
+                                  isSelected && { color: isDark ? '#34D399' : '#164E3F', fontWeight: '700' },
                                 ]}
                               >
                                 {item.name}
@@ -563,9 +568,9 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                               </Text>
                             </View>
                             {isSelected ? (
-                              <Check size={16} color="#164E3F" strokeWidth={2.4} />
+                              <Check size={16} color={isDark ? '#34D399' : '#164E3F'} strokeWidth={2.4} />
                             ) : (
-                              <Plus size={16} color="#94A3B8" />
+                              <Plus size={16} color={isDark ? '#64748B' : '#94A3B8'} />
                             )}
                           </TouchableOpacity>
                         );
@@ -614,18 +619,18 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
               {/* Search Bar for Inviting Collaborators */}
               <View style={styles.searchContainer}>
                 <View style={styles.searchBar}>
-                  <Search size={18} color="#94A3B8" />
+                  <Search size={18} color={isDark ? '#64748B' : '#94A3B8'} />
                   <TextInput
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     placeholder="Search collaborators to invite"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                     style={styles.searchInput}
                     returnKeyType="search"
                   />
                   {searchQuery.length > 0 && (
                     <TouchableOpacity onPress={() => setSearchQuery('')}>
-                      <X size={16} color="#94A3B8" />
+                      <X size={16} color={isDark ? '#94A3B8' : '#64748B'} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -697,7 +702,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                       {item.fullName || item.handle}
                     </Text>
                     {item.orcidVerified && (
-                      <CheckCircle2 size={13} color="#164E3F" strokeWidth={2.5} />
+                      <CheckCircle2 size={13} color={isDark ? '#34D399' : '#164E3F'} strokeWidth={2.5} />
                     )}
                   </View>
                   <Text numberOfLines={1} style={styles.userHandle}>
@@ -720,12 +725,12 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
           ListEmptyComponent={
             isLoadingList ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#164E3F" />
+                <ActivityIndicator size="small" color={isDark ? '#34D399' : '#164E3F'} />
                 <Text style={styles.loadingText}>Loading researchers...</Text>
               </View>
             ) : (
               <View style={styles.emptyList}>
-                <Users size={36} color="#CBD5E1" />
+                <Users size={36} color={isDark ? '#334155' : '#CBD5E1'} />
                 <Text style={styles.emptyListTitle}>No researchers found</Text>
                 <Text style={styles.emptyListSubtitle}>
                   Try searching with a different name or keyword.
@@ -776,7 +781,7 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
           <View style={styles.modalBackdrop}>
             <View style={styles.confirmDialogCard}>
               <View style={styles.confirmDialogIconWrap}>
-                <Info size={24} color="#0F172A" strokeWidth={2} />
+                <Info size={24} color={isDark ? '#F1F5F9' : '#0F172A'} strokeWidth={2} />
               </View>
 
               <Text style={styles.confirmDialogTitle}>Disable "{communityToDisable?.name}"?</Text>
@@ -789,19 +794,19 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
                 <View style={styles.confirmBulletItem}>
                   <Text style={styles.confirmBulletDot}>•</Text>
                   <Text style={styles.confirmBulletText}>
-                    <Text style={{ fontWeight: '600', color: '#0F172A' }}>View Only:</Text> Past chats, papers, media, and profiles remain viewable for portfolio and reference.
+                    <Text style={{ fontWeight: '600', color: isDark ? '#F1F5F9' : '#0F172A' }}>View Only:</Text> Past chats, papers, media, and profiles remain viewable for portfolio and reference.
                   </Text>
                 </View>
                 <View style={styles.confirmBulletItem}>
                   <Text style={styles.confirmBulletDot}>•</Text>
                   <Text style={styles.confirmBulletText}>
-                    <Text style={{ fontWeight: '600', color: '#0F172A' }}>Communication Closed:</Text> Sending new messages and calls will be disabled.
+                    <Text style={{ fontWeight: '600', color: isDark ? '#F1F5F9' : '#0F172A' }}>Communication Closed:</Text> Sending new messages and calls will be disabled.
                   </Text>
                 </View>
                 <View style={styles.confirmBulletItem}>
                   <Text style={styles.confirmBulletDot}>•</Text>
                   <Text style={styles.confirmBulletText}>
-                    <Text style={{ fontWeight: '600', color: '#0F172A' }}>Permanent:</Text> This action cannot be undone.
+                    <Text style={{ fontWeight: '600', color: isDark ? '#F1F5F9' : '#0F172A' }}>Permanent:</Text> This action cannot be undone.
                   </Text>
                 </View>
               </View>
@@ -840,621 +845,622 @@ export const CreateCommunityModal: React.FC<CreateCommunityModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
-  },
-  backBtn: {
-    padding: 4,
-    marginLeft: -4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-  limitInfoCard: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
-    padding: 14,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  limitInfoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  limitInfoTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  limitInfoSub: {
-    fontSize: 12.5,
-    color: '#475569',
-    lineHeight: 17,
-  },
-  limitInfoNoteBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  limitInfoNoteText: {
-    fontSize: 11.5,
-    color: '#64748B',
-    lineHeight: 16,
-  },
-  disableListHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  disableCommunitiesList: {
-    gap: 8,
-  },
-  disableCommunityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 10,
-  },
-  disableCommunityInfo: {
-    flex: 1,
-  },
-  disableCommunityName: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  disableCommunityMeta: {
-    fontSize: 11.5,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  disableActionBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  disableActionBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#DC2626',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  confirmDialogCard: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  confirmDialogIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  confirmDialogTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-    textAlign: 'center',
-    letterSpacing: -0.2,
-    marginBottom: 4,
-  },
-  confirmDialogSubtitle: {
-    fontSize: 12.5,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 17,
-    marginBottom: 14,
-  },
-  confirmBulletList: {
-    width: '100%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 12,
-    gap: 8,
-    marginBottom: 18,
-  },
-  confirmBulletItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-  },
-  confirmBulletDot: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: -1,
-  },
-  confirmBulletText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#475569',
-    lineHeight: 16,
-  },
-  confirmDialogActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    width: '100%',
-  },
-  confirmCancelBtn: {
-    flex: 1,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmCancelBtnText: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  confirmDangerBtn: {
-    flex: 1,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: '#DC2626',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmDangerBtnText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  capacityBadgeContainer: {
-    alignItems: 'flex-start',
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  capacityPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
-  },
-  capacityPillText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#166534',
-    letterSpacing: -0.1,
-  },
-  inputContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  communityHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatarPickerBtn: {
-    position: 'relative',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPickerPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1.5,
-    borderColor: '#A7F3D0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarCameraBadge: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 17,
-    height: 17,
-    borderRadius: 8.5,
-    backgroundColor: '#164E3F',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 48,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#0F172A',
-  },
-  clearInputBtn: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F4F7',
-    borderRadius: 22,
-    paddingHorizontal: 14,
-    height: 40,
-    gap: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#0F172A',
-  },
-  selectedSection: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  selectedScrollContent: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
-  selectedMemberChip: {
-    alignItems: 'center',
-    width: 60,
-  },
-  selectedAvatarWrapper: {
-    position: 'relative',
-  },
-  selectedRemoveBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#1E293B',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedMemberName: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#0F172A',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  sectionHeaderRow: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 6,
-  },
-  sectionHeaderTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  listContent: {
-    paddingBottom: 90,
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 12,
-  },
-  userRowSelected: {
-    backgroundColor: '#F8FAFC',
-  },
-  userInfoCol: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  userHandle: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  selectionCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  selectionCircleActive: {
-    backgroundColor: '#164E3F',
-    borderColor: '#164E3F',
-  },
-  loadingContainer: {
-    padding: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: '#64748B',
-  },
-  emptyList: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  emptyListTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  emptyListSubtitle: {
-    fontSize: 13,
-    color: '#94A3B8',
-    textAlign: 'center',
-  },
-  errorContainer: {
-    marginHorizontal: 16,
-    padding: 10,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  errorText: {
-    fontSize: 13,
-    color: '#DC2626',
-    textAlign: 'center',
-  },
-  fieldsSection: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
-  },
-  fieldsSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  fieldsSectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-    letterSpacing: -0.2,
-  },
-  fieldsCounter: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#164E3F',
-  },
-  fieldsSectionSub: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 17,
-    marginBottom: 10,
-  },
-  selectedTopicsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 10,
-  },
-  selectedTopicChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#164E3F',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-  },
-  selectedTopicChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  topicSearchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 42,
-    gap: 8,
-  },
-  topicSearchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#0F172A',
-  },
-  topicDropdownContainer: {
-    marginTop: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingVertical: 4,
-    maxHeight: 220,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  topicDropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
-  },
-  topicDropdownItemSelected: {
-    backgroundColor: '#ECFDF5',
-  },
-  topicDropdownItemName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  topicDropdownItemHier: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  topicNoResultText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    padding: 12,
-    textAlign: 'center',
-  },
-  popularTopicsWrap: {
-    marginTop: 10,
-  },
-  popularTopicsLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  popularTopicsScroll: {
-    gap: 6,
-    paddingBottom: 2,
-  },
-  popularTopicChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingVertical: 6,
-    paddingHorizontal: 11,
-    borderRadius: 16,
-  },
-  popularTopicChipSelected: {
-    backgroundColor: '#164E3F',
-    borderColor: '#164E3F',
-  },
-  popularTopicText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#334155',
-  },
-  popularTopicTextSelected: {
-    color: '#FFFFFF',
-  },
-  bottomDock: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  createBtn: {
-    backgroundColor: '#164E3F',
-    borderRadius: 24,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  createBtnDisabled: {
-    backgroundColor: '#94A3B8',
-    opacity: 0.6,
-  },
-  createBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: -0.2,
-  },
-});
+const createStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: isDark ? '#0B0F17' : '#FFFFFF',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
+      backgroundColor: isDark ? '#0B0F17' : '#FFFFFF',
+    },
+    backBtn: {
+      padding: 4,
+      marginLeft: -4,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+      letterSpacing: -0.3,
+    },
+    limitInfoCard: {
+      marginHorizontal: 16,
+      marginTop: 12,
+      marginBottom: 4,
+      padding: 14,
+      backgroundColor: isDark ? '#161B26' : '#F8FAFC',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E2E8F0',
+    },
+    limitInfoHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 4,
+    },
+    limitInfoTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+    },
+    limitInfoSub: {
+      fontSize: 12.5,
+      color: isDark ? '#94A3B8' : '#475569',
+      lineHeight: 17,
+    },
+    limitInfoNoteBox: {
+      backgroundColor: isDark ? '#111622' : '#FFFFFF',
+      borderRadius: 8,
+      padding: 10,
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : '#E2E8F0',
+    },
+    limitInfoNoteText: {
+      fontSize: 11.5,
+      color: isDark ? '#94A3B8' : '#64748B',
+      lineHeight: 16,
+    },
+    disableListHeader: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDark ? '#CBD5E1' : '#475569',
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    disableCommunitiesList: {
+      gap: 8,
+    },
+    disableCommunityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+      padding: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : '#E2E8F0',
+      gap: 10,
+    },
+    disableCommunityInfo: {
+      flex: 1,
+    },
+    disableCommunityName: {
+      fontSize: 13.5,
+      fontWeight: '700',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+    },
+    disableCommunityMeta: {
+      fontSize: 11.5,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: 1,
+    },
+    disableActionBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FECACA',
+    },
+    disableActionBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDark ? '#F87171' : '#DC2626',
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.75)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    confirmDialogCard: {
+      width: '100%',
+      maxWidth: 380,
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+      borderRadius: 16,
+      padding: 20,
+      alignItems: 'center',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      elevation: 6,
+    },
+    confirmDialogIconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+    },
+    confirmDialogTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+      textAlign: 'center',
+      letterSpacing: -0.2,
+      marginBottom: 4,
+    },
+    confirmDialogSubtitle: {
+      fontSize: 12.5,
+      color: isDark ? '#94A3B8' : '#64748B',
+      textAlign: 'center',
+      lineHeight: 17,
+      marginBottom: 14,
+    },
+    confirmBulletList: {
+      width: '100%',
+      backgroundColor: isDark ? '#111622' : '#F8FAFC',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : '#E2E8F0',
+      padding: 12,
+      gap: 8,
+      marginBottom: 18,
+    },
+    confirmBulletItem: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
+    },
+    confirmBulletDot: {
+      fontSize: 13,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: -1,
+    },
+    confirmBulletText: {
+      flex: 1,
+      fontSize: 12,
+      color: isDark ? '#CBD5E1' : '#475569',
+      lineHeight: 16,
+    },
+    confirmDialogActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      width: '100%',
+    },
+    confirmCancelBtn: {
+      flex: 1,
+      height: 42,
+      borderRadius: 10,
+      backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    confirmCancelBtnText: {
+      fontSize: 13.5,
+      fontWeight: '600',
+      color: isDark ? '#E2E8F0' : '#475569',
+    },
+    confirmDangerBtn: {
+      flex: 1,
+      height: 42,
+      borderRadius: 10,
+      backgroundColor: '#DC2626',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    confirmDangerBtnText: {
+      fontSize: 13.5,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
+    capacityBadgeContainer: {
+      alignItems: 'flex-start',
+      marginHorizontal: 16,
+      marginTop: 12,
+      marginBottom: 4,
+    },
+    capacityPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#F0FDF4',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#DCFCE7',
+    },
+    capacityPillText: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: isDark ? '#34D399' : '#166534',
+      letterSpacing: -0.1,
+    },
+    inputContainer: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 4,
+    },
+    communityHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    avatarPickerBtn: {
+      position: 'relative',
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: isDark ? '#161D2A' : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarPickerPlaceholder: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: isDark ? '#111622' : '#ECFDF5',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#065F46' : '#A7F3D0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarCameraBadge: {
+      position: 'absolute',
+      bottom: -1,
+      right: -1,
+      width: 17,
+      height: 17,
+      borderRadius: 8.5,
+      backgroundColor: isDark ? '#10B981' : '#164E3F',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#0B0F17' : '#FFFFFF',
+    },
+    inputWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#2E384D' : '#E2E8F0',
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      height: 48,
+    },
+    textInput: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '500',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+    },
+    clearInputBtn: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    searchContainer: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 6,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161D2A' : '#F2F4F7',
+      borderRadius: 22,
+      paddingHorizontal: 14,
+      height: 40,
+      gap: 10,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: isDark ? '#F1F5F9' : '#0F172A',
+    },
+    selectedSection: {
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
+    },
+    selectedScrollContent: {
+      paddingHorizontal: 16,
+      gap: 16,
+    },
+    selectedMemberChip: {
+      alignItems: 'center',
+      width: 60,
+    },
+    selectedAvatarWrapper: {
+      position: 'relative',
+    },
+    selectedRemoveBadge: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: isDark ? '#334155' : '#1E293B',
+      borderWidth: 2,
+      borderColor: isDark ? '#0B0F17' : '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    selectedMemberName: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+      marginTop: 4,
+      textAlign: 'center',
+    },
+    sectionHeaderRow: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 6,
+    },
+    sectionHeaderTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+    },
+    listContent: {
+      paddingBottom: 90,
+    },
+    userRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      gap: 12,
+    },
+    userRowSelected: {
+      backgroundColor: isDark ? '#161D2A' : '#F8FAFC',
+    },
+    userInfoCol: {
+      flex: 1,
+    },
+    userName: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+    },
+    userHandle: {
+      fontSize: 13,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: 1,
+    },
+    selectionCircle: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: isDark ? '#2E384D' : '#CBD5E1',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#111622' : '#FFFFFF',
+    },
+    selectionCircleActive: {
+      backgroundColor: isDark ? '#10B981' : '#164E3F',
+      borderColor: isDark ? '#10B981' : '#164E3F',
+    },
+    loadingContainer: {
+      padding: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    loadingText: {
+      fontSize: 13,
+      color: isDark ? '#94A3B8' : '#64748B',
+    },
+    emptyList: {
+      padding: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    emptyListTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+    },
+    emptyListSubtitle: {
+      fontSize: 13,
+      color: isDark ? '#64748B' : '#94A3B8',
+      textAlign: 'center',
+    },
+    errorContainer: {
+      marginHorizontal: 16,
+      padding: 10,
+      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2',
+      borderRadius: 8,
+      marginBottom: 8,
+    },
+    errorText: {
+      fontSize: 13,
+      color: isDark ? '#F87171' : '#DC2626',
+      textAlign: 'center',
+    },
+    fieldsSection: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 8,
+    },
+    fieldsSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+    },
+    fieldsSectionTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+      letterSpacing: -0.2,
+    },
+    fieldsCounter: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDark ? '#34D399' : '#164E3F',
+    },
+    fieldsSectionSub: {
+      fontSize: 12,
+      color: isDark ? '#94A3B8' : '#64748B',
+      lineHeight: 17,
+      marginBottom: 10,
+    },
+    selectedTopicsWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginBottom: 10,
+    },
+    selectedTopicChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: isDark ? '#065F46' : '#164E3F',
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+      borderRadius: 16,
+    },
+    selectedTopicChipText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+    topicSearchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161D2A' : '#F8FAFC',
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E2E8F0',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      height: 42,
+      gap: 8,
+    },
+    topicSearchInput: {
+      flex: 1,
+      fontSize: 13,
+      color: isDark ? '#F1F5F9' : '#0F172A',
+    },
+    topicDropdownContainer: {
+      marginTop: 8,
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E2E8F0',
+      borderRadius: 12,
+      paddingVertical: 4,
+      maxHeight: 220,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    topicDropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 9,
+      paddingHorizontal: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : '#F8FAFC',
+    },
+    topicDropdownItemSelected: {
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+    },
+    topicDropdownItemName: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+    },
+    topicDropdownItemHier: {
+      fontSize: 11,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: 1,
+    },
+    topicNoResultText: {
+      fontSize: 12,
+      color: isDark ? '#64748B' : '#94A3B8',
+      padding: 12,
+      textAlign: 'center',
+    },
+    popularTopicsWrap: {
+      marginTop: 10,
+    },
+    popularTopicsLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDark ? '#94A3B8' : '#64748B',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 6,
+    },
+    popularTopicsScroll: {
+      gap: 6,
+      paddingBottom: 2,
+    },
+    popularTopicChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161D2A' : '#F1F5F9',
+      borderWidth: 1,
+      borderColor: isDark ? '#222A3A' : '#E2E8F0',
+      paddingVertical: 6,
+      paddingHorizontal: 11,
+      borderRadius: 16,
+    },
+    popularTopicChipSelected: {
+      backgroundColor: isDark ? '#10B981' : '#164E3F',
+      borderColor: isDark ? '#10B981' : '#164E3F',
+    },
+    popularTopicText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDark ? '#CBD5E1' : '#334155',
+    },
+    popularTopicTextSelected: {
+      color: '#FFFFFF',
+    },
+    bottomDock: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: isDark ? '#0B0F17' : '#FFFFFF',
+      borderTopWidth: 1,
+      borderTopColor: isDark ? '#1F2636' : '#F1F5F9',
+    },
+    createBtn: {
+      backgroundColor: isDark ? '#10B981' : '#164E3F',
+      borderRadius: 24,
+      height: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    createBtnDisabled: {
+      backgroundColor: isDark ? '#1E2636' : '#94A3B8',
+      opacity: isDark ? 0.7 : 0.6,
+    },
+    createBtnText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#FFFFFF',
+      letterSpacing: -0.2,
+    },
+  });

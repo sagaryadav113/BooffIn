@@ -31,6 +31,7 @@ import { uploadPostImage } from '../../api/storageService';
 import { supabase } from '../../api/client';
 import { UserProfile } from '../../types';
 import { Avatar } from '../core/Avatar';
+import { useColors, useIsDark } from '../../theme';
 
 interface CreateWorkspaceModalProps {
   visible: boolean;
@@ -41,6 +42,10 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
   visible,
   onClose,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const currentUser = useAuthStore((s) => s.user);
   const createInnerCircle = useWorkspaceStore((s) => s.createInnerCircle);
 
@@ -253,7 +258,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
             style={styles.backBtn}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
+            <ArrowLeft size={22} color={isDark ? '#F8FAFC' : '#0F172A'} strokeWidth={2.2} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>New group chat</Text>
           <View style={{ width: 32 }} />
@@ -270,12 +275,12 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
               style={styles.avatarPickerBtn}
             >
               {isUploadingAvatar ? (
-                <ActivityIndicator size="small" color="#164E3F" />
+                <ActivityIndicator size="small" color={isDark ? '#10B981' : '#164E3F'} />
               ) : avatarUri ? (
                 <Avatar uri={avatarUri} name={groupName || 'Pod'} size={46} />
               ) : (
                 <View style={styles.avatarPickerPlaceholder}>
-                  <Camera size={20} color="#164E3F" strokeWidth={2} />
+                  <Camera size={20} color={isDark ? '#10B981' : '#164E3F'} strokeWidth={2} />
                 </View>
               )}
               <View style={styles.avatarCameraBadge}>
@@ -291,7 +296,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
                   if (errorText) setErrorText(null);
                 }}
                 placeholder="Group name"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                 style={styles.groupNameInput}
                 autoCapitalize="words"
               />
@@ -301,7 +306,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
                   onPress={() => setGroupName('')}
                   style={styles.clearInputBtn}
                 >
-                  <X size={14} color="#64748B" />
+                  <X size={14} color={isDark ? '#94A3B8' : '#64748B'} />
                 </TouchableOpacity>
               )}
             </View>
@@ -311,18 +316,18 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
-            <Search size={18} color="#94A3B8" />
+            <Search size={18} color={isDark ? '#64748B' : '#94A3B8'} />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
               style={styles.searchInput}
               returnKeyType="search"
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={16} color="#94A3B8" />
+                <X size={16} color={isDark ? '#94A3B8' : '#94A3B8'} />
               </TouchableOpacity>
             )}
           </View>
@@ -331,7 +336,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
         {/* Create group with link option row */}
         <TouchableOpacity activeOpacity={0.7} style={styles.linkGroupRow}>
           <View style={styles.linkIconCircle}>
-            <Link2 size={20} color="#0F172A" strokeWidth={2.2} />
+            <Link2 size={20} color={isDark ? '#F8FAFC' : '#0F172A'} strokeWidth={2.2} />
           </View>
           <View style={styles.linkTextCol}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -393,7 +398,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
         {/* Researchers / Followings List */}
         {isLoadingList ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#164E3F" />
+            <ActivityIndicator size="small" color={isDark ? '#10B981' : '#164E3F'} />
             <Text style={styles.loadingText}>Loading researchers...</Text>
           </View>
         ) : (
@@ -422,7 +427,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
                         {item.fullName || item.handle}
                       </Text>
                       {item.orcidVerified && (
-                        <CheckCircle2 size={13} color="#164E3F" strokeWidth={2.5} />
+                        <CheckCircle2 size={13} color={isDark ? '#10B981' : '#164E3F'} strokeWidth={2.5} />
                       )}
                     </View>
                     <Text numberOfLines={1} style={styles.userHandle}>
@@ -444,7 +449,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
             }}
             ListEmptyComponent={
               <View style={styles.emptyList}>
-                <Users size={36} color="#CBD5E1" />
+                <Users size={36} color={isDark ? '#334155' : '#CBD5E1'} />
                 <Text style={styles.emptyListTitle}>No researchers found</Text>
                 <Text style={styles.emptyListSubtitle}>
                   Try searching with a different name or keyword.
@@ -482,310 +487,313 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
-  },
-  backBtn: {
-    padding: 4,
-    marginLeft: -4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-  groupNameContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  groupHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatarPickerBtn: {
-    position: 'relative',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPickerPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1.5,
-    borderColor: '#A7F3D0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarCameraBadge: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 17,
-    height: 17,
-    borderRadius: 8.5,
-    backgroundColor: '#164E3F',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  groupNameInputWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 48,
-  },
-  groupNameInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#0F172A',
-  },
-  clearInputBtn: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F4F7',
-    borderRadius: 22,
-    paddingHorizontal: 14,
-    height: 40,
-    gap: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#0F172A',
-  },
-  linkGroupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 14,
-  },
-  linkIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F2F4F7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  linkTextCol: {
-    flex: 1,
-  },
-  linkTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  linkSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  newBadge: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  newBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  selectedSection: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  selectedScrollContent: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
-  selectedMemberChip: {
-    alignItems: 'center',
-    width: 60,
-  },
-  selectedAvatarWrapper: {
-    position: 'relative',
-  },
-  selectedRemoveBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#1E293B',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedMemberName: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#0F172A',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  sectionHeaderRow: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
-  sectionHeaderTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  listContent: {
-    paddingBottom: 90,
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 12,
-  },
-  userRowSelected: {
-    backgroundColor: '#F8FAFC',
-  },
-  userInfoCol: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  userHandle: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  selectionCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  selectionCircleActive: {
-    backgroundColor: '#164E3F',
-    borderColor: '#164E3F',
-  },
-  loadingContainer: {
-    padding: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: '#64748B',
-  },
-  emptyList: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  emptyListTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  emptyListSubtitle: {
-    fontSize: 13,
-    color: '#94A3B8',
-    textAlign: 'center',
-  },
-  errorContainer: {
-    marginHorizontal: 16,
-    padding: 10,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  errorText: {
-    fontSize: 13,
-    color: '#DC2626',
-    textAlign: 'center',
-  },
-  bottomDock: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  createBtn: {
-    backgroundColor: '#164E3F',
-    borderRadius: 24,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  createBtnDisabled: {
-    backgroundColor: '#94A3B8',
-    opacity: 0.6,
-  },
-  createBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: -0.2,
-  },
-});
+const createStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: isDark ? '#0B0F17' : '#FFFFFF',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
+      backgroundColor: isDark ? '#0B0F17' : '#FFFFFF',
+    },
+    backBtn: {
+      padding: 4,
+      marginLeft: -4,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+      letterSpacing: -0.3,
+    },
+    groupNameContainer: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    groupHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    avatarPickerBtn: {
+      position: 'relative',
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: isDark ? '#1E2636' : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarPickerPlaceholder: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: isDark ? '#064E3B33' : '#ECFDF5',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#059669' : '#A7F3D0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarCameraBadge: {
+      position: 'absolute',
+      bottom: -1,
+      right: -1,
+      width: 17,
+      height: 17,
+      borderRadius: 8.5,
+      backgroundColor: isDark ? '#10B981' : '#164E3F',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#0B0F17' : '#FFFFFF',
+    },
+    groupNameInputWrap: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#2E384D' : '#E2E8F0',
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      height: 48,
+    },
+    groupNameInput: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '500',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+    },
+    clearInputBtn: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: isDark ? '#263042' : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    searchContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161D2A' : '#F2F4F7',
+      borderWidth: isDark ? 1 : 0,
+      borderColor: isDark ? '#2E384D' : 'transparent',
+      borderRadius: 22,
+      paddingHorizontal: 14,
+      height: 40,
+      gap: 10,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: isDark ? '#F8FAFC' : '#0F172A',
+    },
+    linkGroupRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      gap: 14,
+    },
+    linkIconCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: isDark ? '#1E2636' : '#F2F4F7',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    linkTextCol: {
+      flex: 1,
+    },
+    linkTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+    },
+    linkSubtitle: {
+      fontSize: 12,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: 2,
+    },
+    newBadge: {
+      backgroundColor: '#3B82F6',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+    },
+    newBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
+    selectedSection: {
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
+    },
+    selectedScrollContent: {
+      paddingHorizontal: 16,
+      gap: 16,
+    },
+    selectedMemberChip: {
+      alignItems: 'center',
+      width: 60,
+    },
+    selectedAvatarWrapper: {
+      position: 'relative',
+    },
+    selectedRemoveBadge: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: isDark ? '#334155' : '#1E293B',
+      borderWidth: 2,
+      borderColor: isDark ? '#0B0F17' : '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    selectedMemberName: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: isDark ? '#F1F5F9' : '#0F172A',
+      marginTop: 4,
+      textAlign: 'center',
+    },
+    sectionHeaderRow: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 6,
+    },
+    sectionHeaderTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDark ? '#94A3B8' : '#64748B',
+    },
+    listContent: {
+      paddingBottom: 90,
+    },
+    userRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      gap: 12,
+    },
+    userRowSelected: {
+      backgroundColor: isDark ? '#161F30' : '#F8FAFC',
+    },
+    userInfoCol: {
+      flex: 1,
+    },
+    userName: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+    },
+    userHandle: {
+      fontSize: 13,
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginTop: 1,
+    },
+    selectionCircle: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: isDark ? '#3B4861' : '#CBD5E1',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#161B26' : '#FFFFFF',
+    },
+    selectionCircleActive: {
+      backgroundColor: isDark ? '#10B981' : '#164E3F',
+      borderColor: isDark ? '#10B981' : '#164E3F',
+    },
+    loadingContainer: {
+      padding: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    loadingText: {
+      fontSize: 13,
+      color: isDark ? '#94A3B8' : '#64748B',
+    },
+    emptyList: {
+      padding: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    emptyListTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDark ? '#F8FAFC' : '#0F172A',
+    },
+    emptyListSubtitle: {
+      fontSize: 13,
+      color: isDark ? '#94A3B8' : '#94A3B8',
+      textAlign: 'center',
+    },
+    errorContainer: {
+      marginHorizontal: 16,
+      padding: 10,
+      backgroundColor: isDark ? '#450A0A' : '#FEE2E2',
+      borderRadius: 8,
+      marginBottom: 8,
+    },
+    errorText: {
+      fontSize: 13,
+      color: isDark ? '#FCA5A5' : '#DC2626',
+      textAlign: 'center',
+    },
+    bottomDock: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: isDark ? '#0B0F17' : '#FFFFFF',
+      borderTopWidth: 1,
+      borderTopColor: isDark ? '#1F2636' : '#F1F5F9',
+    },
+    createBtn: {
+      backgroundColor: isDark ? '#10B981' : '#164E3F',
+      borderRadius: 24,
+      height: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    createBtnDisabled: {
+      backgroundColor: isDark ? '#1E2636' : '#94A3B8',
+      opacity: 0.6,
+    },
+    createBtnText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDark ? '#06281E' : '#FFFFFF',
+      letterSpacing: -0.2,
+    },
+  });
