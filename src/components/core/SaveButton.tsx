@@ -15,7 +15,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../../theme';
+import { useColors, useIsDark } from '../../theme';
 
 export interface SaveButtonProps {
   isSaved: boolean;
@@ -30,6 +30,9 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
   size = 20,
   style,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   // Shared Animation Values
   const unlikedOpacity = useSharedValue(isSaved ? 0 : 1);
   const unlikedScale = useSharedValue(isSaved ? 0.7 : 1);
@@ -191,9 +194,10 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
 
   const iconBoxSize = size + 4;
   const strokeColor = colors.textSecondary || '#64748B';
-  const backPaperColor = '#1E293B';
-  const frontPaperColor = '#F8FAFC';
-  const ribbonColor = '#1E293B';
+  const backPaperColor = isDark ? '#1E2636' : '#1E293B';
+  const frontPaperColor = isDark ? '#FFFFFF' : '#F8FAFC';
+  const ribbonColor = isDark ? '#10B981' : '#064E3B';
+  const sparkColor = isDark ? '#34D399' : '#059669';
 
   return (
     <TouchableOpacity
@@ -279,19 +283,19 @@ export const SaveButton: React.FC<SaveButtonProps> = ({
           <Svg width={iconBoxSize} height={iconBoxSize} viewBox="0 0 28 28">
             <Path
               d="M 23 3.5 L 25 1.5"
-              stroke={ribbonColor}
+              stroke={sparkColor}
               strokeWidth="1.3"
               strokeLinecap="round"
             />
             <Path
               d="M 24.5 6 L 27.2 4.2"
-              stroke={ribbonColor}
+              stroke={sparkColor}
               strokeWidth="1.3"
               strokeLinecap="round"
             />
             <Path
               d="M 24.8 9 L 27.5 9"
-              stroke={ribbonColor}
+              stroke={sparkColor}
               strokeWidth="1.3"
               strokeLinecap="round"
             />

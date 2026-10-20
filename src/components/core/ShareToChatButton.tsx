@@ -14,7 +14,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../../theme';
+import { useColors } from '../../theme';
 
 export interface ShareToChatButtonProps {
   onPress: () => void;
@@ -26,9 +26,11 @@ export interface ShareToChatButtonProps {
 export const ShareToChatButton: React.FC<ShareToChatButtonProps> = ({
   onPress,
   size = 19,
-  color = colors.textSecondary,
+  color,
   style,
 }) => {
+  const colors = useColors();
+  const iconColor = color || colors.textSecondary;
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -74,7 +76,7 @@ export const ShareToChatButton: React.FC<ShareToChatButtonProps> = ({
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
       <Animated.View style={[styles.iconContainer, animatedStyle]}>
-        <Send size={size} color={color} strokeWidth={2} />
+        <Send size={size} color={iconColor} strokeWidth={2} />
       </Animated.View>
     </TouchableOpacity>
   );

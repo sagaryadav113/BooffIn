@@ -16,7 +16,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { colors, typography } from '../../theme';
+import { typography, useColors, useIsDark } from '../../theme';
 
 export interface LikeButtonProps {
   isLiked: boolean;
@@ -37,6 +37,9 @@ export const LikeButton: React.FC<LikeButtonProps> = ({
   showCount = true,
   style,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   // Shared Animation Values
   const unlikedOpacity = useSharedValue(isLiked ? 0 : 1);
   const unlikedScale = useSharedValue(isLiked ? 0.7 : 1);
@@ -209,9 +212,10 @@ export const LikeButton: React.FC<LikeButtonProps> = ({
 
   const iconBoxSize = size + 4;
   const strokeColor = colors.textSecondary || '#64748B';
-  const backPaperColor = '#1E293B';
-  const frontPaperColor = '#F8FAFC';
-  const handColor = '#1E293B';
+  const backPaperColor = isDark ? '#065F46' : '#1E293B';
+  const frontPaperColor = isDark ? '#FFFFFF' : '#F8FAFC';
+  const handColor = isDark ? '#064E3B' : '#1E293B';
+  const rayColor = isDark ? '#34D399' : '#64748B';
 
   const renderIcon = () => (
     <View style={{ width: iconBoxSize, height: iconBoxSize, position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
@@ -304,19 +308,19 @@ export const LikeButton: React.FC<LikeButtonProps> = ({
         <Svg width={iconBoxSize} height={iconBoxSize} viewBox="0 0 28 28">
           <Path
             d="M 11.5 6.8 L 12.8 8.2"
-            stroke={handColor}
+            stroke={rayColor}
             strokeWidth="1.2"
             strokeLinecap="round"
           />
           <Path
             d="M 15 5 L 15 6.8"
-            stroke={handColor}
+            stroke={rayColor}
             strokeWidth="1.2"
             strokeLinecap="round"
           />
           <Path
             d="M 18.5 6.8 L 17.2 8.2"
-            stroke={handColor}
+            stroke={rayColor}
             strokeWidth="1.2"
             strokeLinecap="round"
           />
@@ -333,7 +337,8 @@ export const LikeButton: React.FC<LikeButtonProps> = ({
         <Text
           style={[
             styles.actionCount,
-            isLiked && { color: colors.textPrimary, fontWeight: '700' },
+            { color: isLiked ? (isDark ? '#34D399' : '#047857') : colors.textSecondary },
+            isLiked && { fontWeight: '700' },
           ]}
         >
           {likesCount}
@@ -406,7 +411,6 @@ const styles = StyleSheet.create({
   },
   actionCount: {
     ...typography.captionMedium,
-    color: colors.textSecondary,
     fontSize: 13.5,
   },
 });

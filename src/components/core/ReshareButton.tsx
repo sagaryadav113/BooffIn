@@ -16,7 +16,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { colors, typography } from '../../theme';
+import { typography, useColors, useIsDark } from '../../theme';
 
 export interface ReshareButtonProps {
   isReposted: boolean;
@@ -35,6 +35,9 @@ export const ReshareButton: React.FC<ReshareButtonProps> = ({
   showCount = true,
   style,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   // Animation shared values
   const flightScale = useSharedValue(1);
   const flightTranslateX = useSharedValue(0);
@@ -239,7 +242,8 @@ export const ReshareButton: React.FC<ReshareButtonProps> = ({
           <Text
             style={[
               styles.actionCount,
-              isReposted && { color: activeColor, fontWeight: '700' },
+              { color: isReposted ? activeColor : colors.textSecondary },
+              isReposted && { fontWeight: '700' },
             ]}
           >
             {repostsCount}
@@ -260,7 +264,6 @@ const styles = StyleSheet.create({
   },
   actionCount: {
     ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 13,
   },
 });

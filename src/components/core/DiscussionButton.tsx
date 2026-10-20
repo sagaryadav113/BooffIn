@@ -16,7 +16,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { colors, typography } from '../../theme';
+import { typography, useColors, useIsDark } from '../../theme';
 
 export interface DiscussionButtonProps {
   commentsCount: number;
@@ -33,6 +33,9 @@ export const DiscussionButton: React.FC<DiscussionButtonProps> = ({
   showCount = true,
   style,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   // Shared animation values
   const frontScale = useSharedValue(1);
   const frontTranslateY = useSharedValue(0);
@@ -144,9 +147,9 @@ export const DiscussionButton: React.FC<DiscussionButtonProps> = ({
   }));
 
   const iconBoxSize = size + 4;
-  const strokeColor = colors.textPrimary || '#1E293B';
-  const backBubbleColor = '#1E293B';
-  const frontBubbleColor = '#FFFFFF';
+  const strokeColor = colors.textSecondary || '#64748B';
+  const backBubbleColor = isDark ? '#1E2636' : '#1E293B';
+  const frontBubbleColor = isDark ? '#FFFFFF' : '#FFFFFF';
 
   return (
     <TouchableOpacity
@@ -240,7 +243,7 @@ export const DiscussionButton: React.FC<DiscussionButtonProps> = ({
 
       {showCount && (
         <AnimatedView style={countAnimatedStyle}>
-          <Text style={styles.actionCount}>
+          <Text style={[styles.actionCount, { color: colors.textSecondary }]}>
             {commentsCount}
           </Text>
         </AnimatedView>
@@ -261,7 +264,6 @@ const styles = StyleSheet.create({
   },
   actionCount: {
     ...typography.captionMedium,
-    color: colors.textSecondary,
     fontSize: 13.5,
   },
 });
