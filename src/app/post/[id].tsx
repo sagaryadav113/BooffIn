@@ -45,6 +45,7 @@ export default function PostDetailScreen() {
   const addComment = usePostStore((s) => s.addComment);
   const deleteComment = usePostStore((s) => s.deleteComment);
   const toggleLikeComment = usePostStore((s) => s.toggleLikeComment);
+  const toggleLikePost = usePostStore((s) => s.toggleLikePost);
   const currentUser = useAuthStore((s) => s.user);
 
   const [activeFilter, setActiveFilter] = useState<'all' | DiscussionType>('all');
@@ -318,6 +319,25 @@ export default function PostDetailScreen() {
               return;
             }
             toggleLikeComment(replyId, activePost.id, currentUser.id);
+          }}
+          onLikePost={() => {
+            if (!currentUser?.id) {
+              router.push('/(auth)/login');
+              return;
+            }
+            const wasLiked = Boolean(activePost.isLiked);
+            const nextLiked = !wasLiked;
+            const delta = nextLiked ? 1 : -1;
+            setPost((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    isLiked: nextLiked,
+                    likesCount: Math.max(0, (prev.likesCount || 0) + delta),
+                  }
+                : null
+            );
+            toggleLikePost(activePost.id, currentUser.id);
           }}
           isSubmittingComment={isSubmitting}
           onPostUpdated={(updated) => setPost(updated)}

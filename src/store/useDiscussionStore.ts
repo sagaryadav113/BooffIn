@@ -651,7 +651,7 @@ export const useDiscussionStore = create<DiscussionState>((set, get) => ({
       };
     });
 
-    apiToggleLike(discussionId, wasLiked, currentUserId).catch(() => {});
+    toggleCommentLike(discussionId, wasLiked, currentUserId).catch(() => {});
   },
 
   toggleLikeReply: (paperId: string, discussionId: string, replyId: string, currentUserId?: string) => {

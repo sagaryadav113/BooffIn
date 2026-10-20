@@ -32,6 +32,7 @@ import { Post, ArticleData, ArticleReference, Comment, DiscussionType } from '..
 import { UserProfile } from '../../types/user';
 import { DiscussionIcon } from '../core/DiscussionIcon';
 import { DiscussionComposer, DiscussionTypePills } from '../discussion';
+import { LikeButton } from '../core/LikeButton';
 import { CommentCard } from '../cards/CommentCard';
 import { EmptyState } from '../feedback/EmptyState';
 import { ArticleComposer } from '../composer/ArticleComposer';
@@ -53,6 +54,7 @@ export interface ResearchArticleViewProps {
   onDeleteComment?: (commentId: string) => void;
   onLikeComment?: (commentId: string) => void;
   onLikeReply?: (parentId: string, replyId: string) => void;
+  onLikePost?: () => void;
   isSubmittingComment?: boolean;
 }
 
@@ -71,6 +73,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
   onDeleteComment,
   onLikeComment,
   onLikeReply,
+  onLikePost,
   isSubmittingComment = false,
 }) => {
   const colors = useColors();
@@ -378,6 +381,43 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
             ))}
           </View>
         )}
+
+        {/* Article Interaction Dock */}
+        <View
+          style={[
+            styles.interactionDock,
+            {
+              backgroundColor: isDark ? '#161B26' : colors.backgroundSecondary,
+              borderColor: colors.borderLight,
+            },
+          ]}
+        >
+          {onLikePost ? (
+            <LikeButton
+              isLiked={Boolean(post.isLiked)}
+              likesCount={post.likesCount || 0}
+              onPress={onLikePost}
+              size={20}
+              style={styles.dockItem}
+            />
+          ) : null}
+
+          <View style={styles.dockItem}>
+            <DiscussionIcon size={19} color={colors.textSecondary} />
+            <Text style={[styles.dockText, { color: colors.textSecondary }]}>
+              {totalDiscussionCount ?? (comments?.length || 0)} Discussions
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={handleShare}
+            style={styles.dockItem}
+            activeOpacity={0.7}
+          >
+            <Share2 size={19} color={colors.textSecondary} />
+            <Text style={[styles.dockText, { color: colors.textSecondary }]}>Share</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* ==================================================================== */}
         {/* DISCUSSION & PEER REVIEW SECTION                                     */}
@@ -802,6 +842,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#1B4D3E',
+  },
+  interactionDock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xl,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+  },
+  dockItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  dockText: {
+    fontSize: 13.5,
+    fontWeight: '600',
   },
   discussionSectionContainer: {
     marginTop: spacing.xl,

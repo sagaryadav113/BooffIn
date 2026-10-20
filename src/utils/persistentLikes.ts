@@ -1,16 +1,21 @@
 import { supabase, appStorage } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 
-// In-memory cache for ultra-fast synchronous UI lookups and mapper resolution
+// In-memory caches for ultra-fast synchronous UI lookups and mapper resolution
 const userLikedCommentsCache = new Map<string, Set<string>>();
-const storageLoadedMap = new Map<string, boolean>();
+const userLikedPostsCache = new Map<string, Set<string>>();
+const userLikedPapersCache = new Map<string, Set<string>>();
+
+const commentsStorageLoadedMap = new Map<string, boolean>();
+const postsStorageLoadedMap = new Map<string, boolean>();
+const papersStorageLoadedMap = new Map<string, boolean>();
 
 /**
  * Resolves the effective user ID for like operations.
  * Checks explicit parameter -> auth store -> Supabase auth -> 'anonymous'.
  */
-async function resolveEffectiveUserId(userId?: string): Promise<string> {
-  if (userId && userId.trim().length > 0 && userId !== 'anonymous') {
+export async function resolveEffectiveUserId(userId?: string): Promise<string> {
+  if (userId && userId.trim().length > 0 && userId !== 'anonymous' && userId !== 'usr_me') {
     return userId.trim();
   }
   const storeUser = useAuthStore.getState().user;
@@ -21,20 +26,34 @@ async function resolveEffectiveUserId(userId?: string): Promise<string> {
     const { data: { user } } = await supabase.auth.getUser();
     if (user?.id) return user.id.trim();
   } catch {}
-  return 'anonymous';
+  return storeUser?.id || 'anonymous';
 }
 
-function getStorageKey(userId?: string): string {
+function getCommentsStorageKey(userId?: string): string {
   const normalizedUser = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
   return `@booffin_liked_comments_${normalizedUser}`;
 }
+
+function getPostsStorageKey(userId?: string): string {
+  const normalizedUser = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
+  return `@booffin_liked_posts_${normalizedUser}`;
+}
+
+function getPapersStorageKey(userId?: string): string {
+  const normalizedUser = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
+  return `@booffin_liked_papers_${normalizedUser}`;
+}
+
+// ============================================================================
+// 1. COMMENTS & DISCUSSIONS & REPLIES
+// ============================================================================
 
 /**
  * Synchronously check if a comment or reply ID is liked by the user.
  */
 export function isCommentLikedSync(commentId: string, userId?: string): boolean {
   if (!commentId) return false;
-  
+
   // 1. Check explicit user ID cache
   if (userId && userId.trim().length > 0) {
     const set = userLikedCommentsCache.get(userId.trim());
@@ -73,11 +92,10 @@ export function getLikedCommentIdsSync(userId?: string): Set<string> {
 
 /**
  * Loads the user's liked comment IDs from persistent storage into memory cache.
- * Guarantees existing IDs are merged and never overwritten.
  */
 export async function loadUserLikedComments(userId?: string): Promise<Set<string>> {
   const effectiveUserId = await resolveEffectiveUserId(userId);
-  const storageKey = getStorageKey(effectiveUserId);
+  const storageKey = getCommentsStorageKey(effectiveUserId);
 
   try {
     const raw = await appStorage.getItem(storageKey);
@@ -91,15 +109,13 @@ export async function loadUserLikedComments(userId?: string): Promise<Set<string
       } catch {}
     }
 
-    // Merge with any existing in-memory set so we never drop likes
     const existing = userLikedCommentsCache.get(effectiveUserId) || new Set<string>();
     for (const id of ids) {
       existing.add(id);
     }
 
-    // If logged in, also merge any anonymous likes
     if (effectiveUserId !== 'anonymous') {
-      const anonRaw = await appStorage.getItem(getStorageKey('anonymous'));
+      const anonRaw = await appStorage.getItem(getCommentsStorageKey('anonymous'));
       if (anonRaw) {
         try {
           const anonParsed = JSON.parse(anonRaw);
@@ -111,7 +127,7 @@ export async function loadUserLikedComments(userId?: string): Promise<Set<string
     }
 
     userLikedCommentsCache.set(effectiveUserId, existing);
-    storageLoadedMap.set(effectiveUserId, true);
+    commentsStorageLoadedMap.set(effectiveUserId, true);
     return existing;
   } catch {
     const fallback = userLikedCommentsCache.get(effectiveUserId) || new Set<string>();
@@ -120,12 +136,9 @@ export async function loadUserLikedComments(userId?: string): Promise<Set<string
   }
 }
 
-/**
- * Persists the user's liked comment IDs to persistent storage.
- */
 async function saveUserLikedComments(userId: string | undefined, set: Set<string>): Promise<void> {
   const effectiveUserId = await resolveEffectiveUserId(userId);
-  const storageKey = getStorageKey(effectiveUserId);
+  const storageKey = getCommentsStorageKey(effectiveUserId);
   try {
     const arr = Array.from(set);
     await appStorage.setItem(storageKey, JSON.stringify(arr));
@@ -134,13 +147,6 @@ async function saveUserLikedComments(userId: string | undefined, set: Set<string
   }
 }
 
-/**
- * Toggles like status for a comment or reply:
- * 1. Ensures persistent storage is loaded FIRST (never overwrites with empty set)
- * 2. Synchronously updates in-memory cache
- * 3. Asynchronously persists to storage (AsyncStorage/SecureStore/localStorage)
- * 4. Atomically updates `comments.likes_count` in Supabase
- */
 export async function toggleCommentLike(
   commentId: string,
   isCurrentlyLiked: boolean,
@@ -152,9 +158,8 @@ export async function toggleCommentLike(
 
   const effectiveUserId = await resolveEffectiveUserId(userId);
 
-  // CRITICAL: Ensure existing liked comments are loaded from disk BEFORE modifying!
   let set = userLikedCommentsCache.get(effectiveUserId);
-  if (!set || !storageLoadedMap.get(effectiveUserId)) {
+  if (!set || !commentsStorageLoadedMap.get(effectiveUserId)) {
     set = await loadUserLikedComments(effectiveUserId);
   }
 
@@ -166,8 +171,6 @@ export async function toggleCommentLike(
   }
 
   userLikedCommentsCache.set(effectiveUserId, set);
-
-  // Save to persistent storage immediately
   saveUserLikedComments(effectiveUserId, set).catch(() => {});
 
   // Update Supabase comments table likes_count atomically
@@ -185,6 +188,320 @@ export async function toggleCommentLike(
       .from('comments')
       .update({ likes_count: newCount })
       .eq('id', commentId);
+
+    return { success: true, isLiked: willBeLiked, error: null };
+  } catch (err: any) {
+    return { success: true, isLiked: willBeLiked, error: err?.message || null };
+  }
+}
+
+// ============================================================================
+// 2. POSTS & ARTICLES
+// ============================================================================
+
+/**
+ * Synchronously check if a post or article ID is liked by the user.
+ */
+export function isPostLikedSync(postId: string, userId?: string): boolean {
+  if (!postId) return false;
+
+  if (userId && userId.trim().length > 0) {
+    const set = userLikedPostsCache.get(userId.trim());
+    if (set && set.has(postId)) return true;
+  }
+
+  const storeUserId = useAuthStore.getState().user?.id;
+  if (storeUserId && storeUserId.trim().length > 0) {
+    const set = userLikedPostsCache.get(storeUserId.trim());
+    if (set && set.has(postId)) return true;
+  }
+
+  const anonSet = userLikedPostsCache.get('anonymous');
+  if (anonSet && anonSet.has(postId)) return true;
+
+  return false;
+}
+
+export function getLikedPostIdsSync(userId?: string): Set<string> {
+  const normalizedUser = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
+  const direct = userLikedPostsCache.get(normalizedUser);
+  if (direct && direct.size > 0) return direct;
+
+  const storeUserId = useAuthStore.getState().user?.id;
+  if (storeUserId && userLikedPostsCache.has(storeUserId)) {
+    return userLikedPostsCache.get(storeUserId)!;
+  }
+
+  return userLikedPostsCache.get('anonymous') || new Set<string>();
+}
+
+export async function loadUserLikedPosts(userId?: string): Promise<Set<string>> {
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+  const storageKey = getPostsStorageKey(effectiveUserId);
+
+  try {
+    const raw = await appStorage.getItem(storageKey);
+    let ids: string[] = [];
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          ids = parsed;
+        }
+      } catch {}
+    }
+
+    const existing = userLikedPostsCache.get(effectiveUserId) || new Set<string>();
+    for (const id of ids) {
+      existing.add(id);
+    }
+
+    if (effectiveUserId !== 'anonymous') {
+      const anonRaw = await appStorage.getItem(getPostsStorageKey('anonymous'));
+      if (anonRaw) {
+        try {
+          const anonParsed = JSON.parse(anonRaw);
+          if (Array.isArray(anonParsed)) {
+            anonParsed.forEach((id) => existing.add(id));
+          }
+        } catch {}
+      }
+    }
+
+    userLikedPostsCache.set(effectiveUserId, existing);
+    postsStorageLoadedMap.set(effectiveUserId, true);
+    return existing;
+  } catch {
+    const fallback = userLikedPostsCache.get(effectiveUserId) || new Set<string>();
+    userLikedPostsCache.set(effectiveUserId, fallback);
+    return fallback;
+  }
+}
+
+async function saveUserLikedPosts(userId: string | undefined, set: Set<string>): Promise<void> {
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+  const storageKey = getPostsStorageKey(effectiveUserId);
+  try {
+    const arr = Array.from(set);
+    await appStorage.setItem(storageKey, JSON.stringify(arr));
+  } catch (err) {
+    console.warn('[persistentLikes] Failed to save liked posts:', err);
+  }
+}
+
+export async function togglePostLikePersistence(
+  postId: string,
+  isCurrentlyLiked: boolean,
+  userId?: string
+): Promise<{ success: boolean; isLiked: boolean; error: string | null }> {
+  if (!postId) {
+    return { success: false, isLiked: isCurrentlyLiked, error: 'Missing post ID' };
+  }
+
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+
+  let set = userLikedPostsCache.get(effectiveUserId);
+  if (!set || !postsStorageLoadedMap.get(effectiveUserId)) {
+    set = await loadUserLikedPosts(effectiveUserId);
+  }
+
+  const willBeLiked = !isCurrentlyLiked;
+  if (willBeLiked) {
+    set.add(postId);
+  } else {
+    set.delete(postId);
+  }
+
+  userLikedPostsCache.set(effectiveUserId, set);
+  saveUserLikedPosts(effectiveUserId, set).catch(() => {});
+
+  // Update Supabase in background
+  try {
+    let verifiedUserId: string | null = null;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      verifiedUserId = user?.id || null;
+    } catch {}
+
+    if (!verifiedUserId && effectiveUserId !== 'anonymous' && effectiveUserId !== 'usr_me') {
+      verifiedUserId = effectiveUserId;
+    }
+
+    if (verifiedUserId) {
+      if (willBeLiked) {
+        await supabase
+          .from('likes')
+          .upsert(
+            { user_id: verifiedUserId, post_id: postId },
+            { onConflict: 'user_id,post_id', ignoreDuplicates: true }
+          );
+      } else {
+        await supabase
+          .from('likes')
+          .delete()
+          .eq('user_id', verifiedUserId)
+          .eq('post_id', postId);
+      }
+    }
+
+    // Attempt to update posts.likes_count atomically
+    try {
+      const { data: postRow } = await supabase
+        .from('posts')
+        .select('likes_count')
+        .eq('id', postId)
+        .maybeSingle();
+
+      if (postRow && typeof postRow.likes_count === 'number') {
+        const newCount = Math.max(0, postRow.likes_count + (willBeLiked ? 1 : -1));
+        await supabase
+          .from('posts')
+          .update({ likes_count: newCount })
+          .eq('id', postId);
+      }
+    } catch {}
+
+    return { success: true, isLiked: willBeLiked, error: null };
+  } catch (err: any) {
+    return { success: true, isLiked: willBeLiked, error: err?.message || null };
+  }
+}
+
+// ============================================================================
+// 3. PAPERS & PUBLICATIONS
+// ============================================================================
+
+/**
+ * Synchronously check if a paper is liked by the user.
+ */
+export function isPaperLikedSync(paperId: string, userId?: string): boolean {
+  if (!paperId) return false;
+
+  if (userId && userId.trim().length > 0) {
+    const set = userLikedPapersCache.get(userId.trim());
+    if (set && set.has(paperId)) return true;
+  }
+
+  const storeUserId = useAuthStore.getState().user?.id;
+  if (storeUserId && storeUserId.trim().length > 0) {
+    const set = userLikedPapersCache.get(storeUserId.trim());
+    if (set && set.has(paperId)) return true;
+  }
+
+  const anonSet = userLikedPapersCache.get('anonymous');
+  if (anonSet && anonSet.has(paperId)) return true;
+
+  return false;
+}
+
+export function getLikedPaperIdsSync(userId?: string): Set<string> {
+  const normalizedUser = userId && userId.trim().length > 0 ? userId.trim() : 'anonymous';
+  const direct = userLikedPapersCache.get(normalizedUser);
+  if (direct && direct.size > 0) return direct;
+
+  const storeUserId = useAuthStore.getState().user?.id;
+  if (storeUserId && userLikedPapersCache.has(storeUserId)) {
+    return userLikedPapersCache.get(storeUserId)!;
+  }
+
+  return userLikedPapersCache.get('anonymous') || new Set<string>();
+}
+
+export async function loadUserLikedPapers(userId?: string): Promise<Set<string>> {
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+  const storageKey = getPapersStorageKey(effectiveUserId);
+
+  try {
+    const raw = await appStorage.getItem(storageKey);
+    let ids: string[] = [];
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          ids = parsed;
+        }
+      } catch {}
+    }
+
+    const existing = userLikedPapersCache.get(effectiveUserId) || new Set<string>();
+    for (const id of ids) {
+      existing.add(id);
+    }
+
+    if (effectiveUserId !== 'anonymous') {
+      const anonRaw = await appStorage.getItem(getPapersStorageKey('anonymous'));
+      if (anonRaw) {
+        try {
+          const anonParsed = JSON.parse(anonRaw);
+          if (Array.isArray(anonParsed)) {
+            anonParsed.forEach((id) => existing.add(id));
+          }
+        } catch {}
+      }
+    }
+
+    userLikedPapersCache.set(effectiveUserId, existing);
+    papersStorageLoadedMap.set(effectiveUserId, true);
+    return existing;
+  } catch {
+    const fallback = userLikedPapersCache.get(effectiveUserId) || new Set<string>();
+    userLikedPapersCache.set(effectiveUserId, fallback);
+    return fallback;
+  }
+}
+
+async function saveUserLikedPapers(userId: string | undefined, set: Set<string>): Promise<void> {
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+  const storageKey = getPapersStorageKey(effectiveUserId);
+  try {
+    const arr = Array.from(set);
+    await appStorage.setItem(storageKey, JSON.stringify(arr));
+  } catch (err) {
+    console.warn('[persistentLikes] Failed to save liked papers:', err);
+  }
+}
+
+export async function togglePaperLikePersistence(
+  paperId: string,
+  isCurrentlyLiked: boolean,
+  userId?: string
+): Promise<{ success: boolean; isLiked: boolean; error: string | null }> {
+  if (!paperId) {
+    return { success: false, isLiked: isCurrentlyLiked, error: 'Missing paper ID' };
+  }
+
+  const effectiveUserId = await resolveEffectiveUserId(userId);
+
+  let set = userLikedPapersCache.get(effectiveUserId);
+  if (!set || !papersStorageLoadedMap.get(effectiveUserId)) {
+    set = await loadUserLikedPapers(effectiveUserId);
+  }
+
+  const willBeLiked = !isCurrentlyLiked;
+  if (willBeLiked) {
+    set.add(paperId);
+  } else {
+    set.delete(paperId);
+  }
+
+  userLikedPapersCache.set(effectiveUserId, set);
+  saveUserLikedPapers(effectiveUserId, set).catch(() => {});
+
+  // Update Supabase papers table if available
+  try {
+    const { data: paperRow } = await supabase
+      .from('papers')
+      .select('likes_count')
+      .eq('id', paperId)
+      .maybeSingle();
+
+    if (paperRow && typeof paperRow.likes_count === 'number') {
+      const newCount = Math.max(0, paperRow.likes_count + (willBeLiked ? 1 : -1));
+      await supabase
+        .from('papers')
+        .update({ likes_count: newCount })
+        .eq('id', paperId);
+    }
 
     return { success: true, isLiked: willBeLiked, error: null };
   } catch (err: any) {

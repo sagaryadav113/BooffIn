@@ -15,6 +15,7 @@ import {
   toggleCommentLike as apiToggleCommentLike,
   votePoll as apiVotePoll,
 } from '../api/socialService';
+import { isPostLikedSync } from '../utils/persistentLikes';
 
 export interface CreatePostParams {
   content: string;
@@ -188,8 +189,15 @@ export const usePostStore = create<PostState>((set, get) => ({
   },
 
   toggleLikePost: async (postId, currentUserId) => {
+    const userId = currentUserId || useAuthStore.getState().user?.id;
     const post = get().posts.find((p) => p.id === postId);
-    if (!post) return;
+
+    if (!post) {
+      // Toggle persistence even if not currently cached in posts list
+      const isCurrentlyLiked = isPostLikedSync(postId, userId);
+      await apiToggleLike(postId, isCurrentlyLiked, userId);
+      return;
+    }
 
     const wasLiked = Boolean(post.isLiked);
     const newIsLiked = !wasLiked;
@@ -209,25 +217,11 @@ export const usePostStore = create<PostState>((set, get) => ({
       }),
     }));
 
-    // 2. Perform backend API mutation
-    const userId = currentUserId || useAuthStore.getState().user?.id;
-    const res = await apiToggleLike(postId, wasLiked, userId);
-
-    // 3. Rollback if error
-    if (!res.success) {
-      console.warn('[usePostStore] Like mutation failed, rolling back:', res.error);
-      set((state) => ({
-        posts: state.posts.map((p) => {
-          if (p.id === postId) {
-            return {
-              ...p,
-              isLiked: wasLiked,
-              likesCount: Math.max(0, p.likesCount - countDelta),
-            };
-          }
-          return p;
-        }),
-      }));
+    // 2. Perform backend API mutation & persistent storage
+    try {
+      await apiToggleLike(postId, wasLiked, userId);
+    } catch (err) {
+      console.warn('[usePostStore] Like mutation error:', err);
     }
   },
 

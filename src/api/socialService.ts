@@ -8,9 +8,22 @@ import {
   isCommentLikedSync,
   loadUserLikedComments,
   toggleCommentLike,
+  isPostLikedSync,
+  loadUserLikedPosts,
+  togglePostLikePersistence,
+  isPaperLikedSync,
+  loadUserLikedPapers,
+  togglePaperLikePersistence,
 } from '../utils/persistentLikes';
 
-export { toggleCommentLike };
+export {
+  toggleCommentLike,
+  isPostLikedSync,
+  loadUserLikedPosts,
+  isPaperLikedSync,
+  loadUserLikedPapers,
+  togglePaperLikePersistence,
+};
 
 /**
  * Explainable "For You" Feed Ranking Function
@@ -151,6 +164,11 @@ export function mapSupabasePaper(row: any, currentUserId?: string): Paper {
     ? row.bookmarks.some((b: any) => b.user_id === currentUserId)
     : Boolean(row.is_saved);
 
+  const isLiked =
+    isPaperLikedSync(row.id, currentUserId) ||
+    (row.doi ? isPaperLikedSync(row.doi, currentUserId) : false) ||
+    Boolean(row.is_liked);
+
   return {
     id: row.id,
     doi: row.doi || undefined,
@@ -172,6 +190,7 @@ export function mapSupabasePaper(row: any, currentUserId?: string): Paper {
     likesCount: row.likes_count || 0,
     savesCount: row.saves_count || 0,
     isSaved: isSaved || Boolean(row.is_saved),
+    isLiked,
   };
 }
 
@@ -453,9 +472,11 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
     ? row.post_topics.map((pt: any) => pt.topic?.name).filter(Boolean)
     : [];
 
-  const isLiked = Array.isArray(row.likes)
-    ? row.likes.some((l: any) => l.user_id === currentUserId)
-    : Boolean(row.is_liked);
+  const isLiked =
+    isPostLikedSync(row.id, currentUserId) ||
+    (Array.isArray(row.likes)
+      ? row.likes.some((l: any) => l.user_id === currentUserId)
+      : Boolean(row.is_liked));
 
   const isReposted = Array.isArray(row.reposts)
     ? row.reposts.some((r: any) => r.user_id === currentUserId)
@@ -626,6 +647,7 @@ export async function fetchFeed(
       return { posts: [], hasMore: false, error: null };
     }
 
+    await loadUserLikedPosts(resolvedUserId).catch(() => {});
     let mappedPosts = data.map((row: any) => mapSupabasePost(row, resolvedUserId));
 
     if (resolvedUserId) {
@@ -1179,47 +1201,14 @@ export async function updatePost(
 
 
 // ============================================================================
-// 3. LIKE & UNLIKE (Database-driven via public.likes)
+// 3. LIKE & UNLIKE (Persistent cache + Database sync)
 // ============================================================================
 export async function toggleLike(
   postId: string,
   isCurrentlyLiked: boolean,
-  _userId?: string
+  userId?: string
 ): Promise<{ success: boolean; isLiked: boolean; error: string | null }> {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    return { success: false, isLiked: isCurrentlyLiked, error: 'User not authenticated' };
-  }
-  const verifiedUserId = user.id;
-
-  try {
-    if (isCurrentlyLiked) {
-      const { error } = await supabase
-        .from('likes')
-        .delete()
-        .eq('user_id', verifiedUserId)
-        .eq('post_id', postId);
-
-      if (error && !error.message.includes('not found')) {
-        return { success: false, isLiked: isCurrentlyLiked, error: error.message };
-      }
-      return { success: true, isLiked: false, error: null };
-    } else {
-      const { error } = await supabase
-        .from('likes')
-        .upsert(
-          { user_id: verifiedUserId, post_id: postId },
-          { onConflict: 'user_id,post_id', ignoreDuplicates: true }
-        );
-
-      if (error) {
-        return { success: false, isLiked: isCurrentlyLiked, error: error.message };
-      }
-      return { success: true, isLiked: true, error: null };
-    }
-  } catch (err: any) {
-    return { success: false, isLiked: isCurrentlyLiked, error: err?.message };
-  }
+  return togglePostLikePersistence(postId, isCurrentlyLiked, userId);
 }
 
 // ============================================================================

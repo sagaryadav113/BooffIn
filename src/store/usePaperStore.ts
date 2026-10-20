@@ -4,6 +4,11 @@ import { toggleBookmark as apiToggleBookmark, mapSupabasePaper } from '../api/so
 import { useAuthStore } from './useAuthStore';
 import { supabase, appStorage } from '../api/client';
 import { recordPaperView, getReadPapersRegistry, PaperMetrics } from '../api/hypeScoreService';
+import {
+  isPaperLikedSync,
+  loadUserLikedPapers,
+  togglePaperLikePersistence,
+} from '../utils/persistentLikes';
 
 const SAVED_PAPER_IDS_KEY = 'booffin_saved_paper_ids';
 const SAVED_PAPERS_CACHE_KEY = 'booffin_saved_papers_cache';
@@ -16,7 +21,7 @@ interface PaperState {
   fetchPapers: (forceFresh?: boolean) => Promise<void>;
   fetchPaperById: (id: string) => Promise<Paper | null>;
   toggleSavePaper: (paperId: string, currentUserId?: string, paper?: Paper) => Promise<void>;
-  toggleLikePaper: (paperId: string) => void;
+  toggleLikePaper: (paperId: string, currentUserId?: string, paper?: Paper) => Promise<boolean>;
   getPaperById: (id: string) => Paper | undefined;
   getPaperByDoi: (doi: string) => Paper | undefined;
   addPaper: (paper: Paper) => void;
@@ -190,20 +195,50 @@ export const usePaperStore = create<PaperState>((set, get) => ({
       console.warn('[usePaperStore] Save sync warning:', e);
     }
   },
-  toggleLikePaper: (paperId) =>
-    set((state) => ({
-      papers: state.papers.map((p) => {
-        if (p.id === paperId) {
-          const isLiked = !p.isLiked;
+  toggleLikePaper: async (paperId, currentUserId, paperObj) => {
+    const userId = currentUserId || useAuthStore.getState().user?.id;
+    const existing =
+      get().papers.find((p) => p.id === paperId || (p.doi && p.doi === paperId)) || paperObj;
+    const wasLiked =
+      existing?.isLiked !== undefined
+        ? Boolean(existing.isLiked)
+        : isPaperLikedSync(paperId, userId);
+    const newIsLiked = !wasLiked;
+
+    set((state) => {
+      let found = false;
+      const updatedList = state.papers.map((p) => {
+        if (p.id === paperId || (p.doi && p.doi === paperId)) {
+          found = true;
           return {
             ...p,
-            isLiked,
-            likesCount: isLiked ? p.likesCount + 1 : Math.max(0, p.likesCount - 1),
+            isLiked: newIsLiked,
+            likesCount: newIsLiked ? (p.likesCount || 0) + 1 : Math.max(0, (p.likesCount || 1) - 1),
           };
         }
         return p;
-      }),
-    })),
+      });
+
+      if (!found && paperObj) {
+        updatedList.unshift({
+          ...paperObj,
+          isLiked: newIsLiked,
+          likesCount: newIsLiked
+            ? (paperObj.likesCount || 0) + 1
+            : Math.max(0, (paperObj.likesCount || 1) - 1),
+        });
+      }
+
+      return { papers: updatedList };
+    });
+
+    try {
+      await togglePaperLikePersistence(paperId, wasLiked, userId);
+    } catch (e) {
+      console.warn('[usePaperStore] Like sync warning:', e);
+    }
+    return newIsLiked;
+  },
   getPaperById: (id) => get().papers.find((p) => p.id === id || (p.doi && p.doi === id)),
   getPaperByDoi: (doi) => get().papers.find((p) => p.doi && p.doi.toLowerCase() === doi.toLowerCase()),
   addPaper: (paper) =>

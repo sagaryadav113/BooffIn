@@ -60,6 +60,7 @@ import { usePaperStore } from '../../store/usePaperStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePostStore } from '../../store/usePostStore';
 import { useDiscussionStore } from '../../store/useDiscussionStore';
+import { isPaperLikedSync } from '../../utils/persistentLikes';
 import { supabase } from '../../api/client';
 import {
   DiscussionTypePills,
@@ -230,8 +231,16 @@ export default function PaperDetailScreen() {
       };
     }
 
+    if (p) {
+      const isLiked =
+        isPaperLikedSync(p.id, currentUser?.id) ||
+        (p.doi ? isPaperLikedSync(p.doi, currentUser?.id) : false) ||
+        Boolean(p.isLiked);
+      p = { ...p, isLiked };
+    }
+
     return p || null;
-  }, [paperId, activePostId, getPaperById, doi, title, url, pdfUrl, refId]);
+  }, [paperId, activePostId, getPaperById, doi, title, url, pdfUrl, refId, currentUser?.id]);
 
   const [paper, setPaper] = useState<Paper | null>(initialPaper);
   const resolvedFigures = usePaperFigures(paper);
@@ -538,7 +547,18 @@ export default function PaperDetailScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    toggleLikePaper(paper.id);
+    const willBeLiked = !paper.isLiked;
+    const delta = willBeLiked ? 1 : -1;
+    setPaper((prev) =>
+      prev
+        ? {
+            ...prev,
+            isLiked: willBeLiked,
+            likesCount: Math.max(0, (prev.likesCount || 0) + delta),
+          }
+        : null
+    );
+    toggleLikePaper(paper.id, currentUser?.id, paper);
   };
 
   /**
