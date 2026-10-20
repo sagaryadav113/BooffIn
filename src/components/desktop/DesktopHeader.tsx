@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
     borderRadius: radii.full,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
     paddingHorizontal: 16,
     height: 42,

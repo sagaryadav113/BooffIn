@@ -95,10 +95,10 @@ export const darkColors: typeof lightColors = {
   white: '#FFFFFF',
   primary: '#10B981',
 
-  // Borders & Separators (Refined Low-Glare Lines)
-  border: '#222A3A',
-  borderLight: '#1A2230',
-  borderDark: '#2D3748',
+  // Borders & Separators (Refined Low-Glare Lines - 5% Softer)
+  border: '#1B2232',
+  borderLight: '#141A26',
+  borderDark: '#232B3C',
   borderFocused: '#10B981',
 
   // Typography Hierarchy (Anti-Glare Luma Calibrated)

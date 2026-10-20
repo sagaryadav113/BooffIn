@@ -1413,7 +1413,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       alignItems: 'center',
       backgroundColor: isDark ? '#161D2A' : '#F1F5F9',
       borderWidth: 1,
-      borderColor: isDark ? '#222A3A' : '#E2E8F0',
+      borderColor: isDark ? colors.border : '#E2E8F0',
       paddingVertical: 6,
       paddingHorizontal: 11,
       borderRadius: 16,
