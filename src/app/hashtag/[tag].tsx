@@ -22,7 +22,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { PostCard } from '../../components/cards/PostCard';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { fetchPostsByHashtag } from '../../api/trendingService';
@@ -34,6 +34,10 @@ import { supabase } from '../../api/client';
 type SortTab = 'top' | 'latest';
 
 export default function HashtagFeedScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const params = useLocalSearchParams<{ tag?: string }>();
   const rawTagParam = params.tag || 'Science';
   const cleanTag = useMemo(() => rawTagParam.replace(/^#/, '').trim(), [rawTagParam]);
@@ -156,7 +160,7 @@ export default function HashtagFeedScreen() {
           </Text>
           {data.postsCount24h > 0 && (
             <View style={styles.timeTag}>
-              <Sparkles size={10} color="#1B4D3E" />
+              <Sparkles size={10} color={isDark ? '#34D399' : '#1B4D3E'} />
               <Text style={styles.timeTagText}>Live</Text>
             </View>
           )}
@@ -171,7 +175,7 @@ export default function HashtagFeedScreen() {
           >
             <Flame
               size={15}
-              color={activeTab === 'top' ? '#1B4D3E' : '#64748B'}
+              color={activeTab === 'top' ? (isDark ? '#34D399' : '#1B4D3E') : colors.textSecondary}
             />
             <Text
               style={[
@@ -190,7 +194,7 @@ export default function HashtagFeedScreen() {
           >
             <Clock
               size={15}
-              color={activeTab === 'latest' ? '#1B4D3E' : '#64748B'}
+              color={activeTab === 'latest' ? (isDark ? '#34D399' : '#1B4D3E') : colors.textSecondary}
             />
             <Text
               style={[
@@ -210,7 +214,7 @@ export default function HashtagFeedScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Top Navigation Bar */}
       <View style={styles.navbar}>
@@ -228,7 +232,7 @@ export default function HashtagFeedScreen() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={styles.navButton}
         >
-          <ArrowLeft size={22} color="#0F172A" />
+          <ArrowLeft size={22} color={colors.textPrimary} />
         </TouchableOpacity>
 
         <View style={styles.navTitleContainer}>
@@ -245,14 +249,14 @@ export default function HashtagFeedScreen() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={styles.navButton}
         >
-          <Share2 size={20} color="#0F172A" />
+          <Share2 size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
       {/* Feed Area */}
       {isLoading && !data ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1B4D3E" />
+          <ActivityIndicator size="large" color={colors.brandGreen} />
           <Text style={styles.loadingText}>Fetching trending posts for {displayTag}...</Text>
         </View>
       ) : (
@@ -266,8 +270,8 @@ export default function HashtagFeedScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              tintColor="#1B4D3E"
-              colors={['#1B4D3E']}
+              tintColor={colors.brandGreen}
+              colors={[colors.brandGreen]}
             />
           }
           renderItem={({ item }) => (
@@ -290,154 +294,159 @@ export default function HashtagFeedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  navbar: {
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
-  },
-  navButton: {
-    width: 38,
-    height: 38,
-    borderRadius: radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 10,
-  },
-  navTitle: {
-    ...typography.h3,
-    fontSize: 16.5,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  navSubtitle: {
-    ...typography.caption,
-    fontSize: 11.5,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  listContent: {
-    paddingBottom: 90,
-  },
-  bannerContainer: {
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  rankPill: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radii.sm,
-  },
-  rankPillText: {
-    ...typography.caption,
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  titleRow: {
-    marginBottom: 6,
-  },
-  mainTitle: {
-    ...typography.h1,
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#0F172A',
-    letterSpacing: -0.5,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 14,
-  },
-  statsText: {
-    ...typography.caption,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  timeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#EAF3EE',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radii.full,
-  },
-  timeTagText: {
-    ...typography.caption,
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#1B4D3E',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    marginTop: 4,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 11,
-    gap: 6,
-    borderBottomWidth: 2.5,
-    borderBottomColor: 'transparent',
-  },
-  tabButtonActive: {
-    borderBottomColor: '#1B4D3E',
-  },
-  tabText: {
-    ...typography.body,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  tabTextActive: {
-    color: '#1B4D3E',
-    fontWeight: '800',
-  },
-  postWrapper: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-  },
-  loadingText: {
-    ...typography.body,
-    fontSize: 13.5,
-    color: '#64748B',
-    marginTop: 12,
-  },
-});
+const createStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    navbar: {
+      height: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+      backgroundColor: colors.background,
+    },
+    navButton: {
+      width: 38,
+      height: 38,
+      borderRadius: radii.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navTitleContainer: {
+      flex: 1,
+      alignItems: 'center',
+      marginHorizontal: 10,
+    },
+    navTitle: {
+      ...typography.h3,
+      fontSize: 16.5,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
+    navSubtitle: {
+      ...typography.caption,
+      fontSize: 11.5,
+      color: colors.textSecondary,
+      marginTop: 1,
+    },
+    listContent: {
+      paddingBottom: 90,
+      backgroundColor: colors.background,
+    },
+    bannerContainer: {
+      paddingTop: 16,
+      paddingHorizontal: 16,
+      paddingBottom: 10,
+      backgroundColor: colors.backgroundCard,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 6,
+    },
+    rankPill: {
+      backgroundColor: isDark ? colors.backgroundSecondary : '#F1F5F9',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: radii.sm,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+    },
+    rankPillText: {
+      ...typography.caption,
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: isDark ? '#34D399' : '#475569',
+    },
+    titleRow: {
+      marginBottom: 6,
+    },
+    mainTitle: {
+      ...typography.h1,
+      fontSize: 26,
+      fontWeight: '900',
+      color: colors.textPrimary,
+      letterSpacing: -0.5,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 14,
+    },
+    statsText: {
+      ...typography.caption,
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    timeTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#EAF3EE',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: radii.full,
+    },
+    timeTagText: {
+      ...typography.caption,
+      fontSize: 10.5,
+      fontWeight: '700',
+      color: isDark ? '#34D399' : '#1B4D3E',
+    },
+    tabContainer: {
+      flexDirection: 'row',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+      marginTop: 4,
+    },
+    tabButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 11,
+      gap: 6,
+      borderBottomWidth: 2.5,
+      borderBottomColor: 'transparent',
+    },
+    tabButtonActive: {
+      borderBottomColor: isDark ? '#34D399' : '#1B4D3E',
+    },
+    tabText: {
+      ...typography.body,
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    tabTextActive: {
+      color: isDark ? '#34D399' : '#1B4D3E',
+      fontWeight: '800',
+    },
+    postWrapper: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+      backgroundColor: colors.backgroundCard,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: 60,
+    },
+    loadingText: {
+      ...typography.body,
+      fontSize: 13.5,
+      color: colors.textSecondary,
+      marginTop: 12,
+    },
+  });

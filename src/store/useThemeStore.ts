@@ -23,6 +23,37 @@ function syncWebDocumentTheme(isDark: boolean) {
       if (meta) {
         meta.setAttribute('content', isDark ? '#0B0F17' : '#FFFFFF');
       }
+
+      let styleEl = document.getElementById('booffin-scrollbar-theme') as HTMLStyleElement | null;
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'booffin-scrollbar-theme';
+        document.head.appendChild(styleEl);
+      }
+      styleEl.innerHTML = `
+        html, body {
+          background-color: ${isDark ? '#0B0F17' : '#FFFFFF'};
+          color-scheme: ${isDark ? 'dark' : 'light'};
+        }
+        * {
+          scrollbar-color: ${isDark ? '#1F2636 transparent' : '#CBD5E1 transparent'};
+          scrollbar-width: thin;
+        }
+        *::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        *::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        *::-webkit-scrollbar-thumb {
+          background: ${isDark ? '#1F2636' : '#CBD5E1'};
+          border-radius: 9999px;
+        }
+        *::-webkit-scrollbar-thumb:hover {
+          background: ${isDark ? '#2E384D' : '#94A3B8'};
+        }
+      `;
     } catch {}
   }
 }
