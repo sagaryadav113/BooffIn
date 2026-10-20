@@ -58,6 +58,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
   const searchContainerRef = useRef<any>(null);
   const pathname = usePathname();
   const isExplorePage = pathname.includes('explore');
+  const isMac = typeof navigator !== 'undefined' && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform || navigator.userAgent);
 
   // Keep local search input synchronized with explore search store
   useEffect(() => {
@@ -237,7 +238,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
               onSubmitEditing={handleSearchSubmit}
               returnKeyType="search"
             />
-            {searchQuery.length > 0 && (
+            {searchQuery.length > 0 ? (
               <TouchableOpacity
                 onPress={() => {
                   setSearchQuery('');
@@ -246,6 +247,33 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({ onSearch }) => {
                 style={{ padding: 4 }}
               >
                 <X size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  const searchInput = document.getElementById('desktop-global-search-input');
+                  if (searchInput) {
+                    searchInput.focus();
+                    setIsSearchOpen(true);
+                  }
+                }}
+                style={[
+                  styles.shortcutBadge,
+                  {
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9',
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.14)' : '#E2E8F0',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.shortcutText,
+                    { color: isDark ? '#94A3B8' : '#64748B' },
+                  ]}
+                >
+                  {isMac ? '⌘K' : 'Ctrl K'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -616,15 +644,21 @@ const styles = StyleSheet.create({
     outlineStyle: 'none' as any,
   },
   shortcutBadge: {
-    backgroundColor: '#E2E8F0',
     borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+    cursor: 'pointer' as any,
+    userSelect: 'none' as any,
   },
   shortcutText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
-    color: '#64748B',
+    fontFamily: Platform.OS === 'web' ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' : undefined,
+    letterSpacing: 0.4,
   },
   dropdownFilterRow: {
     flexDirection: 'row',
