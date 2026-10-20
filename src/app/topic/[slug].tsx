@@ -20,7 +20,7 @@ import {
   Check,
   Plus,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Badge } from '../../components/core/Badge';
 import { Typography } from '../../components/core/Typography';
@@ -36,6 +36,10 @@ import { fetchTopicPageData, TopicPageData } from '../../api/topicService';
 type TopicTab = 'trending' | 'shares' | 'discussions' | 'researchers';
 
 export default function TopicDetailScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const topicSlug = slug || 'neuroscience';
 
@@ -159,7 +163,7 @@ export default function TopicDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
       <AppHeader
@@ -176,12 +180,12 @@ export default function TopicDetailScreen() {
           >
             {currentTopic.isFollowing ? (
               <>
-                <Check size={13} color={colors.textPrimary} />
+                <Check size={13} color={isDark ? '#F1F5F9' : colors.textPrimary} />
                 <Text style={styles.headerFollowingText}>Following</Text>
               </>
             ) : (
               <>
-                <Plus size={13} color={colors.white} />
+                <Plus size={13} color={isDark ? '#06281E' : colors.white} />
                 <Text style={styles.headerFollowText}>Follow</Text>
               </>
             )}
@@ -250,7 +254,9 @@ export default function TopicDetailScreen() {
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               const IconComp = tab.icon;
-              const iconColor = isActive ? colors.white : colors.textSecondary;
+              const iconColor = isActive
+                ? (isDark ? '#06281E' : colors.white)
+                : (isDark ? '#94A3B8' : colors.textSecondary);
 
               return (
                 <TouchableOpacity
@@ -370,148 +376,149 @@ export default function TopicDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  headerFollowBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.black,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 1,
-    borderRadius: radii.full,
-    gap: 4,
-  },
-  headerFollowingBtn: {
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  headerFollowText: {
-    ...typography.micro,
-    color: colors.white,
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  headerFollowingText: {
-    ...typography.micro,
-    color: colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  scrollContent: {
-    paddingBottom: spacing.xxxl * 1.5,
-  },
-  topicHeaderBanner: {
-    padding: spacing.lg,
-    backgroundColor: colors.backgroundSecondary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  categoryBadgeRow: {
-    marginBottom: spacing.xs,
-  },
-  topicTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  topicDesc: {
-    lineHeight: 22,
-    marginBottom: spacing.md,
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundCard,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  metricItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  metricDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: colors.borderLight,
-    marginHorizontal: spacing.md,
-  },
-  tabsWrapper: {
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  tabsScroll: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    gap: spacing.xs + 2,
-  },
-  tabButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 3,
-    borderRadius: radii.full,
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    gap: 6,
-  },
-  tabButtonActive: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  tabLabel: {
-    ...typography.captionMedium,
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  tabLabelActive: {
-    color: colors.white,
-    fontWeight: '700',
-  },
-  tabBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: radii.full,
-    backgroundColor: colors.backgroundTertiary,
-  },
-  tabBadgeActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  tabBadgeText: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  tabBadgeTextActive: {
-    color: colors.white,
-  },
-  loadingContainer: {
-    paddingVertical: spacing.xxxl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabContentContainer: {
-    paddingTop: spacing.xs,
-  },
-  listSection: {
-    gap: spacing.sm,
-  },
-  paperCardItem: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-  },
-  researchersList: {
-    backgroundColor: colors.backgroundCard,
-  },
-});
+const createStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerFollowBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#10B981' : colors.black,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs + 1,
+      borderRadius: radii.full,
+      gap: 4,
+    },
+    headerFollowingBtn: {
+      backgroundColor: isDark ? '#161D2A' : colors.backgroundSecondary,
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : colors.borderLight,
+    },
+    headerFollowText: {
+      ...typography.micro,
+      color: isDark ? '#06281E' : colors.white,
+      fontWeight: '700',
+      fontSize: 12,
+    },
+    headerFollowingText: {
+      ...typography.micro,
+      color: isDark ? '#F1F5F9' : colors.textPrimary,
+      fontWeight: '600',
+      fontSize: 12,
+    },
+    scrollContent: {
+      paddingBottom: spacing.xxxl * 1.5,
+    },
+    topicHeaderBanner: {
+      padding: spacing.lg,
+      backgroundColor: isDark ? '#0B0F17' : colors.backgroundSecondary,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : colors.borderLight,
+    },
+    categoryBadgeRow: {
+      marginBottom: spacing.xs,
+    },
+    topicTitle: {
+      fontSize: 24,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    topicDesc: {
+      lineHeight: 22,
+      marginBottom: spacing.md,
+    },
+    metricsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161B26' : colors.backgroundCard,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : colors.borderLight,
+    },
+    metricItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    metricDivider: {
+      width: 1,
+      height: 16,
+      backgroundColor: isDark ? '#1F2636' : colors.borderLight,
+      marginHorizontal: spacing.md,
+    },
+    tabsWrapper: {
+      backgroundColor: colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : colors.borderLight,
+    },
+    tabsScroll: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm + 2,
+      gap: spacing.xs + 2,
+    },
+    tabButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs + 3,
+      borderRadius: radii.full,
+      backgroundColor: isDark ? '#161D2A' : colors.backgroundSecondary,
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : colors.borderLight,
+      gap: 6,
+    },
+    tabButtonActive: {
+      backgroundColor: isDark ? '#10B981' : colors.black,
+      borderColor: isDark ? '#10B981' : colors.black,
+    },
+    tabLabel: {
+      ...typography.captionMedium,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      fontSize: 13,
+    },
+    tabLabelActive: {
+      color: isDark ? '#06281E' : colors.white,
+      fontWeight: '700',
+    },
+    tabBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: radii.full,
+      backgroundColor: isDark ? '#1F2636' : colors.backgroundTertiary,
+    },
+    tabBadgeActive: {
+      backgroundColor: isDark ? 'rgba(6, 40, 30, 0.25)' : 'rgba(255, 255, 255, 0.25)',
+    },
+    tabBadgeText: {
+      ...typography.micro,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    tabBadgeTextActive: {
+      color: isDark ? '#06281E' : colors.white,
+    },
+    loadingContainer: {
+      paddingVertical: spacing.xxxl,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tabContentContainer: {
+      paddingTop: spacing.xs,
+    },
+    listSection: {
+      gap: spacing.sm,
+    },
+    paperCardItem: {
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.md,
+    },
+    researchersList: {
+      backgroundColor: colors.background,
+    },
+  });

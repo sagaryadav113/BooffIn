@@ -30,7 +30,7 @@ import {
   GraduationCap,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { AppHeader } from '../../components/layout/AppHeader';
 import { Button } from '../../components/core/Button';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -53,6 +53,10 @@ import { ResearchDisciplinePicker } from '../../components/taxonomy/ResearchDisc
 const DEFAULT_BANNER_FALLBACK = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80';
 
 export default function EditProfileScreen() {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = React.useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const user = useAuthStore((s) => s.user);
   const updateProfile = useAuthStore((s) => s.updateProfile);
 
@@ -309,7 +313,7 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <AppHeader
         showBack
@@ -371,7 +375,7 @@ export default function EditProfileScreen() {
                   style={styles.pillButtonPrimary}
                   activeOpacity={0.7}
                 >
-                  <Camera size={14} color={colors.textPrimary} />
+                  <Camera size={14} color={isDark ? '#F1F5F9' : colors.textPrimary} />
                   <Text style={styles.pillButtonPrimaryText}>
                     {bannerUrl ? 'Change Banner' : 'Upload Banner'}
                   </Text>
@@ -432,7 +436,7 @@ export default function EditProfileScreen() {
                     style={styles.pillButtonPrimary}
                     activeOpacity={0.7}
                   >
-                    <Upload size={14} color={colors.textPrimary} />
+                    <Upload size={14} color={isDark ? '#F1F5F9' : colors.textPrimary} />
                     <Text style={styles.pillButtonPrimaryText}>
                       {avatarUrl ? 'Change Photo' : 'Upload Photo'}
                     </Text>
@@ -460,13 +464,13 @@ export default function EditProfileScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.fieldLabel}>Full Name *</Text>
               <View style={styles.inputWithIconContainer}>
-                <User size={16} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <User size={16} color={isDark ? '#94A3B8' : colors.textSecondary} style={styles.fieldLeftIcon} />
                 <TextInput
                   style={styles.fieldInputClean}
                   value={fullName}
                   onChangeText={setFullName}
                   placeholder="e.g. Sagar Yadav or Dr. Jane Doe"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={isDark ? '#64748B' : colors.textMuted}
                 />
               </View>
             </View>
@@ -485,7 +489,7 @@ export default function EditProfileScreen() {
                   }}
                   maxLength={16}
                   placeholder="username"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={isDark ? '#64748B' : colors.textMuted}
                   autoCapitalize="none"
                 />
               </View>
@@ -505,14 +509,14 @@ export default function EditProfileScreen() {
                     </>
                   ) : handleStatus.available === true ? (
                     <>
-                      <CheckCircle2 size={14} color="#16a34a" />
+                      <CheckCircle2 size={14} color={isDark ? '#34D399' : '#16a34a'} />
                       <Text style={styles.availabilitySuccessText}>
                         ✓ {handleStatus.message}
                       </Text>
                     </>
                   ) : handleStatus.available === false ? (
                     <>
-                      <AlertCircle size={14} color={colors.accentRed} />
+                      <AlertCircle size={14} color={isDark ? '#F87171' : colors.accentRed} />
                       <Text style={styles.availabilityErrorText}>
                         ✕ {handleStatus.message}
                       </Text>
@@ -526,13 +530,13 @@ export default function EditProfileScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.fieldLabel}>Academic Role / Status</Text>
               <View style={styles.inputWithIconContainer}>
-                <GraduationCap size={16} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <GraduationCap size={16} color={isDark ? '#94A3B8' : colors.textSecondary} style={styles.fieldLeftIcon} />
                 <TextInput
                   style={styles.fieldInputClean}
                   value={academicTitle}
                   onChangeText={setAcademicTitle}
                   placeholder="e.g. Student researcher, PhD Candidate, Professor"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={isDark ? '#64748B' : colors.textMuted}
                 />
               </View>
               <Text style={styles.fieldHint}>
@@ -544,13 +548,13 @@ export default function EditProfileScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.fieldLabel}>Institution / Organization</Text>
               <View style={styles.inputWithIconContainer}>
-                <Building size={16} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <Building size={16} color={isDark ? '#94A3B8' : colors.textSecondary} style={styles.fieldLeftIcon} />
                 <TextInput
                   style={styles.fieldInputClean}
                   value={institution}
                   onChangeText={setInstitution}
                   placeholder="e.g. Independent Researcher / MIT / Delhi University"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={isDark ? '#64748B' : colors.textMuted}
                 />
               </View>
             </View>
@@ -566,7 +570,7 @@ export default function EditProfileScreen() {
                   multiline
                   numberOfLines={3}
                   placeholder="I am a neuroscience student interested in AI and biology..."
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={isDark ? '#64748B' : colors.textMuted}
                 />
               </View>
             </View>
@@ -580,26 +584,26 @@ export default function EditProfileScreen() {
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.fieldLabel}>Country</Text>
                 <View style={styles.inputWithIconContainer}>
-                  <Globe size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                  <Globe size={15} color={isDark ? '#94A3B8' : colors.textSecondary} style={styles.fieldLeftIcon} />
                   <TextInput
                     style={styles.fieldInputClean}
                     value={country}
                     onChangeText={setCountry}
                     placeholder="e.g. India"
-                    placeholderTextColor={colors.textMuted}
+                    placeholderTextColor={isDark ? '#64748B' : colors.textMuted}
                   />
                 </View>
               </View>
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={styles.fieldLabel}>City / Location</Text>
                 <View style={styles.inputWithIconContainer}>
-                  <MapPin size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                  <MapPin size={15} color={isDark ? '#94A3B8' : colors.textSecondary} style={styles.fieldLeftIcon} />
                   <TextInput
                     style={styles.fieldInputClean}
                     value={location}
                     onChangeText={setLocation}
                     placeholder="e.g. New Delhi"
-                    placeholderTextColor={colors.textMuted}
+                    placeholderTextColor={isDark ? '#64748B' : colors.textMuted}
                   />
                 </View>
               </View>
@@ -633,13 +637,13 @@ export default function EditProfileScreen() {
                 <Text style={styles.orcidBadge}>Verified Researcher</Text>
               </View>
               <View style={styles.inputWithIconContainer}>
-                <ExternalLink size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <ExternalLink size={15} color={isDark ? '#94A3B8' : colors.textSecondary} style={styles.fieldLeftIcon} />
                 <TextInput
                   style={styles.fieldInputClean}
                   value={orcidId}
                   onChangeText={setOrcidId}
                   placeholder="0000-0002-8140-5231"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={isDark ? '#64748B' : colors.textMuted}
                   autoCapitalize="none"
                 />
               </View>
@@ -652,13 +656,13 @@ export default function EditProfileScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.fieldLabel}>Personal Website / Lab Page</Text>
               <View style={styles.inputWithIconContainer}>
-                <Globe size={15} color={colors.textSecondary} style={styles.fieldLeftIcon} />
+                <Globe size={15} color={isDark ? '#94A3B8' : colors.textSecondary} style={styles.fieldLeftIcon} />
                 <TextInput
                   style={styles.fieldInputClean}
                   value={websiteUrl}
                   onChangeText={setWebsiteUrl}
                   placeholder="https://yourwebsite.edu"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={isDark ? '#64748B' : colors.textMuted}
                   autoCapitalize="none"
                   keyboardType="url"
                 />
@@ -692,313 +696,314 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  scrollContent: {
-    paddingBottom: spacing.xxxl * 2,
-  },
-  saveHeaderButton: {
-    backgroundColor: colors.black,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-  },
-  saveHeaderText: {
-    ...typography.captionBold,
-    color: colors.white,
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  pageSubtitle: {
-    ...typography.body,
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  sectionHeaderTitle: {
-    ...typography.captionBold,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    color: colors.textSecondary,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xs + 2,
-    textTransform: 'uppercase',
-  },
-  cardContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: spacing.lg,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xl,
-    gap: spacing.md,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-      },
-      default: {
-        elevation: 1,
-      },
-    }),
-  },
-  mediaItemBlock: {
-    gap: 4,
-  },
-  mediaItemTitle: {
-    ...typography.bodyBold,
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  mediaItemSubtitle: {
-    ...typography.caption,
-    fontSize: 12,
-    color: colors.textSecondary,
-    lineHeight: 16,
-    marginBottom: 8,
-  },
-  bannerPreviewWrapper: {
-    width: '100%',
-    height: 120,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F3F4F6',
-    position: 'relative',
-  },
-  bannerPreviewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  uploadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    zIndex: 10,
-  },
-  uploadingText: {
-    ...typography.captionBold,
-    color: colors.white,
-    fontSize: 13,
-  },
-  mediaActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: 10,
-  },
-  pillButtonPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  pillButtonPrimaryText: {
-    ...typography.captionBold,
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  pillButtonSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.white,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  pillButtonSecondaryText: {
-    ...typography.captionBold,
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginVertical: 4,
-  },
-  avatarControlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: 4,
-  },
-  avatarPreviewWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  avatarPreviewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPlaceholderText: {
-    ...typography.h3,
-    fontSize: 22,
-    color: colors.textSecondary,
-    fontWeight: '700',
-  },
-  avatarUploadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  avatarButtonsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  formGroup: {
-    gap: 6,
-  },
-  fieldLabel: {
-    ...typography.captionBold,
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  labelWithBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  orcidBadge: {
-    ...typography.micro,
-    color: '#16a34a',
-    fontWeight: '700',
-    backgroundColor: 'rgba(22, 163, 74, 0.08)',
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-  },
-  inputWithIconContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    minHeight: 44,
-  },
-  fieldLeftIcon: {
-    marginRight: 8,
-  },
-  handlePrefixText: {
-    ...typography.bodyBold,
-    color: colors.textSecondary,
-    marginRight: 4,
-    fontSize: 15,
-  },
-  fieldInputClean: {
-    flex: 1,
-    ...typography.body,
-    fontSize: 14,
-    color: colors.textPrimary,
-    paddingVertical: 8,
-  },
-  textAreaContainer: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minHeight: 88,
-  },
-  textAreaInput: {
-    ...typography.body,
-    fontSize: 14,
-    color: colors.textPrimary,
-    minHeight: 70,
-    textAlignVertical: 'top',
-  },
-  rowInputs: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  fieldHint: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  availabilityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 2,
-    marginTop: 2,
-  },
-  availabilityCheckingText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  availabilitySuccessText: {
-    ...typography.captionBold,
-    color: '#16a34a',
-    fontSize: 12,
-  },
-  availabilityErrorText: {
-    ...typography.captionBold,
-    color: colors.accentRed,
-    fontSize: 12,
-  },
-  bottomButtonContainer: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-  },
-  saveSubmitButton: {
-    backgroundColor: colors.black,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-  },
-});
+const createStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      paddingBottom: spacing.xxxl * 2,
+    },
+    saveHeaderButton: {
+      backgroundColor: isDark ? '#10B981' : colors.black,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+      borderRadius: radii.full,
+    },
+    saveHeaderText: {
+      ...typography.captionBold,
+      color: isDark ? '#06281E' : colors.white,
+      fontWeight: '700',
+      fontSize: 13,
+    },
+    pageSubtitle: {
+      ...typography.body,
+      fontSize: 14,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    sectionHeaderTitle: {
+      ...typography.captionBold,
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.8,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.xs + 2,
+      textTransform: 'uppercase',
+    },
+    cardContainer: {
+      backgroundColor: isDark ? '#161B26' : colors.white,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : '#E5E7EB',
+      padding: spacing.lg,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.xl,
+      gap: spacing.md,
+      ...Platform.select({
+        web: {
+          boxShadow: isDark ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.04)',
+        },
+        default: {
+          elevation: 1,
+        },
+      }),
+    },
+    mediaItemBlock: {
+      gap: 4,
+    },
+    mediaItemTitle: {
+      ...typography.bodyBold,
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDark ? '#F1F5F9' : colors.textPrimary,
+    },
+    mediaItemSubtitle: {
+      ...typography.caption,
+      fontSize: 12,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      lineHeight: 16,
+      marginBottom: 8,
+    },
+    bannerPreviewWrapper: {
+      width: '100%',
+      height: 120,
+      borderRadius: 10,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E5E7EB',
+      backgroundColor: isDark ? '#111622' : '#F3F4F6',
+      position: 'relative',
+    },
+    bannerPreviewImage: {
+      width: '100%',
+      height: '100%',
+    },
+    uploadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: spacing.sm,
+      zIndex: 10,
+    },
+    uploadingText: {
+      ...typography.captionBold,
+      color: colors.white,
+      fontSize: 13,
+    },
+    mediaActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: 10,
+    },
+    pillButtonPrimary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: isDark ? '#1F2636' : '#F3F4F6',
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E5E7EB',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    pillButtonPrimaryText: {
+      ...typography.captionBold,
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDark ? '#F1F5F9' : colors.textPrimary,
+    },
+    pillButtonSecondary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: isDark ? '#161B26' : colors.white,
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E5E7EB',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    pillButtonSecondaryText: {
+      ...typography.captionBold,
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDark ? '#F1F5F9' : colors.textPrimary,
+    },
+    cardDivider: {
+      height: 1,
+      backgroundColor: isDark ? '#1F2636' : '#F3F4F6',
+      marginVertical: 4,
+    },
+    avatarControlsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginTop: 4,
+    },
+    avatarPreviewWrapper: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E5E7EB',
+      backgroundColor: isDark ? '#111622' : '#F3F4F6',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+    },
+    avatarPreviewImage: {
+      width: '100%',
+      height: '100%',
+    },
+    avatarPlaceholder: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: isDark ? '#111622' : '#F3F4F6',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarPlaceholderText: {
+      ...typography.h3,
+      fontSize: 22,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      fontWeight: '700',
+    },
+    avatarUploadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10,
+    },
+    avatarButtonsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      flexWrap: 'wrap',
+    },
+    formGroup: {
+      gap: 6,
+    },
+    fieldLabel: {
+      ...typography.captionBold,
+      fontSize: 13,
+      fontWeight: '700',
+      color: isDark ? '#F1F5F9' : colors.textPrimary,
+    },
+    labelWithBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    orcidBadge: {
+      ...typography.micro,
+      color: isDark ? '#34D399' : '#16a34a',
+      fontWeight: '700',
+      backgroundColor: isDark ? 'rgba(52, 211, 153, 0.12)' : 'rgba(22, 163, 74, 0.08)',
+      paddingHorizontal: spacing.xs + 2,
+      paddingVertical: 2,
+      borderRadius: radii.sm,
+    },
+    inputWithIconContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#0B0F17' : '#F9FAFB',
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E5E7EB',
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      minHeight: 44,
+    },
+    fieldLeftIcon: {
+      marginRight: 8,
+    },
+    handlePrefixText: {
+      ...typography.bodyBold,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      marginRight: 4,
+      fontSize: 15,
+    },
+    fieldInputClean: {
+      flex: 1,
+      ...typography.body,
+      fontSize: 14,
+      color: isDark ? '#F1F5F9' : colors.textPrimary,
+      paddingVertical: 8,
+    },
+    textAreaContainer: {
+      backgroundColor: isDark ? '#0B0F17' : '#F9FAFB',
+      borderWidth: 1,
+      borderColor: isDark ? '#2E384D' : '#E5E7EB',
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      minHeight: 88,
+    },
+    textAreaInput: {
+      ...typography.body,
+      fontSize: 14,
+      color: isDark ? '#F1F5F9' : colors.textPrimary,
+      minHeight: 70,
+      textAlignVertical: 'top',
+    },
+    rowInputs: {
+      flexDirection: 'row',
+      gap: spacing.md,
+    },
+    fieldHint: {
+      ...typography.micro,
+      color: isDark ? '#64748B' : colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 16,
+    },
+    availabilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 2,
+      marginTop: 2,
+    },
+    availabilityCheckingText: {
+      ...typography.caption,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      fontSize: 12,
+    },
+    availabilitySuccessText: {
+      ...typography.captionBold,
+      color: isDark ? '#34D399' : '#16a34a',
+      fontSize: 12,
+    },
+    availabilityErrorText: {
+      ...typography.captionBold,
+      color: isDark ? '#F87171' : colors.accentRed,
+      fontSize: 12,
+    },
+    bottomButtonContainer: {
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.md,
+    },
+    saveSubmitButton: {
+      backgroundColor: isDark ? '#10B981' : colors.black,
+      borderRadius: radii.md,
+      paddingVertical: spacing.md,
+    },
+  });
 

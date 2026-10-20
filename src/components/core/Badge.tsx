@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { radii, spacing, typography, useColors, useIsDark } from '../../theme';
 
 interface BadgeProps {
   label: string;
@@ -9,18 +9,21 @@ interface BadgeProps {
 }
 
 export const Badge: React.FC<BadgeProps> = ({ label, variant = 'generic', style }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   const getColors = () => {
     switch (variant) {
       case 'nature':
-        return { text: colors.journalNature, bg: 'rgba(220, 38, 38, 0.08)' };
+        return { text: colors.journalNature, bg: isDark ? 'rgba(248, 113, 113, 0.15)' : 'rgba(220, 38, 38, 0.08)' };
       case 'science':
-        return { text: colors.journalScience, bg: 'rgba(217, 119, 6, 0.08)' };
+        return { text: colors.journalScience, bg: isDark ? 'rgba(251, 191, 36, 0.15)' : 'rgba(217, 119, 6, 0.08)' };
       case 'cell':
-        return { text: colors.journalCell, bg: 'rgba(2, 132, 199, 0.08)' };
+        return { text: colors.journalCell, bg: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(2, 132, 199, 0.08)' };
       case 'oa':
-        return { text: colors.accentGreen, bg: 'rgba(16, 185, 129, 0.08)' };
+        return { text: colors.accentGreen, bg: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.08)' };
       case 'closed':
-        return { text: '#DC2626', bg: 'rgba(220, 38, 38, 0.08)' };
+        return { text: isDark ? '#F87171' : '#DC2626', bg: isDark ? 'rgba(248, 113, 113, 0.15)' : 'rgba(220, 38, 38, 0.08)' };
       case 'topic':
         return { text: colors.textSecondary, bg: colors.backgroundTertiary };
       default:
