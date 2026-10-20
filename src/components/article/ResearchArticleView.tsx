@@ -27,7 +27,7 @@ import {
   Activity,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Post, ArticleData, ArticleReference, Comment, DiscussionType } from '../../types';
 import { UserProfile } from '../../types/user';
 import { DiscussionIcon } from '../core/DiscussionIcon';
@@ -73,6 +73,8 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
   onLikeReply,
   isSubmittingComment = false,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const article: ArticleData | undefined = post.article;
   const [viewMode, setViewMode] = useState<'article' | 'pdf'>('article');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -143,37 +145,37 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
     });
 
     if (patterns.length === 0) {
-      return <Text style={styles.paragraphText}>{text}</Text>;
+      return <Text style={[styles.paragraphText, { color: isDark ? '#D1D5DB' : '#334155' }]}>{text}</Text>;
     }
 
     const regex = new RegExp(`(${patterns.join('|')})`, 'g');
     const parts = text.split(regex);
 
     return (
-      <Text style={styles.paragraphText}>
+      <Text style={[styles.paragraphText, { color: isDark ? '#D1D5DB' : '#334155' }]}>
         {parts.map((part, index) => {
           const matchedRef = citationMap.get(part);
           if (matchedRef) {
             return (
               <Text
                 key={index}
-                style={styles.inlineCitationLink}
+                style={[styles.inlineCitationLink, { color: isDark ? '#34D399' : colors.accentBlue }]}
                 onPress={() => handleOpenReferenceInApp(matchedRef)}
               >
                 {part}
               </Text>
             );
           }
-          return <Text key={index}>{part}</Text>;
+          return <Text key={index} style={{ color: isDark ? '#D1D5DB' : '#334155' }}>{part}</Text>;
         })}
       </Text>
     );
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Top Header (Matching Screenshot 2) */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
         <TouchableOpacity
           onPress={onBack ? onBack : () => router.back()}
           style={styles.headerIconButton}
@@ -182,17 +184,17 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
           <ArrowLeft size={22} color={colors.textPrimary} />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Research Article</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Research Article</Text>
 
         <View style={styles.headerActions}>
           {isAuthor && (
             <TouchableOpacity
               onPress={() => setIsEditModalOpen(true)}
-              style={styles.headerEditBtn}
+              style={[styles.headerEditBtn, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}
               activeOpacity={0.8}
             >
-              <Edit3 size={13} color="#1B4D3E" />
-              <Text style={styles.headerEditBtnText}>Edit</Text>
+              <Edit3 size={13} color={isDark ? '#34D399' : '#1B4D3E'} />
+              <Text style={[styles.headerEditBtnText, { color: isDark ? '#34D399' : '#1B4D3E' }]}>Edit</Text>
             </TouchableOpacity>
           )}
 
@@ -213,20 +215,21 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
 
       {/* Reader View Mode Switcher (Matching Screenshot 2) */}
       {(Boolean(post.paper?.openAccessUrl) || Boolean(article.references?.find((r) => r.openAccessPdfUrl))) && (
-        <View style={styles.tabSwitcher}>
+        <View style={[styles.tabSwitcher, { backgroundColor: colors.backgroundSecondary }]}>
           <TouchableOpacity
-            style={[styles.tabButton, viewMode === 'article' && styles.tabButtonActive]}
+            style={[styles.tabButton, viewMode === 'article' && [styles.tabButtonActive, { backgroundColor: isDark ? '#1F2636' : '#0F172A' }]]}
             onPress={() => setViewMode('article')}
           >
             <BookOpen
               size={15}
-              color={viewMode === 'article' ? colors.white : colors.textSecondary}
+              color={viewMode === 'article' ? (isDark ? '#34D399' : colors.white) : colors.textSecondary}
               style={{ marginRight: 6 }}
             />
             <Text
               style={[
                 styles.tabButtonText,
-                viewMode === 'article' && styles.tabButtonTextActive,
+                { color: colors.textSecondary },
+                viewMode === 'article' && [styles.tabButtonTextActive, { color: isDark ? '#34D399' : '#FFFFFF' }],
               ]}
             >
               Article View
@@ -234,7 +237,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabButton, viewMode === 'pdf' && styles.tabButtonActive]}
+            style={[styles.tabButton, viewMode === 'pdf' && [styles.tabButtonActive, { backgroundColor: isDark ? '#1F2636' : '#0F172A' }]]}
             onPress={() => {
               const primaryPdfRef = post.paper?.openAccessUrl
                 ? { paperId: post.paper.id, doi: post.paper.doi, title: post.paper.title, openAccessPdfUrl: post.paper.openAccessUrl }
@@ -246,13 +249,14 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
           >
             <FileText
               size={15}
-              color={viewMode === 'pdf' ? colors.white : colors.textSecondary}
+              color={viewMode === 'pdf' ? (isDark ? '#34D399' : colors.white) : colors.textSecondary}
               style={{ marginRight: 6 }}
             />
             <Text
               style={[
                 styles.tabButtonText,
-                viewMode === 'pdf' && styles.tabButtonTextActive,
+                { color: colors.textSecondary },
+                viewMode === 'pdf' && [styles.tabButtonTextActive, { color: isDark ? '#34D399' : '#FFFFFF' }],
               ]}
             >
               Original PDF
@@ -263,27 +267,27 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
 
       {/* Main Research Article Document */}
       <ScrollView
-        style={styles.scrollContainer}
+        style={[styles.scrollContainer, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
         {/* Article Headline (Matching Screenshot 2) */}
-        <Text style={styles.articleTitle}>{article.title}</Text>
+        <Text style={[styles.articleTitle, { color: colors.textPrimary }]}>{article.title}</Text>
 
         {/* Authors Byline */}
-        <Text style={styles.authorsByline}>
+        <Text style={[styles.authorsByline, { color: colors.textSecondary }]}>
           By {article.authors.join(', ')}
         </Text>
 
         {/* DOI / Publication Metadata */}
         <View style={styles.metaRow}>
           {article.doi ? (
-            <Text style={styles.doiText}>DOI: {article.doi}</Text>
+            <Text style={[styles.doiText, { color: colors.textMuted }]}>DOI: {article.doi}</Text>
           ) : (
-            <Text style={styles.doiText}>BooffIn Academic Preprint</Text>
+            <Text style={[styles.doiText, { color: colors.textMuted }]}>BooffIn Academic Preprint</Text>
           )}
           {article.readingTimeMinutes && (
-            <Text style={styles.readingTimeText}>
+            <Text style={[styles.readingTimeText, { color: colors.textMuted }]}>
               • {article.readingTimeMinutes} min read
             </Text>
           )}
@@ -291,12 +295,12 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
 
         {/* Abstract & Key Findings Box (Matching Screenshot 2) */}
         {article.abstract ? (
-          <View style={styles.abstractCard}>
+          <View style={[styles.abstractCard, { backgroundColor: isDark ? '#161B26' : '#F8FAFC', borderLeftColor: isDark ? '#10B981' : '#0F172A' }]}>
             <View style={styles.abstractHeaderRow}>
-              <View style={styles.abstractBullet} />
-              <Text style={styles.abstractLabel}>ABSTRACT & KEY FINDINGS</Text>
+              <View style={[styles.abstractBullet, { backgroundColor: isDark ? '#10B981' : '#0F172A' }]} />
+              <Text style={[styles.abstractLabel, { color: isDark ? '#34D399' : '#0F172A' }]}>ABSTRACT & KEY FINDINGS</Text>
             </View>
-            <Text style={styles.abstractBodyText}>{article.abstract}</Text>
+            <Text style={[styles.abstractBodyText, { color: isDark ? '#E5E7EB' : '#1E293B' }]}>{article.abstract}</Text>
           </View>
         ) : null}
 
@@ -305,7 +309,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
           article.sections.map((section) => (
             <View key={section.id} style={styles.sectionBlock}>
               {section.heading ? (
-                <Text style={styles.sectionHeading}>{section.heading}</Text>
+                <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>{section.heading}</Text>
               ) : null}
 
               {/* Section Paragraph Text with Clickable Citations */}
@@ -315,17 +319,17 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
               {section.images && section.images.length > 0 && (
                 <View style={styles.figuresContainer}>
                   {section.images.map((img) => (
-                    <View key={img.id} style={styles.figureCard}>
+                    <View key={img.id} style={[styles.figureCard, { backgroundColor: isDark ? '#161B26' : '#F8FAFC', borderColor: colors.borderLight }]}>
                       <Image
                         source={{ uri: img.uri }}
                         style={styles.figureImage}
                         contentFit="contain"
                       />
                       {img.caption ? (
-                        <View style={styles.captionContainer}>
-                          <Text style={styles.captionText}>
+                        <View style={[styles.captionContainer, { backgroundColor: colors.cardBackground, borderTopColor: colors.borderLight }]}>
+                          <Text style={[styles.captionText, { color: colors.textSecondary }]}>
                             {img.figureNumber ? (
-                              <Text style={styles.figureNumberBold}>
+                              <Text style={[styles.figureNumberBold, { color: colors.textPrimary }]}>
                                 Figure {img.figureNumber}:{' '}
                               </Text>
                             ) : null}
@@ -342,25 +346,25 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
 
         {/* References Section (Auto-generated in APA Style) */}
         {article.references && article.references.length > 0 && (
-          <View style={styles.referencesCard}>
+          <View style={[styles.referencesCard, { borderTopColor: colors.borderLight }]}>
             <View style={styles.referencesHeaderRow}>
-              <Text style={styles.referencesTitle}>References</Text>
+              <Text style={[styles.referencesTitle, { color: colors.textPrimary }]}>References</Text>
               <Text style={styles.referencesSubtitle}>APA 7th Edition</Text>
             </View>
 
             {article.references.map((ref, idx) => (
               <TouchableOpacity
                 key={ref.id}
-                style={styles.referenceItem}
+                style={[styles.referenceItem, { borderBottomColor: colors.borderLight }]}
                 onPress={() => handleOpenReferenceInApp(ref, true)}
                 activeOpacity={0.7}
               >
-                <View style={styles.referenceIndexCircle}>
-                  <Text style={styles.referenceIndexText}>{idx + 1}</Text>
+                <View style={[styles.referenceIndexCircle, { backgroundColor: colors.backgroundSecondary }]}>
+                  <Text style={[styles.referenceIndexText, { color: colors.textSecondary }]}>{idx + 1}</Text>
                 </View>
 
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.referenceCitationText}>
+                  <Text style={[styles.referenceCitationText, { color: colors.textPrimary }]}>
                     {ref.apaFullCitation}
                   </Text>
                   <View style={styles.openPdfHintRow}>
@@ -379,7 +383,7 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
         {/* DISCUSSION & PEER REVIEW SECTION                                     */}
         {/* ==================================================================== */}
         <View style={styles.discussionSectionContainer}>
-          <View style={styles.discussionSectionDivider} />
+          <View style={[styles.discussionSectionDivider, { backgroundColor: colors.borderLight }]} />
 
           {/* Section Header */}
           <View style={styles.discussionHeader}>
@@ -387,14 +391,14 @@ export const ResearchArticleView: React.FC<ResearchArticleViewProps> = ({
               <View style={styles.discussionTitleCol}>
                 <View style={styles.discussionTitleRow}>
                   <DiscussionIcon size={20} color={colors.textPrimary} />
-                  <Text style={styles.discussionTitleText}>Discussion & Peer Review</Text>
-                  <View style={styles.discussionCountBadge}>
-                    <Text style={styles.discussionCountBadgeText}>
+                  <Text style={[styles.discussionTitleText, { color: colors.textPrimary }]}>Discussion & Peer Review</Text>
+                  <View style={[styles.discussionCountBadge, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+                    <Text style={[styles.discussionCountBadgeText, { color: colors.textSecondary }]}>
                       {totalDiscussionCount ?? (comments?.length || 0)}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.discussionSubtitleText}>
+                <Text style={[styles.discussionSubtitleText, { color: colors.textSecondary }]}>
                   Constructive scientific inquiry, questions & methodology review
                 </Text>
               </View>

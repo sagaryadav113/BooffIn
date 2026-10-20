@@ -217,13 +217,13 @@ const AnimatedTypingIndicator: React.FC<{ name: string; count?: number }> = ({ n
   }, [dot1, dot2, dot3]);
 
   return (
-    <View style={styles.typingIndicatorBanner}>
-      <View style={styles.typingDotsWrap}>
-        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot1 }] }]} />
-        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot2 }] }]} />
-        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot3 }] }]} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 7, gap: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#94A3B8' }, { transform: [{ translateY: dot1 }] }]} />
+        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#94A3B8' }, { transform: [{ translateY: dot2 }] }]} />
+        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#94A3B8' }, { transform: [{ translateY: dot3 }] }]} />
       </View>
-      <Text style={styles.typingIndicatorText} numberOfLines={1}>
+      <Text style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic' }} numberOfLines={1}>
         <Text style={{ fontWeight: '700' }}>{name}</Text> {count > 1 ? 'are typing...' : 'is typing...'}
       </Text>
     </View>
@@ -3390,28 +3390,28 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         onRequestClose={() => setEditingMessage(null)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Message</Text>
+              <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Edit Message</Text>
               <TouchableOpacity onPress={() => setEditingMessage(null)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
             <TextInput
               value={editInputText}
               onChangeText={setEditInputText}
               placeholder="Edit your message..."
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { height: 90, textAlignVertical: 'top', paddingTop: 10 }]}
+              placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+              style={[styles.doiInput, { height: 90, textAlignVertical: 'top', paddingTop: 10 }, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636', color: '#F9FAFB' }]}
               multiline
               autoFocus
             />
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
                 onPress={() => setEditingMessage(null)}
-                style={styles.cancelModalBtn}
+                style={[styles.cancelModalBtn, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
               >
-                <Text style={styles.cancelModalBtnText}>Cancel</Text>
+                <Text style={[styles.cancelModalBtnText, isDark && { color: '#94A3B8' }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSaveEdit}
@@ -3437,19 +3437,19 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         onRequestClose={() => setForwardingMessage(null)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Forward to Workspace</Text>
+              <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Forward to Workspace</Text>
               <TouchableOpacity onPress={() => setForwardingMessage(null)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
             <TextInput
               value={forwardSearch}
               onChangeText={setForwardSearch}
               placeholder="Search chat or workspace..."
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 12 }]}
+              placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+              style={[styles.doiInput, { marginBottom: 12 }, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636', color: '#F9FAFB' }]}
             />
             <ScrollView style={{ maxHeight: 220 }}>
               {[...innerCircles, ...communities, ...dms]
@@ -3460,19 +3460,19 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     key={ws.id}
                     onPress={() => handleSendForward(ws.id)}
                     disabled={forwardingTargetId === ws.id}
-                    style={styles.forwardWsRow}
+                    style={[styles.forwardWsRow, isDark && { borderBottomColor: '#1F2636' }]}
                   >
                     <Avatar uri={ws.avatar_url || undefined} name={ws.name || 'Chat'} size="sm" />
                     <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={styles.forwardWsName}>{ws.name || 'Chat'}</Text>
-                      <Text style={styles.forwardWsType}>
+                      <Text style={[styles.forwardWsName, isDark && { color: '#F9FAFB' }]}>{ws.name || 'Chat'}</Text>
+                      <Text style={[styles.forwardWsType, isDark && { color: '#94A3B8' }]}>
                         {ws.type === 'inner_circle' ? 'Inner Circle Pod' : ws.type === 'community' ? 'Community' : 'Direct Message'}
                       </Text>
                     </View>
                     {forwardingTargetId === ws.id ? (
-                      <ActivityIndicator size="small" color="#164E3F" />
+                      <ActivityIndicator size="small" color={isDark ? '#34D399' : '#164E3F'} />
                     ) : (
-                      <Send size={15} color="#164E3F" />
+                      <Send size={15} color={isDark ? '#34D399' : '#164E3F'} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -3487,8 +3487,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           {/* Top Action & Collapse Toggle Bar */}
           <View style={styles.tabActionBar}>
             <View style={{ flex: 1, minWidth: 160, marginRight: 8 }}>
-              <Text style={styles.tabActionTitle}>Calendar & Milestones</Text>
-              <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+              <Text style={[styles.tabActionTitle, isDark && { color: '#F9FAFB' }]}>Calendar & Milestones</Text>
+              <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B', marginTop: 2 }}>
                 Schedule group meetings, project reviews, or milestones.
               </Text>
             </View>
@@ -3496,14 +3496,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setIsCalendarCollapsed(!isCalendarCollapsed)}
-                style={styles.calendarTogglePill}
+                style={[styles.calendarTogglePill, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
               >
                 {isCalendarCollapsed ? (
-                  <ChevronDown size={14} color="#164E3F" />
+                  <ChevronDown size={14} color={isDark ? '#34D399' : '#164E3F'} />
                 ) : (
-                  <ChevronUp size={14} color="#164E3F" />
+                  <ChevronUp size={14} color={isDark ? '#34D399' : '#164E3F'} />
                 )}
-                <Text style={styles.calendarTogglePillText} numberOfLines={1}>
+                <Text style={[styles.calendarTogglePillText, isDark && { color: '#94A3B8' }]} numberOfLines={1}>
                   {isCalendarCollapsed ? 'Expand' : 'Collapse'}
                 </Text>
               </TouchableOpacity>
@@ -3520,29 +3520,29 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
           {/* Collapsible Month Calendar Grid */}
           {!isCalendarCollapsed ? (
-            <View style={styles.calendarCard}>
+            <View style={[styles.calendarCard, isDark && { backgroundColor: '#111622', borderColor: '#1F2636' }]}>
               {/* Month Navigation Row */}
-              <View style={styles.calendarMonthHeader}>
+              <View style={[styles.calendarMonthHeader, isDark && { borderBottomColor: '#1F2636' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <TouchableOpacity
                     onPress={handlePrevMonth}
-                    style={styles.calendarNavBtn}
+                    style={[styles.calendarNavBtn, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <ChevronLeft size={16} color="#0F172A" />
+                    <ChevronLeft size={16} color={isDark ? '#F9FAFB' : '#0F172A'} />
                   </TouchableOpacity>
-                  <Text style={styles.calendarMonthTitle}>{calendarMonthTitle}</Text>
+                  <Text style={[styles.calendarMonthTitle, isDark && { color: '#F9FAFB' }]}>{calendarMonthTitle}</Text>
                   <TouchableOpacity
                     onPress={handleNextMonth}
-                    style={styles.calendarNavBtn}
+                    style={[styles.calendarNavBtn, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <ChevronRight size={16} color="#0F172A" />
+                    <ChevronRight size={16} color={isDark ? '#F9FAFB' : '#0F172A'} />
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity onPress={handleGoToday} style={styles.todayBtn}>
-                  <Text style={styles.todayBtnText}>Today</Text>
+                <TouchableOpacity onPress={handleGoToday} style={[styles.todayBtn, isDark && { backgroundColor: '#064E3B', borderColor: '#059669' }]}>
+                  <Text style={[styles.todayBtnText, isDark && { color: '#34D399' }]}>Today</Text>
                 </TouchableOpacity>
               </View>
 
@@ -3550,7 +3550,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               <View style={styles.calendarWeekRow}>
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
                   <View key={d} style={styles.calendarWeekHeaderCell}>
-                    <Text style={styles.calendarWeekHeaderText}>{d}</Text>
+                    <Text style={[styles.calendarWeekHeaderText, isDark && { color: '#94A3B8' }]}>{d}</Text>
                   </View>
                 ))}
               </View>
@@ -3575,13 +3575,14 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         style={[
                           styles.calendarDayCell,
                           cell.isToday && styles.calendarDayCellToday,
-                          cell.isSelected && styles.calendarDayCellSelected,
+                          cell.isSelected && (isDark ? { backgroundColor: '#10B981' } : styles.calendarDayCellSelected),
                         ]}
                       >
                         <Text
                           style={[
                             styles.calendarDayText,
-                            cell.isToday && styles.calendarDayTextToday,
+                            isDark && { color: '#E2E8F0' },
+                            cell.isToday && (isDark ? { color: '#34D399' } : styles.calendarDayTextToday),
                             cell.isSelected && styles.calendarDayTextSelected,
                           ]}
                         >
@@ -3611,17 +3612,17 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setIsCalendarCollapsed(false)}
-              style={styles.calendarCollapsedBanner}
+              style={[styles.calendarCollapsedBanner, isDark && { backgroundColor: '#064E3B', borderColor: '#059669' }]}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, marginRight: 8 }}>
-                <Calendar size={16} color="#166534" />
-                <Text style={styles.calendarCollapsedText} numberOfLines={1} ellipsizeMode="tail">
+                <Calendar size={16} color={isDark ? '#34D399' : '#166534'} />
+                <Text style={[styles.calendarCollapsedText, isDark && { color: '#A7F3D0' }]} numberOfLines={1} ellipsizeMode="tail">
                   {calendarMonthTitle} • Selected: {formattedSelectedDate} • {events.length} total event{events.length === 1 ? '' : 's'}
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#166534' }}>Expand</Text>
-                <ChevronDown size={14} color="#166534" />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isDark ? '#34D399' : '#166534' }}>Expand</Text>
+                <ChevronDown size={14} color={isDark ? '#34D399' : '#166534'} />
               </View>
             </TouchableOpacity>
           )}
@@ -3629,7 +3630,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           {/* Agenda & Day Events Section */}
           <View style={styles.agendaHeaderRow}>
             <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 150, marginRight: 8 }}>
-              <Text style={styles.agendaTitle} numberOfLines={1} ellipsizeMode="tail">
+              <Text style={[styles.agendaTitle, isDark && { color: '#F9FAFB' }]} numberOfLines={1} ellipsizeMode="tail">
                 {calendarViewMode === 'selected'
                   ? `Events for ${formattedSelectedDate}`
                   : 'All Scheduled Events'}
@@ -3642,13 +3643,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   onPress={() => setCalendarViewMode('selected')}
                   style={[
                     styles.agendaFilterPill,
-                    calendarViewMode === 'selected' && styles.agendaFilterPillActive,
+                    isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' },
+                    calendarViewMode === 'selected' && (isDark ? { backgroundColor: '#10B981', borderColor: '#10B981' } : styles.agendaFilterPillActive),
                   ]}
                 >
                   <Text
                     style={[
                       styles.agendaFilterPillText,
-                      calendarViewMode === 'selected' && styles.agendaFilterPillTextActive,
+                      isDark && { color: '#94A3B8' },
+                      calendarViewMode === 'selected' && (isDark ? { color: '#FFFFFF' } : styles.agendaFilterPillTextActive),
                     ]}
                     numberOfLines={1}
                   >
@@ -3660,13 +3663,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   onPress={() => setCalendarViewMode('all')}
                   style={[
                     styles.agendaFilterPill,
-                    calendarViewMode === 'all' && styles.agendaFilterPillActive,
+                    isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' },
+                    calendarViewMode === 'all' && (isDark ? { backgroundColor: '#10B981', borderColor: '#10B981' } : styles.agendaFilterPillActive),
                   ]}
                 >
                   <Text
                     style={[
                       styles.agendaFilterPillText,
-                      calendarViewMode === 'all' && styles.agendaFilterPillTextActive,
+                      isDark && { color: '#94A3B8' },
+                      calendarViewMode === 'all' && (isDark ? { color: '#FFFFFF' } : styles.agendaFilterPillTextActive),
                     ]}
                     numberOfLines={1}
                   >
@@ -3679,9 +3684,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
           {/* Events List or Empty State */}
           {displayedEvents.length === 0 ? (
-            <View style={styles.emptyDayBox}>
-              <Calendar size={36} color="#94A3B8" />
-              <Text style={styles.emptyDayText}>
+            <View style={[styles.emptyDayBox, isDark && { backgroundColor: '#111622', borderColor: '#1F2636' }]}>
+              <Calendar size={36} color={isDark ? '#64748B' : '#94A3B8'} />
+              <Text style={[styles.emptyDayText, isDark && { color: '#94A3B8' }]}>
                 {calendarViewMode === 'selected'
                   ? `No events scheduled for ${formattedSelectedDate}`
                   : 'No scheduled events found in this pod'}
@@ -3709,27 +3714,27 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               );
 
               return (
-                <View key={ev.id} style={styles.eventCardEnhanced}>
+                <View key={ev.id} style={[styles.eventCardEnhanced, isDark && { backgroundColor: '#111622', borderColor: '#1F2636' }]}>
                   <View style={styles.eventCardHeader}>
                     <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text style={styles.eventTitle}>{ev.title}</Text>
+                      <Text style={[styles.eventTitle, isDark && { color: '#F9FAFB' }]}>{ev.title}</Text>
                     </View>
 
                     <View style={styles.eventActionsRow}>
                       {canDelete && (
                         <TouchableOpacity
                           onPress={() => openEditModalForEvent(ev)}
-                          style={styles.eventEditBtn}
+                          style={[styles.eventEditBtn, isDark && { backgroundColor: '#161B26' }]}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                          <Pencil size={15} color="#164E3F" />
+                          <Pencil size={15} color={isDark ? '#34D399' : '#164E3F'} />
                         </TouchableOpacity>
                       )}
 
                       {canDelete && (
                         <TouchableOpacity
                           onPress={() => handleDeleteEvent(ev.id, ev.title)}
-                          style={styles.eventDeleteBtn}
+                          style={[styles.eventDeleteBtn, isDark && { backgroundColor: '#2D1515' }]}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
                           <Trash2 size={16} color="#DC2626" />
@@ -3739,21 +3744,21 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                   </View>
 
                   <View style={styles.eventTimeRow}>
-                    <Clock size={12} color="#64748B" />
-                    <Text style={styles.eventTimeText}>
+                    <Clock size={12} color={isDark ? '#94A3B8' : '#64748B'} />
+                    <Text style={[styles.eventTimeText, isDark && { color: '#94A3B8' }]}>
                       {dateFormatted} at {timeFormatted}
                     </Text>
                   </View>
 
                   {ev.description ? (
-                    <Text style={styles.eventDesc}>{ev.description}</Text>
+                    <Text style={[styles.eventDesc, isDark && { color: '#CBD5E1' }]}>{ev.description}</Text>
                   ) : null}
 
                   {/* Attendees from Group */}
                   <View style={styles.eventAttendeesSection}>
                     <View style={styles.eventAttendeesTitleRow}>
-                      <Users size={12} color="#059669" />
-                      <Text style={styles.eventAttendeesTitle}>
+                      <Users size={12} color={isDark ? '#34D399' : '#059669'} />
+                      <Text style={[styles.eventAttendeesTitle, isDark && { color: '#94A3B8' }]}>
                         {taggedAttendees.length > 0
                           ? `Invited from Group (${taggedAttendees.length}):`
                           : 'Invited from Group: All pod members'}
@@ -3764,9 +3769,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         {taggedAttendees.map((att) => {
                           const attName = att.profile?.fullName || att.profile?.handle || 'Member';
                           return (
-                            <View key={att.user_id} style={styles.attendeeChip}>
+                            <View key={att.user_id} style={[styles.attendeeChip, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}>
                               <Avatar url={att.profile?.avatarUrl || undefined} name={attName} size={18} />
-                              <Text style={styles.attendeeChipText}>{attName}</Text>
+                              <Text style={[styles.attendeeChipText, isDark && { color: '#E2E8F0' }]}>{attName}</Text>
                             </View>
                           );
                         })}
@@ -3782,11 +3787,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         setActiveTab('manager');
                         loadTasks(workspace.id);
                       }}
-                      style={styles.eventViewManagerBtn}
+                      style={[styles.eventViewManagerBtn, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
                     >
-                      <Columns3 size={11} color="#059669" />
-                      <Text style={styles.eventViewManagerBtnText}>View in BooffIn manager</Text>
-                      <ChevronRight size={11} color="#059669" />
+                      <Columns3 size={11} color={isDark ? '#34D399' : '#059669'} />
+                      <Text style={[styles.eventViewManagerBtnText, isDark && { color: '#34D399' }]}>View in BooffIn manager</Text>
+                      <ChevronRight size={11} color={isDark ? '#34D399' : '#059669'} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -3816,16 +3821,16 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           <View style={styles.vaultHeaderRow}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <VaultIcon size={22} color="#059669" />
-                <Text style={styles.tabActionTitle}>Pod Vault</Text>
+                <VaultIcon size={22} color={isDark ? '#34D399' : '#059669'} />
+                <Text style={[styles.tabActionTitle, isDark && { color: '#F9FAFB' }]}>Pod Vault</Text>
               </View>
-              <Text style={styles.vaultSubtitle}>
+              <Text style={[styles.vaultSubtitle, isDark && { color: '#94A3B8' }]}>
                 Confidential discussions, research papers, and messages saved by your pod members.
               </Text>
             </View>
             {savedItems.length > 0 && (
-              <View style={styles.vaultCountBadge}>
-                <Text style={styles.vaultCountBadgeText}>
+              <View style={[styles.vaultCountBadge, isDark && { backgroundColor: '#064E3B', borderColor: '#059669' }]}>
+                <Text style={[styles.vaultCountBadgeText, isDark && { color: '#34D399' }]}>
                   {savedItems.length} {savedItems.length === 1 ? 'item' : 'items'}
                 </Text>
               </View>
@@ -3834,11 +3839,11 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
           {savedItems.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <View style={styles.vaultEmptyIconCircle}>
-                <VaultIcon size={38} color="#059669" />
+              <View style={[styles.vaultEmptyIconCircle, isDark && { backgroundColor: '#064E3B' }]}>
+                <VaultIcon size={38} color={isDark ? '#34D399' : '#059669'} />
               </View>
-              <Text style={styles.emptyTitle}>Vault is Empty</Text>
-              <Text style={styles.emptySub}>
+              <Text style={[styles.emptyTitle, isDark && { color: '#F9FAFB' }]}>Vault is Empty</Text>
+              <Text style={[styles.emptySub, isDark && { color: '#94A3B8' }]}>
                 When you find an important message or paper in discussions, tap &quot;Save to Vault&quot; from the message menu to keep it here.
               </Text>
             </View>
@@ -3863,31 +3868,31 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 const doiMeta = meta.doi_metadata;
 
                 return (
-                  <View key={item.id} style={styles.vaultItemCard}>
+                  <View key={item.id} style={[styles.vaultItemCard, isDark && { backgroundColor: '#111622', borderColor: '#1F2636' }]}>
                     {/* Top row: Sender info + item type + delete button */}
                     <View style={styles.vaultCardTopRow}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                         <Avatar url={senderAvatar || undefined} name={senderName} size={32} />
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <Text style={styles.vaultSenderName} numberOfLines={1}>
+                            <Text style={[styles.vaultSenderName, isDark && { color: '#F9FAFB' }]} numberOfLines={1}>
                               {senderName}
                             </Text>
                             {senderHandle ? (
-                              <Text style={styles.vaultSenderHandle} numberOfLines={1}>
+                              <Text style={[styles.vaultSenderHandle, isDark && { color: '#64748B' }]} numberOfLines={1}>
                                 {senderHandle}
                               </Text>
                             ) : null}
                           </View>
                           {formattedDate ? (
-                            <Text style={styles.vaultItemDate}>{formattedDate}</Text>
+                            <Text style={[styles.vaultItemDate, isDark && { color: '#64748B' }]}>{formattedDate}</Text>
                           ) : null}
                         </View>
                       </View>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={styles.vaultTypeBadge}>
-                          <Text style={styles.vaultTypeBadgeText}>
+                        <View style={[styles.vaultTypeBadge, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}>
+                          <Text style={[styles.vaultTypeBadgeText, isDark && { color: '#34D399' }]}>
                             {item.item_type === 'doi_paper' || doiMeta ? 'DOI Paper' : 'Message'}
                           </Text>
                         </View>
@@ -3901,7 +3906,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                             setVaultToast({ message: 'Removed from Vault' });
                             setTimeout(() => setVaultToast(null), 2500);
                           }}
-                          style={styles.vaultDeleteBtn}
+                          style={[styles.vaultDeleteBtn, isDark && { backgroundColor: '#2D1515' }]}
                           accessibilityLabel="Remove from Vault"
                         >
                           <Trash2 size={16} color="#DC2626" />
@@ -3913,53 +3918,53 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     <TouchableOpacity
                       activeOpacity={0.7}
                       onPress={() => handleOpenSavedMessageInDiscussion(item)}
-                      style={styles.vaultMessageBody}
+                      style={[styles.vaultMessageBody, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
                     >
-                      <Text style={styles.vaultMessageText} selectable={false}>
+                      <Text style={[styles.vaultMessageText, isDark && { color: '#E2E8F0' }]} selectable={false}>
                         {messageText}
                       </Text>
                       <View style={styles.vaultTapHintRow}>
-                        <MessageSquare size={11} color="#059669" />
-                        <Text style={styles.vaultTapHintText}>Tap to open in discussion</Text>
+                        <MessageSquare size={11} color={isDark ? '#34D399' : '#059669'} />
+                        <Text style={[styles.vaultTapHintText, isDark && { color: '#34D399' }]}>Tap to open in discussion</Text>
                       </View>
                     </TouchableOpacity>
 
                     {/* Optional: DOI Paper Banner if present */}
                     {doiMeta && (
-                      <View style={styles.vaultDoiSnippet}>
+                      <View style={[styles.vaultDoiSnippet, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                          <BookOpen size={14} color="#059669" />
-                          <Text style={styles.vaultDoiSnippetLabel}>Research Paper Reference</Text>
+                          <BookOpen size={14} color={isDark ? '#34D399' : '#059669'} />
+                          <Text style={[styles.vaultDoiSnippetLabel, isDark && { color: '#34D399' }]}>Research Paper Reference</Text>
                         </View>
-                        <Text style={styles.vaultDoiSnippetTitle} numberOfLines={2}>
+                        <Text style={[styles.vaultDoiSnippetTitle, isDark && { color: '#F9FAFB' }]} numberOfLines={2}>
                           {doiMeta.title || 'Referenced Research Paper'}
                         </Text>
                         {doiMeta.doi ? (
-                          <Text style={styles.vaultDoiSnippetCode}>DOI: {doiMeta.doi}</Text>
+                          <Text style={[styles.vaultDoiSnippetCode, isDark && { color: '#34D399' }]}>DOI: {doiMeta.doi}</Text>
                         ) : null}
                         {doiMeta.url && (
                           <TouchableOpacity
                             onPress={() => Linking.openURL(doiMeta.url)}
                             style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}
                           >
-                            <Text style={{ fontSize: 12, color: '#059669', fontWeight: '600' }}>Read Paper</Text>
-                            <ExternalLink size={12} color="#059669" />
+                            <Text style={{ fontSize: 12, color: isDark ? '#34D399' : '#059669', fontWeight: '600' }}>Read Paper</Text>
+                            <ExternalLink size={12} color={isDark ? '#34D399' : '#059669'} />
                           </TouchableOpacity>
                         )}
                       </View>
                     )}
 
                     {/* Bottom: Action footer */}
-                    <View style={styles.vaultCardFooter}>
+                    <View style={[styles.vaultCardFooter, isDark && { borderTopColor: '#1F2636' }]}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <TouchableOpacity
                           activeOpacity={0.7}
                           onPress={() => handleOpenSavedMessageInDiscussion(item)}
-                          style={styles.vaultOpenDiscussionBtn}
+                          style={[styles.vaultOpenDiscussionBtn, isDark && { backgroundColor: '#064E3B', borderColor: '#059669' }]}
                         >
-                          <MessageSquare size={13} color="#164E3F" />
-                          <Text style={styles.vaultOpenDiscussionBtnText}>Open in Discussion</Text>
-                          <ChevronRight size={13} color="#164E3F" />
+                          <MessageSquare size={13} color={isDark ? '#34D399' : '#164E3F'} />
+                          <Text style={[styles.vaultOpenDiscussionBtnText, isDark && { color: '#34D399' }]}>Open in Discussion</Text>
+                          <ChevronRight size={13} color={isDark ? '#34D399' : '#164E3F'} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -3972,25 +3977,25 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                               setTimeout(() => setCopiedVaultItemId(null), 2000);
                             } catch {}
                           }}
-                          style={styles.vaultCopyBtn}
+                          style={[styles.vaultCopyBtn, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
                         >
                           {isCopied ? (
                             <>
-                              <Check size={13} color="#059669" />
-                              <Text style={styles.vaultCopyBtnTextCopied}>Copied</Text>
+                              <Check size={13} color={isDark ? '#34D399' : '#059669'} />
+                              <Text style={[styles.vaultCopyBtnTextCopied, isDark && { color: '#34D399' }]}>Copied</Text>
                             </>
                           ) : (
                             <>
-                              <Copy size={13} color="#475569" />
-                              <Text style={styles.vaultCopyBtnText}>Copy Text</Text>
+                              <Copy size={13} color={isDark ? '#94A3B8' : '#475569'} />
+                              <Text style={[styles.vaultCopyBtnText, isDark && { color: '#94A3B8' }]}>Copy Text</Text>
                             </>
                           )}
                         </TouchableOpacity>
                       </View>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Lock size={12} color="#94A3B8" />
-                        <Text style={styles.vaultEncryptedLabel}>Confidential Pod Item</Text>
+                        <Lock size={12} color={isDark ? '#64748B' : '#94A3B8'} />
+                        <Text style={[styles.vaultEncryptedLabel, isDark && { color: '#64748B' }]}>Confidential Pod Item</Text>
                       </View>
                     </View>
                   </View>
@@ -4004,21 +4009,21 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       {/* Modal: Share Paper via DOI */}
       <Modal visible={showDoiModal} transparent animationType="fade" onRequestClose={() => setShowDoiModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Share Research Paper</Text>
+              <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Share Research Paper</Text>
               <TouchableOpacity onPress={() => setShowDoiModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalSubtitle}>Enter paper DOI to resolve and attach verified metadata.</Text>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>Enter paper DOI to resolve and attach verified metadata.</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               <TextInput
                 value={doiQuery}
                 onChangeText={setDoiQuery}
                 placeholder="10.1038/s41586-..."
-                placeholderTextColor="#94A3B8"
-                style={styles.doiInput}
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                style={[styles.doiInput, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636', color: '#F9FAFB' }]}
               />
               <TouchableOpacity
                 onPress={handleResolveDoi}
@@ -4050,46 +4055,46 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       {/* Modal: Schedule / Edit Event with Add People from Group */}
       <Modal visible={showEventModal} transparent animationType="fade" onRequestClose={() => { setShowEventModal(false); setEditingEvent(null); }}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxHeight: '92%' }]}>
+          <View style={[styles.modalCard, { maxHeight: '92%' }, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>{editingEvent ? 'Edit Event' : 'Schedule Event'}</Text>
-                <Text style={{ fontSize: 12, color: '#059669', fontWeight: '600', marginTop: 2 }}>
+                <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>{editingEvent ? 'Edit Event' : 'Schedule Event'}</Text>
+                <Text style={{ fontSize: 12, color: isDark ? '#34D399' : '#059669', fontWeight: '600', marginTop: 2 }}>
                   📅 {formattedSelectedDate}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => { setShowEventModal(false); setEditingEvent(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ marginVertical: 8 }}>
               {/* Event Name */}
-              <Text style={styles.modalLabel}>Event Title *</Text>
+              <Text style={[styles.modalLabel, isDark && { color: '#E2E8F0' }]}>Event Title *</Text>
               <TextInput
                 value={eventTitle}
                 onChangeText={setEventTitle}
                 placeholder="e.g. Model Architecture Review, Journal Club"
-                placeholderTextColor="#94A3B8"
-                style={[styles.doiInput, { marginBottom: 12 }]}
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                style={[styles.doiInput, { marginBottom: 12 }, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636', color: '#F9FAFB' }]}
               />
 
               {/* Event Time Section with Interactive Clock Picker */}
               <View style={{ marginBottom: 14 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={styles.modalLabel}>Event Time *</Text>
+                  <Text style={[styles.modalLabel, isDark && { color: '#E2E8F0' }]}>Event Time *</Text>
                   <TouchableOpacity
                     onPress={() => setShowClockPicker(!showClockPicker)}
-                    style={styles.clockTogglePill}
+                    style={[styles.clockTogglePill, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
                   >
-                    <Clock size={13} color="#164E3F" />
-                    <Text style={styles.clockTogglePillText}>
+                    <Clock size={13} color={isDark ? '#34D399' : '#164E3F'} />
+                    <Text style={[styles.clockTogglePillText, isDark && { color: '#34D399' }]}>
                       {showClockPicker ? 'Hide Time' : 'Set Time'}
                     </Text>
                     {showClockPicker ? (
-                      <ChevronUp size={13} color="#164E3F" />
+                      <ChevronUp size={13} color={isDark ? '#34D399' : '#164E3F'} />
                     ) : (
-                      <ChevronDown size={13} color="#164E3F" />
+                      <ChevronDown size={13} color={isDark ? '#34D399' : '#164E3F'} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -4098,26 +4103,26 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => setShowClockPicker(!showClockPicker)}
-                  style={styles.selectedTimeBanner}
+                  style={[styles.selectedTimeBanner, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View style={styles.clockIconCircle}>
-                      <Clock size={16} color="#164E3F" />
+                    <View style={[styles.clockIconCircle, isDark && { backgroundColor: '#064E3B' }]}>
+                      <Clock size={16} color={isDark ? '#34D399' : '#164E3F'} />
                     </View>
                     <View>
-                      <Text style={styles.selectedTimeValue}>
+                      <Text style={[styles.selectedTimeValue, isDark && { color: '#F9FAFB' }]}>
                         {(() => {
                           const parsed = parse24HourToClock(eventTime);
                           return `${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')} ${parsed.period}`;
                         })()}
                       </Text>
-                      <Text style={styles.selectedTimeSub}>
+                      <Text style={[styles.selectedTimeSub, isDark && { color: '#94A3B8' }]}>
                         Tap to {showClockPicker ? 'collapse' : 'open time picker & adjust'}
                       </Text>
                     </View>
                   </View>
-                  <View style={styles.clockBadgePill}>
-                    <Text style={styles.clockBadgePillText}>
+                  <View style={[styles.clockBadgePill, isDark && { backgroundColor: '#064E3B' }]}>
+                    <Text style={[styles.clockBadgePillText, isDark && { color: '#34D399' }]}>
                       {showClockPicker ? 'Active Picker' : 'Change Time'}
                     </Text>
                   </View>
@@ -4133,29 +4138,29 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               </View>
 
               {/* Description & Agenda */}
-              <Text style={styles.modalLabel}>Description & Agenda</Text>
+              <Text style={[styles.modalLabel, isDark && { color: '#E2E8F0' }]}>Description & Agenda</Text>
               <TextInput
                 value={eventDesc}
                 onChangeText={setEventDesc}
                 placeholder="Add meeting agenda, discussion topics, preprint links..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                 multiline
                 numberOfLines={3}
-                style={[styles.doiInput, { height: 72, textAlignVertical: 'top', paddingVertical: 8, marginBottom: 12 }]}
+                style={[styles.doiInput, { height: 72, textAlignVertical: 'top', paddingVertical: 8, marginBottom: 12 }, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636', color: '#F9FAFB' }]}
               />
 
               {/* Add People from Group Section */}
-              <View style={styles.eventModalSection}>
+              <View style={[styles.eventModalSection, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}>
                 <View style={styles.eventModalSectionHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Users size={15} color="#164E3F" />
-                    <Text style={styles.eventModalSectionTitle}>Add People from Group</Text>
+                    <Users size={15} color={isDark ? '#34D399' : '#164E3F'} />
+                    <Text style={[styles.eventModalSectionTitle, isDark && { color: '#F9FAFB' }]}>Add People from Group</Text>
                   </View>
-                  <Text style={styles.eventModalSelectedBadge}>
+                  <Text style={[styles.eventModalSelectedBadge, isDark && { backgroundColor: '#064E3B', color: '#34D399' }]}>
                     {selectedAttendeeIds.length} of {members.length} selected
                   </Text>
                 </View>
-                <Text style={styles.eventModalSectionSub}>
+                <Text style={[styles.eventModalSectionSub, isDark && { color: '#94A3B8' }]}>
                   Select members of this Inner Circle to attend or collaborate
                 </Text>
 
@@ -4164,8 +4169,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                     value={memberFilterQuery}
                     onChangeText={setMemberFilterQuery}
                     placeholder="Search pod members..."
-                    placeholderTextColor="#94A3B8"
-                    style={styles.eventModalSearchInput}
+                    placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                    style={[styles.eventModalSearchInput, isDark && { backgroundColor: '#111622', borderColor: '#1F2636', color: '#F9FAFB' }]}
                   />
                   <TouchableOpacity
                     onPress={() => {
@@ -4175,9 +4180,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                         setSelectedAttendeeIds(members.map((m) => m.user_id));
                       }
                     }}
-                    style={styles.selectAllBtn}
+                    style={[styles.selectAllBtn, isDark && { backgroundColor: '#111622', borderColor: '#1F2636' }]}
                   >
-                    <Text style={styles.selectAllBtnText}>
+                    <Text style={[styles.selectAllBtnText, isDark && { color: '#34D399' }]}>
                       {selectedAttendeeIds.length === members.length ? 'Clear' : 'Select All'}
                     </Text>
                   </TouchableOpacity>
@@ -4185,7 +4190,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
 
                 <ScrollView style={styles.eventModalMemberList} nestedScrollEnabled>
                   {members.length === 0 ? (
-                    <Text style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', paddingVertical: 12 }}>
+                    <Text style={{ fontSize: 12, color: isDark ? '#64748B' : '#94A3B8', textAlign: 'center', paddingVertical: 12 }}>
                       No other pod members found
                     </Text>
                   ) : (
@@ -4216,7 +4221,8 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                             }}
                             style={[
                               styles.eventMemberRow,
-                              isSelected && styles.eventMemberRowSelected,
+                              isDark && { borderBottomColor: '#1F2636' },
+                              isSelected && (isDark ? { backgroundColor: '#064E3B20' } : styles.eventMemberRowSelected),
                             ]}
                           >
                             <Avatar
@@ -4226,7 +4232,7 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                             />
                             <View style={styles.eventMemberInfo}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.eventMemberName} numberOfLines={1}>{name}</Text>
+                                <Text style={[styles.eventMemberName, isDark && { color: '#F9FAFB' }]} numberOfLines={1}>{name}</Text>
                                 {isCurrentUser && (
                                   <View style={styles.youBadge}>
                                     <Text style={styles.youBadgeText}>You</Text>
@@ -4238,9 +4244,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                                   </View>
                                 )}
                               </View>
-                              {handle ? <Text style={styles.eventMemberHandle} numberOfLines={1}>{handle}</Text> : null}
+                              {handle ? <Text style={[styles.eventMemberHandle, isDark && { color: '#64748B' }]} numberOfLines={1}>{handle}</Text> : null}
                             </View>
-                            <View style={[styles.checkboxWrap, isSelected && styles.checkboxWrapActive]}>
+                            <View style={[styles.checkboxWrap, isDark && { borderColor: '#1F2636' }, isSelected && styles.checkboxWrapActive]}>
                               {isSelected ? <Check size={12} color="#FFFFFF" strokeWidth={3} /> : null}
                             </View>
                           </TouchableOpacity>
@@ -4255,9 +4261,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
               <TouchableOpacity
                 onPress={() => { setShowEventModal(false); setEditingEvent(null); }}
-                style={[styles.confirmAttachBtn, { flex: 1, backgroundColor: '#F1F5F9' }]}
+                style={[styles.confirmAttachBtn, { flex: 1, backgroundColor: isDark ? '#161B26' : '#F1F5F9', borderWidth: isDark ? 1 : 0, borderColor: isDark ? '#1F2636' : 'transparent' }]}
               >
-                <Text style={[styles.confirmAttachBtnText, { color: '#475569' }]}>Cancel</Text>
+                <Text style={[styles.confirmAttachBtnText, { color: isDark ? '#94A3B8' : '#475569' }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -4286,13 +4292,13 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         onRequestClose={() => !isDeletingEvent && setEventToDelete(null)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxWidth: 380, padding: 20 }]}>
+          <View style={[styles.modalCard, { maxWidth: 380, padding: 20 }, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={{ alignItems: 'center', marginBottom: 16 }}>
               <View style={styles.deleteEventModalIconCircle}>
                 <Trash2 size={26} color="#DC2626" />
               </View>
-              <Text style={styles.deleteEventModalTitle}>Delete Event</Text>
-              <Text style={styles.deleteEventModalDesc}>
+              <Text style={[styles.deleteEventModalTitle, isDark && { color: '#F9FAFB' }]}>Delete Event</Text>
+              <Text style={[styles.deleteEventModalDesc, isDark && { color: '#94A3B8' }]}>
                 Are you sure you want to delete &quot;{eventToDelete?.title}&quot;? This cannot be undone.
               </Text>
             </View>
@@ -4301,9 +4307,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               <TouchableOpacity
                 disabled={isDeletingEvent}
                 onPress={() => setEventToDelete(null)}
-                style={styles.deleteEventModalCancelBtn}
+                style={[styles.deleteEventModalCancelBtn, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636' }]}
               >
-                <Text style={styles.deleteEventModalCancelText}>Cancel</Text>
+                <Text style={[styles.deleteEventModalCancelText, isDark && { color: '#94A3B8' }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -4325,43 +4331,43 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
       {/* Modal: Invite Researcher */}
       <Modal visible={showInviteModal} transparent animationType="fade" onRequestClose={() => setShowInviteModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Invite Researcher to Pod</Text>
+              <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Invite Researcher to Pod</Text>
               <TouchableOpacity onPress={() => setShowInviteModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>
               Inner Circles are capped at 25 members for confidential E2EE collaboration.
             </Text>
             <TextInput
               value={searchUserQuery}
               onChangeText={handleSearchUsers}
               placeholder="Search by name or username..."
-              placeholderTextColor="#94A3B8"
-              style={[styles.doiInput, { marginBottom: 10 }]}
+              placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+              style={[styles.doiInput, { marginBottom: 10 }, isDark && { backgroundColor: '#161B26', borderColor: '#1F2636', color: '#F9FAFB' }]}
             />
             {isSearchingUsers ? (
-              <ActivityIndicator size="small" color="#164E3F" style={{ marginVertical: 10 }} />
+              <ActivityIndicator size="small" color={isDark ? '#34D399' : '#164E3F'} style={{ marginVertical: 10 }} />
             ) : (
               searchResults.map((user) => (
                 <TouchableOpacity
                   key={user.id}
                   onPress={() => handleInvite(user.id)}
-                  style={styles.searchUserRow}
+                  style={[styles.searchUserRow, isDark && { borderBottomColor: '#1F2636' }]}
                 >
                   <Avatar uri={user.avatarUrl} name={user.fullName || user.handle} size="sm" />
                   <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.searchUserName}>{user.fullName || `@${user.handle}`}</Text>
-                    <Text style={styles.searchUserSub}>{user.academicTitle || user.institution || 'Researcher'}</Text>
+                    <Text style={[styles.searchUserName, isDark && { color: '#F9FAFB' }]}>{user.fullName || `@${user.handle}`}</Text>
+                    <Text style={[styles.searchUserSub, isDark && { color: '#94A3B8' }]}>{user.academicTitle || user.institution || 'Researcher'}</Text>
                   </View>
                   <Text style={styles.invitePill}>Add</Text>
                 </TouchableOpacity>
               ))
             )}
             {inviteStatus && (
-              <Text style={{ fontSize: 12, color: '#164E3F', marginTop: 8, fontWeight: '600' }}>
+              <Text style={{ fontSize: 12, color: isDark ? '#34D399' : '#164E3F', marginTop: 8, fontWeight: '600' }}>
                 {inviteStatus}
               </Text>
             )}
@@ -4474,18 +4480,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
           activeOpacity={1}
           onPress={() => setShowOptionsMenu(false)}
         >
-          <View style={styles.optionsSheet}>
-            <View style={styles.optionsHandleBar} />
-            <Text style={styles.optionsSheetTitle}>{workspace.name || 'Inner Circle Pod'}</Text>
+          <View style={[styles.optionsSheet, isDark && { backgroundColor: '#111622', borderTopWidth: 1, borderTopColor: '#1F2636' }]}>
+            <View style={[styles.optionsHandleBar, isDark && { backgroundColor: '#334155' }]} />
+            <Text style={[styles.optionsSheetTitle, isDark && { color: '#94A3B8' }]}>{workspace.name || 'Inner Circle Pod'}</Text>
 
             {/* 1. Pin Conversation */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleTogglePin}
-              style={styles.optionsItemRow}
+              style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
             >
-              <Pin size={20} color="#164E3F" />
-              <Text style={[styles.optionsItemText, { color: '#0F172A' }]}>
+              <Pin size={20} color={isDark ? '#34D399' : '#164E3F'} />
+              <Text style={[styles.optionsItemText, { color: isDark ? '#34D399' : '#164E3F' }]}>
                 {isPinned ? 'Unpin Conversation' : 'Pin Conversation'}
               </Text>
             </TouchableOpacity>
@@ -4494,10 +4500,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleToggleArchive}
-              style={styles.optionsItemRow}
+              style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
             >
-              <Archive size={20} color="#164E3F" />
-              <Text style={[styles.optionsItemText, { color: '#0F172A' }]}>
+              <Archive size={20} color={isDark ? '#34D399' : '#164E3F'} />
+              <Text style={[styles.optionsItemText, { color: isDark ? '#34D399' : '#164E3F' }]}>
                 {isArchived ? 'Unarchive Chat' : 'Archive Chat'}
               </Text>
             </TouchableOpacity>
@@ -4509,10 +4515,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 setShowOptionsMenu(false);
                 setShowMuteModal(true);
               }}
-              style={styles.optionsItemRow}
+              style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
             >
-              <BellOff size={20} color="#164E3F" />
-              <Text style={[styles.optionsItemText, { color: '#0F172A' }]}>
+              <BellOff size={20} color={isDark ? '#34D399' : '#164E3F'} />
+              <Text style={[styles.optionsItemText, { color: isDark ? '#34D399' : '#164E3F' }]}>
                 {isMuted ? 'Unmute Notifications' : 'Mute Notifications'}
               </Text>
             </TouchableOpacity>
@@ -4524,15 +4530,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 setShowOptionsMenu(false);
                 setShowGalleryModal(true);
               }}
-              style={styles.optionsItemRow}
+              style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
             >
-              <FolderOpen size={20} color="#164E3F" />
-              <Text style={[styles.optionsItemText, { color: '#0F172A' }]}>
+              <FolderOpen size={20} color={isDark ? '#34D399' : '#164E3F'} />
+              <Text style={[styles.optionsItemText, { color: isDark ? '#34D399' : '#164E3F' }]}>
                 View Media, Papers & Links
               </Text>
             </TouchableOpacity>
 
-            <View style={styles.optionsDivider} />
+            <View style={[styles.optionsDivider, isDark && { backgroundColor: '#1F2636' }]} />
 
             {/* 5. Clear Chat History */}
             <TouchableOpacity
@@ -4541,10 +4547,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 setShowOptionsMenu(false);
                 setShowClearHistoryModal(true);
               }}
-              style={styles.optionsItemRow}
+              style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
             >
-              <Trash2 size={20} color="#D97706" />
-              <Text style={[styles.optionsItemText, { color: '#D97706' }]}>
+              <Trash2 size={20} color={isDark ? '#FBBF24' : '#D97706'} />
+              <Text style={[styles.optionsItemText, { color: isDark ? '#FBBF24' : '#D97706' }]}>
                 Clear Chat History
               </Text>
             </TouchableOpacity>
@@ -4556,15 +4562,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 setShowOptionsMenu(false);
                 setShowDeleteChatModal(true);
               }}
-              style={styles.optionsItemRow}
+              style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
             >
-              <Trash size={20} color="#DC2626" />
-              <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+              <Trash size={20} color={isDark ? '#F87171' : '#DC2626'} />
+              <Text style={[styles.optionsItemText, { color: isDark ? '#F87171' : '#DC2626' }]}>
                 Leave Pod / Delete
               </Text>
             </TouchableOpacity>
 
-            <View style={styles.optionsDivider} />
+            <View style={[styles.optionsDivider, isDark && { backgroundColor: '#1F2636' }]} />
 
             {/* 7. Report Pod */}
             <TouchableOpacity
@@ -4573,10 +4579,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 setShowOptionsMenu(false);
                 setShowReportModal(true);
               }}
-              style={styles.optionsItemRow}
+              style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
             >
-              <Flag size={20} color="#64748B" />
-              <Text style={[styles.optionsItemText, { color: '#64748B' }]}>
+              <Flag size={20} color={isDark ? '#94A3B8' : '#64748B'} />
+              <Text style={[styles.optionsItemText, { color: isDark ? '#94A3B8' : '#64748B' }]}>
                 Report Pod
               </Text>
             </TouchableOpacity>
@@ -4589,10 +4595,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 if (Platform.OS === 'web') window.alert('Mute notifications for all pod members enabled.');
                 else Alert.alert('Members Muted', 'Notifications from this pod have been silenced.');
               }}
-              style={styles.optionsItemRow}
+              style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
             >
-              <Ban size={20} color="#DC2626" />
-              <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+              <Ban size={20} color={isDark ? '#F87171' : '#DC2626'} />
+              <Text style={[styles.optionsItemText, { color: isDark ? '#F87171' : '#DC2626' }]}>
                 Mute Pod Members
               </Text>
             </TouchableOpacity>
@@ -4600,9 +4606,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setShowOptionsMenu(false)}
-              style={styles.optionsCancelBtn}
+              style={[styles.optionsCancelBtn, isDark && { backgroundColor: '#162032', borderWidth: 1, borderColor: '#1F2636' }]}
             >
-              <Text style={styles.optionsCancelText}>Cancel</Text>
+              <Text style={[styles.optionsCancelText, isDark && { color: '#F9FAFB' }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -4618,18 +4624,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         onRequestClose={() => setShowMuteModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <BellOff size={18} color="#164E3F" />
-                <Text style={styles.modalTitle}>Mute Notifications</Text>
+                <BellOff size={18} color={isDark ? '#34D399' : '#164E3F'} />
+                <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Mute Notifications</Text>
               </View>
               <TouchableOpacity onPress={() => setShowMuteModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>
               Choose how long you want to mute notifications from this pod.
             </Text>
 
@@ -4638,38 +4644,43 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => handleSelectMuteDuration('unmute')}
-                  style={styles.muteOptionCard}
+                  style={[
+                    styles.muteOptionCard,
+                    isDark
+                      ? { borderColor: '#10B981', backgroundColor: '#064E3B' }
+                      : { borderColor: '#164E3F', backgroundColor: '#F0FDF4' },
+                  ]}
                 >
-                  <Text style={styles.muteOptionTitle}>Unmute Pod</Text>
-                  <Text style={styles.muteOptionDesc}>Resume receiving push notifications</Text>
+                  <Text style={[styles.muteOptionTitle, { color: isDark ? '#34D399' : '#164E3F' }]}>Unmute Pod</Text>
+                  <Text style={[styles.muteOptionDesc, isDark && { color: '#A7F3D0' }]}>Resume receiving push notifications</Text>
                 </TouchableOpacity>
               ) : (
                 <>
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => handleSelectMuteDuration('8h')}
-                    style={styles.muteOptionCard}
+                    style={[styles.muteOptionCard, isDark && { backgroundColor: '#162032', borderColor: '#1F2636' }]}
                   >
-                    <Text style={styles.muteOptionTitle}>For 8 Hours</Text>
-                    <Text style={styles.muteOptionDesc}>Mute temporarily during work sessions</Text>
+                    <Text style={[styles.muteOptionTitle, isDark && { color: '#F9FAFB' }]}>For 8 Hours</Text>
+                    <Text style={[styles.muteOptionDesc, isDark && { color: '#94A3B8' }]}>Mute temporarily during work sessions</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => handleSelectMuteDuration('1w')}
-                    style={styles.muteOptionCard}
+                    style={[styles.muteOptionCard, isDark && { backgroundColor: '#162032', borderColor: '#1F2636' }]}
                   >
-                    <Text style={styles.muteOptionTitle}>For 1 Week</Text>
-                    <Text style={styles.muteOptionDesc}>Mute for the upcoming sprint or break</Text>
+                    <Text style={[styles.muteOptionTitle, isDark && { color: '#F9FAFB' }]}>For 1 Week</Text>
+                    <Text style={[styles.muteOptionDesc, isDark && { color: '#94A3B8' }]}>Mute for the upcoming sprint or break</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={() => handleSelectMuteDuration('always')}
-                    style={styles.muteOptionCard}
+                    style={[styles.muteOptionCard, isDark && { backgroundColor: '#162032', borderColor: '#1F2636' }]}
                   >
-                    <Text style={styles.muteOptionTitle}>Always</Text>
-                    <Text style={styles.muteOptionDesc}>Until you manually unmute</Text>
+                    <Text style={[styles.muteOptionTitle, isDark && { color: '#F9FAFB' }]}>Always</Text>
+                    <Text style={[styles.muteOptionDesc, isDark && { color: '#94A3B8' }]}>Until you manually unmute</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -4688,18 +4699,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         onRequestClose={() => setShowClearHistoryModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Trash2 size={18} color="#D97706" />
-                <Text style={styles.modalTitle}>Clear Chat History?</Text>
+                <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Clear Chat History?</Text>
               </View>
               <TouchableOpacity onPress={() => setShowClearHistoryModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>
               This will clear all messages from your local pod discussion view. Shared DOIs and media remain stored in the lab vault.
             </Text>
 
@@ -4707,9 +4718,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setShowClearHistoryModal(false)}
-                style={styles.confirmModalCancelBtn}
+                style={[styles.confirmModalCancelBtn, isDark && { backgroundColor: '#162032', borderWidth: 1, borderColor: '#1F2636' }]}
               >
-                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+                <Text style={[styles.confirmModalCancelText, isDark && { color: '#E2E8F0' }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -4739,20 +4750,20 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         onRequestClose={() => setShowDeleteChatModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Trash size={18} color="#DC2626" />
-                <Text style={styles.modalTitle}>
+                <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>
                   {isOwner ? 'Delete Research Pod?' : 'Leave Research Pod?'}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setShowDeleteChatModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>
               {isOwner
                 ? 'Are you sure you want to permanently delete this research pod? All messages, documents, and discussions will be removed for all members.'
                 : 'Are you sure you want to remove this pod from your active workspace? You can rejoin later if invited.'}
@@ -4762,9 +4773,9 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setShowDeleteChatModal(false)}
-                style={styles.confirmModalCancelBtn}
+                style={[styles.confirmModalCancelBtn, isDark && { backgroundColor: '#162032', borderWidth: 1, borderColor: '#1F2636' }]}
               >
-                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+                <Text style={[styles.confirmModalCancelText, isDark && { color: '#E2E8F0' }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -4796,18 +4807,18 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
         onRequestClose={() => setShowReportModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Flag size={18} color="#DC2626" />
-                <Text style={styles.modalTitle}>Report Research Pod</Text>
+                <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Report Research Pod</Text>
               </View>
               <TouchableOpacity onPress={() => setShowReportModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>
               Help keep BooffIn safe and academically rigorous. Why are you reporting this pod?
             </Text>
 
@@ -4818,13 +4829,15 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
                 onPress={() => setReportReason(r)}
                 style={[
                   styles.reasonOption,
-                  reportReason === r && styles.reasonOptionSelected,
+                  isDark && { backgroundColor: '#162032', borderColor: '#1F2636' },
+                  reportReason === r && (isDark ? { borderColor: '#10B981', backgroundColor: '#064E3B' } : styles.reasonOptionSelected),
                 ]}
               >
                 <Text
                   style={[
                     styles.reasonOptionText,
-                    reportReason === r && styles.reasonOptionTextSelected,
+                    isDark && { color: '#CBD5E1' },
+                    reportReason === r && { color: isDark ? '#34D399' : '#164E3F', fontWeight: '700' },
                   ]}
                 >
                   {r === 'spam'
@@ -4845,7 +4858,10 @@ export const WorkspaceInnerCircleView: React.FC<WorkspaceInnerCircleViewProps> =
               onChangeText={setReportDetails}
               placeholder="Additional details (optional)..."
               placeholderTextColor="#94A3B8"
-              style={styles.reportDetailsInput}
+              style={[
+                styles.reportDetailsInput,
+                isDark && { backgroundColor: '#162032', borderColor: '#1F2636', color: '#F9FAFB' },
+              ]}
               multiline
             />
 

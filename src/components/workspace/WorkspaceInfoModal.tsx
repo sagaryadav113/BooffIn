@@ -72,6 +72,7 @@ import { ChatMediaGalleryModal } from '../chat/ChatMediaGalleryModal';
 import { ChatThemePickerModal } from '../chat/ChatThemePickerModal';
 import { WorkspaceExportModal } from './WorkspaceExportModal';
 import { WorkspaceAddMembersModal } from './WorkspaceAddMembersModal';
+import { useColors, useIsDark } from '../../theme';
 
 interface WorkspaceInfoModalProps {
   visible: boolean;
@@ -84,6 +85,10 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   onClose,
   workspace,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const currentUser = useAuthStore((s) => s.user);
   const messages = useWorkspaceStore((s) => s.messages);
   const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
@@ -820,7 +825,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
             style={styles.backBtn}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
+            <ArrowLeft size={22} color={isDark ? '#F9FAFB' : '#0F172A'} strokeWidth={2.2} />
           </TouchableOpacity>
           <View style={{ width: 32 }} />
         </View>
@@ -980,7 +985,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                 style={styles.actionBtn}
               >
                 <View style={styles.actionIconCircle}>
-                  <UserPlus size={20} color="#0F172A" strokeWidth={2.2} />
+                  <UserPlus size={20} color={isDark ? '#F9FAFB' : '#0F172A'} strokeWidth={2.2} />
                 </View>
                 <Text style={styles.actionLabel}>Add</Text>
               </TouchableOpacity>
@@ -996,7 +1001,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                 style={styles.actionBtn}
               >
                 <View style={styles.actionIconCircle}>
-                  <Search size={20} color="#0F172A" strokeWidth={2.2} />
+                  <Search size={20} color={isDark ? '#F9FAFB' : '#0F172A'} strokeWidth={2.2} />
                 </View>
                 <Text style={styles.actionLabel}>Search</Text>
               </TouchableOpacity>
@@ -1012,7 +1017,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                 {isMuted ? (
                   <BellOff size={20} color="#FFFFFF" strokeWidth={2.2} />
                 ) : (
-                  <Bell size={20} color="#0F172A" strokeWidth={2.2} />
+                  <Bell size={20} color={isDark ? '#F9FAFB' : '#0F172A'} strokeWidth={2.2} />
                 )}
               </View>
               <Text style={styles.actionLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
@@ -1027,7 +1032,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               style={styles.actionBtn}
             >
               <View style={styles.actionIconCircle}>
-                <MoreHorizontal size={20} color="#0F172A" strokeWidth={2.2} />
+                <MoreHorizontal size={20} color={isDark ? '#F9FAFB' : '#0F172A'} strokeWidth={2.2} />
               </View>
               <Text style={styles.actionLabel}>Options</Text>
             </TouchableOpacity>
@@ -1274,7 +1279,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               style={styles.menuRow}
             >
               <View style={styles.menuIconWrap}>
-                <Palette size={22} color="#0F172A" strokeWidth={2} />
+                <Palette size={22} color={isDark ? '#F9FAFB' : '#0F172A'} strokeWidth={2} />
               </View>
               <View style={styles.menuTextCol}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1287,7 +1292,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                         borderRadius: 8,
                         backgroundColor: currentChatThemeConfig.previewColor,
                         borderWidth: 1.5,
-                        borderColor: '#E2E8F0',
+                        borderColor: isDark ? '#334155' : '#E2E8F0',
                       }}
                     />
                     <ChevronRight size={16} color="#94A3B8" />
@@ -1306,7 +1311,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               style={styles.menuRow}
             >
               <View style={styles.menuIconWrap}>
-                <FolderOpen size={22} color="#0F172A" strokeWidth={2} />
+                <FolderOpen size={22} color={isDark ? '#F9FAFB' : '#0F172A'} strokeWidth={2} />
               </View>
               <View style={styles.menuTextCol}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1327,7 +1332,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
                 style={styles.menuRow}
               >
                 <View style={styles.menuIconWrap}>
-                  <Clock size={22} color="#0F172A" strokeWidth={2} />
+                  <Clock size={22} color={isDark ? '#F9FAFB' : '#0F172A'} strokeWidth={2} />
                 </View>
                 <View style={styles.menuTextCol}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1360,11 +1365,11 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               style={styles.menuRow}
             >
               <View style={styles.menuIconWrap}>
-                <BookOpen size={22} color="#164E3F" strokeWidth={2} />
+                <BookOpen size={22} color={isDark ? '#34D399' : '#164E3F'} strokeWidth={2} />
               </View>
               <View style={styles.menuTextCol}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={[styles.menuTitle, { color: '#164E3F' }]}>Export Lab Record</Text>
+                  <Text style={[styles.menuTitle, { color: isDark ? '#34D399' : '#164E3F' }]}>Export Lab Record</Text>
                   <ChevronRight size={16} color="#94A3B8" />
                 </View>
                 <Text style={styles.menuSubtitle}>
@@ -1380,7 +1385,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               style={styles.menuRow}
             >
               <View style={styles.menuIconWrap}>
-                <Trash2 size={22} color="#64748B" strokeWidth={2} />
+                <Trash2 size={22} color={isDark ? '#94A3B8' : '#64748B'} strokeWidth={2} />
               </View>
               <View style={styles.menuTextCol}>
                 <Text style={styles.menuTitle}>Clear chat history</Text>
@@ -1403,7 +1408,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
               style={styles.menuRow}
             >
               <View style={styles.menuIconWrap}>
-                <Lock size={22} color="#0F172A" strokeWidth={2} />
+                <Lock size={22} color={isDark ? '#F9FAFB' : '#0F172A'} strokeWidth={2} />
               </View>
               <View style={styles.menuTextCol}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1492,7 +1497,7 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
           <View style={styles.sharedMediaSection}>
             <Text style={styles.sharedMediaTitle}>Shared media</Text>
             <View style={styles.sharedMediaEmptyBox}>
-              <FileText size={28} color="#CBD5E1" />
+              <FileText size={28} color={isDark ? '#64748B' : '#CBD5E1'} />
               <Text style={styles.sharedMediaEmptyText}>No shared files or papers yet</Text>
               <Text style={styles.sharedMediaEmptySub}>
                 Papers, DOIs, and shared attachments will appear here.
@@ -2013,10 +2018,11 @@ export const WorkspaceInfoModal: React.FC<WorkspaceInfoModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#0B0F17' : '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -2024,7 +2030,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#0B0F17' : '#FFFFFF',
   },
   backBtn: {
     padding: 4,
@@ -2053,7 +2059,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: '#15803D',
     borderWidth: 3,
-    borderColor: '#FFFFFF',
+    borderColor: isDark ? '#0B0F17' : '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -2063,7 +2069,7 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     textAlign: 'center',
     letterSpacing: -0.4,
     marginBottom: 6,
@@ -2076,17 +2082,18 @@ const styles = StyleSheet.create({
   },
   editNameInput: {
     borderWidth: 1.5,
-    borderColor: '#164E3F',
+    borderColor: isDark ? '#10B981' : '#164E3F',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 6,
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     minWidth: 180,
   },
   saveNameBtn: {
-    backgroundColor: '#164E3F',
+    backgroundColor: isDark ? '#10B981' : '#164E3F',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
@@ -2103,7 +2110,7 @@ const styles = StyleSheet.create({
   changeNameText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: isDark ? '#34D399' : '#3B82F6',
   },
   actionBar: {
     flexDirection: 'row',
@@ -2123,22 +2130,22 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#F2F4F7',
+    backgroundColor: isDark ? '#161B26' : '#F2F4F7',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
   },
   actionIconCircleActive: {
-    backgroundColor: '#164E3F',
+    backgroundColor: isDark ? '#10B981' : '#164E3F',
   },
   actionLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#0F172A',
+    color: isDark ? '#94A3B8' : '#0F172A',
   },
   divider: {
     height: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
     marginVertical: 8,
   },
   menuSection: {
@@ -2162,24 +2169,26 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   menuSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 2,
   },
   memberCountBadge: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
   },
   expandedMembersList: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#111622' : '#F8FAFC',
     marginHorizontal: 16,
     borderRadius: 12,
     paddingVertical: 6,
     marginVertical: 6,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? '#1F2636' : 'transparent',
   },
   memberRow: {
     flexDirection: 'row',
@@ -2194,11 +2203,11 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   memberRole: {
     fontSize: 12,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 1,
   },
   sharedMediaSection: {
@@ -2208,25 +2217,27 @@ const styles = StyleSheet.create({
   sharedMediaTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     marginBottom: 12,
   },
   sharedMediaEmptyBox: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 24,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#111622' : '#F8FAFC',
     borderRadius: 12,
     gap: 6,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? '#1F2636' : 'transparent',
   },
   sharedMediaEmptyText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#475569',
+    color: isDark ? '#E2E8F0' : '#475569',
   },
   sharedMediaEmptySub: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: isDark ? '#94A3B8' : '#94A3B8',
     textAlign: 'center',
     paddingHorizontal: 20,
   },
@@ -2236,25 +2247,27 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   optionsSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 36,
+    borderTopWidth: isDark ? 1 : 0,
+    borderTopColor: isDark ? '#1F2636' : 'transparent',
   },
   optionsHandleBar: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: isDark ? '#334155' : '#E2E8F0',
     alignSelf: 'center',
     marginBottom: 14,
   },
   optionsSheetTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -2264,23 +2277,26 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
   },
   optionsItemText: {
     fontSize: 16,
     fontWeight: '600',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   optionsCancelBtn: {
     marginTop: 16,
     paddingVertical: 14,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#161B26' : '#F1F5F9',
     borderRadius: 12,
     alignItems: 'center',
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? '#1F2636' : 'transparent',
   },
   optionsCancelText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   modalOverlay: {
     flex: 1,
@@ -2292,9 +2308,11 @@ const styles = StyleSheet.create({
   reportModalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 16,
     padding: 20,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? '#1F2636' : 'transparent',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -2305,11 +2323,11 @@ const styles = StyleSheet.create({
   modalHeaderTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   reportSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     lineHeight: 18,
     marginBottom: 14,
   },
@@ -2318,30 +2336,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     marginBottom: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
   },
   reasonOptionSelected: {
-    borderColor: '#164E3F',
-    backgroundColor: '#F0FDF4',
+    borderColor: isDark ? '#34D399' : '#164E3F',
+    backgroundColor: isDark ? '#064E3B' : '#F0FDF4',
   },
   reasonOptionText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#334155',
+    color: isDark ? '#E2E8F0' : '#334155',
   },
   reasonOptionTextSelected: {
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
     fontWeight: '700',
   },
   reportDetailsInput: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     borderRadius: 8,
     padding: 10,
     fontSize: 13,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
     height: 70,
     textAlignVertical: 'top',
     marginTop: 6,
@@ -2359,7 +2378,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   capacityBadgeContainer: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? '#064E3B' : '#ECFDF5',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
@@ -2367,9 +2386,9 @@ const styles = StyleSheet.create({
   memberSearchInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     borderRadius: 10,
     paddingHorizontal: 10,
     marginHorizontal: 12,
@@ -2380,11 +2399,11 @@ const styles = StyleSheet.create({
   memberSearchInput: {
     flex: 1,
     fontSize: 12,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   memberAcademicSub: {
     fontSize: 11,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 1,
   },
   rolePill: {
@@ -2396,48 +2415,48 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   rolePillOwner: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? '#064E3B' : '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: isDark ? '#059669' : '#A7F3D0',
   },
   rolePillAdmin: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: isDark ? '#1E3A8A' : '#EFF6FF',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: isDark ? '#3B82F6' : '#BFDBFE',
   },
   rolePillMod: {
-    backgroundColor: '#F5F3FF',
+    backgroundColor: isDark ? '#4C1D95' : '#F5F3FF',
     borderWidth: 1,
-    borderColor: '#DDD6FE',
+    borderColor: isDark ? '#7C3AED' : '#DDD6FE',
   },
   rolePillMember: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
   },
   rolePillText: {
     fontSize: 10,
     fontWeight: '700',
   },
   rolePillTextOwner: {
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
   },
   rolePillTextAdmin: {
-    color: '#2563EB',
+    color: isDark ? '#60A5FA' : '#2563EB',
   },
   rolePillTextMod: {
-    color: '#7C3AED',
+    color: isDark ? '#A78BFA' : '#7C3AED',
   },
   rolePillTextMember: {
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
   },
   expandedPermissionsCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#111622' : '#F8FAFC',
     marginHorizontal: 16,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   permissionToggleRow: {
     flexDirection: 'row',
@@ -2448,17 +2467,17 @@ const styles = StyleSheet.create({
   permissionToggleTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   permissionToggleDesc: {
     fontSize: 11,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 2,
     lineHeight: 15,
   },
   permissionToggleDivider: {
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: isDark ? '#1F2636' : '#E2E8F0',
     marginVertical: 6,
   },
   memberActionHeader: {
@@ -2466,32 +2485,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
     marginBottom: 8,
   },
   memberActionName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   memberActionRoleLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
     marginTop: 2,
   },
   avatarEditOverlayBtn: {
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: '#164E3F',
+    backgroundColor: isDark ? '#10B981' : '#164E3F',
     width: 28,
     height: 28,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: isDark ? '#0B0F17' : '#FFFFFF',
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -2500,36 +2519,36 @@ const styles = StyleSheet.create({
   },
   editPodCard: {
     width: '100%',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#111622' : '#F8FAFC',
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     marginVertical: 8,
   },
   editSectionLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   editDescInput: {
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     minHeight: 64,
     textAlignVertical: 'top',
   },
   charCountLabel: {
     fontSize: 10,
-    color: '#94A3B8',
+    color: isDark ? '#64748B' : '#94A3B8',
     alignSelf: 'flex-end',
     marginTop: 3,
   },
@@ -2543,18 +2562,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: isDark ? '#1F2636' : '#E2E8F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   cancelEditBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
+    color: isDark ? '#E2E8F0' : '#475569',
   },
   groupDescriptionSnippet: {
     fontSize: 13,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: 16,
@@ -2562,21 +2581,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   ephemeralBadgeContainer: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: isDark ? '#064E3B' : '#F0FDF4',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#DCFCE7',
+    borderColor: isDark ? '#059669' : '#DCFCE7',
   },
   ephemeralBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
   },
   muteModalSub: {
     fontSize: 13,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 16,
@@ -2584,7 +2603,7 @@ const styles = StyleSheet.create({
   },
   optionsItemSubText: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: isDark ? '#64748B' : '#94A3B8',
     marginTop: 2,
   },
   modalBackdrop: {
@@ -2597,10 +2616,12 @@ const styles = StyleSheet.create({
   confirmDialogCard: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? '#1F2636' : 'transparent',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.15,
@@ -2611,7 +2632,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: isDark ? '#3B1219' : '#FEE2E2',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -2619,15 +2640,15 @@ const styles = StyleSheet.create({
   confirmDialogTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     textAlign: 'center',
     letterSpacing: -0.3,
     marginBottom: 8,
   },
   confirmDialogWarningBox: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: isDark ? '#2D1215' : '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: isDark ? '#7F1D1D' : '#FECACA',
     borderRadius: 10,
     padding: 10,
     width: '100%',
@@ -2636,14 +2657,14 @@ const styles = StyleSheet.create({
   confirmDialogWarningHeadline: {
     fontSize: 11.5,
     fontWeight: '800',
-    color: '#DC2626',
+    color: '#EF4444',
     letterSpacing: 0.3,
     marginBottom: 3,
     textAlign: 'center',
   },
   confirmDialogWarningBody: {
     fontSize: 12.5,
-    color: '#991B1B',
+    color: isDark ? '#FCA5A5' : '#991B1B',
     textAlign: 'center',
     lineHeight: 17,
   },
@@ -2659,13 +2680,13 @@ const styles = StyleSheet.create({
   },
   confirmBulletDot: {
     fontSize: 13,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: -1,
   },
   confirmBulletText: {
     flex: 1,
     fontSize: 12,
-    color: '#475569',
+    color: isDark ? '#CBD5E1' : '#475569',
     lineHeight: 16,
   },
   confirmDialogActions: {
@@ -2678,14 +2699,16 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#161B26' : '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? '#1F2636' : 'transparent',
   },
   confirmCancelBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#475569',
+    color: isDark ? '#CBD5E1' : '#475569',
   },
   confirmDangerBtn: {
     flex: 1.3,

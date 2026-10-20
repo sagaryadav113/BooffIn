@@ -38,7 +38,7 @@ import { PaperMetrics } from '../../api/hypeScoreService';
 import { PaperStatsTimeframe } from '../../types/paperStats';
 import { getPaperStats } from '../../api/paperStatsService';
 import { SaveButton } from '../core/SaveButton';
-import { colors } from '../../theme';
+import { colors, useColors, useIsDark } from '../../theme';
 
 interface ArticleStatsViewProps {
   paper: Paper;
@@ -98,6 +98,8 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
   onSwitchToArticleView,
   onOpenPdf,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const [selectedTimeframe, setSelectedTimeframe] = useState<PaperStatsTimeframe>('24H');
   const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState<number>(Dimensions.get('window').width - 48);
@@ -190,11 +192,11 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
   }, [paper.authors]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ==================================================================== */}
       {/* 1. HERO PAPER CARD WITH NATIVE SAVE & READ BUTTONS                   */}
       {/* ==================================================================== */}
-      <View style={styles.heroCard}>
+      <View style={[styles.heroCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
         <View style={styles.heroTopRow}>
           {/* Paper Cover Thumbnail */}
           <View style={styles.thumbnailContainer}>
@@ -215,29 +217,29 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
             <View style={styles.badgeRow}>
               {paper.isOpenAccess ? (
                 <>
-                  <View style={styles.openAccessPill}>
+                  <View style={[styles.openAccessPill, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
                     <View style={styles.greenDot} />
-                    <Text style={styles.openAccessText}>Open Access</Text>
+                    <Text style={[styles.openAccessText, { color: isDark ? '#34D399' : '#065F46' }]}>Open Access</Text>
                   </View>
-                  <View style={styles.licensePill}>
-                    <Text style={styles.licenseText}>CC BY</Text>
+                  <View style={[styles.licensePill, { backgroundColor: isDark ? '#1F2636' : '#F3F4F6' }]}>
+                    <Text style={[styles.licenseText, { color: colors.textSecondary }]}>CC BY</Text>
                   </View>
                 </>
               ) : (
-                <View style={styles.closedAccessPill}>
-                  <Lock size={10} color="#DC2626" />
-                  <Text style={styles.closedAccessText}>Closed Paper</Text>
+                <View style={[styles.closedAccessPill, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2' }]}>
+                  <Lock size={10} color={isDark ? '#F87171' : '#DC2626'} />
+                  <Text style={[styles.closedAccessText, { color: isDark ? '#F87171' : '#DC2626' }]}>Closed Paper</Text>
                 </View>
               )}
             </View>
 
             {/* Paper Title */}
-            <Text style={styles.heroTitle} numberOfLines={3}>
+            <Text style={[styles.heroTitle, { color: colors.textPrimary }]} numberOfLines={3}>
               {paper.title}
             </Text>
 
             {/* Author */}
-            <Text style={styles.heroAuthor} numberOfLines={1}>
+            <Text style={[styles.heroAuthor, { color: colors.textSecondary }]} numberOfLines={1}>
               {authorsText}
             </Text>
 
@@ -247,11 +249,11 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
               onPress={handleOpenDoi}
               activeOpacity={0.7}
             >
-              <Text style={styles.doiText} numberOfLines={1}>
+              <Text style={[styles.doiText, { color: colors.textMuted }]} numberOfLines={1}>
                 {paper.journal || 'Academic Journal'} · {paper.publicationYear || '2024'} ·{' '}
                 {paper.doi ? paper.doi : 'Publisher Reference'}
               </Text>
-              <ExternalLink size={11} color="#6B7280" style={{ marginLeft: 4 }} />
+              <ExternalLink size={11} color={colors.textMuted} style={{ marginLeft: 4 }} />
             </TouchableOpacity>
           </View>
 
@@ -267,7 +269,7 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
               </View>
             )}
             <TouchableOpacity
-              style={styles.readPaperBtn}
+              style={[styles.readPaperBtn, { backgroundColor: isDark ? '#10B981' : '#065F46' }]}
               onPress={onSwitchToArticleView || onOpenPdf}
               activeOpacity={0.85}
             >
@@ -283,13 +285,13 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.topicsScrollContent}
-            style={styles.topicsContainer}
+            style={[styles.topicsContainer, { borderTopColor: colors.borderLight }]}
           >
             {paper.topics.map((topic, i) => {
               const topicName = typeof topic === 'string' ? topic : (topic as any)?.name || String(topic);
               return (
-                <View key={`topic-${i}-${topicName}`} style={styles.topicPill}>
-                  <Text style={styles.topicPillText}>{topicName}</Text>
+                <View key={`topic-${i}-${topicName}`} style={[styles.topicPill, { backgroundColor: colors.backgroundSecondary }]}>
+                  <Text style={[styles.topicPillText, { color: colors.textSecondary }]}>{topicName}</Text>
                 </View>
               );
             })}
@@ -300,49 +302,52 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
       {/* ==================================================================== */}
       {/* 2. PAPER IMPACT SECTION WITH INTERACTIVE CHART                        */}
       {/* ==================================================================== */}
-      <View style={styles.impactCard} onLayout={handleChartLayout}>
+      <View style={[styles.impactCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]} onLayout={handleChartLayout}>
         {/* Section Header */}
         <View style={styles.impactHeader}>
           <View style={styles.impactTitleRow}>
-            <View style={styles.impactSignalIcon}>
-              <Radio size={16} color="#059669" />
+            <View style={[styles.impactSignalIcon, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
+              <Radio size={16} color={isDark ? '#34D399' : '#059669'} />
             </View>
-            <Text style={styles.impactTitle}>Paper Impact</Text>
+            <Text style={[styles.impactTitle, { color: colors.textPrimary }]}>Paper Impact</Text>
           </View>
 
           {/* HYPE Rating Badge Box - only for open access papers */}
           {paper.isOpenAccess ? (
-            <View style={styles.hypeBox}>
-              <Text style={styles.hypeBoxLabel}>HYPE</Text>
+            <View style={[styles.hypeBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+              <Text style={[styles.hypeBoxLabel, { color: colors.textMuted }]}>HYPE</Text>
               {stats.currentHypeScore > 0 ? (
                 <>
                   <View style={styles.hypeValueRow}>
-                    <Text style={styles.hypeValueMain}>
+                    <Text style={[styles.hypeValueMain, { color: colors.textPrimary }]}>
                       {stats.currentHypeScore.toFixed(1)}
                     </Text>
-                    <Text style={styles.hypeValueSub}> / 5</Text>
+                    <Text style={[styles.hypeValueSub, { color: colors.textSecondary }]}> / 5</Text>
                   </View>
-                  <View style={styles.hypeBarBg}>
+                  <View style={[styles.hypeBarBg, { backgroundColor: isDark ? '#1F2636' : '#E5E7EB' }]}>
                     <View
                       style={[
                         styles.hypeBarFill,
-                        { width: `${(stats.currentHypeScore / 5) * 100}%` },
+                        {
+                          width: `${(stats.currentHypeScore / 5) * 100}%`,
+                          backgroundColor: isDark ? '#10B981' : '#065F46',
+                        },
                       ]}
                     />
                   </View>
                 </>
               ) : (
                 <View style={styles.hypeValueRow}>
-                  <Text style={[styles.hypeValueSub, { fontSize: 13, fontWeight: '700', color: '#94A3B8', marginTop: 3 }]}>
+                  <Text style={[styles.hypeValueSub, { fontSize: 13, fontWeight: '700', color: colors.textMuted, marginTop: 3 }]}>
                     Unrated
                   </Text>
                 </View>
               )}
             </View>
           ) : (
-            <View style={styles.closedHypeBox}>
-              <Text style={styles.closedHypeBoxLabel}>ACCESS</Text>
-              <Text style={styles.closedHypeBoxValue}>Closed Paper</Text>
+            <View style={[styles.closedHypeBox, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2', borderColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#FEE2E2' }]}>
+              <Text style={[styles.closedHypeBoxLabel, { color: isDark ? '#F87171' : '#991B1B' }]}>ACCESS</Text>
+              <Text style={[styles.closedHypeBoxValue, { color: isDark ? '#F87171' : '#DC2626' }]}>Closed Paper</Text>
             </View>
           )}
         </View>
@@ -350,8 +355,8 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
         {/* Dynamic Tooltip Badge based on active scrubbed point */}
         {activePoint && (
           <View style={styles.tooltipBadgeContainer}>
-            <View style={styles.tooltipBadge}>
-              <Text style={styles.tooltipValue}>
+            <View style={[styles.tooltipBadge, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+              <Text style={[styles.tooltipValue, { color: colors.textPrimary }]}>
                 {activePoint.value > 0 ? activePoint.value.toFixed(1) : '0.0'}
               </Text>
               {activePoint.deltaPercent > 0 ? (
@@ -359,7 +364,7 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
                   ▲ +{activePoint.deltaPercent}%
                 </Text>
               ) : null}
-              <Text style={styles.tooltipTimeframe}>
+              <Text style={[styles.tooltipTimeframe, { color: colors.textSecondary }]}>
                 {stats.timeframeLabel}
               </Text>
             </View>
@@ -371,8 +376,8 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
           <Svg width={chartWidth} height={chartHeight}>
             <Defs>
               <LinearGradient id="impactGradient" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0%" stopColor="#10B981" stopOpacity="0.32" />
-                <Stop offset="70%" stopColor="#10B981" stopOpacity="0.08" />
+                <Stop offset="0%" stopColor="#10B981" stopOpacity={isDark ? '0.45' : '0.32'} />
+                <Stop offset="70%" stopColor="#10B981" stopOpacity={isDark ? '0.12' : '0.08'} />
                 <Stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
               </LinearGradient>
             </Defs>
@@ -387,7 +392,7 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
                     y1={y}
                     x2={chartWidth - paddingRight}
                     y2={y}
-                    stroke="#F3F4F6"
+                    stroke={isDark ? '#1F2636' : '#F3F4F6'}
                     strokeWidth="1"
                     strokeDasharray="3, 3"
                   />
@@ -395,7 +400,7 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
                     x={paddingLeft - 8}
                     y={y + 3.5}
                     fontSize="10"
-                    fill="#9CA3AF"
+                    fill={isDark ? '#64748B' : '#9CA3AF'}
                     textAnchor="end"
                     fontWeight="500"
                   >
@@ -413,7 +418,7 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
               <Path
                 d={linePath}
                 fill="none"
-                stroke="#059669"
+                stroke={isDark ? '#34D399' : '#059669'}
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -427,15 +432,15 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
                   cx={activeCoord.x}
                   cy={activeCoord.y}
                   r="7"
-                  fill="#059669"
-                  opacity="0.25"
+                  fill="#10B981"
+                  opacity="0.3"
                 />
                 <Circle
                   cx={activeCoord.x}
                   cy={activeCoord.y}
                   r="4.5"
-                  fill="#059669"
-                  stroke="#FFFFFF"
+                  fill="#10B981"
+                  stroke={isDark ? '#0B0F17' : '#FFFFFF'}
                   strokeWidth="2"
                 />
               </>
@@ -474,7 +479,8 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
               key={`xlabel-${idx}`}
               style={[
                 styles.xAxisLabel,
-                activePointIndex === idx && styles.xAxisLabelActive,
+                { color: colors.textMuted },
+                activePointIndex === idx && [styles.xAxisLabelActive, { color: isDark ? '#34D399' : '#059669' }],
               ]}
               numberOfLines={1}
             >
@@ -484,7 +490,7 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
         </View>
 
         {/* Timeframe Selector Pills */}
-        <View style={styles.timeframeRow}>
+        <View style={[styles.timeframeRow, { backgroundColor: colors.backgroundSecondary }]}>
           {TIMEFRAMES.map((tf) => {
             const isSelected = selectedTimeframe === tf;
             return (
@@ -492,7 +498,7 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
                 key={tf}
                 style={[
                   styles.timeframePill,
-                  isSelected && styles.timeframePillActive,
+                  isSelected && [styles.timeframePillActive, { backgroundColor: isDark ? '#10B981' : '#064E3B' }],
                 ]}
                 onPress={() => handleTimeframeChange(tf)}
                 activeOpacity={0.8}
@@ -500,6 +506,7 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
                 <Text
                   style={[
                     styles.timeframeText,
+                    { color: colors.textSecondary },
                     isSelected && styles.timeframeTextActive,
                   ]}
                 >
@@ -516,61 +523,61 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
       {/* ==================================================================== */}
       <View style={styles.statsGrid}>
         {/* Card 1: Views */}
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
           <View style={styles.statCardHeader}>
-            <Eye size={18} color="#059669" />
-            <Text style={styles.statCardTotal}>
+            <Eye size={18} color={isDark ? '#34D399' : '#059669'} />
+            <Text style={[styles.statCardTotal, { color: colors.textPrimary }]}>
               {stats.views.totalFormatted}
             </Text>
             {stats.views.delta > 0 && (
-              <View style={styles.statDeltaPill}>
-                <Text style={styles.statDeltaText}>
+              <View style={[styles.statDeltaPill, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
+                <Text style={[styles.statDeltaText, { color: isDark ? '#34D399' : '#059669' }]}>
                   ▲ {stats.views.deltaFormatted}
                 </Text>
               </View>
             )}
           </View>
-          <Text style={styles.statCardSubtitle}>
+          <Text style={[styles.statCardSubtitle, { color: colors.textSecondary }]}>
             Views ({stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})
           </Text>
         </View>
 
         {/* Card 2: Discussions */}
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
           <View style={styles.statCardHeader}>
-            <MessageSquare size={18} color="#059669" />
-            <Text style={styles.statCardTotal}>
+            <MessageSquare size={18} color={isDark ? '#34D399' : '#059669'} />
+            <Text style={[styles.statCardTotal, { color: colors.textPrimary }]}>
               {stats.discussions.totalFormatted}
             </Text>
             {stats.discussions.delta > 0 && (
-              <View style={styles.statDeltaPill}>
-                <Text style={styles.statDeltaText}>
+              <View style={[styles.statDeltaPill, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
+                <Text style={[styles.statDeltaText, { color: isDark ? '#34D399' : '#059669' }]}>
                   ▲ {stats.discussions.deltaFormatted}
                 </Text>
               </View>
             )}
           </View>
-          <Text style={styles.statCardSubtitle}>
+          <Text style={[styles.statCardSubtitle, { color: colors.textSecondary }]}>
             Discussions ({stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})
           </Text>
         </View>
 
         {/* Card 3: HYPE Votes or Citations */}
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
           <View style={styles.statCardHeader}>
-            <BarChart2 size={18} color="#059669" />
-            <Text style={styles.statCardTotal}>
+            <BarChart2 size={18} color={isDark ? '#34D399' : '#059669'} />
+            <Text style={[styles.statCardTotal, { color: colors.textPrimary }]}>
               {paper.isOpenAccess ? stats.hypeVotes.totalFormatted : (paper.citationCount || 0).toLocaleString()}
             </Text>
             {paper.isOpenAccess && stats.hypeVotes.delta > 0 && (
-              <View style={styles.statDeltaPill}>
-                <Text style={styles.statDeltaText}>
+              <View style={[styles.statDeltaPill, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
+                <Text style={[styles.statDeltaText, { color: isDark ? '#34D399' : '#059669' }]}>
                   ▲ {stats.hypeVotes.deltaFormatted}
                 </Text>
               </View>
             )}
           </View>
-          <Text style={styles.statCardSubtitle}>
+          <Text style={[styles.statCardSubtitle, { color: colors.textSecondary }]}>
             {paper.isOpenAccess
               ? `HYPE Votes (${stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})`
               : 'Citations (Indexed)'}
@@ -578,21 +585,21 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
         </View>
 
         {/* Card 4: Shares */}
-        <View style={styles.statCard}>
+        <View style={[styles.statCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
           <View style={styles.statCardHeader}>
-            <Share2 size={18} color="#059669" />
-            <Text style={styles.statCardTotal}>
+            <Share2 size={18} color={isDark ? '#34D399' : '#059669'} />
+            <Text style={[styles.statCardTotal, { color: colors.textPrimary }]}>
               {stats.shares.totalFormatted}
             </Text>
             {stats.shares.delta > 0 && (
-              <View style={styles.statDeltaPill}>
-                <Text style={styles.statDeltaText}>
+              <View style={[styles.statDeltaPill, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
+                <Text style={[styles.statDeltaText, { color: isDark ? '#34D399' : '#059669' }]}>
                   ▲ {stats.shares.deltaFormatted}
                 </Text>
               </View>
             )}
           </View>
-          <Text style={styles.statCardSubtitle}>
+          <Text style={[styles.statCardSubtitle, { color: colors.textSecondary }]}>
             Shares ({stats.timeframe === '24H' ? 'last 24h' : stats.timeframe.toLowerCase()})
           </Text>
         </View>
@@ -601,10 +608,10 @@ export const ArticleStatsView: React.FC<ArticleStatsViewProps> = ({
       {/* ==================================================================== */}
       {/* 4. HYPE BREAKDOWN CARD WITH CIRCULAR SVG PROGRESS RINGS               */}
       {/* ==================================================================== */}
-      <View style={styles.breakdownCard}>
+      <View style={[styles.breakdownCard, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
         <View style={styles.breakdownHeader}>
-          <Text style={styles.breakdownTitle}>HYPE Breakdown</Text>
-          <Info size={14} color="#9CA3AF" />
+          <Text style={[styles.breakdownTitle, { color: colors.textPrimary }]}>HYPE Breakdown</Text>
+          <Info size={14} color={colors.textMuted} />
         </View>
 
         <View style={styles.ringsRow}>
@@ -643,6 +650,8 @@ const CircularProgressRing: React.FC<CircularProgressRingProps> = ({
   score,
   label,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const size = 84;
   const strokeWidth = 6.5;
   const radius = (size - strokeWidth) / 2;
@@ -660,7 +669,7 @@ const CircularProgressRing: React.FC<CircularProgressRingProps> = ({
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke="#E5E7EB"
+            stroke={isDark ? '#1F2636' : '#E5E7EB'}
             strokeWidth={strokeWidth}
             fill="none"
           />
@@ -670,7 +679,7 @@ const CircularProgressRing: React.FC<CircularProgressRingProps> = ({
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              stroke="#059669"
+              stroke={isDark ? '#10B981' : '#059669'}
               strokeWidth={strokeWidth}
               strokeDasharray={`${circumference} ${circumference}`}
               strokeDashoffset={strokeDashoffset}
@@ -681,10 +690,10 @@ const CircularProgressRing: React.FC<CircularProgressRingProps> = ({
           )}
         </Svg>
         <View style={styles.ringCenterTextWrap}>
-          <Text style={styles.ringScoreText}>{score > 0 ? score.toFixed(1) : '—'}</Text>
+          <Text style={[styles.ringScoreText, { color: colors.textPrimary }]}>{score > 0 ? score.toFixed(1) : '—'}</Text>
         </View>
       </View>
-      <Text style={styles.ringLabelText}>{label}</Text>
+      <Text style={[styles.ringLabelText, { color: colors.textSecondary }]}>{label}</Text>
     </View>
   );
 };

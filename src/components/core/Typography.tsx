@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text as RNText, TextProps as RNTextProps, TextStyle } from 'react-native';
-import { typography, colors } from '../../theme';
+import { typography, colors, useColors } from '../../theme';
 
 export type TypographyVariant =
   | 'display'
@@ -37,19 +37,21 @@ export interface TypographyProps extends RNTextProps {
 
 export const Typography: React.FC<TypographyProps> = ({
   variant = 'body',
-  color = colors.textPrimary,
+  color,
   align = 'left',
   style,
   children,
   ...props
 }) => {
+  const themeColors = useColors();
+  const textColor = color ?? themeColors.textPrimary;
   const variantStyle = typography[variant] || typography.body;
 
   return (
     <RNText
       style={[
         variantStyle,
-        { color, textAlign: align },
+        { color: textColor, textAlign: align },
         style,
       ]}
       {...props}

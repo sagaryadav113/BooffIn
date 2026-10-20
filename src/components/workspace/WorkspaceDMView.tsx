@@ -184,13 +184,13 @@ const AnimatedTypingIndicator: React.FC<{ name: string }> = ({ name }) => {
   }, [dot1, dot2, dot3]);
 
   return (
-    <View style={styles.typingIndicatorBanner}>
-      <View style={styles.typingDotsWrap}>
-        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot1 }] }]} />
-        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot2 }] }]} />
-        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot3 }] }]} />
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ flexDirection: 'row', gap: 4 }}>
+        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#94A3B8' }, { transform: [{ translateY: dot1 }] }]} />
+        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#94A3B8' }, { transform: [{ translateY: dot2 }] }]} />
+        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#94A3B8' }, { transform: [{ translateY: dot3 }] }]} />
       </View>
-      <Text style={styles.typingIndicatorText} numberOfLines={1}>
+      <Text style={{ fontSize: 12, color: '#94A3B8', marginLeft: 6 }} numberOfLines={1}>
         <Text style={{ fontWeight: '700' }}>{name}</Text> is typing...
       </Text>
     </View>
@@ -204,6 +204,7 @@ interface WorkspaceDMViewProps {
 export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) => {
   const colors = useColors();
   const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(isDark), [isDark]);
   const currentUser = useAuthStore((s) => s.user);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const messages = useWorkspaceStore((s) => s.messages);
@@ -3522,9 +3523,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
           activeOpacity={1}
           onPress={() => setShowOptionsMenu(false)}
         >
-          <View style={styles.optionsSheet}>
-            <View style={styles.optionsHandleBar} />
-            <Text style={styles.optionsSheetTitle}>
+          <View style={[styles.optionsSheet, isDark && { backgroundColor: '#111622', borderTopWidth: 1, borderTopColor: '#1F2636' }]}>
+            <View style={[styles.optionsHandleBar, isDark && { backgroundColor: '#334155' }]} />
+            <Text style={[styles.optionsSheetTitle, isDark && { color: '#94A3B8' }]}>
               {partner?.fullName || 'Conversation Settings'}
             </Text>
 
@@ -3533,14 +3534,14 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handleTogglePin}
-                style={styles.optionsItemRow}
+                style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
               >
                 {isPinned ? (
-                  <PinOff size={20} color="#164E3F" />
+                  <PinOff size={20} color={isDark ? '#34D399' : '#164E3F'} />
                 ) : (
-                  <Pin size={20} color="#164E3F" fill="#164E3F" />
+                  <Pin size={20} color={isDark ? '#34D399' : '#164E3F'} fill={isDark ? '#34D399' : '#164E3F'} />
                 )}
-                <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>
+                <Text style={[styles.optionsItemText, { color: isDark ? '#34D399' : '#164E3F' }]}>
                   {isPinned ? 'Unpin Conversation' : 'Pin Conversation'}
                 </Text>
               </TouchableOpacity>
@@ -3549,10 +3550,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handleToggleArchive}
-                style={styles.optionsItemRow}
+                style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
               >
-                <Archive size={20} color="#164E3F" />
-                <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>
+                <Archive size={20} color={isDark ? '#34D399' : '#164E3F'} />
+                <Text style={[styles.optionsItemText, { color: isDark ? '#34D399' : '#164E3F' }]}>
                   {isArchived ? 'Unarchive Chat' : 'Archive Chat'}
                 </Text>
               </TouchableOpacity>
@@ -3561,14 +3562,14 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handleOpenMuteSelector}
-                style={styles.optionsItemRow}
+                style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
               >
                 {isMuted ? (
-                  <Bell size={20} color="#164E3F" />
+                  <Bell size={20} color={isDark ? '#34D399' : '#164E3F'} />
                 ) : (
-                  <BellOff size={20} color="#164E3F" />
+                  <BellOff size={20} color={isDark ? '#34D399' : '#164E3F'} />
                 )}
-                <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>
+                <Text style={[styles.optionsItemText, { color: isDark ? '#34D399' : '#164E3F' }]}>
                   {isMuted ? 'Unmute Notifications' : 'Mute Notifications'}
                 </Text>
               </TouchableOpacity>
@@ -3580,15 +3581,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                   setShowOptionsMenu(false);
                   setShowGalleryModal(true);
                 }}
-                style={styles.optionsItemRow}
+                style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
               >
-                <FolderOpen size={20} color="#164E3F" />
-                <Text style={[styles.optionsItemText, { color: '#164E3F' }]}>
+                <FolderOpen size={20} color={isDark ? '#34D399' : '#164E3F'} />
+                <Text style={[styles.optionsItemText, { color: isDark ? '#34D399' : '#164E3F' }]}>
                   View Media, Papers & Links
                 </Text>
               </TouchableOpacity>
 
-              <View style={styles.optionsDivider} />
+              <View style={[styles.optionsDivider, isDark && { backgroundColor: '#1F2636' }]} />
 
               {/* 5. Clear Chat History */}
               <TouchableOpacity
@@ -3597,10 +3598,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                   setShowOptionsMenu(false);
                   setShowClearHistoryModal(true);
                 }}
-                style={styles.optionsItemRow}
+                style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
               >
-                <Trash size={20} color="#D97706" />
-                <Text style={[styles.optionsItemText, { color: '#D97706' }]}>
+                <Trash size={20} color={isDark ? '#FBBF24' : '#D97706'} />
+                <Text style={[styles.optionsItemText, { color: isDark ? '#FBBF24' : '#D97706' }]}>
                   Clear Chat History
                 </Text>
               </TouchableOpacity>
@@ -3612,15 +3613,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                   setShowOptionsMenu(false);
                   setShowDeleteChatModal(true);
                 }}
-                style={styles.optionsItemRow}
+                style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
               >
-                <Trash2 size={20} color="#DC2626" />
-                <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+                <Trash2 size={20} color={isDark ? '#F87171' : '#DC2626'} />
+                <Text style={[styles.optionsItemText, { color: isDark ? '#F87171' : '#DC2626' }]}>
                   Delete Conversation
                 </Text>
               </TouchableOpacity>
 
-              <View style={styles.optionsDivider} />
+              <View style={[styles.optionsDivider, isDark && { backgroundColor: '#1F2636' }]} />
 
               {/* 7. Report */}
               <TouchableOpacity
@@ -3629,10 +3630,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                   setShowOptionsMenu(false);
                   setShowReportModal(true);
                 }}
-                style={styles.optionsItemRow}
+                style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
               >
-                <Flag size={20} color="#64748B" />
-                <Text style={[styles.optionsItemText, { color: '#64748B' }]}>
+                <Flag size={20} color={isDark ? '#94A3B8' : '#64748B'} />
+                <Text style={[styles.optionsItemText, { color: isDark ? '#94A3B8' : '#64748B' }]}>
                   Report Researcher
                 </Text>
               </TouchableOpacity>
@@ -3641,10 +3642,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handleBlock}
-                style={styles.optionsItemRow}
+                style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
               >
-                <Ban size={20} color="#DC2626" />
-                <Text style={[styles.optionsItemText, { color: '#DC2626' }]}>
+                <Ban size={20} color={isDark ? '#F87171' : '#DC2626'} />
+                <Text style={[styles.optionsItemText, { color: isDark ? '#F87171' : '#DC2626' }]}>
                   Block User
                 </Text>
               </TouchableOpacity>
@@ -3653,10 +3654,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handleUnfollow}
-                style={styles.optionsItemRow}
+                style={[styles.optionsItemRow, isDark && { borderBottomColor: '#1F2636' }]}
               >
-                <UserMinus size={20} color="#64748B" />
-                <Text style={[styles.optionsItemText, { color: '#64748B' }]}>
+                <UserMinus size={20} color={isDark ? '#94A3B8' : '#64748B'} />
+                <Text style={[styles.optionsItemText, { color: isDark ? '#94A3B8' : '#64748B' }]}>
                   Unfollow
                 </Text>
               </TouchableOpacity>
@@ -3666,9 +3667,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setShowOptionsMenu(false)}
-              style={styles.optionsCancelBtn}
+              style={[styles.optionsCancelBtn, isDark && { backgroundColor: '#162032', borderWidth: 1, borderColor: '#1F2636' }]}
             >
-              <Text style={styles.optionsCancelText}>Cancel</Text>
+              <Text style={[styles.optionsCancelText, isDark && { color: '#F9FAFB' }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -3682,20 +3683,20 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         onRequestClose={() => setShowMuteModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <BellOff size={18} color="#164E3F" />
-                <Text style={styles.modalTitle}>
+                <BellOff size={18} color={isDark ? '#34D399' : '#164E3F'} />
+                <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>
                   {isMuted ? 'Notification Settings' : 'Mute Notifications'}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setShowMuteModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>
               {isMuted
                 ? 'This conversation is currently muted. Choose to unmute or change duration.'
                 : 'Choose how long you want to mute notifications for this conversation:'}
@@ -3705,38 +3706,43 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => handleSelectMuteDuration('8h')}
-                style={styles.muteOptionCard}
+                style={[styles.muteOptionCard, isDark && { backgroundColor: '#162032', borderColor: '#1F2636' }]}
               >
-                <Text style={styles.muteOptionTitle}>8 Hours</Text>
-                <Text style={styles.muteOptionDesc}>Mute alerts until tomorrow morning</Text>
+                <Text style={[styles.muteOptionTitle, isDark && { color: '#F9FAFB' }]}>8 Hours</Text>
+                <Text style={[styles.muteOptionDesc, isDark && { color: '#94A3B8' }]}>Mute alerts until tomorrow morning</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => handleSelectMuteDuration('1w')}
-                style={styles.muteOptionCard}
+                style={[styles.muteOptionCard, isDark && { backgroundColor: '#162032', borderColor: '#1F2636' }]}
               >
-                <Text style={styles.muteOptionTitle}>1 Week</Text>
-                <Text style={styles.muteOptionDesc}>Pause alerts for 7 days</Text>
+                <Text style={[styles.muteOptionTitle, isDark && { color: '#F9FAFB' }]}>1 Week</Text>
+                <Text style={[styles.muteOptionDesc, isDark && { color: '#94A3B8' }]}>Pause alerts for 7 days</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => handleSelectMuteDuration('always')}
-                style={styles.muteOptionCard}
+                style={[styles.muteOptionCard, isDark && { backgroundColor: '#162032', borderColor: '#1F2636' }]}
               >
-                <Text style={styles.muteOptionTitle}>Always</Text>
-                <Text style={styles.muteOptionDesc}>Keep muted until you manually unmute</Text>
+                <Text style={[styles.muteOptionTitle, isDark && { color: '#F9FAFB' }]}>Always</Text>
+                <Text style={[styles.muteOptionDesc, isDark && { color: '#94A3B8' }]}>Keep muted until you manually unmute</Text>
               </TouchableOpacity>
 
               {isMuted && (
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => handleSelectMuteDuration('unmute')}
-                  style={[styles.muteOptionCard, { borderColor: '#164E3F', backgroundColor: '#F0FDF4' }]}
+                  style={[
+                    styles.muteOptionCard,
+                    isDark
+                      ? { borderColor: '#10B981', backgroundColor: '#064E3B' }
+                      : { borderColor: '#164E3F', backgroundColor: '#F0FDF4' },
+                  ]}
                 >
-                  <Text style={[styles.muteOptionTitle, { color: '#164E3F' }]}>🔔 Unmute Notifications</Text>
-                  <Text style={styles.muteOptionDesc}>Resume receiving all message alerts</Text>
+                  <Text style={[styles.muteOptionTitle, { color: isDark ? '#34D399' : '#164E3F' }]}>🔔 Unmute Notifications</Text>
+                  <Text style={[styles.muteOptionDesc, isDark && { color: '#A7F3D0' }]}>Resume receiving all message alerts</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -3752,18 +3758,18 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         onRequestClose={() => setShowClearHistoryModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Trash size={18} color="#D97706" />
-                <Text style={styles.modalTitle}>Clear Chat History?</Text>
+                <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Clear Chat History?</Text>
               </View>
               <TouchableOpacity onPress={() => setShowClearHistoryModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>
               This will remove all messages from your chat view. Other participants will still be able to see their copy of the conversation.
             </Text>
 
@@ -3771,9 +3777,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setShowClearHistoryModal(false)}
-                style={styles.confirmModalCancelBtn}
+                style={[styles.confirmModalCancelBtn, isDark && { backgroundColor: '#162032', borderWidth: 1, borderColor: '#1F2636' }]}
               >
-                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+                <Text style={[styles.confirmModalCancelText, isDark && { color: '#E2E8F0' }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3801,18 +3807,18 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         onRequestClose={() => setShowDeleteChatModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <AlertTriangle size={18} color="#DC2626" />
-                <Text style={styles.modalTitle}>Delete Conversation?</Text>
+                <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Delete Conversation?</Text>
               </View>
               <TouchableOpacity onPress={() => setShowDeleteChatModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>
               Are you sure you want to delete this conversation? It will be removed from your Messages list.
             </Text>
 
@@ -3820,9 +3826,9 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setShowDeleteChatModal(false)}
-                style={styles.confirmModalCancelBtn}
+                style={[styles.confirmModalCancelBtn, isDark && { backgroundColor: '#162032', borderWidth: 1, borderColor: '#1F2636' }]}
               >
-                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+                <Text style={[styles.confirmModalCancelText, isDark && { color: '#E2E8F0' }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3850,18 +3856,18 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
         onRequestClose={() => setShowReportModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.pollModalCard}>
+          <View style={[styles.pollModalCard, isDark && { backgroundColor: '#111622', borderWidth: 1, borderColor: '#1F2636' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Flag size={18} color="#DC2626" />
-                <Text style={styles.modalTitle}>Report Researcher</Text>
+                <Text style={[styles.modalTitle, isDark && { color: '#F9FAFB' }]}>Report Researcher</Text>
               </View>
               <TouchableOpacity onPress={() => setShowReportModal(false)}>
-                <X size={20} color="#64748B" />
+                <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalSubtitle, isDark && { color: '#94A3B8' }]}>
               Please select the reason for reporting this user.
             </Text>
 
@@ -3871,13 +3877,15 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                 onPress={() => setReportReason(reason)}
                 style={[
                   styles.reasonOption,
-                  reportReason === reason && styles.reasonOptionSelected,
+                  isDark && { backgroundColor: '#162032', borderColor: '#1F2636' },
+                  reportReason === reason && (isDark ? { borderColor: '#10B981', backgroundColor: '#064E3B' } : styles.reasonOptionSelected),
                 ]}
               >
                 <Text
                   style={[
                     styles.reasonOptionText,
-                    reportReason === reason && styles.reasonOptionTextSelected,
+                    isDark && { color: '#CBD5E1' },
+                    reportReason === reason && { color: isDark ? '#34D399' : '#164E3F', fontWeight: '700' },
                   ]}
                 >
                   {reason}
@@ -3890,7 +3898,10 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
               onChangeText={setReportDetails}
               placeholder="Additional comments (optional)..."
               placeholderTextColor="#94A3B8"
-              style={styles.reportDetailsInput}
+              style={[
+                styles.reportDetailsInput,
+                isDark && { backgroundColor: '#162032', borderColor: '#1F2636', color: '#F9FAFB' },
+              ]}
               multiline
               numberOfLines={3}
             />
@@ -3939,7 +3950,8 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (isDark: boolean) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -4704,9 +4716,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   quickStarterChip: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 20,
@@ -4714,7 +4726,7 @@ const styles = StyleSheet.create({
   quickStarterChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#334155',
+    color: isDark ? '#CBD5E1' : '#334155',
   },
   /* Hovering Message Popover Menu */
   messagePopoverCard: {
@@ -4728,7 +4740,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 6,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderRadius: 10,
     marginHorizontal: 8,
     marginTop: 4,
@@ -4747,7 +4759,7 @@ const styles = StyleSheet.create({
   deleteModalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 18,
     padding: 22,
     shadowColor: '#000',
@@ -4755,6 +4767,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 16,
     elevation: 10,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? '#1F2636' : 'transparent',
   },
   deleteModalHeader: {
     alignItems: 'center',
@@ -4772,12 +4786,12 @@ const styles = StyleSheet.create({
   deleteModalTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     marginBottom: 4,
   },
   deleteModalSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -4791,13 +4805,13 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
     gap: 12,
   },
   deleteForEveryoneBtn: {
     borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: isDark ? '#2D1515' : '#FEF2F2',
   },
   deleteOptionIconWrap: {
     width: 36,
@@ -4809,24 +4823,24 @@ const styles = StyleSheet.create({
   deleteOptionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     marginBottom: 2,
   },
   deleteOptionDesc: {
     fontSize: 11,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     lineHeight: 15,
   },
   deleteModalCancelBtn: {
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#162032' : '#F1F5F9',
     alignItems: 'center',
   },
   deleteModalCancelText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#475569',
+    color: isDark ? '#94A3B8' : '#475569',
   },
   /* Action Menu Overlay & Card (Fallback) */
   actionMenuOverlay: {
@@ -4835,7 +4849,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   actionMenuCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 16,
@@ -4847,10 +4861,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingVertical: 8,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   emojiReactionBtn: {
     padding: 6,
@@ -4861,7 +4875,7 @@ const styles = StyleSheet.create({
   },
   actionMenuDivider: {
     height: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
     marginVertical: 12,
   },
   actionMenuRow: {
@@ -4874,13 +4888,13 @@ const styles = StyleSheet.create({
   actionMenuRowText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   /* Edit Modal */
   editModalCard: {
     width: '100%',
     maxWidth: 440,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -4891,13 +4905,13 @@ const styles = StyleSheet.create({
   },
   editTextInput: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#1F2636' : '#CBD5E1',
     borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     minHeight: 80,
     textAlignVertical: 'top',
     marginVertical: 14,
@@ -4911,18 +4925,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#162032' : '#F1F5F9',
   },
   editCancelBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
   },
   editSaveBtn: {
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderRadius: 8,
-    backgroundColor: '#164E3F',
+    backgroundColor: isDark ? '#10B981' : '#164E3F',
   },
   editSaveBtnDisabled: {
     backgroundColor: '#94A3B8',
@@ -4937,7 +4951,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 460,
     maxHeight: '80%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -4963,9 +4977,9 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   forwardPreviewSnippet: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderLeftWidth: 3,
-    borderLeftColor: '#164E3F',
+    borderLeftColor: isDark ? '#10B981' : '#164E3F',
     borderRadius: 6,
     padding: 8,
     marginVertical: 10,
@@ -4973,19 +4987,19 @@ const styles = StyleSheet.create({
   forwardPreviewLabel: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   forwardPreviewText: {
     fontSize: 12,
-    color: '#334155',
+    color: isDark ? '#CBD5E1' : '#334155',
   },
   forwardSearchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#161B26' : '#F1F5F9',
     borderRadius: 10,
     paddingHorizontal: 10,
     height: 38,
@@ -4994,7 +5008,7 @@ const styles = StyleSheet.create({
   forwardSearchInput: {
     flex: 1,
     fontSize: 13,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   forwardTargetsList: {
     maxHeight: 260,
@@ -5010,20 +5024,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
   },
   forwardTargetTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   forwardTargetType: {
     fontSize: 11,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 1,
   },
   forwardSendBtn: {
-    backgroundColor: '#164E3F',
+    backgroundColor: isDark ? '#10B981' : '#164E3F',
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 8,
@@ -5040,7 +5054,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   optionsSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
@@ -5051,14 +5065,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: isDark ? '#334155' : '#E2E8F0',
     alignSelf: 'center',
     marginBottom: 14,
   },
   optionsSheetTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -5068,7 +5082,7 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
   },
   optionsItemText: {
     fontSize: 16,
@@ -5077,14 +5091,14 @@ const styles = StyleSheet.create({
   optionsCancelBtn: {
     marginTop: 16,
     paddingVertical: 14,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#162032' : '#F1F5F9',
     borderRadius: 12,
     alignItems: 'center',
   },
   optionsCancelText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   attachIconWrap: {
     width: 40,
@@ -5096,11 +5110,11 @@ const styles = StyleSheet.create({
   attachItemTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   attachItemSubtitle: {
     fontSize: 12,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 1,
   },
   modalOverlay: {
@@ -5113,7 +5127,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 500,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -5125,7 +5139,7 @@ const styles = StyleSheet.create({
   pollModalCard: {
     width: '100%',
     maxWidth: 440,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 16,
     padding: 20,
   },
@@ -5138,30 +5152,30 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   modalSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginBottom: 16,
     lineHeight: 18,
   },
   pollInputLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#334155',
+    color: isDark ? '#E2E8F0' : '#334155',
     marginBottom: 6,
     textTransform: 'uppercase',
   },
   pollQuestionInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#1F2636' : '#CBD5E1',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   pollOptionRow: {
     flexDirection: 'row',
@@ -5171,14 +5185,14 @@ const styles = StyleSheet.create({
   },
   pollOptionInput: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#1F2636' : '#CBD5E1',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   removeOptionBtn: {
     padding: 6,
@@ -5189,9 +5203,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 8,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: isDark ? '#161B26' : '#F0FDF4',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: isDark ? '#1F2636' : '#BBF7D0',
     borderRadius: 8,
     marginTop: 4,
     marginBottom: 16,
@@ -5199,10 +5213,10 @@ const styles = StyleSheet.create({
   addOptionBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
   },
   createPollSubmitBtn: {
-    backgroundColor: '#164E3F',
+    backgroundColor: isDark ? '#10B981' : '#164E3F',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -5220,30 +5234,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     marginBottom: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
   },
   reasonOptionSelected: {
-    borderColor: '#164E3F',
-    backgroundColor: '#F0FDF4',
+    borderColor: isDark ? '#10B981' : '#164E3F',
+    backgroundColor: isDark ? '#064E3B' : '#F0FDF4',
   },
   reasonOptionText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#334155',
+    color: isDark ? '#CBD5E1' : '#334155',
   },
   reasonOptionTextSelected: {
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
     fontWeight: '700',
   },
   reportDetailsInput: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     borderRadius: 8,
     padding: 10,
     fontSize: 13,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
     height: 70,
     textAlignVertical: 'top',
     marginTop: 6,
@@ -5267,19 +5282,19 @@ const styles = StyleSheet.create({
   doiInput: {
     flex: 1,
     height: 42,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#1F2636' : '#CBD5E1',
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 13,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   doiLookupBtn: {
     width: 42,
     height: 42,
     borderRadius: 8,
-    backgroundColor: '#164E3F',
+    backgroundColor: isDark ? '#10B981' : '#164E3F',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -5291,7 +5306,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#164E3F',
+    backgroundColor: isDark ? '#10B981' : '#164E3F',
     paddingVertical: 12,
     borderRadius: 8,
     marginTop: 12,
@@ -5312,44 +5327,44 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   headerPinBadge: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? '#064E3B' : '#ECFDF5',
     padding: 3,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: isDark ? '#10B981' : '#A7F3D0',
     transform: [{ rotate: '45deg' }],
   },
   headerMuteBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
     padding: 3,
     borderRadius: 6,
   },
   headerSubtext: {
     fontSize: 11,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 1,
   },
   optionsDivider: {
     height: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
     marginVertical: 6,
   },
   muteOptionCard: {
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   muteOptionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   muteOptionDesc: {
     fontSize: 12,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 2,
   },
   confirmModalActionsRow: {
@@ -5363,12 +5378,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#162032' : '#F1F5F9',
   },
   confirmModalCancelText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
+    color: isDark ? '#94A3B8' : '#475569',
   },
   confirmModalDestructiveBtn: {
     paddingVertical: 10,

@@ -6,9 +6,10 @@ import {
   ActivityIndicator,
   ViewStyle,
   TextStyle,
+  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography, layout } from '../../theme';
+import { colors, radii, spacing, typography, layout, useColors, useIsDark } from '../../theme';
 
 interface ButtonProps {
   title: string;
@@ -35,6 +36,9 @@ export const Button: React.FC<ButtonProps> = ({
   iconRight,
   iconLeft,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   const handlePress = () => {
     if (disabled || loading) return;
     try {
@@ -48,30 +52,36 @@ export const Button: React.FC<ButtonProps> = ({
   const getContainerStyle = () => {
     switch (variant) {
       case 'primary':
-        return styles.primaryContainer;
+        return [styles.primaryContainer, isDark && { backgroundColor: '#10B981' }];
       case 'secondary':
-        return styles.secondaryContainer;
+        return [styles.secondaryContainer, isDark && { backgroundColor: colors.backgroundSecondary }];
       case 'outline':
-        return styles.outlineContainer;
+        return [
+          styles.outlineContainer,
+          isDark && {
+            borderColor: colors.border,
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          },
+        ];
       case 'ghost':
         return styles.ghostContainer;
       case 'danger':
-        return styles.dangerContainer;
+        return [styles.dangerContainer, isDark && { backgroundColor: colors.accentRed }];
     }
   };
 
   const getTextStyle = () => {
     switch (variant) {
       case 'primary':
-        return styles.primaryText;
+        return [styles.primaryText, isDark && { color: '#FFFFFF' }];
       case 'secondary':
-        return styles.secondaryText;
+        return [styles.secondaryText, isDark && { color: colors.textPrimary }];
       case 'outline':
-        return styles.outlineText;
+        return [styles.outlineText, isDark && { color: colors.textPrimary }];
       case 'ghost':
-        return styles.ghostText;
+        return [styles.ghostText, isDark && { color: colors.textPrimary }];
       case 'danger':
-        return styles.dangerText;
+        return [styles.dangerText, isDark && { color: colors.white }];
     }
   };
 
@@ -99,6 +109,7 @@ export const Button: React.FC<ButtonProps> = ({
         getContainerStyle(),
         getSizeStyle(),
         disabled && styles.disabled,
+        Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null,
         style,
       ]}
       hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
@@ -106,7 +117,13 @@ export const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'primary' || variant === 'danger' ? colors.white : colors.black}
+          color={
+            variant === 'primary' || variant === 'danger'
+              ? colors.white
+              : isDark
+              ? colors.textPrimary
+              : colors.black
+          }
         />
       ) : (
         <>

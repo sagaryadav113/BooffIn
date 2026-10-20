@@ -88,6 +88,7 @@ function isOpenAlexOrOrcidIdentifier(
 export default function OtherResearcherProfileScreen() {
   const colors = useColors();
   const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const { id, openAlexId, orcidId } = useLocalSearchParams<{
     id: string;
@@ -797,7 +798,7 @@ export default function OtherResearcherProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -925,6 +926,7 @@ export default function OtherResearcherProfileScreen() {
                   disabled={isMessageLoading}
                   onPress={handleStartDM}
                   style={styles.messageButton}
+                  textStyle={isDark ? { color: '#34D399' } : undefined}
                 />
               )}
             </View>
@@ -1313,432 +1315,444 @@ export default function OtherResearcherProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  joinCommunityBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#064E3B',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    gap: 6,
-    marginTop: -4,
-    marginBottom: spacing.md,
-  },
-  joinCommunityText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  scrollContent: {
-    paddingBottom: spacing.xxxl * 2,
-  },
-  bannerContainer: {
-    height: 140,
-    width: '100%',
-    position: 'relative',
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  bannerNav: {
-    position: 'absolute',
-    top: spacing.md,
-    left: spacing.lg,
-    right: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  bannerIconButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-  },
-  profileHeader: {
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.background,
-  },
-  avatarActionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    marginTop: -42,
-    marginBottom: spacing.sm,
-  },
-  avatarOverBanner: {
-    borderWidth: 3,
-    borderColor: colors.white,
-  },
-  actionButtonsGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs + 2,
-  },
-  followButton: {
-    minWidth: 90,
-    borderRadius: radii.full,
-  },
-  messageButton: {
-    minWidth: 90,
-    borderRadius: radii.full,
-    borderColor: '#064E3B',
-  },
-  nameSection: {
-    marginBottom: spacing.xs,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  fullName: {
-    ...typography.h2,
-    fontSize: 22,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  verifiedTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-  },
-  verifiedText: {
-    ...typography.micro,
-    color: colors.accentGreen,
-    fontWeight: '700',
-    fontSize: 11,
-  },
-  handle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 1,
-  },
-  roleBox: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs + 2,
-  },
-  roleTitle: {
-    ...typography.captionBold,
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  institutionText: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    marginTop: 2,
-    fontSize: 13,
-  },
-  bio: {
-    ...typography.body,
-    fontSize: 14,
-    lineHeight: 21,
-    color: colors.textPrimary,
-    marginVertical: spacing.xs,
-  },
-  mutualInterestsCard: {
-    backgroundColor: '#F0F7FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginVertical: spacing.sm,
-  },
-  mutualHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  mutualTitle: {
-    ...typography.captionBold,
-    color: '#1E40AF',
-    fontSize: 13,
-  },
-  mutualDesc: {
-    ...typography.micro,
-    color: '#3B82F6',
-    marginBottom: spacing.xs + 2,
-  },
-  mutualInterestBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: '#93C5FD',
-  },
-  mutualInterestBadgeText: {
-    ...typography.captionBold,
-    color: '#1E40AF',
-    fontSize: 11,
-  },
-  discussedSection: {
-    marginVertical: spacing.xs + 2,
-  },
-  discussedChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    paddingLeft: spacing.sm + 2,
-    paddingRight: spacing.xs + 2,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    gap: 4,
-  },
-  discussedChipLabel: {
-    ...typography.captionMedium,
-    color: colors.textPrimary,
-    fontSize: 12,
-  },
-  discussedCountBadge: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderWidth: 1,
-    borderColor: colors.borderDark,
-  },
-  discussedCountText: {
-    ...typography.micro,
-    fontSize: 10,
-    color: colors.textSecondary,
-    fontWeight: '700',
-  },
-  interestsSection: {
-    marginVertical: spacing.xs + 2,
-  },
-  interestsLabel: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-  },
-  interestsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  metaContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  orcidItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(37, 99, 235, 0.08)',
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-  },
-  orcidText: {
-    ...typography.micro,
-    color: colors.accentBlue,
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  websiteItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  websiteText: {
-    ...typography.micro,
-    color: colors.accentLink,
-    fontWeight: '500',
-    fontSize: 12,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xl,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.lg,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statNumber: {
-    ...typography.captionBold,
-    color: colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  statLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  tabsRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-    backgroundColor: colors.background,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabButtonActive: {
-    borderBottomColor: colors.black,
-  },
-  tabText: {
-    ...typography.captionMedium,
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  tabTextActive: {
-    color: colors.black,
-    fontWeight: '700',
-  },
-  postsList: {
-    width: '100%',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radii.full,
-    gap: 6,
-  },
-  filterChipActive: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  filterChipText: {
-    ...typography.captionBold,
-    color: colors.textSecondary,
-    fontSize: 12.5,
-    fontWeight: '600',
-  },
-  filterChipTextActive: {
-    color: colors.white,
-    fontWeight: '700',
-  },
-  filterCountBadge: {
-    backgroundColor: colors.borderLight,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: radii.full,
-  },
-  filterCountBadgeActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  filterCountText: {
-    ...typography.micro,
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  filterCountTextActive: {
-    color: colors.white,
-    fontWeight: '700',
-  },
-  papersList: {
-    padding: spacing.lg,
-  },
-  activityList: {
-    padding: spacing.lg,
-  },
-  privateProfileContainer: {
-    paddingVertical: spacing.xl * 2,
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-    marginTop: spacing.md,
-  },
-  privateIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.cardBackground,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  privateTitle: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-  },
-  privateSubtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    maxWidth: 280,
-    lineHeight: 18,
-  },
-  loadMoreButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderRadius: radii.md,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-    marginHorizontal: spacing.lg,
-  },
-  loadMoreButtonText: {
-    ...typography.captionBold,
-    color: colors.accentBlue,
-    fontSize: 13,
-  },
-});
+const createStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    joinCommunityBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: '#064E3B',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : '#047857',
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      gap: 6,
+      marginTop: -4,
+      marginBottom: spacing.md,
+    },
+    joinCommunityText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+    scrollContent: {
+      paddingBottom: spacing.xxxl * 2,
+      backgroundColor: colors.background,
+    },
+    bannerContainer: {
+      height: 140,
+      width: '100%',
+      position: 'relative',
+    },
+    bannerImage: {
+      width: '100%',
+      height: '100%',
+    },
+    bannerNav: {
+      position: 'absolute',
+      top: spacing.md,
+      left: spacing.lg,
+      right: spacing.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    bannerIconButton: {
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    },
+    profileHeader: {
+      paddingHorizontal: spacing.lg,
+      backgroundColor: colors.background,
+    },
+    avatarActionRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      marginTop: -42,
+      marginBottom: spacing.sm,
+    },
+    avatarOverBanner: {
+      borderWidth: 3,
+      borderColor: isDark ? colors.background : colors.white,
+    },
+    actionButtonsGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs + 2,
+    },
+    followButton: {
+      minWidth: 90,
+      borderRadius: radii.full,
+    },
+    messageButton: {
+      minWidth: 90,
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: isDark ? '#10B981' : '#064E3B',
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+    },
+    nameSection: {
+      marginBottom: spacing.xs,
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      flexWrap: 'wrap',
+    },
+    fullName: {
+      ...typography.h2,
+      fontSize: 22,
+      fontWeight: '800',
+      color: colors.textPrimary,
+    },
+    verifiedTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+      paddingHorizontal: spacing.xs + 2,
+      paddingVertical: 2,
+      borderRadius: radii.sm,
+    },
+    verifiedText: {
+      ...typography.micro,
+      color: colors.accentGreen,
+      fontWeight: '700',
+      fontSize: 11,
+    },
+    handle: {
+      ...typography.caption,
+      color: colors.textSecondary,
+      marginTop: 1,
+    },
+    roleBox: {
+      marginTop: spacing.xs,
+      marginBottom: spacing.xs + 2,
+    },
+    roleTitle: {
+      ...typography.captionBold,
+      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    institutionText: {
+      ...typography.micro,
+      color: colors.textSecondary,
+      marginTop: 2,
+      fontSize: 13,
+    },
+    bio: {
+      ...typography.body,
+      fontSize: 14,
+      lineHeight: 21,
+      color: colors.textPrimary,
+      marginVertical: spacing.xs,
+    },
+    mutualInterestsCard: {
+      backgroundColor: isDark ? 'rgba(37, 99, 235, 0.12)' : '#F0F7FF',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE',
+      borderRadius: radii.md,
+      padding: spacing.md,
+      marginVertical: spacing.sm,
+    },
+    mutualHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 2,
+    },
+    mutualTitle: {
+      ...typography.captionBold,
+      color: isDark ? '#93C5FD' : '#1E40AF',
+      fontSize: 13,
+    },
+    mutualDesc: {
+      ...typography.micro,
+      color: isDark ? '#60A5FA' : '#3B82F6',
+      marginBottom: spacing.xs + 2,
+    },
+    mutualInterestBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161B26' : colors.white,
+      paddingHorizontal: spacing.sm + 2,
+      paddingVertical: spacing.xs,
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(59, 130, 246, 0.4)' : '#93C5FD',
+    },
+    mutualInterestBadgeText: {
+      ...typography.captionBold,
+      color: isDark ? '#93C5FD' : '#1E40AF',
+      fontSize: 11,
+    },
+    discussedSection: {
+      marginVertical: spacing.xs + 2,
+    },
+    discussedChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161B26' : colors.backgroundSecondary,
+      paddingLeft: spacing.sm + 2,
+      paddingRight: spacing.xs + 2,
+      paddingVertical: spacing.xs,
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : colors.borderLight,
+      gap: 4,
+    },
+    discussedChipLabel: {
+      ...typography.captionMedium,
+      color: colors.textPrimary,
+      fontSize: 12,
+    },
+    discussedCountBadge: {
+      backgroundColor: isDark ? '#1F2636' : colors.cardBackground,
+      borderRadius: 8,
+      paddingHorizontal: 5,
+      paddingVertical: 1,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : colors.borderDark,
+    },
+    discussedCountText: {
+      ...typography.micro,
+      fontSize: 10,
+      color: colors.textSecondary,
+      fontWeight: '700',
+    },
+    interestsSection: {
+      marginVertical: spacing.xs + 2,
+    },
+    interestsLabel: {
+      ...typography.micro,
+      color: colors.textSecondary,
+      fontWeight: '600',
+      marginBottom: spacing.xs,
+    },
+    interestsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+    },
+    metaContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginTop: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    metaItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    metaText: {
+      ...typography.micro,
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    orcidItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(37, 99, 235, 0.08)',
+      paddingHorizontal: spacing.xs + 2,
+      paddingVertical: 2,
+      borderRadius: radii.sm,
+    },
+    orcidText: {
+      ...typography.micro,
+      color: isDark ? '#38BDF8' : colors.accentBlue,
+      fontWeight: '600',
+      fontSize: 12,
+    },
+    websiteItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    websiteText: {
+      ...typography.micro,
+      color: isDark ? '#60A5FA' : colors.accentLink,
+      fontWeight: '500',
+      fontSize: 12,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xl,
+      paddingTop: spacing.xs,
+      paddingBottom: spacing.lg,
+    },
+    statItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    statNumber: {
+      ...typography.captionBold,
+      color: colors.textPrimary,
+      fontWeight: '700',
+      fontSize: 15,
+    },
+    statLabel: {
+      ...typography.caption,
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    tabsRow: {
+      flexDirection: 'row',
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : colors.borderLight,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? '#1F2636' : colors.borderLight,
+      backgroundColor: colors.background,
+    },
+    tabButton: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      alignItems: 'center',
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+      ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
+    },
+    tabButtonActive: {
+      borderBottomColor: isDark ? '#10B981' : colors.black,
+    },
+    tabText: {
+      ...typography.captionMedium,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      fontSize: 13,
+    },
+    tabTextActive: {
+      color: isDark ? '#34D399' : colors.black,
+      fontWeight: '700',
+    },
+    postsList: {
+      width: '100%',
+      backgroundColor: colors.background,
+    },
+    filterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      gap: spacing.sm,
+      backgroundColor: colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1F2636' : colors.borderLight,
+    },
+    filterChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? '#161B26' : colors.backgroundSecondary,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : colors.borderLight,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs + 2,
+      borderRadius: radii.full,
+      gap: 6,
+      ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
+    },
+    filterChipActive: {
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : colors.black,
+      borderColor: isDark ? '#10B981' : colors.black,
+    },
+    filterChipText: {
+      ...typography.captionBold,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      fontSize: 12.5,
+      fontWeight: '600',
+    },
+    filterChipTextActive: {
+      color: isDark ? '#34D399' : colors.white,
+      fontWeight: '700',
+    },
+    filterCountBadge: {
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.borderLight,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: radii.full,
+    },
+    filterCountBadgeActive: {
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.25)',
+    },
+    filterCountText: {
+      ...typography.micro,
+      color: isDark ? '#94A3B8' : colors.textSecondary,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    filterCountTextActive: {
+      color: isDark ? '#34D399' : colors.white,
+      fontWeight: '700',
+    },
+    papersList: {
+      padding: spacing.lg,
+      backgroundColor: colors.background,
+    },
+    activityList: {
+      padding: spacing.lg,
+      backgroundColor: colors.background,
+    },
+    privateProfileContainer: {
+      paddingVertical: spacing.xl * 2,
+      paddingHorizontal: spacing.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderTopWidth: 1,
+      borderTopColor: isDark ? '#1F2636' : colors.borderLight,
+      marginTop: spacing.md,
+      backgroundColor: colors.background,
+    },
+    privateIconCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: isDark ? '#161B26' : colors.cardBackground,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : colors.borderLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.md,
+    },
+    privateTitle: {
+      ...typography.h3,
+      color: colors.textPrimary,
+      marginBottom: spacing.xs,
+      textAlign: 'center',
+    },
+    privateSubtitle: {
+      ...typography.caption,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      maxWidth: 280,
+      lineHeight: 18,
+    },
+    loadMoreButton: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#161B26' : colors.backgroundSecondary,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : colors.borderLight,
+      borderRadius: radii.md,
+      marginTop: spacing.sm,
+      marginBottom: spacing.md,
+      marginHorizontal: spacing.lg,
+    },
+    loadMoreButtonText: {
+      ...typography.captionBold,
+      color: isDark ? '#38BDF8' : colors.accentBlue,
+      fontSize: 13,
+    },
+  });
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors, spacing, layout, typography } from '../../theme';
+import { colors, spacing, layout, typography, useColors, useIsDark } from '../../theme';
 import { Typography } from '../core/Typography';
 import { Button } from '../core/Button';
 import { Icon, IconName } from '../core/Icon';
@@ -24,24 +24,44 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onActionPress,
   style,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const handleAction = onAction || onActionPress;
 
   return (
     <View style={[styles.container, style]}>
       {icon && (
-        <View style={styles.iconCircle}>
-          <Icon name={icon} size={28} color={colors.textSecondary} strokeWidth={1.75} />
+        <View
+          style={[
+            styles.iconCircle,
+            isDark && {
+              backgroundColor: '#161B26',
+              borderColor: '#1F2636',
+            },
+          ]}
+        >
+          <Icon
+            name={icon}
+            size={28}
+            color={isDark ? '#94A3B8' : colors.textSecondary}
+            strokeWidth={1.75}
+          />
         </View>
       )}
 
-      <Typography variant="sectionTitle" align="center" style={styles.title}>
+      <Typography
+        variant="sectionTitle"
+        align="center"
+        color={isDark ? '#F9FAFB' : colors.textPrimary}
+        style={styles.title}
+      >
         {title}
       </Typography>
 
       {description && (
         <Typography
           variant="body"
-          color={colors.textSecondary}
+          color={isDark ? '#94A3B8' : colors.textSecondary}
           align="center"
           style={styles.description}
         >
@@ -99,3 +119,4 @@ const styles = StyleSheet.create({
     minWidth: 160,
   },
 });
+

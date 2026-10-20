@@ -98,7 +98,7 @@ function createPaperFromReference(ref: any): Paper {
 }
 
 export default function PaperDetailScreen() {
-  const dynamicColors = useColors();
+  const colors = useColors();
   const isDark = useIsDark();
   const { id, fromPostId, doi, title, url, pdfUrl, refId, mode } = useLocalSearchParams<{
     id: string;
@@ -946,10 +946,10 @@ export default function PaperDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: dynamicColors.background }]} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
         <AppHeader showBack title="Research Article" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Typography variant="caption" color={dynamicColors.textSecondary}>
+          <Typography variant="caption" color={colors.textSecondary}>
             Loading article details...
           </Typography>
         </View>
@@ -959,7 +959,7 @@ export default function PaperDetailScreen() {
 
   if (!paper) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: dynamicColors.background }]} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
         <AppHeader showBack title="Research Article" />
         <EmptyState
           icon="FileText"
@@ -989,8 +989,8 @@ export default function PaperDetailScreen() {
   }, [isClosedPaper, viewMode]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: dynamicColors.background }]} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={dynamicColors.background} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -1018,8 +1018,8 @@ export default function PaperDetailScreen() {
         />
 
         {/* View Mode Switcher: Article (Substack) vs Stats vs PDF Document */}
-        <View style={styles.viewModeSwitcherContainer}>
-          <View style={styles.viewModeSwitcher}>
+        <View style={[styles.viewModeSwitcherContainer, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
+          <View style={[styles.viewModeSwitcher, { backgroundColor: colors.backgroundSecondary }]}>
             <TouchableOpacity
               onPress={() => {
                 try {
@@ -1029,18 +1029,19 @@ export default function PaperDetailScreen() {
               }}
               style={[
                 styles.viewModeTab,
-                viewMode === 'article' && styles.viewModeTabActive,
+                viewMode === 'article' && [styles.viewModeTabActive, { backgroundColor: isDark ? '#1F2636' : colors.black }],
               ]}
               activeOpacity={0.8}
             >
               <BookOpen
                 size={14}
-                color={viewMode === 'article' ? colors.white : colors.textSecondary}
+                color={viewMode === 'article' ? (isDark ? '#34D399' : colors.white) : colors.textSecondary}
               />
               <Text
                 style={[
                   styles.viewModeTabText,
-                  viewMode === 'article' && styles.viewModeTabTextActive,
+                  { color: colors.textSecondary },
+                  viewMode === 'article' && [styles.viewModeTabTextActive, { color: isDark ? '#34D399' : colors.white }],
                 ]}
                 numberOfLines={1}
               >
@@ -1057,18 +1058,19 @@ export default function PaperDetailScreen() {
               }}
               style={[
                 styles.viewModeTab,
-                viewMode === 'stats' && styles.viewModeTabActive,
+                viewMode === 'stats' && [styles.viewModeTabActive, { backgroundColor: isDark ? '#1F2636' : colors.black }],
               ]}
               activeOpacity={0.8}
             >
               <TrendingUp
                 size={14}
-                color={viewMode === 'stats' ? colors.white : colors.textSecondary}
+                color={viewMode === 'stats' ? (isDark ? '#34D399' : colors.white) : colors.textSecondary}
               />
               <Text
                 style={[
                   styles.viewModeTabText,
-                  viewMode === 'stats' && styles.viewModeTabTextActive,
+                  { color: colors.textSecondary },
+                  viewMode === 'stats' && [styles.viewModeTabTextActive, { color: isDark ? '#34D399' : colors.white }],
                 ]}
                 numberOfLines={1}
               >
@@ -1086,18 +1088,19 @@ export default function PaperDetailScreen() {
                 }}
                 style={[
                   styles.viewModeTab,
-                  viewMode === 'pdf' && styles.viewModeTabActive,
+                  viewMode === 'pdf' && [styles.viewModeTabActive, { backgroundColor: isDark ? '#1F2636' : colors.black }],
                 ]}
                 activeOpacity={0.8}
               >
                 <FileText
                   size={14}
-                  color={viewMode === 'pdf' ? colors.white : colors.textSecondary}
+                  color={viewMode === 'pdf' ? (isDark ? '#34D399' : colors.white) : colors.textSecondary}
                 />
                 <Text
                   style={[
                     styles.viewModeTabText,
-                    viewMode === 'pdf' && styles.viewModeTabTextActive,
+                    { color: colors.textSecondary },
+                    viewMode === 'pdf' && [styles.viewModeTabTextActive, { color: isDark ? '#34D399' : colors.white }],
                   ]}
                   numberOfLines={1}
                 >
@@ -1132,8 +1135,8 @@ export default function PaperDetailScreen() {
               <RefreshControl
                 refreshing={isRefreshing}
                 onRefresh={handleRefresh}
-                tintColor={dynamicColors.primary}
-                colors={[dynamicColors.primary]}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
               />
             }
           >
@@ -1154,7 +1157,7 @@ export default function PaperDetailScreen() {
               /* VIEW MODE 3: SUBSTACK-STYLE ARTICLE FORMAT                          */
               /* ==================================================================== */
               <>
-                <View style={styles.articleBody}>
+                <View style={[styles.articleBody, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
               {/* Publication Pill & Date Bar */}
               <View style={styles.editorialMetaRow}>
                 <Badge
@@ -1175,34 +1178,42 @@ export default function PaperDetailScreen() {
                   />
                 )}
 
-                <Text style={styles.editorialDateText}>
+                <Text style={[styles.editorialDateText, { color: colors.textSecondary }]}>
                   {paper.publicationDate || `${paper.publicationYear}`} · 8 min read
                 </Text>
               </View>
 
               {/* Substack Article Headline (Georgia Serif) */}
-              <Text style={styles.editorialHeadline}>{paper.title}</Text>
+              <Text style={[styles.editorialHeadline, { color: colors.textPrimary }]}>{paper.title}</Text>
 
               {/* Author Byline Section */}
               <View style={styles.bylineCard}>
                 <View style={styles.bylineHeader}>
-                  <Text style={styles.bylineAuthorsLabel}>By {authorsString}</Text>
+                  <Text style={[styles.bylineAuthorsLabel, { color: colors.textSecondary }]}>By {authorsString}</Text>
                 </View>
                 {paper.doi && (
                   <View style={styles.doiRow}>
-                    <Text style={styles.doiLabel}>DOI: {paper.doi}</Text>
+                    <Text style={[styles.doiLabel, { color: colors.textMuted }]}>DOI: {paper.doi}</Text>
                   </View>
                 )}
               </View>
 
               {/* Closed Paper Informational Callout */}
               {isClosedPaper && (
-                <View style={styles.closedPaperNoticeBox}>
+                <View
+                  style={[
+                    styles.closedPaperNoticeBox,
+                    {
+                      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
+                      borderColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#FEE2E2',
+                    },
+                  ]}
+                >
                   <View style={styles.closedPaperNoticeHeader}>
                     <Lock size={13} color="#DC2626" />
-                    <Text style={styles.closedPaperNoticeTitle}>Closed Access Publication</Text>
+                    <Text style={[styles.closedPaperNoticeTitle, { color: isDark ? '#F87171' : '#991B1B' }]}>Closed Access Publication</Text>
                   </View>
-                  <Text style={styles.closedPaperNoticeBody}>
+                  <Text style={[styles.closedPaperNoticeBody, { color: isDark ? '#FCA5A5' : '#7F1D1D' }]}>
                     This article is behind a publisher subscription paywall. The abstract and bibliographic data are freely viewable, while full manuscript access is governed by institutional credentials via the publisher link below.
                   </Text>
                 </View>
@@ -1210,9 +1221,14 @@ export default function PaperDetailScreen() {
 
               {/* Real-Time Live Readers Velocity */}
               {paperMetrics && (
-                <View style={styles.liveVelocityRow}>
-                  <Flame size={13} color="#D97706" />
-                  <Text style={styles.liveVelocityText}>
+                <View
+                  style={[
+                    styles.liveVelocityRow,
+                    { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7' },
+                  ]}
+                >
+                  <Flame size={13} color={isDark ? '#FBBF24' : '#D97706'} />
+                  <Text style={[styles.liveVelocityText, { color: isDark ? '#FBBF24' : '#92400E' }]}>
                     {paperMetrics.views === 0
                       ? 'Be first verified reader · Reading now'
                       : paperMetrics.views === 1
@@ -1224,30 +1240,38 @@ export default function PaperDetailScreen() {
 
               {/* Substack-Style Abstract Callout Box */}
               {paper.abstract && (
-                <View style={styles.substackCalloutBox}>
+                <View
+                  style={[
+                    styles.substackCalloutBox,
+                    {
+                      backgroundColor: isDark ? '#161B26' : '#F8FAFC',
+                      borderLeftColor: isDark ? '#10B981' : '#1E293B',
+                    },
+                  ]}
+                >
                   <View style={styles.calloutHeaderRow}>
-                    <View style={styles.calloutAccentBar} />
-                    <Text style={styles.calloutHeaderTitle}>ABSTRACT & KEY FINDINGS</Text>
+                    <View style={[styles.calloutAccentBar, { backgroundColor: isDark ? '#10B981' : '#1E293B' }]} />
+                    <Text style={[styles.calloutHeaderTitle, { color: isDark ? '#34D399' : '#1E293B' }]}>ABSTRACT & KEY FINDINGS</Text>
                   </View>
-                  <Text style={styles.substackAbstractText}>{paper.abstract}</Text>
+                  <Text style={[styles.substackAbstractText, { color: isDark ? '#E5E7EB' : '#1F2937' }]}>{paper.abstract}</Text>
                 </View>
               )}
 
               {/* High-Resolution Scientific Figures Gallery (if available) */}
               {((paper.figures && paper.figures.length > 0) || (resolvedFigures && resolvedFigures.length > 0)) && (
                 <View style={styles.figuresSection}>
-                  <Text style={styles.sectionHeaderTitle}>FIGURES & SCHEMATICS</Text>
+                  <Text style={[styles.sectionHeaderTitle, { color: colors.textSecondary }]}>FIGURES & SCHEMATICS</Text>
                   <ScrollView
                     horizontal
                     pagingEnabled
                     showsHorizontalScrollIndicator={false}
-                    style={styles.figuresScroll}
+                    style={[styles.figuresScroll, { backgroundColor: isDark ? '#161B26' : colors.backgroundSecondary }]}
                   >
                     {(paper.figures && paper.figures.length > 0 ? paper.figures : resolvedFigures).map((fig) => (
-                      <View key={fig.id} style={styles.figureSlide}>
+                      <View key={fig.id} style={[styles.figureSlide, { backgroundColor: isDark ? '#161B26' : colors.backgroundSecondary }]}>
                         <Image
                           source={{ uri: fig.url }}
-                          style={styles.figureImage}
+                          style={[styles.figureImage, { backgroundColor: isDark ? '#1F2636' : colors.backgroundTertiary }]}
                           contentFit="cover"
                           transition={200}
                           cachePolicy="disk"
@@ -1271,7 +1295,7 @@ export default function PaperDetailScreen() {
               {/* Topics Tags */}
               {Array.isArray(paper.topics) && paper.topics.length > 0 && (
                 <View style={styles.topicsSection}>
-                  <Text style={styles.sectionHeaderTitle}>DISCIPLINES & TOPICS</Text>
+                  <Text style={[styles.sectionHeaderTitle, { color: colors.textSecondary }]}>DISCIPLINES & TOPICS</Text>
                   <View style={styles.topicPillsWrap}>
                     {paper.topics.map((t) => (
                       <TopicChip
@@ -1293,7 +1317,14 @@ export default function PaperDetailScreen() {
               {/* Canonical Publisher External CTA */}
               <TouchableOpacity
                 onPress={handleOpenPublisher}
-                style={styles.publisherCtaCard}
+                style={[
+                  styles.publisherCtaCard,
+                  {
+                    backgroundColor: isDark ? '#161B26' : colors.black,
+                    borderWidth: 1,
+                    borderColor: colors.borderLight,
+                  },
+                ]}
                 activeOpacity={0.88}
               >
                 <View style={styles.publisherCtaLeft}>
@@ -1311,7 +1342,7 @@ export default function PaperDetailScreen() {
               </TouchableOpacity>
 
               {/* Interaction Bar (Like, Citations, Share) */}
-              <View style={styles.interactionBar}>
+              <View style={[styles.interactionBar, { borderTopColor: colors.borderLight }]}>
                 <LikeButton
                   isLiked={Boolean(paper.isLiked)}
                   likesCount={paper.likesCount}
@@ -1362,18 +1393,18 @@ export default function PaperDetailScreen() {
           {/* ==================================================================== */}
           {/* UNIFIED SYNCHRONIZED DISCUSSION SECTION                             */}
           {/* ==================================================================== */}
-          <View style={styles.discussionSectionWrapper}>
+          <View style={[styles.discussionSectionWrapper, { backgroundColor: colors.background }]}>
             <View style={styles.discussionHeader}>
               <View style={styles.discussionTitleRow}>
                 <DiscussionIcon size={20} color={colors.textPrimary} />
-                <Text style={styles.discussionTitle}>Discussion</Text>
-                <View style={styles.discussionCountBadge}>
-                  <Text style={styles.discussionCountBadgeText}>
+                <Text style={[styles.discussionTitle, { color: colors.textPrimary }]}>Discussion</Text>
+                <View style={[styles.discussionCountBadge, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
+                  <Text style={[styles.discussionCountBadgeText, { color: colors.textSecondary }]}>
                     {totalCommentsCount}
                   </Text>
                 </View>
               </View>
-              <Text style={styles.discussionSubtitleText}>
+              <Text style={[styles.discussionSubtitleText, { color: colors.textSecondary }]}>
                 Constructive scientific inquiry & insights
               </Text>
             </View>

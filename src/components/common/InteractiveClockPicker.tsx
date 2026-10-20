@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { ChevronUp, ChevronDown } from 'lucide-react-native';
+import { useIsDark } from '../../theme';
 
 export interface InteractiveClockPickerProps {
   value: string; // 'HH:mm', e.g. '14:30'
@@ -51,6 +52,8 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
   onChange,
   style,
 }) => {
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(isDark), [isDark]);
   const [activeCol, setActiveCol] = useState<'hour' | 'minute' | 'period'>('hour');
 
   const { hour, minute, period } = useMemo(() => parse24HourToClock(value), [value]);
@@ -217,7 +220,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
         >
           <ChevronUp
             size={22}
-            color={activeCol === 'hour' ? '#0D9488' : '#64748B'}
+            color={activeCol === 'hour' ? (isDark ? '#34D399' : '#0D9488') : (isDark ? '#94A3B8' : '#64748B')}
             strokeWidth={2.5}
           />
         </TouchableOpacity>
@@ -232,7 +235,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
         >
           <ChevronUp
             size={22}
-            color={activeCol === 'minute' ? '#0D9488' : '#64748B'}
+            color={activeCol === 'minute' ? (isDark ? '#34D399' : '#0D9488') : (isDark ? '#94A3B8' : '#64748B')}
             strokeWidth={2.5}
           />
         </TouchableOpacity>
@@ -247,7 +250,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
         >
           <ChevronUp
             size={22}
-            color={activeCol === 'period' ? '#0D9488' : '#64748B'}
+            color={activeCol === 'period' ? (isDark ? '#34D399' : '#0D9488') : (isDark ? '#94A3B8' : '#64748B')}
             strokeWidth={2.5}
           />
         </TouchableOpacity>
@@ -362,7 +365,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
         >
           <ChevronDown
             size={22}
-            color={activeCol === 'hour' ? '#0D9488' : '#64748B'}
+            color={activeCol === 'hour' ? (isDark ? '#34D399' : '#0D9488') : (isDark ? '#94A3B8' : '#64748B')}
             strokeWidth={2.5}
           />
         </TouchableOpacity>
@@ -377,7 +380,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
         >
           <ChevronDown
             size={22}
-            color={activeCol === 'minute' ? '#0D9488' : '#64748B'}
+            color={activeCol === 'minute' ? (isDark ? '#34D399' : '#0D9488') : (isDark ? '#94A3B8' : '#64748B')}
             strokeWidth={2.5}
           />
         </TouchableOpacity>
@@ -392,7 +395,7 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
         >
           <ChevronDown
             size={22}
-            color={activeCol === 'period' ? '#0D9488' : '#64748B'}
+            color={activeCol === 'period' ? (isDark ? '#34D399' : '#0D9488') : (isDark ? '#94A3B8' : '#64748B')}
             strokeWidth={2.5}
           />
         </TouchableOpacity>
@@ -434,147 +437,148 @@ export const InteractiveClockPicker: React.FC<InteractiveClockPickerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    marginVertical: 6,
-  },
-  chevronsRow: {
-    width: 280,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  colonSpacer: {
-    width: 16,
-  },
-  chevronBtn: {
-    flex: 1,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-  },
-  timeCard: {
-    width: 280,
-    height: 74,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginVertical: 4,
-    overflow: 'hidden',
-  },
-  segment: {
-    flex: 1,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    backgroundColor: 'transparent',
-  },
-  segmentActive: {
-    backgroundColor: '#FFFFFF',
-  },
-  timeInput: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#334155',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-    width: '100%',
-    height: '100%',
-    padding: 0,
-    margin: 0,
-    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outline: 'none' } as any) : {}),
-  },
-  timeInputActive: {
-    color: '#0F172A',
-  },
-  periodText: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#475569',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
-  periodTextActive: {
-    color: '#0F172A',
-  },
-  colonContainer: {
-    width: 16,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  colonText: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    left: 8,
-    right: 8,
-    height: 3.5,
-    borderRadius: 2,
-    backgroundColor: '#0D9488', // Cyan/teal accent line matching Windows alarm
-  },
-  presetsSection: {
-    width: 280,
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  presetsLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    marginBottom: 6,
-  },
-  presetsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  presetChip: {
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  presetChipActive: {
-    backgroundColor: '#164E3F',
-    borderColor: '#164E3F',
-  },
-  presetChipText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  presetChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-});
+const createStyles = (isDark: boolean) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: isDark ? '#111622' : '#FFFFFF',
+      borderRadius: 16,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : '#E2E8F0',
+      alignItems: 'center',
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+      marginVertical: 6,
+    },
+    chevronsRow: {
+      width: 280,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    colonSpacer: {
+      width: 16,
+    },
+    chevronBtn: {
+      flex: 1,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 8,
+    },
+    timeCard: {
+      width: 280,
+      height: 74,
+      borderRadius: 12,
+      backgroundColor: isDark ? '#161B26' : '#F1F5F9',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#1F2636' : '#CBD5E1',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginVertical: 4,
+      overflow: 'hidden',
+    },
+    segment: {
+      flex: 1,
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+      backgroundColor: 'transparent',
+    },
+    segmentActive: {
+      backgroundColor: isDark ? '#1F2636' : '#FFFFFF',
+    },
+    timeInput: {
+      fontSize: 32,
+      fontWeight: '800',
+      color: isDark ? '#CBD5E1' : '#334155',
+      letterSpacing: 0.5,
+      textAlign: 'center',
+      width: '100%',
+      height: '100%',
+      padding: 0,
+      margin: 0,
+      ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outline: 'none' } as any) : {}),
+    },
+    timeInputActive: {
+      color: isDark ? '#F9FAFB' : '#0F172A',
+    },
+    periodText: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: isDark ? '#94A3B8' : '#475569',
+      letterSpacing: 0.5,
+      textAlign: 'center',
+    },
+    periodTextActive: {
+      color: isDark ? '#F9FAFB' : '#0F172A',
+    },
+    colonContainer: {
+      width: 16,
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    colonText: {
+      fontSize: 24,
+      fontWeight: '800',
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginBottom: 4,
+    },
+    activeIndicator: {
+      position: 'absolute',
+      bottom: 0,
+      left: 8,
+      right: 8,
+      height: 3.5,
+      borderRadius: 2,
+      backgroundColor: '#10B981', // Emerald accent line matching Obsidian theme
+    },
+    presetsSection: {
+      width: 280,
+      marginTop: 12,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? '#1F2636' : '#F1F5F9',
+    },
+    presetsLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDark ? '#94A3B8' : '#64748B',
+      marginBottom: 6,
+    },
+    presetsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: 4,
+    },
+    presetChip: {
+      paddingHorizontal: 7,
+      paddingVertical: 4,
+      borderRadius: 6,
+      backgroundColor: isDark ? '#161B26' : '#F8FAFC',
+      borderWidth: 1,
+      borderColor: isDark ? '#1F2636' : '#E2E8F0',
+    },
+    presetChipActive: {
+      backgroundColor: isDark ? '#064E3B' : '#164E3F',
+      borderColor: isDark ? '#059669' : '#164E3F',
+    },
+    presetChipText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: isDark ? '#94A3B8' : '#475569',
+    },
+    presetChipTextActive: {
+      color: isDark ? '#34D399' : '#FFFFFF',
+      fontWeight: '700',
+    },
+  });

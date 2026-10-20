@@ -14,7 +14,7 @@ import {
   BarChart2,
   Image as ImageIcon,
 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import {
   UserPaperRating,
   PaperMetrics,
@@ -38,6 +38,8 @@ export const FloatingRatingDock: React.FC<FloatingRatingDockProps> = ({
   onRatingUpdated,
   style,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const currentUser = useAuthStore((s) => s.user);
 
   const [userRating, setUserRating] = useState<UserPaperRating | null>(null);
@@ -115,23 +117,23 @@ export const FloatingRatingDock: React.FC<FloatingRatingDockProps> = ({
       {/* ── ACTIVE STEPPER POPOVER (SCORE X/5) ── */}
       {activePopover && (
         <View style={styles.popoverWrapper}>
-          <View style={styles.popoverBubble}>
+          <View style={[styles.popoverBubble, { backgroundColor: isDark ? '#161B26' : '#FFFFFF', borderColor: isDark ? '#1F2636' : '#E2E8F0' }]}>
             <View style={styles.popoverHeaderRow}>
-              <Text style={styles.popoverHeaderTitle}>
+              <Text style={[styles.popoverHeaderTitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>
                 {activePopover === 'clarity'
                   ? 'CLARITY'
                   : activePopover === 'impact'
                   ? 'IMPACT'
                   : 'VISUALS'}
               </Text>
-              <Text style={styles.popoverHeaderScore}>
+              <Text style={[styles.popoverHeaderScore, { color: isDark ? '#34D399' : '#1B4D3E' }]}>
                 {currentScoreForPopover > 0 ? `${currentScoreForPopover}/5` : 'UNRATED'}
               </Text>
             </View>
 
             {/* Connected Stepper Line 1 - 2 - (3) - 4 - 5 */}
             <View style={styles.stepperTrackContainer}>
-              <View style={styles.stepperHorizontalLine} />
+              <View style={[styles.stepperHorizontalLine, { backgroundColor: isDark ? '#1F2636' : '#E2E8F0' }]} />
 
               {[1, 2, 3, 4, 5].map((score) => {
                 const isSelected = currentScoreForPopover === score;
@@ -140,7 +142,8 @@ export const FloatingRatingDock: React.FC<FloatingRatingDockProps> = ({
                     key={score}
                     style={[
                       styles.stepperNode,
-                      isSelected && styles.stepperNodeSelected,
+                      { backgroundColor: isDark ? '#111622' : '#F8FAFC', borderColor: isDark ? '#334155' : '#CBD5E1' },
+                      isSelected && [styles.stepperNodeSelected, { backgroundColor: isDark ? '#10B981' : '#1B4D3E', borderColor: isDark ? '#10B981' : '#1B4D3E' }],
                     ]}
                     onPress={() => handleSelectScore(activePopover, score)}
                     activeOpacity={0.7}
@@ -149,6 +152,7 @@ export const FloatingRatingDock: React.FC<FloatingRatingDockProps> = ({
                     <Text
                       style={[
                         styles.stepperNodeText,
+                        { color: isDark ? '#94A3B8' : '#475569' },
                         isSelected && styles.stepperNodeTextSelected,
                       ]}
                     >
@@ -161,32 +165,35 @@ export const FloatingRatingDock: React.FC<FloatingRatingDockProps> = ({
           </View>
 
           {/* Downward Caret Arrow pointing to the active button */}
-          <View style={styles.popoverCaret} />
+          <View style={[styles.popoverCaret, { borderTopColor: isDark ? '#161B26' : '#FFFFFF' }]} />
         </View>
       )}
 
       {/* The 3-Pill Floating Dock (Clarity, Impact, Visuals) */}
-      <View style={styles.dockBar}>
+      <View style={[styles.dockBar, { backgroundColor: isDark ? '#161B26' : '#FFFFFF', borderColor: isDark ? '#1F2636' : '#E2E8F0' }]}>
         {/* 1. CLARITY PILL */}
         <TouchableOpacity
           style={[
             styles.metricPill,
-            activePopover === 'clarity' && styles.metricPillActive,
+            { backgroundColor: isDark ? '#111622' : '#F1F5F9' },
+            activePopover === 'clarity' && [styles.metricPillActive, { backgroundColor: isDark ? '#1F2636' : '#E2E8F0', borderColor: isDark ? '#34D399' : '#94A3B8' }],
           ]}
           onPress={() => handleTogglePopover('clarity')}
           activeOpacity={0.8}
         >
-          <AlignLeft size={13} color="#4A5568" />
-          <Text style={styles.metricLabel}>Clarity</Text>
+          <AlignLeft size={13} color={isDark ? '#94A3B8' : '#4A5568'} />
+          <Text style={[styles.metricLabel, { color: isDark ? '#E2E8F0' : '#334155' }]}>Clarity</Text>
           <View
             style={[
               styles.scoreBadge,
-              clarityVal > 0 && styles.scoreBadgeActive,
+              { backgroundColor: isDark ? '#1F2636' : '#E2E8F0' },
+              clarityVal > 0 && [styles.scoreBadgeActive, { backgroundColor: isDark ? '#10B981' : '#1B4D3E' }],
             ]}
           >
             <Text
               style={[
                 styles.scoreBadgeText,
+                { color: isDark ? '#94A3B8' : '#64748B' },
                 clarityVal > 0 && styles.scoreBadgeTextActive,
               ]}
             >
@@ -199,22 +206,25 @@ export const FloatingRatingDock: React.FC<FloatingRatingDockProps> = ({
         <TouchableOpacity
           style={[
             styles.metricPill,
-            activePopover === 'impact' && styles.metricPillActive,
+            { backgroundColor: isDark ? '#111622' : '#F1F5F9' },
+            activePopover === 'impact' && [styles.metricPillActive, { backgroundColor: isDark ? '#1F2636' : '#E2E8F0', borderColor: isDark ? '#34D399' : '#94A3B8' }],
           ]}
           onPress={() => handleTogglePopover('impact')}
           activeOpacity={0.8}
         >
-          <BarChart2 size={13} color="#4A5568" />
-          <Text style={styles.metricLabel}>Impact</Text>
+          <BarChart2 size={13} color={isDark ? '#94A3B8' : '#4A5568'} />
+          <Text style={[styles.metricLabel, { color: isDark ? '#E2E8F0' : '#334155' }]}>Impact</Text>
           <View
             style={[
               styles.scoreBadge,
-              impactVal > 0 && styles.scoreBadgeActive,
+              { backgroundColor: isDark ? '#1F2636' : '#E2E8F0' },
+              impactVal > 0 && [styles.scoreBadgeActive, { backgroundColor: isDark ? '#10B981' : '#1B4D3E' }],
             ]}
           >
             <Text
               style={[
                 styles.scoreBadgeText,
+                { color: isDark ? '#94A3B8' : '#64748B' },
                 impactVal > 0 && styles.scoreBadgeTextActive,
               ]}
             >
@@ -227,22 +237,25 @@ export const FloatingRatingDock: React.FC<FloatingRatingDockProps> = ({
         <TouchableOpacity
           style={[
             styles.metricPill,
-            activePopover === 'visuals' && styles.metricPillActive,
+            { backgroundColor: isDark ? '#111622' : '#F1F5F9' },
+            activePopover === 'visuals' && [styles.metricPillActive, { backgroundColor: isDark ? '#1F2636' : '#E2E8F0', borderColor: isDark ? '#34D399' : '#94A3B8' }],
           ]}
           onPress={() => handleTogglePopover('visuals')}
           activeOpacity={0.8}
         >
-          <ImageIcon size={13} color="#4A5568" />
-          <Text style={styles.metricLabel}>Visuals</Text>
+          <ImageIcon size={13} color={isDark ? '#94A3B8' : '#4A5568'} />
+          <Text style={[styles.metricLabel, { color: isDark ? '#E2E8F0' : '#334155' }]}>Visuals</Text>
           <View
             style={[
               styles.scoreBadge,
-              visualsVal > 0 && styles.scoreBadgeActive,
+              { backgroundColor: isDark ? '#1F2636' : '#E2E8F0' },
+              visualsVal > 0 && [styles.scoreBadgeActive, { backgroundColor: isDark ? '#10B981' : '#1B4D3E' }],
             ]}
           >
             <Text
               style={[
                 styles.scoreBadgeText,
+                { color: isDark ? '#94A3B8' : '#64748B' },
                 visualsVal > 0 && styles.scoreBadgeTextActive,
               ]}
             >

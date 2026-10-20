@@ -42,10 +42,18 @@ import {
 } from '../../types/workspace';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useColors, useIsDark } from '../../theme';
 
 // Enable layout animations on Android if available
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+function useManagerStyles() {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  return { styles, isDark, colors };
 }
 
 export interface WorkspaceBooffInManagerViewProps {
@@ -174,6 +182,7 @@ const AnimatedTaskCard: React.FC<AnimatedTaskCardProps> = ({
   onDelete,
   onOpenCalendar,
 }) => {
+  const { styles, isDark } = useManagerStyles();
   const isCompleted = task.status === 'done';
   const statusOrder: WorkspaceTaskStatus[] = ['todo', 'in_progress', 'review', 'done'];
   const colIdx = statusOrder.indexOf(task.status);
@@ -269,27 +278,27 @@ const AnimatedTaskCard: React.FC<AnimatedTaskCardProps> = ({
     switch (priority) {
       case 'urgent':
         return (
-          <View style={[styles.priorityBadge, { backgroundColor: '#FEF2F2', borderColor: '#FEE2E2' }]}>
-            <Text style={[styles.priorityText, { color: '#DC2626' }]}>Urgent</Text>
+          <View style={[styles.priorityBadge, { backgroundColor: isDark ? '#3B1219' : '#FEF2F2', borderColor: isDark ? '#7F1D1D' : '#FEE2E2' }]}>
+            <Text style={[styles.priorityText, { color: isDark ? '#F87171' : '#DC2626' }]}>Urgent</Text>
           </View>
         );
       case 'high':
         return (
-          <View style={[styles.priorityBadge, { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7' }]}>
-            <Text style={[styles.priorityText, { color: '#D97706' }]}>High</Text>
+          <View style={[styles.priorityBadge, { backgroundColor: isDark ? '#3D2408' : '#FFFBEB', borderColor: isDark ? '#78350F' : '#FEF3C7' }]}>
+            <Text style={[styles.priorityText, { color: isDark ? '#FBBF24' : '#D97706' }]}>High</Text>
           </View>
         );
       case 'medium':
         return (
-          <View style={[styles.priorityBadge, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
-            <Text style={[styles.priorityText, { color: '#475569' }]}>Medium</Text>
+          <View style={[styles.priorityBadge, { backgroundColor: isDark ? '#161B26' : '#F8FAFC', borderColor: isDark ? '#1F2636' : '#E2E8F0' }]}>
+            <Text style={[styles.priorityText, { color: isDark ? '#94A3B8' : '#475569' }]}>Medium</Text>
           </View>
         );
       case 'low':
       default:
         return (
-          <View style={[styles.priorityBadge, { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
-            <Text style={[styles.priorityText, { color: '#64748B' }]}>Low</Text>
+          <View style={[styles.priorityBadge, { backgroundColor: isDark ? '#161B26' : '#F8FAFC', borderColor: isDark ? '#1F2636' : '#E2E8F0' }]}>
+            <Text style={[styles.priorityText, { color: isDark ? '#64748B' : '#64748B' }]}>Low</Text>
           </View>
         );
     }
@@ -299,13 +308,13 @@ const AnimatedTaskCard: React.FC<AnimatedTaskCardProps> = ({
   const renderDateLabel = (dateStr: string) => {
     const today = new Date().toISOString().split('T')[0];
     let label = dateStr.slice(5);
-    let color = '#475569';
+    let color = isDark ? '#94A3B8' : '#475569';
     if (dateStr < today) {
       label = 'Overdue';
-      color = '#DC2626';
+      color = isDark ? '#F87171' : '#DC2626';
     } else if (dateStr === today) {
       label = 'Due Today';
-      color = '#D97706';
+      color = isDark ? '#FBBF24' : '#D97706';
     }
     return { label, color };
   };
@@ -352,14 +361,14 @@ const AnimatedTaskCard: React.FC<AnimatedTaskCardProps> = ({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.cardIconBtn}
           >
-            <Edit3 size={13} color="#94A3B8" />
+            <Edit3 size={13} color={isDark ? '#64748B' : '#94A3B8'} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => onDelete(task)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.cardIconBtn}
           >
-            <Trash2 size={13} color="#94A3B8" />
+            <Trash2 size={13} color={isDark ? '#64748B' : '#94A3B8'} />
           </TouchableOpacity>
         </View>
       </View>
@@ -404,7 +413,7 @@ const AnimatedTaskCard: React.FC<AnimatedTaskCardProps> = ({
             </View>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <User size={12} color="#94A3B8" />
+              <User size={12} color={isDark ? '#64748B' : '#94A3B8'} />
               <Text style={styles.unassignedText}>Unassigned</Text>
             </View>
           )}
@@ -418,7 +427,7 @@ const AnimatedTaskCard: React.FC<AnimatedTaskCardProps> = ({
               style={styles.stepBtnPrev}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <ChevronLeft size={13} color="#64748B" />
+              <ChevronLeft size={13} color={isDark ? '#94A3B8' : '#64748B'} />
             </TouchableOpacity>
           )}
 
@@ -431,7 +440,7 @@ const AnimatedTaskCard: React.FC<AnimatedTaskCardProps> = ({
               <Text style={styles.advanceStageText}>
                 {nextCol.title}
               </Text>
-              <ArrowRight size={11} color="#2563EB" />
+              <ArrowRight size={11} color={isDark ? '#60A5FA' : '#2563EB'} />
             </TouchableOpacity>
           ) : (
             <View style={styles.completedBadgePill}>
@@ -467,6 +476,7 @@ const HoveringCalendarPicker: React.FC<HoveringCalendarPickerProps> = ({
   onSelectDate,
   onClose,
 }) => {
+  const { styles, isDark } = useManagerStyles();
   const initialDate = useMemo(() => {
     if (selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
       const [y, m, d] = selectedDate.split('-').map(Number);
@@ -590,7 +600,7 @@ const HoveringCalendarPicker: React.FC<HoveringCalendarPickerProps> = ({
           style={styles.popoverNavBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <ChevronLeft size={15} color="#0F172A" />
+          <ChevronLeft size={15} color={isDark ? '#F9FAFB' : '#0F172A'} />
         </TouchableOpacity>
         <Text style={styles.popoverMonthTitle}>
           {MONTH_NAMES[currentMonth]} {currentYear}
@@ -600,7 +610,7 @@ const HoveringCalendarPicker: React.FC<HoveringCalendarPickerProps> = ({
           style={styles.popoverNavBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <ChevronRight size={15} color="#0F172A" />
+          <ChevronRight size={15} color={isDark ? '#F9FAFB' : '#0F172A'} />
         </TouchableOpacity>
       </View>
 
@@ -677,6 +687,7 @@ const SquareTimePicker: React.FC<SquareTimePickerProps> = ({
   onSelectTime,
   onClose,
 }) => {
+  const { styles, isDark } = useManagerStyles();
   const { hour24, minute } = useMemo(() => {
     const [hStr, mStr] = (selectedTime || '14:00').split(':');
     let h = parseInt(hStr, 10);
@@ -728,7 +739,7 @@ const SquareTimePicker: React.FC<SquareTimePickerProps> = ({
       {/* Clock Setting Header & Mode Switcher */}
       <View style={styles.clockModeHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Clock size={14} color="#0F172A" />
+          <Clock size={14} color={isDark ? '#34D399' : '#0F172A'} />
           <Text style={styles.clockModeTitle}>Clock Setting</Text>
         </View>
 
@@ -879,6 +890,7 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
   members,
   onOpenCalendar,
 }) => {
+  const { styles, isDark, colors } = useManagerStyles();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -1173,17 +1185,17 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
         {/* Minimal Search & Filter Pills */}
         <View style={styles.filterControlRow}>
           <View style={styles.searchBar}>
-            <Search size={13} color="#94A3B8" />
+            <Search size={13} color={isDark ? '#64748B' : '#94A3B8'} />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Filter tasks..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
               style={styles.searchInput}
             />
             {Boolean(searchQuery) && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={13} color="#94A3B8" />
+                <X size={13} color={isDark ? '#94A3B8' : '#94A3B8'} />
               </TouchableOpacity>
             )}
           </View>
@@ -1252,7 +1264,7 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
                     style={styles.columnAddBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Plus size={14} color="#64748B" />
+                    <Plus size={14} color={isDark ? '#94A3B8' : '#64748B'} />
                   </TouchableOpacity>
                 </View>
 
@@ -1369,7 +1381,7 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
                 {editingTask ? 'Edit Task' : 'New Task'}
               </Text>
               <TouchableOpacity onPress={() => setIsModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={18} color="#64748B" />
+                <X size={18} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
             </View>
 
@@ -1384,7 +1396,7 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
                 value={formTitle}
                 onChangeText={setFormTitle}
                 placeholder="Task title..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                 style={styles.textInput}
               />
 
@@ -1393,7 +1405,7 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
                 value={formDescription}
                 onChangeText={setFormDescription}
                 placeholder="Details or references..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
                 multiline
                 numberOfLines={3}
                 style={[styles.textInput, styles.textAreaInput]}
@@ -1456,7 +1468,7 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
                       onPress={() => setFormColor(cKey)}
                       style={[
                         styles.colorPickerPill,
-                        isSelected && { borderColor: cfg.accent, backgroundColor: '#F8FAFC' },
+                        isSelected && { borderColor: cfg.accent, backgroundColor: isDark ? '#161B26' : '#F8FAFC' },
                       ]}
                     >
                       <View style={[styles.colorPickerDot, { backgroundColor: cfg.accent }]} />
@@ -1670,18 +1682,18 @@ export const WorkspaceBooffInManagerView: React.FC<WorkspaceBooffInManagerViewPr
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#0B0F17' : '#F8FAFC',
   },
   headerBanner: {
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   headerTitleRow: {
     flexDirection: 'row',
@@ -1691,19 +1703,19 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     letterSpacing: -0.2,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 1,
   },
   createTaskBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
@@ -1727,26 +1739,26 @@ const styles = StyleSheet.create({
   },
   statItemText: {
     fontSize: 12,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     fontWeight: '500',
   },
   statNumber: {
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   statDot: {
-    color: '#CBD5E1',
+    color: isDark ? '#475569' : '#CBD5E1',
     fontSize: 12,
   },
   progressBarTrack: {
     height: 3,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
     borderRadius: 1.5,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
     borderRadius: 1.5,
   },
 
@@ -1759,17 +1771,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     paddingHorizontal: 9,
     height: 32,
   },
   searchInput: {
     flex: 1,
     fontSize: 12,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     paddingVertical: 0,
   },
   filterPillsStrip: {
@@ -1781,17 +1793,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   subFilterPillActive: {
-    backgroundColor: '#0F172A',
-    borderColor: '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
+    borderColor: isDark ? '#10B981' : '#0F172A',
   },
   subFilterPillText: {
     fontSize: 11,
-    color: '#475569',
+    color: isDark ? '#94A3B8' : '#475569',
     fontWeight: '500',
   },
   subFilterPillTextActive: {
@@ -1806,10 +1818,10 @@ const styles = StyleSheet.create({
   },
   desktopColumn: {
     width: 290,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#111622' : '#F8FAFC',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     overflow: 'hidden',
     maxHeight: '100%',
   },
@@ -1820,22 +1832,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: isDark ? '#1F2636' : '#E2E8F0',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
   },
   columnTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   columnCountText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
   },
   columnAddBtn: {
     padding: 4,
     borderRadius: 4,
+    backgroundColor: isDark ? '#1F2636' : 'transparent',
   },
   columnCardsScroll: {
     flex: 1,
@@ -1848,11 +1861,11 @@ const styles = StyleSheet.create({
   },
   mobileTabsRow: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     paddingHorizontal: 8,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: isDark ? '#1F2636' : '#E2E8F0',
     gap: 6,
   },
   mobileTabPill: {
@@ -1864,30 +1877,30 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
   },
   mobileTabPillActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#0F172A',
+    backgroundColor: isDark ? '#1F2636' : '#FFFFFF',
+    borderColor: isDark ? '#10B981' : '#0F172A',
     borderWidth: 1.5,
   },
   mobileTabText: {
     fontSize: 11,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     fontWeight: '500',
   },
   mobileTabTextActive: {
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     fontWeight: '700',
   },
   mobileTabCountText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: isDark ? '#64748B' : '#94A3B8',
   },
   mobileTabCountTextActive: {
-    color: '#0F172A',
+    color: isDark ? '#10B981' : '#0F172A',
     fontWeight: '700',
   },
   mobileCardsScroll: {
@@ -1901,15 +1914,15 @@ const styles = StyleSheet.create({
 
   /* MINIMALIST TASK CARD */
   taskCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     position: 'relative',
-    shadowColor: '#0F172A',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
+    shadowOpacity: isDark ? 0.2 : 0.04,
     shadowRadius: 3,
     elevation: 1,
   },
@@ -1960,17 +1973,17 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     lineHeight: 18,
     paddingLeft: 4,
   },
   taskTitleCompleted: {
     textDecorationLine: 'line-through',
-    color: '#64748B',
+    color: isDark ? '#64748B' : '#64748B',
   },
   taskDescription: {
     fontSize: 11,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 3,
     lineHeight: 16,
     paddingLeft: 4,
@@ -1987,11 +2000,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 1.5,
     borderRadius: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1F2636' : '#F1F5F9',
   },
   tagPillText: {
     fontSize: 10,
-    color: '#475569',
+    color: isDark ? '#94A3B8' : '#475569',
     fontWeight: '500',
   },
   cardFooterRow: {
@@ -2001,7 +2014,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F8FAFC',
+    borderTopColor: isDark ? '#1F2636' : '#F8FAFC',
     paddingLeft: 4,
   },
   assigneeContainer: {
@@ -2010,12 +2023,12 @@ const styles = StyleSheet.create({
   assigneeName: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#334155',
+    color: isDark ? '#E2E8F0' : '#334155',
     maxWidth: 90,
   },
   unassignedText: {
     fontSize: 10,
-    color: '#94A3B8',
+    color: isDark ? '#64748B' : '#94A3B8',
   },
   stageTransferRow: {
     flexDirection: 'row',
@@ -2026,9 +2039,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 3,
     borderRadius: 4,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#1F2636' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#2D3748' : '#E2E8F0',
   },
   advanceStagePill: {
     flexDirection: 'row',
@@ -2037,25 +2050,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 5,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: isDark ? '#334155' : '#DBEAFE',
   },
   advanceStageText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#2563EB',
+    color: isDark ? '#60A5FA' : '#2563EB',
   },
   completedBadgePill: {
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 5,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? '#064E3B' : '#ECFDF5',
   },
   completedBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#059669',
+    color: isDark ? '#34D399' : '#059669',
   },
 
   /* EMPTY COLUMN STATE */
@@ -2066,14 +2079,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#1F2636' : '#CBD5E1',
     borderRadius: 8,
     marginTop: 4,
     gap: 4,
   },
   emptyColumnText: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: isDark ? '#64748B' : '#94A3B8',
   },
   emptyColumnAddBtn: {
     paddingHorizontal: 8,
@@ -2082,13 +2095,13 @@ const styles = StyleSheet.create({
   emptyColumnAddText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2563EB',
+    color: isDark ? '#10B981' : '#2563EB',
   },
 
   /* MODALS */
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
@@ -2096,11 +2109,11 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxHeight: '90%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 12,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -2111,7 +2124,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   modalCloseBtn: {
     padding: 2,
@@ -2122,21 +2135,21 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 10,
     marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   textInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#1F2636' : '#CBD5E1',
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   textAreaInput: {
     minHeight: 65,
@@ -2159,9 +2172,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#161B26' : '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   colorPickerDot: {
     width: 8,
@@ -2170,24 +2183,24 @@ const styles = StyleSheet.create({
   },
   colorPickerText: {
     fontSize: 11,
-    color: '#475569',
+    color: isDark ? '#E2E8F0' : '#475569',
     fontWeight: '500',
   },
   choicePill: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 6,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   choicePillActive: {
-    borderColor: '#0F172A',
-    backgroundColor: '#0F172A',
+    borderColor: isDark ? '#10B981' : '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
   },
   choicePillText: {
     fontSize: 11,
-    color: '#475569',
+    color: isDark ? '#94A3B8' : '#475569',
     fontWeight: '500',
   },
   choicePillTextActive: {
@@ -2201,17 +2214,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4.5,
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   assigneeChoicePillActive: {
-    borderColor: '#0F172A',
-    backgroundColor: '#0F172A',
+    borderColor: isDark ? '#10B981' : '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
   },
   assigneeChoiceText: {
     fontSize: 11,
-    color: '#475569',
+    color: isDark ? '#94A3B8' : '#475569',
     fontWeight: '500',
   },
   assigneeChoiceTextActive: {
@@ -2224,9 +2237,9 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 8,
     borderRadius: 6,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     marginTop: 12,
   },
   checkboxSquare: {
@@ -2234,23 +2247,23 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 3,
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#2D3748' : '#CBD5E1',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
   },
   checkboxSquareChecked: {
-    backgroundColor: '#0F172A',
-    borderColor: '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
+    borderColor: isDark ? '#10B981' : '#0F172A',
   },
   syncCalendarTitle: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   syncCalendarSubtitle: {
     fontSize: 10,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
   },
   modalFooter: {
     flexDirection: 'row',
@@ -2260,7 +2273,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: isDark ? '#1F2636' : '#F1F5F9',
   },
   modalCancelBtn: {
     paddingHorizontal: 12,
@@ -2269,13 +2282,13 @@ const styles = StyleSheet.create({
   modalCancelBtnText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
   },
   modalSubmitBtn: {
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 6,
-    backgroundColor: '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
   },
   modalSubmitBtnText: {
     fontSize: 12,
@@ -2290,12 +2303,12 @@ const styles = StyleSheet.create({
   deleteTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     marginBottom: 4,
   },
   deleteSubtitle: {
     fontSize: 12,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     lineHeight: 16,
   },
 
@@ -2304,9 +2317,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#1F2636' : '#CBD5E1',
     borderRadius: 6,
     overflow: 'hidden',
   },
@@ -2316,7 +2329,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   inputIconBtn: {
     paddingHorizontal: 10,
@@ -2332,14 +2345,14 @@ const styles = StyleSheet.create({
     top: 60,
     left: 0,
     width: 285,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#1F2636' : '#CBD5E1',
     padding: 10,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 14,
     elevation: 12,
     zIndex: 1000,
@@ -2353,12 +2366,12 @@ const styles = StyleSheet.create({
   popoverNavBtn: {
     padding: 6,
     borderRadius: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#161B26' : '#F1F5F9',
   },
   popoverMonthTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   popoverWeekdaysRow: {
     flexDirection: 'row',
@@ -2369,7 +2382,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 10,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: isDark ? '#64748B' : '#94A3B8',
   },
   popoverDaysGrid: {
     flexDirection: 'row',
@@ -2383,26 +2396,26 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   popoverDayCellSelected: {
-    backgroundColor: '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
   },
   popoverDayCellToday: {
     borderWidth: 1,
-    borderColor: '#2563EB',
+    borderColor: isDark ? '#10B981' : '#2563EB',
   },
   popoverDayText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#0F172A',
+    color: isDark ? '#E2E8F0' : '#0F172A',
   },
   popoverDayTextMuted: {
-    color: '#CBD5E1',
+    color: isDark ? '#475569' : '#CBD5E1',
   },
   popoverDayTextSelected: {
     color: '#FFFFFF',
     fontWeight: '700',
   },
   popoverDayTextToday: {
-    color: '#2563EB',
+    color: isDark ? '#10B981' : '#2563EB',
     fontWeight: '700',
   },
   popoverFooterRow: {
@@ -2412,24 +2425,24 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: isDark ? '#1F2636' : '#F1F5F9',
   },
   popoverShortcutPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#161B26' : '#F1F5F9',
   },
   popoverShortcutText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#475569',
+    color: isDark ? '#94A3B8' : '#475569',
   },
   popoverCloseBtn: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 4,
-    backgroundColor: '#0F172A',
+    backgroundColor: isDark ? '#1F2636' : '#0F172A',
   },
   popoverCloseText: {
     fontSize: 10,
@@ -2443,14 +2456,14 @@ const styles = StyleSheet.create({
     top: 60,
     right: 0,
     width: 295,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: isDark ? '#1F2636' : '#CBD5E1',
     padding: 12,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 14,
     elevation: 12,
     zIndex: 1000,
@@ -2462,17 +2475,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
   },
   clockModeTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   clockModeTabs: {
     flexDirection: 'row',
     gap: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#161B26' : '#F1F5F9',
     padding: 2,
     borderRadius: 6,
   },
@@ -2482,7 +2495,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   clockModeTabActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#1F2636' : '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
@@ -2492,10 +2505,10 @@ const styles = StyleSheet.create({
   clockModeTabText: {
     fontSize: 10,
     fontWeight: '500',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
   },
   clockModeTabTextActive: {
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
     fontWeight: '700',
   },
   timeHeaderRow: {
@@ -2505,16 +2518,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingBottom: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: isDark ? '#1F2636' : '#F1F5F9',
   },
   timeDisplayMain: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   timeDisplaySub: {
     fontSize: 10,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
   },
   periodToggleRow: {
     flexDirection: 'row',
@@ -2524,18 +2537,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#161B26' : '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   periodSquareBtnActive: {
-    backgroundColor: '#0F172A',
-    borderColor: '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
+    borderColor: isDark ? '#10B981' : '#0F172A',
   },
   periodSquareText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
   },
   periodSquareTextActive: {
     color: '#FFFFFF',
@@ -2543,7 +2556,7 @@ const styles = StyleSheet.create({
   timeSectionLabel: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: isDark ? '#64748B' : '#94A3B8',
     letterSpacing: 0.5,
     marginBottom: 4,
     marginTop: 2,
@@ -2560,22 +2573,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 5,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#161B26' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
   },
   timeSquareBtnHourActive: {
-    backgroundColor: '#0F172A',
-    borderColor: '#0F172A',
+    backgroundColor: isDark ? '#10B981' : '#0F172A',
+    borderColor: isDark ? '#10B981' : '#0F172A',
   },
   timeSquareBtnMinActive: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
+    backgroundColor: isDark ? '#10B981' : '#2563EB',
+    borderColor: isDark ? '#10B981' : '#2563EB',
   },
   timeSquareText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#334155',
+    color: isDark ? '#E2E8F0' : '#334155',
   },
   timeSquareTextActive: {
     color: '#FFFFFF',

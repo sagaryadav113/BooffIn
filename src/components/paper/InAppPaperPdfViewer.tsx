@@ -18,7 +18,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { WebView } from 'react-native-webview';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useColors, useIsDark } from '../../theme';
 import { Paper } from '../../types';
 import { FloatingRatingDock } from './FloatingRatingDock';
 import { PaperMetrics, UserPaperRating } from '../../api/hypeScoreService';
@@ -267,6 +267,8 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   onSwitchToArticleView,
   onRatingUpdated,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
   const webViewRef = useRef<WebView>(null);
 
   // States
@@ -494,11 +496,11 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
   return (
     <View style={styles.container}>
       {/* ── TOP TOOLBAR ── */}
-      <View style={styles.topToolbar}>
+      <View style={[styles.topToolbar, { backgroundColor: colors.cardBackground, borderBottomColor: colors.borderLight }]}>
         <View style={styles.toolbarLeft}>
-          <View style={styles.badgeWrap}>
-            <FileText size={12} color="#1B4D3E" />
-            <Text style={styles.badgeText}>
+          <View style={[styles.badgeWrap, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
+            <FileText size={12} color={isDark ? '#34D399' : '#1B4D3E'} />
+            <Text style={[styles.badgeText, { color: isDark ? '#34D399' : '#1B4D3E' }]}>
               {renderMode === 'publisher_web'
                 ? 'Publisher Portal'
                 : isArxivPdf
@@ -506,7 +508,7 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
                 : 'Original PDF'}
             </Text>
           </View>
-          <Text style={styles.journalSubtitle} numberOfLines={1}>
+          <Text style={[styles.journalSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
             {paper.journal || 'Academic Paper'} {paper.publicationYear ? `· ${paper.publicationYear}` : ''}
             {totalPages ? ` · ${totalPages} pages` : ''}
           </Text>
@@ -514,26 +516,26 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
 
         <View style={styles.toolbarActions}>
           <TouchableOpacity
-            style={styles.toolbarIconBtn}
+            style={[styles.toolbarIconBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}
             onPress={handleReload}
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <RotateCw size={14} color="#4B5563" />
+            <RotateCw size={14} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.toolbarActionBtn}
+            style={[styles.toolbarActionBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}
             onPress={handleOpenExternal}
             activeOpacity={0.8}
           >
-            <ExternalLink size={13} color="#1B4D3E" />
-            <Text style={styles.toolbarActionBtnText}>Browser</Text>
+            <ExternalLink size={13} color={isDark ? '#34D399' : '#1B4D3E'} />
+            <Text style={[styles.toolbarActionBtnText, { color: isDark ? '#34D399' : '#1B4D3E' }]}>Browser</Text>
           </TouchableOpacity>
 
           {onSwitchToArticleView && (
             <TouchableOpacity
-              style={styles.articleToggleBtn}
+              style={[styles.articleToggleBtn, { backgroundColor: isDark ? '#10B981' : '#1B4D3E' }]}
               onPress={onSwitchToArticleView}
               activeOpacity={0.8}
             >
@@ -599,10 +601,10 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
 
               {/* In-App Loading Overlay */}
               {isLoadingPdf && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#1B4D3E" />
-                  <Text style={styles.loadingTitle}>Opening PDF Manuscript...</Text>
-                  <Text style={styles.loadingSubtitle}>
+                <View style={[styles.loadingContainer, { backgroundColor: isDark ? 'rgba(11, 15, 23, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]}>
+                  <ActivityIndicator size="large" color={isDark ? '#10B981' : '#1B4D3E'} />
+                  <Text style={[styles.loadingTitle, { color: colors.textPrimary }]}>Opening PDF Manuscript...</Text>
+                  <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>
                     {downloadProgress > 0 && downloadProgress < 1
                       ? `Loading pages (${Math.round(downloadProgress * 100)}%)...`
                       : 'Rendering in-app publication view'}
@@ -631,21 +633,21 @@ export const InAppPaperPdfViewer: React.FC<InAppPaperPdfViewerProps> = ({
                 userAgent="Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
                 startInLoadingState={true}
                 renderLoading={() => (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#1B4D3E" />
-                    <Text style={styles.loadingTitle}>Opening Publication Reader...</Text>
-                    <Text style={styles.loadingSubtitle}>Loading manuscript from publisher</Text>
+                  <View style={[styles.loadingContainer, { backgroundColor: isDark ? 'rgba(11, 15, 23, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]}>
+                    <ActivityIndicator size="large" color={isDark ? '#10B981' : '#1B4D3E'} />
+                    <Text style={[styles.loadingTitle, { color: colors.textPrimary }]}>Opening Publication Reader...</Text>
+                    <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>Loading manuscript from publisher</Text>
                   </View>
                 )}
                 renderError={(errorDomain, errorCode, errorDesc) => (
-                  <View style={styles.errorContainer}>
+                  <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
                     <ShieldAlert size={36} color="#DC2626" />
-                    <Text style={styles.errorTitle}>Publisher Portal Protected</Text>
-                    <Text style={styles.errorDesc}>
+                    <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>Publisher Portal Protected</Text>
+                    <Text style={[styles.errorDesc, { color: colors.textSecondary }]}>
                       {errorDesc || 'This publisher requires an external browser session.'}
                     </Text>
                     <TouchableOpacity
-                      style={styles.errorPrimaryBtn}
+                      style={[styles.errorPrimaryBtn, { backgroundColor: isDark ? '#10B981' : '#1B4D3E' }]}
                       onPress={handleOpenExternal}
                       activeOpacity={0.85}
                     >

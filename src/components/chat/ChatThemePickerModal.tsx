@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { CHAT_THEME_LIST, CHAT_THEMES } from '../../config/chatThemes';
 import { ChatThemeConfig, ChatThemeId } from '../../types/chatTheme';
 import { useChatThemeStore } from '../../store/useChatThemeStore';
+import { useColors, useIsDark } from '../../theme';
 
 interface ChatThemePickerModalProps {
   visible: boolean;
@@ -35,6 +36,10 @@ export const ChatThemePickerModal: React.FC<ChatThemePickerModalProps> = ({
   workspaceId,
   chatName = 'this chat',
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const currentThemeId = useChatThemeStore(
     (s) => s.themes[workspaceId] || 'default'
   );
@@ -78,7 +83,7 @@ export const ChatThemePickerModal: React.FC<ChatThemePickerModalProps> = ({
           <View style={styles.headerRow}>
             <View style={styles.headerTitleWrap}>
               <View style={styles.headerIconCircle}>
-                <Palette size={20} color="#064E3B" strokeWidth={2.2} />
+                <Palette size={20} color={isDark ? '#34D399' : '#064E3B'} strokeWidth={2.2} />
               </View>
               <View>
                 <Text style={styles.modalTitle}>Chat Theme</Text>
@@ -92,7 +97,7 @@ export const ChatThemePickerModal: React.FC<ChatThemePickerModalProps> = ({
               style={styles.closeBtn}
               accessibilityLabel="Close Theme Picker"
             >
-              <X size={20} color="#64748B" />
+              <X size={20} color={isDark ? '#94A3B8' : '#64748B'} />
             </TouchableOpacity>
           </View>
 
@@ -252,10 +257,10 @@ export const ChatThemePickerModal: React.FC<ChatThemePickerModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: isDark ? 'rgba(0, 0, 0, 0.75)' : 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
@@ -263,12 +268,14 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 480,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#111622' : '#FFFFFF',
     borderRadius: 24,
     padding: 20,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? '#1F2636' : 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
+    shadowOpacity: isDark ? 0.4 : 0.15,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -288,18 +295,18 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: isDark ? '#F9FAFB' : '#0F172A',
   },
   modalSubtitle: {
     fontSize: 12,
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     marginTop: 2,
     maxWidth: 260,
   },
@@ -307,7 +314,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#161B26' : '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -317,7 +324,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     marginBottom: 16,
   },
   livePreviewBg: {
@@ -365,7 +372,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
     letterSpacing: 0.6,
     marginBottom: 10,
   },
@@ -382,8 +389,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   themeCardActive: {
-    borderColor: '#064E3B',
-    backgroundColor: '#F0FDF4',
+    borderColor: isDark ? '#10B981' : '#064E3B',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#F0FDF4',
   },
   themeThumbnailWrapper: {
     width: 74,
@@ -391,7 +398,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#1F2636' : '#E2E8F0',
     marginBottom: 6,
   },
   themeThumbnailImg: {
@@ -410,7 +417,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#064E3B',
+    backgroundColor: isDark ? '#10B981' : '#064E3B',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -424,11 +431,11 @@ const styles = StyleSheet.create({
   themeCardName: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#475569',
+    color: isDark ? '#94A3B8' : '#475569',
     textAlign: 'center',
   },
   themeCardNameActive: {
-    color: '#064E3B',
+    color: isDark ? '#34D399' : '#064E3B',
     fontWeight: '700',
   },
   applyBtn: {
