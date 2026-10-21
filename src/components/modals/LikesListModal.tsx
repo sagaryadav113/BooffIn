@@ -5,14 +5,16 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   FlatList,
   ActivityIndicator,
   RefreshControl,
   TextInput,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Search } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors as defaultColors, radii, spacing, typography, useTheme } from '../../theme';
 import { UserProfile } from '../../types';
 import { ResearcherCard } from '../cards/ResearcherCard';
 import { EmptyState } from '../feedback/EmptyState';
@@ -32,6 +34,7 @@ export const LikesListModal: React.FC<LikesListModalProps> = ({
   onClose,
   likesCount,
 }) => {
+  const { colors, isDark } = useTheme();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
 
@@ -87,114 +90,223 @@ export const LikesListModal: React.FC<LikesListModalProps> = ({
     );
   });
 
+  const isWeb = Platform.OS === 'web';
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
+      transparent
+      animationType={isWeb ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.titleContainer}>
-            <View style={styles.titleRow}>
-              <Text style={styles.headerTitle}>Liked by</Text>
-              {(likers.length > 0 || (likesCount !== undefined && likesCount > 0)) && (
-                <View style={styles.countBadge}>
-                  <Text style={styles.countBadgeText}>
-                    {likers.length > 0 ? likers.length : likesCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.headerSubtitle}>
-              Researchers who endorsed this post
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={onClose}
-            style={styles.closeButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            activeOpacity={0.7}
-          >
-            <X size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View
+          style={[
+            styles.backdrop,
+            { backgroundColor: isDark ? 'rgba(0, 0, 0, 0.78)' : 'rgba(15, 23, 42, 0.5)' },
+          ]}
+        />
+      </TouchableWithoutFeedback>
 
-        {/* Optional Search Bar when there are multiple likers */}
-        {likers.length > 4 && (
-          <View style={styles.searchBarContainer}>
-            <Search size={16} color={colors.textSecondary} style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search researchers..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="none"
-              clearButtonMode="while-editing"
+      <View style={[styles.sheetWrapper, isWeb ? styles.sheetWrapperWeb : styles.sheetWrapperMobile]} pointerEvents="box-none">
+        <View
+          style={[
+            styles.sheetContainer,
+            isWeb ? styles.sheetContainerWeb : styles.sheetContainerMobile,
+            {
+              backgroundColor: isDark ? '#111622' : '#FFFFFF',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.border,
+            },
+          ]}
+        >
+          {!isWeb && (
+            <View
+              style={[
+                styles.dragHandle,
+                { backgroundColor: isDark ? '#334155' : '#CBD5E1' },
+              ]}
             />
-          </View>
-        )}
+          )}
 
-        {/* Content */}
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#064E3B" />
-            <Text style={styles.loadingText}>Loading endorsements...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={loadData} style={styles.retryButton}>
-              <Text style={styles.retryText}>Try Again</Text>
+          {/* Header */}
+          <View
+            style={[
+              styles.header,
+              {
+                backgroundColor: isDark ? '#161B26' : colors.backgroundCard,
+                borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.07)' : colors.border,
+              },
+            ]}
+          >
+            <View style={styles.titleContainer}>
+              <View style={styles.titleRow}>
+                <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Liked by</Text>
+                {(likers.length > 0 || (likesCount !== undefined && likesCount > 0)) && (
+                  <View
+                    style={[
+                      styles.countBadge,
+                      {
+                        backgroundColor: isDark ? 'rgba(16, 185, 129, 0.14)' : 'rgba(6, 78, 59, 0.08)',
+                        borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(6, 78, 59, 0.2)',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.countBadgeText,
+                        { color: isDark ? '#34D399' : '#064E3B' },
+                      ]}
+                    >
+                      {likers.length > 0 ? likers.length : likesCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                Researchers who endorsed this post
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[
+                styles.closeButton,
+                { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.07)' : colors.backgroundSecondary },
+              ]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
+            >
+              <X size={18} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
-        ) : (
-          <FlatList
-            data={filteredLikers}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <ResearcherCard
-                researcher={item}
-                onFollowToggle={() => toggleFollowUser(item.id)}
+
+          {/* Optional Search Bar when there are multiple likers */}
+          {likers.length > 4 && (
+            <View
+              style={[
+                styles.searchBarContainer,
+                {
+                  backgroundColor: isDark ? '#161D2A' : colors.backgroundSecondary,
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.border,
+                },
+              ]}
+            >
+              <Search size={16} color={colors.textSecondary} style={styles.searchIcon} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.textPrimary }]}
+                placeholder="Search researchers..."
+                placeholderTextColor={colors.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                clearButtonMode="while-editing"
               />
-            )}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                tintColor="#064E3B"
-                colors={['#064E3B']}
-              />
-            }
-            ListEmptyComponent={
-              <EmptyState
-                icon="Users"
-                title={searchQuery ? 'No matching researchers' : 'No endorsements yet'}
-                description={
-                  searchQuery
-                    ? `No researchers found matching "${searchQuery}".`
-                    : 'Be the first to endorse this scientific post.'
-                }
-              />
-            }
-            contentContainerStyle={
-              filteredLikers.length === 0 ? styles.emptyListContent : styles.listContent
-            }
-          />
-        )}
-      </SafeAreaView>
+            </View>
+          )}
+
+          {/* Content */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={isDark ? '#10B981' : '#064E3B'} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading endorsements...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+              <TouchableOpacity
+                onPress={loadData}
+                style={[styles.retryButton, { backgroundColor: isDark ? '#10B981' : '#064E3B' }]}
+              >
+                <Text style={styles.retryText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredLikers}
+              keyExtractor={(item) => item.id}
+              style={{ backgroundColor: isDark ? '#111622' : colors.background }}
+              renderItem={({ item }) => (
+                <ResearcherCard
+                  researcher={item}
+                  onFollowToggle={() => toggleFollowUser(item.id)}
+                />
+              )}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={isDark ? '#10B981' : '#064E3B'}
+                  colors={[isDark ? '#10B981' : '#064E3B']}
+                />
+              }
+              ListEmptyComponent={
+                <EmptyState
+                  icon="Users"
+                  title={searchQuery ? 'No matching researchers' : 'No endorsements yet'}
+                  description={
+                    searchQuery
+                      ? `No researchers found matching "${searchQuery}".`
+                      : 'Be the first to endorse this scientific post.'
+                  }
+                />
+              }
+              contentContainerStyle={
+                filteredLikers.length === 0 ? styles.emptyListContent : styles.listContent
+              }
+            />
+          )}
+        </View>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  sheetWrapper: {
     flex: 1,
-    backgroundColor: colors.background,
+  },
+  sheetWrapperWeb: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  sheetWrapperMobile: {
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  sheetContainerWeb: {
+    maxWidth: 580,
+    maxHeight: '85%',
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 28,
+    elevation: 24,
+  },
+  sheetContainerMobile: {
+    maxHeight: '88%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 4,
   },
   header: {
     flexDirection: 'row',
@@ -203,8 +315,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    backgroundColor: colors.white,
   },
   titleContainer: {
     flex: 1,
@@ -218,44 +328,38 @@ const styles = StyleSheet.create({
     ...typography.h3,
     fontSize: 18,
     fontWeight: '700',
-    color: colors.textPrimary,
   },
   countBadge: {
-    backgroundColor: 'rgba(6, 78, 59, 0.08)',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: 'rgba(6, 78, 59, 0.2)',
   },
   countBadgeText: {
     ...typography.microBold,
     fontSize: 11,
-    color: '#064E3B',
     fontWeight: '700',
   },
   headerSubtitle: {
     ...typography.caption,
-    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   closeButton: {
-    padding: spacing.xs,
+    padding: 7,
     borderRadius: radii.full,
-    backgroundColor: colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
     marginHorizontal: spacing.md,
     marginVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radii.full,
     height: 38,
     borderWidth: 1,
-    borderColor: colors.borderLight,
   },
   searchIcon: {
     marginRight: 8,
@@ -264,7 +368,6 @@ const styles = StyleSheet.create({
     flex: 1,
     ...typography.body,
     fontSize: 13.5,
-    color: colors.textPrimary,
     paddingVertical: 0,
   },
   loadingContainer: {
@@ -272,10 +375,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
+    minHeight: 200,
   },
   loadingText: {
     ...typography.caption,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
   },
   errorContainer: {
@@ -283,22 +386,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
+    minHeight: 200,
   },
   errorText: {
     ...typography.body,
-    color: colors.accentRed,
     textAlign: 'center',
     marginBottom: spacing.md,
   },
   retryButton: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    backgroundColor: '#064E3B',
     borderRadius: radii.md,
   },
   retryText: {
     ...typography.captionBold,
-    color: colors.white,
+    color: '#FFFFFF',
   },
   listContent: {
     paddingBottom: spacing.xxl,
@@ -306,5 +408,7 @@ const styles = StyleSheet.create({
   emptyListContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    minHeight: 220,
   },
 });
+

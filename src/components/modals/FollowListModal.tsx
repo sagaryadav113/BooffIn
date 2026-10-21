@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   FlatList,
   ActivityIndicator,
   RefreshControl,
@@ -118,89 +119,179 @@ export const FollowListModal: React.FC<FollowListModalProps> = ({
 
   const title = type === 'followers' ? 'Followers' : 'Following';
 
+  const isWeb = Platform.OS === 'web';
+
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
+      transparent
+      animationType={isWeb ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: colors.backgroundCard, borderBottomColor: colors.border }]}>
-          <View style={styles.titleContainer}>
-            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{title}</Text>
-            {userName ? (
-              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-                {userName}
-              </Text>
-            ) : null}
-          </View>
-          <TouchableOpacity
-            onPress={onClose}
-            style={[styles.closeButton, { backgroundColor: isDark ? '#1F2636' : colors.surfaceHover }]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            activeOpacity={0.7}
-          >
-            <X size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View
+          style={[
+            styles.backdrop,
+            { backgroundColor: isDark ? 'rgba(0, 0, 0, 0.78)' : 'rgba(15, 23, 42, 0.5)' },
+          ]}
+        />
+      </TouchableWithoutFeedback>
 
-        {/* Content */}
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={colors.textPrimary} />
-            <Text style={styles.loadingText}>Loading {title.toLowerCase()}...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={loadData} style={styles.retryButton}>
-              <Text style={styles.retryText}>Try Again</Text>
+      <View style={[styles.sheetWrapper, isWeb ? styles.sheetWrapperWeb : styles.sheetWrapperMobile]} pointerEvents="box-none">
+        <View
+          style={[
+            styles.sheetContainer,
+            isWeb ? styles.sheetContainerWeb : styles.sheetContainerMobile,
+            {
+              backgroundColor: isDark ? '#111622' : '#FFFFFF',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.border,
+            },
+          ]}
+        >
+          {!isWeb && (
+            <View
+              style={[
+                styles.dragHandle,
+                { backgroundColor: isDark ? '#334155' : '#CBD5E1' },
+              ]}
+            />
+          )}
+
+          {/* Header */}
+          <View
+            style={[
+              styles.header,
+              {
+                backgroundColor: isDark ? '#161B26' : colors.backgroundCard,
+                borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.07)' : colors.border,
+              },
+            ]}
+          >
+            <View style={styles.titleContainer}>
+              <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{title}</Text>
+              {userName ? (
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {userName}
+                </Text>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[
+                styles.closeButton,
+                { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.07)' : colors.backgroundSecondary },
+              ]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
+            >
+              <X size={18} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
-        ) : (
-          <FlatList
-            data={researchers}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <ResearcherCard
-                researcher={item}
-                onFollowToggle={() => toggleFollowUser(item.id)}
-                onRemoveFollower={isOwnFollowersList ? () => handleRemoveFollower(item) : undefined}
-                isRemoving={removingFollowerId === item.id}
-              />
-            )}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                tintColor={colors.textPrimary}
-              />
-            }
-            ListEmptyComponent={
-              <EmptyState
-                icon="Users"
-                title={`No ${title.toLowerCase()} yet`}
-                description={
-                  type === 'followers'
-                    ? `${userName} does not have any followers yet.`
-                    : `${userName} is not following any researchers yet.`
-                }
-              />
-            }
-            contentContainerStyle={researchers.length === 0 ? styles.emptyListContent : styles.listContent}
-          />
-        )}
-      </SafeAreaView>
+
+          {/* Content */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={isDark ? '#10B981' : colors.textPrimary} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading {title.toLowerCase()}...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+              <TouchableOpacity
+                onPress={loadData}
+                style={[styles.retryButton, { backgroundColor: isDark ? '#10B981' : '#064E3B' }]}
+              >
+                <Text style={styles.retryText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={researchers}
+              keyExtractor={(item) => item.id}
+              style={{ backgroundColor: isDark ? '#111622' : colors.background }}
+              renderItem={({ item }) => (
+                <ResearcherCard
+                  researcher={item}
+                  onFollowToggle={() => toggleFollowUser(item.id)}
+                  onRemoveFollower={isOwnFollowersList ? () => handleRemoveFollower(item) : undefined}
+                  isRemoving={removingFollowerId === item.id}
+                />
+              )}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={isDark ? '#10B981' : colors.textPrimary}
+                  colors={[isDark ? '#10B981' : '#064E3B']}
+                />
+              }
+              ListEmptyComponent={
+                <EmptyState
+                  icon="Users"
+                  title={`No ${title.toLowerCase()} yet`}
+                  description={
+                    type === 'followers'
+                      ? `${userName} does not have any followers yet.`
+                      : `${userName} is not following any researchers yet.`
+                  }
+                />
+              }
+              contentContainerStyle={researchers.length === 0 ? styles.emptyListContent : styles.listContent}
+            />
+          )}
+        </View>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  sheetWrapper: {
     flex: 1,
-    backgroundColor: colors.background,
+  },
+  sheetWrapperWeb: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  sheetWrapperMobile: {
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  sheetContainerWeb: {
+    maxWidth: 580,
+    maxHeight: '85%',
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 28,
+    elevation: 24,
+  },
+  sheetContainerMobile: {
+    maxHeight: '88%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 4,
   },
   header: {
     flexDirection: 'row',
@@ -209,8 +300,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    backgroundColor: colors.backgroundCard,
   },
   titleContainer: {
     flex: 1,
@@ -219,27 +308,27 @@ const styles = StyleSheet.create({
     ...typography.h3,
     fontSize: 18,
     fontWeight: '700',
-    color: colors.textPrimary,
   },
   headerSubtitle: {
     ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 1,
+    fontSize: 12,
+    marginTop: 2,
   },
   closeButton: {
-    padding: spacing.xs,
+    padding: 7,
     borderRadius: radii.full,
-    backgroundColor: colors.surfaceHover,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
+    minHeight: 200,
   },
   loadingText: {
     ...typography.caption,
-    color: colors.textSecondary,
     marginTop: spacing.sm,
   },
   errorContainer: {
@@ -247,22 +336,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
+    minHeight: 200,
   },
   errorText: {
     ...typography.body,
-    color: colors.accentRed,
     textAlign: 'center',
     marginBottom: spacing.md,
   },
   retryButton: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.textPrimary,
     borderRadius: radii.md,
   },
   retryText: {
     ...typography.captionBold,
-    color: colors.white,
+    color: '#FFFFFF',
   },
   listContent: {
     paddingBottom: spacing.xxl,
@@ -270,5 +358,6 @@ const styles = StyleSheet.create({
   emptyListContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    minHeight: 220,
   },
 });
