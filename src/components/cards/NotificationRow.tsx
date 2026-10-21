@@ -28,6 +28,7 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
   const currentUser = useAuthStore((s) => s.user);
   const refreshCurrentUserProfile = useAuthStore((s) => s.refreshCurrentUserProfile);
   const isFollowingActor = useAuthStore((s) => s.followingIds.has(notification.actor.id));
+  const isFollowerActor = useAuthStore((s) => s.followerIds.has(notification.actor.id));
   const isRequestedActor = useAuthStore((s) => s.requestedUserIds.has(notification.actor.id));
   const isFollowLoading = useAuthStore((s) => s.followLoadingIds.has(notification.actor.id));
   const toggleFollowUser = useAuthStore((s) => s.toggleFollowUser);
@@ -72,6 +73,15 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
     const res = await acceptFollowRequest(notification.actor.id, currentUser?.id);
     if (res.success) {
       setRequestStatus('accepted');
+      // Immediately reflect actor in followerIds so follower/follow back states synchronize across all screens
+      useAuthStore.setState((s) => {
+        const nextFollowers = new Set(s.followerIds);
+        nextFollowers.add(notification.actor.id);
+        return {
+          followerIds: nextFollowers,
+          user: s.user ? { ...s.user, followersCount: (s.user.followersCount || 0) + 1 } : s.user,
+        };
+      });
       refreshCurrentUserProfile();
     } else {
       setRequestStatus('idle');
@@ -174,18 +184,41 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
         {/* Action Buttons for Follow Request */}
         {notification.type === 'follow_request' && (
           <View style={styles.requestActionsRow}>
-            {requestStatus === 'accepted' ? (
-              <View style={styles.resolvedTag}>
-                <Typography variant="captionBold" color={colors.accentGreen}>
-                  ✓ Approved follower
-                </Typography>
-              </View>
-            ) : requestStatus === 'declined' ? (
+            {requestStatus === 'declined' ? (
               <View style={styles.resolvedTag}>
                 <Typography variant="metadata" color={colors.textMuted}>
                   Request removed
                 </Typography>
               </View>
+            ) : requestStatus === 'accepted' || isFollowerActor ? (
+              isFollowingActor ? (
+                <View style={[styles.followingPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                  <Typography variant="captionBold" color={colors.textSecondary}>
+                    Following
+                  </Typography>
+                </View>
+              ) : isRequestedActor ? (
+                <View style={[styles.followingPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+                  <Typography variant="captionBold" color={colors.textSecondary}>
+                    Requested
+                  </Typography>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={[styles.followBackBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleFollowBack}
+                  disabled={isFollowLoading}
+                >
+                  {isFollowLoading ? (
+                    <ActivityIndicator size="small" color={isDark ? colors.black : colors.white} />
+                  ) : (
+                    <Typography variant="captionBold" color={isDark ? colors.black : colors.white}>
+                      Follow Back
+                    </Typography>
+                  )}
+                </TouchableOpacity>
+              )
             ) : (
               <>
                 <TouchableOpacity
