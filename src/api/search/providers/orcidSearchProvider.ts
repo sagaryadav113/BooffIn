@@ -1,25 +1,6 @@
 import { ResearcherSearchResult } from '../types';
 import { isValidOrcidId, normalizeOrcidId } from '../../orcidService';
-
-/**
- * Fetch with retry on network failure
- */
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit & { signal?: AbortSignal },
-  retries = 2
-): Promise<Response> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url, options);
-      return res;
-    } catch (err) {
-      if (attempt === retries) throw err;
-      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
-    }
-  }
-  throw new Error('fetch failed after retries');
-}
+import { fetchWithTimeout } from '../../networkUtils';
 
 /**
  * Build a smart ORCID query from the user's raw input.
@@ -70,15 +51,15 @@ export async function searchOrcidResearchers(
   if (isValidOrcidId(cleanQ)) {
     const exactOrcid = normalizeOrcidId(cleanQ);
     try {
-      const res = await fetchWithRetry(
+      const res = await fetchWithTimeout(
         `https://pub.orcid.org/v3.0/${exactOrcid}/record`,
         {
           headers: {
             Accept: 'application/json',
             'User-Agent': 'BooffIn/1.0 (scholar-search; dev@booffin.science)',
           },
-          signal: AbortSignal.timeout(7000),
-        }
+        },
+        7000
       );
 
       if (res.ok) {
@@ -128,13 +109,16 @@ export async function searchOrcidResearchers(
     const orcidQuery = buildOrcidQuery(cleanQ);
     const searchUrl = `https://pub.orcid.org/v3.0/expanded-search/?q=${orcidQuery}&rows=${limit}&start=0`;
 
-    const res = await fetchWithRetry(searchUrl, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'BooffIn/1.0 (scholar-search; dev@booffin.science)',
+    const res = await fetchWithTimeout(
+      searchUrl,
+      {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'BooffIn/1.0 (scholar-search; dev@booffin.science)',
+        },
       },
-      signal: AbortSignal.timeout(7000),
-    });
+      7000
+    );
 
     if (!res.ok) return [];
     const data = await res.json();

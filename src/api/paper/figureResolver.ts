@@ -1,5 +1,6 @@
 import { PaperFigure } from '../../types';
 import { ParsedReferenceInput } from './types';
+import { fetchWithTimeout } from '../networkUtils';
 
 // In-memory cache for resolved paper figures
 const figureCache = new Map<string, PaperFigure[]>();
@@ -98,10 +99,13 @@ async function resolvePmcFigures(params: {
         query
       )}&format=json&resultType=lite`;
 
-      const epRes = await fetch(epUrl, {
-        headers: { 'User-Agent': 'BooffIn/1.0 (academic; dev@booffin.science)' },
-        signal: AbortSignal.timeout(4500),
-      });
+      const epRes = await fetchWithTimeout(
+        epUrl,
+        {
+          headers: { 'User-Agent': 'BooffIn/1.0 (academic; dev@booffin.science)' },
+        },
+        4500
+      );
 
       if (epRes.ok) {
         const epData = await epRes.json();
@@ -119,9 +123,7 @@ async function resolvePmcFigures(params: {
     const cleanPmcId = resolvedPmcId.replace(/^PMC/i, '');
     const efetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=${cleanPmcId}&retmode=xml`;
 
-    const efetchRes = await fetch(efetchUrl, {
-      signal: AbortSignal.timeout(5000),
-    });
+    const efetchRes = await fetchWithTimeout(efetchUrl, {}, 5000);
 
     if (!efetchRes.ok) return [];
     const xml = await efetchRes.text();
@@ -217,12 +219,15 @@ async function resolvePmcFigures(params: {
 async function resolveArxivFigures(arxivId: string): Promise<PaperFigure[]> {
   const cleanId = arxivId.replace(/^arxiv:/i, '').trim();
   try {
-    const res = await fetch(`https://arxiv.org/html/${cleanId}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+    const res = await fetchWithTimeout(
+      `https://arxiv.org/html/${cleanId}`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+        },
       },
-      signal: AbortSignal.timeout(4500),
-    });
+      4500
+    );
 
     if (!res.ok) return [];
     const html = await res.text();
@@ -319,14 +324,17 @@ async function resolveOpenGraphFigures(
   paperTitle?: string
 ): Promise<PaperFigure[]> {
   try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml',
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml',
+        },
       },
-      signal: AbortSignal.timeout(3500),
-    });
+      3500
+    );
 
     if (!res.ok) return [];
     const html = await res.text();

@@ -1,25 +1,6 @@
 import { supabase } from '../../client';
 import { ResearcherSearchResult } from '../types';
-
-/**
- * Fetch with retry on network failure
- */
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit & { signal?: AbortSignal },
-  retries = 2
-): Promise<Response> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url, options);
-      return res;
-    } catch (err) {
-      if (attempt === retries) throw err;
-      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
-    }
-  }
-  throw new Error('fetch failed after retries');
-}
+import { fetchWithTimeout } from '../../networkUtils';
 
 /**
  * Searches BooffIn registered users from the profiles table (Supabase)
@@ -96,10 +77,13 @@ export async function searchOpenAlexAuthors(
       cleanQ
     )}&per-page=${limit}&page=${page}&select=id,display_name,display_name_alternatives,last_known_institution,works_count,cited_by_count,orcid,x_concepts&mailto=dev@booffin.science`;
 
-    const res = await fetchWithRetry(url, {
-      headers: { 'User-Agent': 'BooffIn/1.0 (scholar-search; dev@booffin.science)' },
-      signal: AbortSignal.timeout(7000),
-    });
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: { 'User-Agent': 'BooffIn/1.0 (scholar-search; dev@booffin.science)' },
+      },
+      7000
+    );
 
     if (!res.ok) return [];
     const data = await res.json();

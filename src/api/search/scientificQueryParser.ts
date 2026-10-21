@@ -434,12 +434,22 @@ export function parseScientificQuery(rawQuery: string): ParsedScientificQuery {
   // Ensures candidate retrieval filters to title/abstract rather than whole-corpus body text
   let openAlexTitleAbstractQuery = clean;
   if (expandedTerms.length > 0 && targetTerms.length > 0) {
-    // E.g.: ("autism" OR "autism spectrum disorder" OR "ASD") AND ("gene" OR "genes" OR "genetic")
-    const entityClause = expandedTerms.slice(0, 3).map((t) => (t.includes(' ') ? `"${t}"` : t)).join(' OR ');
-    const targetClause = targetTerms.slice(0, 4).map((t) => (t.includes(' ') ? `"${t}"` : t)).join(' OR ');
-    openAlexTitleAbstractQuery = `(${entityClause}) AND (${targetClause})`;
+    if (effectiveKeywords.length <= 3) {
+      // E.g.: ("autism" OR "autism spectrum disorder" OR "ASD") AND ("gene" OR "genes" OR "genetic")
+      const entityClause = expandedTerms.slice(0, 3).map((t) => (t.includes(' ') ? `"${t}"` : t)).join(' OR ');
+      const targetClause = targetTerms.slice(0, 4).map((t) => (t.includes(' ') ? `"${t}"` : t)).join(' OR ');
+      openAlexTitleAbstractQuery = `(${entityClause}) AND (${targetClause})`;
+    } else {
+      // Long query / self-made description: use space-separated salient terms for high-recall BM25 matching
+      openAlexTitleAbstractQuery = effectiveKeywords.slice(0, 6).join(' ');
+    }
   } else if (effectiveKeywords.length > 1) {
-    openAlexTitleAbstractQuery = effectiveKeywords.join(' AND ');
+    if (effectiveKeywords.length <= 3) {
+      openAlexTitleAbstractQuery = effectiveKeywords.join(' AND ');
+    } else {
+      // Multi-word descriptions: space-separated allows BM25 to score without failing on missing words
+      openAlexTitleAbstractQuery = effectiveKeywords.slice(0, 6).join(' ');
+    }
   }
 
   // OpenAlex standard / semantic query fallback
@@ -450,7 +460,12 @@ export function parseScientificQuery(rawQuery: string): ParsedScientificQuery {
   // 5. EuropePMC query: Boolean title/abstract clauses with stem wildcards
   let europePmcQuery = clean;
   if (isMultiKeyword && effectiveKeywords.length > 1) {
-    const termClauses = effectiveKeywords.map((k) => {
+    // For short queries (<= 3 keywords), require AND. For long descriptions, pick top 3 most salient terms
+    const salientKeywords = effectiveKeywords.length <= 3
+      ? effectiveKeywords
+      : [...effectiveKeywords].sort((a, b) => b.length - a.length).slice(0, 3);
+
+    const termClauses = salientKeywords.map((k) => {
       const rootStem = k.replace(/('s|s|es|ing|ed)$/, '');
       if (rootStem.length >= 3 && rootStem !== k) {
         return `(TITLE:"${k}" OR ABSTRACT:"${k}" OR TITLE:"${rootStem}*" OR ABSTRACT:"${rootStem}*")`;
@@ -467,8 +482,11 @@ export function parseScientificQuery(rawQuery: string): ParsedScientificQuery {
     ...targetTerms.slice(0, 3),
   ].filter(Boolean).join(' ');
 
-  // 7. arXiv query: all: fields with boolean AND
-  const arxivQuery = effectiveKeywords.length > 0 ? effectiveKeywords.join(' AND ') : clean;
+  // 7. arXiv query: all: fields with boolean AND on salient terms
+  const arxivKeywords = effectiveKeywords.length <= 3
+    ? effectiveKeywords
+    : [...effectiveKeywords].sort((a, b) => b.length - a.length).slice(0, 3);
+  const arxivQuery = arxivKeywords.length > 0 ? arxivKeywords.join(' AND ') : clean;
 
   return {
     rawQuery: clean,

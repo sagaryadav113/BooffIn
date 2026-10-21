@@ -3,26 +3,8 @@ import { parseReferenceInput } from '../../paper/inputParser';
 import { defaultPaperResolver } from '../../paper/metadataResolver';
 import { parseScientificQuery, ParsedScientificQuery } from '../scientificQueryParser';
 import { rankScientificPapers, deduplicatePapers } from '../scientificRanker';
+import { fetchWithTimeout } from '../../networkUtils';
 
-/**
- * Fetch with retry on network failure (not on 4xx/5xx)
- */
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit & { signal?: AbortSignal },
-  retries = 2
-): Promise<Response> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url, options);
-      return res;
-    } catch (err) {
-      if (attempt === retries) throw err;
-      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
-    }
-  }
-  throw new Error('fetch failed after retries');
-}
 
 /**
  * Searches academic literature across EuropePMC, Semantic Scholar, arXiv, and OpenAlex
@@ -87,10 +69,13 @@ async function searchEuropePmc(query: string, limit: number, page = 1): Promise<
       query
     )}&format=json&resultType=core&pageSize=${limit}&page=${page}`;
 
-    const res = await fetchWithRetry(url, {
-      headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
-      signal: AbortSignal.timeout(7000),
-    });
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
+      },
+      7000
+    );
 
     if (!res.ok) return [];
     const data = await res.json();
@@ -168,10 +153,13 @@ async function searchSemanticScholar(query: string, limit: number, page = 1): Pr
       query
     )}&offset=${offset}&limit=${limit}&fields=${fields}`;
 
-    const res = await fetchWithRetry(url, {
-      headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
-      signal: AbortSignal.timeout(7000),
-    });
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
+      },
+      7000
+    );
 
     if (!res.ok) return [];
     const data = await res.json();
@@ -237,10 +225,13 @@ async function searchArxiv(query: string, limit: number, page = 1): Promise<Pape
     const searchQ = `all:${encodeURIComponent(query)}`;
     const url = `https://export.arxiv.org/api/query?search_query=${searchQ}&start=${start}&max_results=${limit}&sortBy=relevance`;
 
-    const res = await fetchWithRetry(url, {
-      headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
-      signal: AbortSignal.timeout(7000),
-    });
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
+      },
+      7000
+    );
 
     if (!res.ok) return [];
     const text = await res.text();
@@ -318,6 +309,11 @@ export async function searchOpenAlex(
 ): Promise<Paper[]> {
   try {
     const isParsed = typeof queryOrParsed === 'object' && queryOrParsed !== null;
+    const rawQuery = isParsed
+      ? (queryOrParsed as ParsedScientificQuery).rawQuery
+      : typeof queryOrParsed === 'string'
+      ? queryOrParsed
+      : '';
     const titleAbstractQuery = isParsed
       ? (queryOrParsed as ParsedScientificQuery).openAlexTitleAbstractQuery ||
         (queryOrParsed as ParsedScientificQuery).cleanedQuery
@@ -326,34 +322,29 @@ export async function searchOpenAlex(
       ? (queryOrParsed as ParsedScientificQuery).cleanedQuery
       : queryOrParsed;
 
+    const wordCount = rawQuery.trim().split(/\s+/).length;
+    const isDescription =
+      wordCount >= 4 ||
+      /^(how|what|why|effect|impact|role|mechanism|using|can|novel|review)\b/i.test(rawQuery.trim());
+
     // Lean field selection to minimize egress and client memory overhead
     const fields =
       'id,doi,title,abstract_inverted_index,authorships,publication_year,open_access,cited_by_count,primary_location,concepts';
 
-    // Tier 1: Targeted Title & Abstract search with native neural/BM25 reranker
-    const tier1Url = `https://api.openalex.org/works?search.title_and_abstract=${encodeURIComponent(
-      titleAbstractQuery
-    )}&rerank=true&page=${page}&per-page=${limit}&select=${fields}&mailto=dev@booffin.science`;
+    let hits: any[] = [];
 
-    let res = await fetchWithRetry(tier1Url, {
-      headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
-      signal: AbortSignal.timeout(7000),
-    });
-
-    let data = res.ok ? await res.json() : null;
-    let hits: any[] = data?.results || [];
-
-    // Tier 2: If Tier 1 produced 0 results, fall back to semantic search
-    if (hits.length === 0 && fallbackQuery) {
+    // If it is a natural-language description / multi-word sentence, prioritize OpenAlex semantic search
+    if (isDescription && (fallbackQuery || rawQuery)) {
       const semanticUrl = `https://api.openalex.org/works?search.semantic=${encodeURIComponent(
-        fallbackQuery
+        fallbackQuery || rawQuery
       )}&page=${page}&per-page=${limit}&select=${fields}&mailto=dev@booffin.science`;
 
       try {
-        const semRes = await fetchWithRetry(semanticUrl, {
-          headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
-          signal: AbortSignal.timeout(6000),
-        });
+        const semRes = await fetchWithTimeout(
+          semanticUrl,
+          { headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' } },
+          7000
+        );
         if (semRes.ok) {
           const semData = await semRes.json();
           if (semData?.results?.length) {
@@ -361,24 +352,65 @@ export async function searchOpenAlex(
           }
         }
       } catch {}
+    }
 
-      // Tier 3: If still empty, fall back to broad search with rerank
-      if (hits.length === 0) {
-        const broadUrl = `https://api.openalex.org/works?search=${encodeURIComponent(
-          fallbackQuery
-        )}&rerank=true&page=${page}&per-page=${limit}&select=${fields}&mailto=dev@booffin.science`;
+    // Tier 1: Targeted Title & Abstract search with native neural/BM25 reranker (for concise keywords or if semantic had no hits)
+    if (hits.length === 0 && titleAbstractQuery) {
+      const tier1Url = `https://api.openalex.org/works?search.title_and_abstract=${encodeURIComponent(
+        titleAbstractQuery
+      )}&rerank=true&page=${page}&per-page=${limit}&select=${fields}&mailto=dev@booffin.science`;
 
-        try {
-          const broadRes = await fetchWithRetry(broadUrl, {
-            headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' },
-            signal: AbortSignal.timeout(6000),
-          });
-          if (broadRes.ok) {
-            const broadData = await broadRes.json();
-            hits = broadData?.results || [];
+      try {
+        const res = await fetchWithTimeout(
+          tier1Url,
+          { headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' } },
+          7000
+        );
+        if (res.ok) {
+          const data = await res.json();
+          hits = data?.results || [];
+        }
+      } catch {}
+    }
+
+    // Tier 2: If Tier 1 produced 0 results and was not already queried via semantic search, try semantic search
+    if (hits.length === 0 && !isDescription && (fallbackQuery || rawQuery)) {
+      const semanticUrl = `https://api.openalex.org/works?search.semantic=${encodeURIComponent(
+        fallbackQuery || rawQuery
+      )}&page=${page}&per-page=${limit}&select=${fields}&mailto=dev@booffin.science`;
+
+      try {
+        const semRes = await fetchWithTimeout(
+          semanticUrl,
+          { headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' } },
+          7000
+        );
+        if (semRes.ok) {
+          const semData = await semRes.json();
+          if (semData?.results?.length) {
+            hits = semData.results;
           }
-        } catch {}
-      }
+        }
+      } catch {}
+    }
+
+    // Tier 3: If still empty, fall back to broad search with rerank
+    if (hits.length === 0 && (fallbackQuery || rawQuery)) {
+      const broadUrl = `https://api.openalex.org/works?search=${encodeURIComponent(
+        fallbackQuery || rawQuery
+      )}&rerank=true&page=${page}&per-page=${limit}&select=${fields}&mailto=dev@booffin.science`;
+
+      try {
+        const broadRes = await fetchWithTimeout(
+          broadUrl,
+          { headers: { 'User-Agent': 'BooffIn/1.0 (academic-search; dev@booffin.science)' } },
+          7000
+        );
+        if (broadRes.ok) {
+          const broadData = await broadRes.json();
+          hits = broadData?.results || [];
+        }
+      } catch {}
     }
 
     if (hits.length === 0) return [];
