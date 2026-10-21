@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { create } from 'zustand';
 import { UserProfile } from '../types';
 import {
@@ -22,6 +23,7 @@ import {
   fetchUserFollowerIds,
   removeFollower,
 } from '../api/socialService';
+import { checkCanFollow, recordFollowAction } from '../api/socialRateLimit';
 import { useSearchStore } from './useSearchStore';
 import { supabase, appStorage } from '../api/client';
 
@@ -495,6 +497,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const currentFollowingSet = new Set(get().followingIds);
     const wasFollowing = currentFollowingSet.has(userId);
 
+    // Rate limit check before attempting to follow or send follow request
+    if (!wasFollowing) {
+      const limitCheck = await checkCanFollow({
+        userId: currentUserId,
+        currentFollowingCount: get().user?.followingCount ?? currentFollowingSet.size,
+        userJoinedDate: get().user?.joinedDate,
+        userCreatedAt: (get().user as any)?.createdAt,
+      });
+
+      if (!limitCheck.allowed) {
+        Alert.alert('Action Restricted', limitCheck.reason || 'Follow limit reached.');
+        set({ authError: limitCheck.reason });
+        return false;
+      }
+    }
+
     const nextLoadingSet = new Set(get().followLoadingIds);
     nextLoadingSet.add(userId);
     set({ followLoadingIds: nextLoadingSet });
@@ -509,6 +527,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         console.warn('[useAuthStore] toggleFollowUser failed:', res.error);
         set({ followLoadingIds: doneLoadingSet, authError: res.error });
         return false;
+      }
+
+      if (res.isFollowing || res.isRequested) {
+        recordFollowAction(currentUserId).catch(() => {});
       }
 
       const nextFollowingSet = new Set(get().followingIds);

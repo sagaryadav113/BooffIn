@@ -1,5 +1,6 @@
 import { supabase, appStorage } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
+import { recordGeneralAction } from '../api/socialRateLimit';
 
 // In-memory caches for ultra-fast synchronous UI lookups and mapper resolution
 const userLikedCommentsCache = new Map<string, Set<string>>();
@@ -371,6 +372,8 @@ export async function togglePostLikePersistence(
 
           if (insertError) {
             console.warn('[persistentLikes] Failed to insert like:', insertError.message);
+          } else {
+            recordGeneralAction(verifiedUserId).catch(() => {});
           }
         }
       } else {

@@ -557,7 +557,26 @@ export default function OtherResearcherProfileScreen() {
       );
     }
 
-    await toggleFollowUser(researcher.id);
+    const ok = await toggleFollowUser(researcher.id);
+    if (!ok) {
+      if (isPrivateAccount) {
+        useAuthStore.setState((s) => {
+          const next = new Set(s.requestedUserIds);
+          next.delete(researcher.id);
+          return { requestedUserIds: next };
+        });
+      } else {
+        setResearcher((prev) =>
+          prev
+            ? {
+                ...prev,
+                isFollowing: false,
+                followersCount: Math.max(0, (prev.followersCount || 1) - 1),
+              }
+            : prev
+        );
+      }
+    }
   };
 
   const handleRemoveThisFollower = () => {

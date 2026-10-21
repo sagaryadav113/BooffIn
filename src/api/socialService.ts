@@ -15,6 +15,7 @@ import {
   loadUserLikedPapers,
   togglePaperLikePersistence,
 } from '../utils/persistentLikes';
+import { checkCanFollow, recordFollowAction, recordGeneralAction } from './socialRateLimit';
 
 export {
   toggleCommentLike,
@@ -941,6 +942,8 @@ export async function createPost(
       entityType: 'post',
     }).catch((e) => console.warn('Mention notification error:', e));
 
+    recordGeneralAction(verifiedAuthorId).catch(() => {});
+
     return { post: fullPost, error: null };
   } catch (err: any) {
     return { post: null, error: err?.message || 'Failed to publish post.' };
@@ -1466,6 +1469,8 @@ export async function addComment(
       }
     } catch {}
 
+    recordGeneralAction(verifiedAuthorId).catch(() => {});
+
     return { comment: mapSupabaseComment(data, verifiedAuthorId), error: null };
   } catch (err: any) {
     return { comment: null, error: err?.message || 'Failed to post comment.' };
@@ -1818,6 +1823,12 @@ export async function sendFollowRequest(
     return { success: false, error: 'Cannot send follow request to self.' };
   }
 
+  // Anti-spam guardrail: Check velocity and daily limits
+  const rateLimit = await checkCanFollow({ userId: verifiedUserId });
+  if (!rateLimit.allowed) {
+    return { success: false, error: rateLimit.reason || 'Follow request limit reached.' };
+  }
+
   try {
     // 1. Immediately save to persistent appStorage
     try {
@@ -1877,6 +1888,8 @@ export async function sendFollowRequest(
           });
       }
     } catch {}
+
+    await recordFollowAction(verifiedUserId);
 
     return { success: true, error: null };
   } catch (err: any) {
@@ -2144,7 +2157,18 @@ export async function toggleFollowUserRpc(
       }
     }
 
-    // 3. Target is public: attempt atomic server-side RPC toggle_follow
+    // 3. Target is public: check rate limit before atomic server-side RPC toggle_follow
+    const rateLimit = await checkCanFollow({ userId: verifiedUserId });
+    if (!rateLimit.allowed) {
+      return {
+        success: false,
+        isFollowing: false,
+        isRequested: false,
+        targetUserId: targetId,
+        error: rateLimit.reason || 'Follow limit reached.',
+      };
+    }
+
     const { data: rpcData, error: rpcError } = await supabase.rpc('toggle_follow', {
       target_user_id: targetId,
       caller_user_id: verifiedUserId,
@@ -2153,6 +2177,9 @@ export async function toggleFollowUserRpc(
     if (!rpcError && rpcData) {
       const parsed = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
       if (parsed && parsed.success === true && parsed.is_following !== undefined) {
+        if (parsed.is_following) {
+          await recordFollowAction(verifiedUserId);
+        }
         return {
           success: true,
           isFollowing: Boolean(parsed.is_following),
@@ -2199,6 +2226,12 @@ export async function followUser(
     return { success: false, error: 'You cannot follow yourself.' };
   }
 
+  // Anti-spam guardrail: Check velocity and daily limits
+  const rateLimit = await checkCanFollow({ userId: verifiedUserId });
+  if (!rateLimit.allowed) {
+    return { success: false, error: rateLimit.reason || 'Follow limit reached.' };
+  }
+
   try {
     const { error } = await supabase
       .from('follows')
@@ -2234,6 +2267,8 @@ export async function followUser(
           read_status: false,
         });
     } catch {}
+
+    await recordFollowAction(verifiedUserId);
 
     return { success: true, error: null };
   } catch (err: any) {

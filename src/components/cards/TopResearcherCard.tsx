@@ -82,10 +82,9 @@ export const TopResearcherCard: React.FC<TopResearcherCardProps> = ({
     setIsSubmittingFollow(true);
 
     try {
-      if (nextState) {
-        await followUser(currentUser.id, researcher.id);
-      } else {
-        await unfollowUser(currentUser.id, researcher.id);
+      const ok = await useAuthStore.getState().toggleFollowUser(researcher.id);
+      if (!ok) {
+        setIsFollowing(!nextState); // Rollback if rate limited or failed
       }
     } catch {
       setIsFollowing(!nextState); // Rollback
