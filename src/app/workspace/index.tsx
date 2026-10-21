@@ -835,104 +835,79 @@ export default function WorkspaceHubScreen() {
   };
 
   // Bottom Navigation Bar (4 Tabs: DM, Community, Inner Circle, Settings)
-  const renderBottomNav = () => (
-    <View
-      style={[
-        styles.bottomTabBar,
-        {
-          backgroundColor: colors.backgroundSecondary,
-          borderTopColor: colors.borderLight,
-          height: 56 + (bottomInset > 0 ? bottomInset : 0),
-          paddingBottom: bottomInset > 0 ? bottomInset : 4,
-        },
-      ]}
-    >
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => setActiveTab('dm')}
-        style={styles.tabItem}
-      >
-        <View style={styles.tabIconWrapper}>
-          <MessageSquare
-            size={22}
-            color={activeTab === 'dm' ? '#064E3B' : '#94A3B8'}
-          />
-          {totalDMsUnread > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>
-                {totalDMsUnread > 99 ? '99+' : totalDMsUnread}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text style={[styles.tabLabel, activeTab === 'dm' && styles.tabLabelActive]}>
-          DM
-        </Text>
-      </TouchableOpacity>
+  const renderBottomNav = () => {
+    const activeBorderColor = isDark ? '#10B981' : '#064E3B';
+    const activeBgColor = isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(6, 78, 59, 0.07)';
+    const activeTabColor = isDark ? '#10B981' : '#064E3B';
+    const inactiveTabColor = '#94A3B8';
 
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => setActiveTab('community')}
-        style={styles.tabItem}
-      >
-        <View style={styles.tabIconWrapper}>
-          <Users
-            size={22}
-            color={activeTab === 'community' ? '#064E3B' : '#94A3B8'}
-          />
-          {totalCommsUnread > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>
-                {totalCommsUnread > 99 ? '99+' : totalCommsUnread}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text style={[styles.tabLabel, activeTab === 'community' && styles.tabLabelActive]}>
-          Community
-        </Text>
-      </TouchableOpacity>
+    const tabs: { id: 'dm' | 'community' | 'inner_circle' | 'settings'; label: string; icon: any; badgeCount?: number }[] = [
+      { id: 'dm', label: 'DM', icon: MessageSquare, badgeCount: totalDMsUnread },
+      { id: 'community', label: 'Community', icon: Users, badgeCount: totalCommsUnread },
+      { id: 'inner_circle', label: 'Inner Circle', icon: Shield, badgeCount: totalInnersUnread },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ];
 
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => setActiveTab('inner_circle')}
-        style={styles.tabItem}
+    return (
+      <View
+        style={[
+          styles.bottomTabBar,
+          {
+            backgroundColor: colors.backgroundSecondary,
+            borderTopColor: colors.borderLight,
+            height: 58 + (bottomInset > 0 ? bottomInset : 0),
+            paddingBottom: bottomInset > 0 ? bottomInset : 4,
+          },
+        ]}
       >
-        <View style={styles.tabIconWrapper}>
-          <Shield
-            size={22}
-            color={activeTab === 'inner_circle' ? '#064E3B' : '#94A3B8'}
-          />
-          {totalInnersUnread > 0 && (
-            <View style={styles.tabBadge}>
-              <Text style={styles.tabBadgeText}>
-                {totalInnersUnread > 99 ? '99+' : totalInnersUnread}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text style={[styles.tabLabel, activeTab === 'inner_circle' && styles.tabLabelActive]}>
-          Inner Circle
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => setActiveTab('settings')}
-        style={styles.tabItem}
-      >
-        <View style={styles.tabIconWrapper}>
-          <Settings
-            size={22}
-            color={activeTab === 'settings' ? '#164E3F' : '#94A3B8'}
-          />
-        </View>
-        <Text style={[styles.tabLabel, activeTab === 'settings' && styles.tabLabelActive]}>
-          Settings
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+        {tabs.map((tab) => {
+          const IconComp = tab.icon;
+          const isSelected = activeTab === tab.id;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              activeOpacity={0.7}
+              onPress={() => setActiveTab(tab.id)}
+              style={styles.tabItem}
+            >
+              <View
+                style={[
+                  styles.tabItemInner,
+                  isSelected && {
+                    borderColor: activeBorderColor,
+                    backgroundColor: activeBgColor,
+                  },
+                ]}
+              >
+                <View style={styles.tabIconWrapper}>
+                  <IconComp
+                    size={21}
+                    color={isSelected ? activeTabColor : inactiveTabColor}
+                  />
+                  {tab.badgeCount && tab.badgeCount > 0 ? (
+                    <View style={[styles.tabBadge, { backgroundColor: activeBorderColor }]}>
+                      <Text style={styles.tabBadgeText}>
+                        {tab.badgeCount > 99 ? '99+' : tab.badgeCount}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    { color: isSelected ? activeTabColor : inactiveTabColor },
+                    isSelected && styles.tabLabelActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
@@ -1731,7 +1706,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    paddingVertical: 6,
+    paddingVertical: 3,
+  },
+  tabItemInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 3.5,
+    paddingHorizontal: 4,
+    width: '92%',
+    maxWidth: 72,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   tabIconWrapper: {
     position: 'relative',

@@ -59,6 +59,11 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
     return null;
   }
 
+  const activeBorderColor = isDark ? '#10B981' : '#064E3B';
+  const activeBgColor = isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(6, 78, 59, 0.07)';
+  const activeColor = isDark ? '#10B981' : '#064E3B';
+  const inactiveColor = colors.textSecondary;
+
   return (
     <View
       style={[
@@ -94,8 +99,6 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
 
         const isCreate = route.name === 'create';
         const isNotifications = route.name === 'notifications';
-        const activeColor = isDark ? colors.textPrimary : colors.black;
-        const inactiveColor = colors.textSecondary;
 
         return (
           <TouchableOpacity
@@ -107,32 +110,42 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
             style={styles.tabItem}
             activeOpacity={0.72}
           >
-            <View style={styles.iconWrapper}>
-              <Icon
-                name={meta.name}
-                size={isCreate ? 26 : 22}
-                color={isFocused ? activeColor : inactiveColor}
-                strokeWidth={isFocused ? 2.5 : 2.1}
-              />
-              {isNotifications && unreadCount > 0 && (
-                <View style={[styles.badge, { backgroundColor: colors.brandGreen }]}>
-                  <Typography variant="micro" color={colors.white} style={styles.badgeText}>
-                    {unreadCount}
-                  </Typography>
-                </View>
-              )}
-            </View>
-            <Typography
-              variant="micro"
+            <View
               style={[
-                styles.label,
-                { color: isFocused ? activeColor : inactiveColor },
-                isFocused && styles.labelFocused,
+                styles.tabItemInner,
+                isFocused && {
+                  borderColor: activeBorderColor,
+                  backgroundColor: activeBgColor,
+                },
               ]}
-              numberOfLines={1}
             >
-              {meta.label}
-            </Typography>
+              <View style={styles.iconWrapper}>
+                <Icon
+                  name={meta.name}
+                  size={isCreate ? 25 : 21}
+                  color={isFocused ? activeColor : inactiveColor}
+                  strokeWidth={isFocused ? 2.5 : 2.1}
+                />
+                {isNotifications && unreadCount > 0 && (
+                  <View style={[styles.badge, { backgroundColor: activeBorderColor }]}>
+                    <Typography variant="micro" color={colors.white} style={styles.badgeText}>
+                      {unreadCount}
+                    </Typography>
+                  </View>
+                )}
+              </View>
+              <Typography
+                variant="micro"
+                style={[
+                  styles.label,
+                  { color: isFocused ? activeColor : inactiveColor },
+                  isFocused && styles.labelFocused,
+                ]}
+                numberOfLines={1}
+              >
+                {meta.label}
+              </Typography>
+            </View>
           </TouchableOpacity>
         );
       })}
@@ -154,6 +167,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: layout.touchTargetMin,
     paddingHorizontal: 2,
+  },
+  tabItemInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 3.5,
+    paddingHorizontal: 4,
+    width: '92%',
+    maxWidth: 72,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   iconWrapper: {
     position: 'relative',
@@ -182,11 +206,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: -0.2,
     fontWeight: '600',
-    color: '#374151',
     textAlign: 'center',
   },
   labelFocused: {
     fontWeight: '700',
-    color: colors.black,
   },
 });
