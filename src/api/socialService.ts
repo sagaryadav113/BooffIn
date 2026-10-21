@@ -1980,28 +1980,49 @@ export async function acceptFollowRequest(
   }
 
   try {
-    // 1. Add follow relation: requester follows target
-    const { error: followError } = await supabase
-      .from('follows')
-      .insert({
-        follower_id: requesterId,
-        following_id: verifiedUserId,
-      });
+    let rpcDone = false;
 
-    if (followError && followError.code !== '23505') {
-      return { success: false, error: followError.message };
-    }
-
-    // 2. Delete the pending request row to prevent dead database clutter
+    // 1. Attempt server-side RPC if available (SECURITY DEFINER, zero RLS issues)
     try {
-      await supabase
-        .from('follow_requests')
-        .delete()
-        .eq('requester_id', requesterId)
-        .eq('target_id', verifiedUserId);
+      const { data: rpcData, error: rpcError } = await supabase.rpc('accept_follow_request', {
+        p_requester_id: requesterId,
+      });
+      if (!rpcError && (rpcData as any)?.success) {
+        rpcDone = true;
+      }
     } catch {}
 
-    // 3. Clean up requester's local storage cache
+    if (!rpcDone) {
+      // 2. Update follow_requests status to 'accepted' (fires trg_handle_follow_request_status_change trigger if present)
+      try {
+        await supabase
+          .from('follow_requests')
+          .update({ status: 'accepted', updated_at: new Date().toISOString() })
+          .eq('requester_id', requesterId)
+          .eq('target_id', verifiedUserId);
+      } catch {}
+
+      // 3. Add follow relation directly into follows table (requester follows target)
+      try {
+        await supabase
+          .from('follows')
+          .insert({
+            follower_id: requesterId,
+            following_id: verifiedUserId,
+          });
+      } catch {}
+
+      // 4. Delete the pending request row to prevent dead database clutter
+      try {
+        await supabase
+          .from('follow_requests')
+          .delete()
+          .eq('requester_id', requesterId)
+          .eq('target_id', verifiedUserId);
+      } catch {}
+    }
+
+    // 5. Clean up requester's local storage cache
     try {
       const cached = await appStorage.getItem(`booffin_outgoing_follow_requests_${requesterId}`);
       if (cached) {
@@ -2011,7 +2032,7 @@ export async function acceptFollowRequest(
       }
     } catch {}
 
-    // 4. Mark the follow_request notification as read
+    // 6. Mark the follow_request notification as read
     try {
       await supabase
         .from('notifications')
@@ -2021,7 +2042,7 @@ export async function acceptFollowRequest(
         .in('type', ['follow_request']);
     } catch {}
 
-    // 5. Send follow_accept notification to the requester (only if not already created by DB trigger)
+    // 7. Send follow_accept notification to the requester (only if not already created by DB trigger)
     try {
       const { data: existingAccept } = await supabase
         .from('notifications')

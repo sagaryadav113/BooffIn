@@ -84,6 +84,7 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({
       });
       refreshCurrentUserProfile();
     } else {
+      console.warn('[NotificationRow] acceptFollowRequest failed:', res.error);
       setRequestStatus('idle');
     }
   };
