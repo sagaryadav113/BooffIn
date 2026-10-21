@@ -270,6 +270,33 @@ export async function loadUserLikedPosts(userId?: string): Promise<Set<string>> 
 
     userLikedPostsCache.set(effectiveUserId, existing);
     postsStorageLoadedMap.set(effectiveUserId, true);
+
+    // Hydrate authoritatively from Supabase public.likes so authenticated user likes
+    // NEVER vanish if local cache is cleared, user logs into another device, or after time
+    if (effectiveUserId && effectiveUserId !== 'anonymous' && effectiveUserId !== 'usr_me') {
+      try {
+        const { data: dbLikes, error: dbLikesErr } = await supabase
+          .from('likes')
+          .select('post_id')
+          .eq('user_id', effectiveUserId)
+          .not('post_id', 'is', null);
+
+        if (!dbLikesErr && Array.isArray(dbLikes)) {
+          let hasNew = false;
+          for (const row of dbLikes) {
+            if (row.post_id && !existing.has(row.post_id)) {
+              existing.add(row.post_id);
+              hasNew = true;
+            }
+          }
+          if (hasNew) {
+            userLikedPostsCache.set(effectiveUserId, existing);
+            saveUserLikedPosts(effectiveUserId, existing).catch(() => {});
+          }
+        }
+      } catch {}
+    }
+
     return existing;
   } catch {
     const fallback = userLikedPostsCache.get(effectiveUserId) || new Set<string>();
@@ -329,34 +356,48 @@ export async function togglePostLikePersistence(
 
     if (verifiedUserId) {
       if (willBeLiked) {
-        await supabase
+        // Check existing to prevent duplicate rows without relying on fragile DB unique constraints
+        const { data: existingLike } = await supabase
           .from('likes')
-          .upsert(
-            { user_id: verifiedUserId, post_id: postId },
-            { onConflict: 'user_id,post_id', ignoreDuplicates: true }
-          );
+          .select('id')
+          .eq('user_id', verifiedUserId)
+          .eq('post_id', postId)
+          .maybeSingle();
+
+        if (!existingLike) {
+          const { error: insertError } = await supabase
+            .from('likes')
+            .insert({ user_id: verifiedUserId, post_id: postId });
+
+          if (insertError) {
+            console.warn('[persistentLikes] Failed to insert like:', insertError.message);
+          }
+        }
       } else {
-        await supabase
+        const { error: deleteError } = await supabase
           .from('likes')
           .delete()
           .eq('user_id', verifiedUserId)
           .eq('post_id', postId);
+
+        if (deleteError) {
+          console.warn('[persistentLikes] Failed to delete like:', deleteError.message);
+        }
       }
     }
 
-    // Attempt to update posts.likes_count atomically
+    // Authoritatively reconcile posts.likes_count from public.likes
+    // Using { count: 'exact', head: true } ensures 0 payload data egress (HTTP HEAD only)
     try {
-      const { data: postRow } = await supabase
-        .from('posts')
-        .select('likes_count')
-        .eq('id', postId)
-        .maybeSingle();
+      const { count: exactCount, error: countErr } = await supabase
+        .from('likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', postId);
 
-      if (postRow && typeof postRow.likes_count === 'number') {
-        const newCount = Math.max(0, postRow.likes_count + (willBeLiked ? 1 : -1));
+      if (!countErr && typeof exactCount === 'number') {
         await supabase
           .from('posts')
-          .update({ likes_count: newCount })
+          .update({ likes_count: exactCount })
           .eq('id', postId);
       }
     } catch {}

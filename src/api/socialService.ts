@@ -502,10 +502,10 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
     quotedPost,
     topics: topics.length > 0 ? topics : [],
     visibility: row.visibility || 'public',
-    likesCount: row.likes_count || 0,
+    likesCount: Array.isArray(row.likes) ? row.likes.length : (row.likes_count || 0),
     commentsCount: row.comments_count || 0,
-    repostsCount: row.reposts_count || 0,
-    savesCount: row.saves_count || 0,
+    repostsCount: Array.isArray(row.reposts) ? row.reposts.length : (row.reposts_count || 0),
+    savesCount: Array.isArray(row.bookmarks) ? row.bookmarks.length : (row.saves_count || 0),
     isLiked,
     isReposted,
     isSaved,
@@ -2538,9 +2538,12 @@ export async function fetchPostLikers(
       const researchers: UserProfile[] = [];
       for (const row of data) {
         if (row.user) {
-          const prof = mapSupabaseProfile(row.user);
-          prof.isFollowing = verifiedViewerId ? followingSet.has(prof.id) : false;
-          researchers.push(prof);
+          const userObj = Array.isArray(row.user) ? row.user[0] : row.user;
+          if (userObj) {
+            const prof = mapSupabaseProfile(userObj);
+            prof.isFollowing = verifiedViewerId ? followingSet.has(prof.id) : false;
+            researchers.push(prof);
+          }
         }
       }
       return { researchers, error: null };
