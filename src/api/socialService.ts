@@ -580,7 +580,8 @@ export async function fetchFeed(
           academic_title,
           institution,
           orcid_id,
-          orcid_verified
+          orcid_verified,
+          is_private
         ),
         paper:papers!paper_id (
           id,
@@ -664,6 +665,25 @@ export async function fetchFeed(
         );
         mappedPosts = mappedPosts.filter((p: any) => !blockedSet.has(p.author?.id));
       }
+    }
+
+    // Privacy boundary: Filter out posts from private accounts if viewer is not author and not following author
+    if (mappedPosts.length > 0) {
+      let followingSet: Set<string> | null = null;
+      if (resolvedUserId) {
+        const viewerFollowing = await fetchUserFollowingIds(resolvedUserId);
+        followingSet = new Set(viewerFollowing);
+      }
+      mappedPosts = mappedPosts.filter((p: any) => {
+        const isAuthorPrivate = Boolean(
+          p.author?.isPrivateRestricted ||
+          (p.author as any)?.visibilityLevel === 'private'
+        );
+        if (!isAuthorPrivate) return true;
+        if (!resolvedUserId) return false;
+        if (p.author?.id === resolvedUserId) return true;
+        return Boolean(followingSet?.has(p.author?.id));
+      });
     }
 
     let filtered = mappedPosts;
@@ -2512,6 +2532,20 @@ export async function fetchFollowers(
   const targetId = (await resolveTargetProfileId(targetUserIdOrHandle)) || targetUserIdOrHandle;
   const verifiedViewerId = await getVerifiedUserId(viewerId);
 
+  // Privacy boundary: If target account is private and viewer is not target, viewer must be an approved follower
+  if (targetId !== verifiedViewerId) {
+    const isTargetPrivate = await checkTargetIsPrivate(targetId);
+    if (isTargetPrivate) {
+      if (!verifiedViewerId) {
+        return { researchers: [], error: 'This account is private. Follow this researcher to view their followers.' };
+      }
+      const isViewerFollowing = await checkIsFollowing(targetId, verifiedViewerId);
+      if (!isViewerFollowing) {
+        return { researchers: [], error: 'This account is private. Follow this researcher to view their followers.' };
+      }
+    }
+  }
+
   try {
     // 1. Direct table query with profile join
     const { data, error } = await supabase
@@ -2648,6 +2682,20 @@ export async function fetchFollowing(
   if (!targetUserIdOrHandle) return { researchers: [], error: 'User ID is required.' };
   const targetId = (await resolveTargetProfileId(targetUserIdOrHandle)) || targetUserIdOrHandle;
   const verifiedViewerId = await getVerifiedUserId(viewerId);
+
+  // Privacy boundary: If target account is private and viewer is not target, viewer must be an approved follower
+  if (targetId !== verifiedViewerId) {
+    const isTargetPrivate = await checkTargetIsPrivate(targetId);
+    if (isTargetPrivate) {
+      if (!verifiedViewerId) {
+        return { researchers: [], error: 'This account is private. Follow this researcher to view who they follow.' };
+      }
+      const isViewerFollowing = await checkIsFollowing(targetId, verifiedViewerId);
+      if (!isViewerFollowing) {
+        return { researchers: [], error: 'This account is private. Follow this researcher to view who they follow.' };
+      }
+    }
+  }
 
   try {
     // 1. Direct table query with profile join

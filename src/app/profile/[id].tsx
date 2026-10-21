@@ -619,11 +619,23 @@ export default function OtherResearcherProfileScreen() {
   };
 
   const handleOpenFollowers = () => {
+    if (isLocked) {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      return;
+    }
     setFollowModalType('followers');
     setFollowModalVisible(true);
   };
 
   const handleOpenFollowing = () => {
+    if (isLocked) {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      return;
+    }
     setFollowModalType('following');
     setFollowModalVisible(true);
   };
@@ -1052,8 +1064,9 @@ export default function OtherResearcherProfileScreen() {
           <View style={styles.statsRow}>
             <TouchableOpacity
               onPress={handleOpenFollowing}
-              style={styles.statItem}
-              activeOpacity={0.7}
+              style={[styles.statItem, isLocked && { opacity: 0.85 }]}
+              activeOpacity={isLocked ? 1 : 0.7}
+              disabled={isLocked}
             >
               <Text style={styles.statNumber}>{researcher.followingCount}</Text>
               <Text style={styles.statLabel}>Following</Text>
@@ -1061,8 +1074,9 @@ export default function OtherResearcherProfileScreen() {
 
             <TouchableOpacity
               onPress={handleOpenFollowers}
-              style={styles.statItem}
-              activeOpacity={0.7}
+              style={[styles.statItem, isLocked && { opacity: 0.85 }]}
+              activeOpacity={isLocked ? 1 : 0.7}
+              disabled={isLocked}
             >
               <Text style={styles.statNumber}>
                 {formatCount(

@@ -358,7 +358,8 @@ export async function fetchPostsByHashtag(
           academic_title,
           institution,
           orcid_id,
-          orcid_verified
+          orcid_verified,
+          is_private
         ),
         paper:papers!paper_id (
           id,
@@ -410,8 +411,26 @@ export async function fetchPostsByHashtag(
 
     let posts: Post[] = [];
     if (rawRows && rawRows.length > 0) {
-      // Filter out blocked users
-      const validRows = rawRows.filter((r: any) => !viewerBlockedSet.has(r.author?.id));
+      // Filter out blocked users and private account posts (unless viewer is author or following author)
+      let followingSet: Set<string> | null = null;
+      if (currentUserId) {
+        const { data: followRows } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', currentUserId);
+        followingSet = new Set((followRows || []).map((f: any) => f.following_id));
+      }
+
+      const validRows = rawRows.filter((r: any) => {
+        if (viewerBlockedSet.has(r.author?.id)) return false;
+        const isAuthorPrivate = Boolean(r.author?.is_private);
+        if (isAuthorPrivate) {
+          if (!currentUserId) return false;
+          if (r.author?.id === currentUserId) return true;
+          return Boolean(followingSet?.has(r.author?.id));
+        }
+        return true;
+      });
       posts = validRows.map((r: any) => mapSupabasePost(r, currentUserId));
       posts = await populatePollVotes(posts, currentUserId);
 

@@ -165,7 +165,8 @@ export class PostgresSearchProvider implements SearchProvider {
               academic_title,
               institution,
               orcid_id,
-              orcid_verified
+              orcid_verified,
+              is_private
             ),
             paper:papers!paper_id (
               id,
@@ -185,9 +186,18 @@ export class PostgresSearchProvider implements SearchProvider {
 
         if (!error && data) {
           discussions = data
-            .filter((row: any) => !viewerBlockedSet.has(row.author?.id))
-            .map((row: any) => mapSupabasePost(row));
-          countDiscussions = count || data.length;
+            .filter((row: any) => {
+              if (viewerBlockedSet.has(row.author?.id)) return false;
+              const isAuthorPrivate = Boolean(row.author?.is_private);
+              if (isAuthorPrivate) {
+                if (!viewerId) return false;
+                if (row.author?.id === viewerId) return true;
+                return viewerFollowingSet.has(row.author?.id);
+              }
+              return true;
+            })
+            .map((row: any) => mapSupabasePost(row, viewerId));
+          countDiscussions = discussions.length;
         }
       }
 
