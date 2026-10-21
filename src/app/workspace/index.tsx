@@ -317,7 +317,7 @@ export default function WorkspaceHubScreen() {
               style={styles.backBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
+              <ArrowLeft size={22} color={colors.textPrimary} strokeWidth={2.2} />
             </TouchableOpacity>
             <Text style={[styles.appBarTitle, { color: colors.textPrimary }]}>Messages</Text>
           </View>
@@ -366,7 +366,7 @@ export default function WorkspaceHubScreen() {
               style={styles.backBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
+              <ArrowLeft size={22} color={colors.textPrimary} strokeWidth={2.2} />
             </TouchableOpacity>
             <Text style={[styles.appBarTitle, { color: colors.textPrimary }]}>Community</Text>
           </View>
@@ -403,7 +403,7 @@ export default function WorkspaceHubScreen() {
               style={styles.backBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
+              <ArrowLeft size={22} color={colors.textPrimary} strokeWidth={2.2} />
             </TouchableOpacity>
             <Text style={[styles.appBarTitle, { color: colors.textPrimary }]}>Settings</Text>
           </View>
@@ -430,7 +430,7 @@ export default function WorkspaceHubScreen() {
             style={styles.backBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <ArrowLeft size={22} color="#0F172A" strokeWidth={2.2} />
+            <ArrowLeft size={22} color={colors.textPrimary} strokeWidth={2.2} />
           </TouchableOpacity>
           <Text style={[styles.appBarTitle, { color: colors.textPrimary }]}>Inner Circle</Text>
         </View>
