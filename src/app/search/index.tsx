@@ -314,9 +314,9 @@ export default function SearchScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <View style={[styles.recentList, { backgroundColor: colors.cardBackground, borderColor: colors.borderLight }]}>
+                <View style={[styles.recentList, { backgroundColor: colors.cardBackground, borderColor: isDark ? colors.border : colors.borderLight }]}>
                   {recentSearches.map((term) => (
-                    <View key={term} style={[styles.recentRow, { borderBottomColor: colors.borderLight }]}>
+                    <View key={term} style={[styles.recentRow, { borderBottomColor: isDark ? colors.border : colors.borderLight }]}>
                       <TouchableOpacity
                         style={styles.recentTextWrapper}
                         onPress={() => handleSelectDiscovery(term)}

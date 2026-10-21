@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Clock, X, Trash2 } from 'lucide-react-native';
-import { colors, radii, spacing, typography } from '../../theme';
+import { Clock, X } from 'lucide-react-native';
+import { radii, spacing, typography, useColors, useIsDark } from '../../theme';
 
 interface RecentSearchesListProps {
   searches: string[];
@@ -16,31 +16,55 @@ export const RecentSearchesList: React.FC<RecentSearchesListProps> = ({
   onRemoveSearch,
   onClearAll,
 }) => {
+  const colors = useColors();
+  const isDark = useIsDark();
+
   if (searches.length === 0) return null;
 
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.headerTitle}>RECENT SEARCHES</Text>
+        <Text style={[styles.headerTitle, { color: colors.textSecondary }]}>
+          RECENT SEARCHES
+        </Text>
         <TouchableOpacity
           onPress={onClearAll}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={styles.clearBtn}
         >
-          <Text style={styles.clearBtnText}>Clear All</Text>
+          <Text
+            style={[
+              styles.clearBtnText,
+              { color: isDark ? colors.brandGreen : colors.textSecondary },
+            ]}
+          >
+            Clear All
+          </Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.list}>
         {searches.map((term) => (
-          <View key={term} style={styles.itemRow}>
+          <View
+            key={term}
+            style={[
+              styles.itemRow,
+              { borderBottomColor: isDark ? colors.border : colors.borderLight },
+            ]}
+          >
             <TouchableOpacity
               style={styles.itemMain}
               onPress={() => onSelectSearch(term)}
               activeOpacity={0.7}
             >
-              <Clock size={14} color={colors.textSecondary} />
-              <Text style={styles.itemText} numberOfLines={1}>
+              <Clock
+                size={15}
+                color={isDark ? colors.textSecondary : colors.textMuted}
+              />
+              <Text
+                style={[styles.itemText, { color: colors.textPrimary }]}
+                numberOfLines={1}
+              >
                 {term}
               </Text>
             </TouchableOpacity>
@@ -49,8 +73,12 @@ export const RecentSearchesList: React.FC<RecentSearchesListProps> = ({
               onPress={() => onRemoveSearch(term)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.removeBtn}
+              accessibilityLabel={`Remove ${term} from search history`}
             >
-              <X size={13} color={colors.textSecondary} />
+              <X
+                size={14}
+                color={isDark ? colors.textSecondary : colors.textMuted}
+              />
             </TouchableOpacity>
           </View>
         ))}
@@ -73,7 +101,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...typography.microBold,
-    color: colors.textSecondary,
     letterSpacing: 0.5,
   },
   clearBtn: {
@@ -81,7 +108,6 @@ const styles = StyleSheet.create({
   },
   clearBtnText: {
     ...typography.captionMedium,
-    color: colors.textSecondary,
     fontSize: 12,
   },
   list: {
@@ -93,7 +119,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
   },
   itemMain: {
     flexDirection: 'row',
@@ -104,10 +129,11 @@ const styles = StyleSheet.create({
   },
   itemText: {
     ...typography.body,
-    color: colors.textPrimary,
     fontSize: 14,
+    fontWeight: '500',
   },
   removeBtn: {
     padding: spacing.xs,
   },
 });
+
