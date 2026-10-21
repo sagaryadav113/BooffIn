@@ -84,8 +84,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         )}
         {isBrandTitle ? (
           <Image
-            source={require('../../../assets/images/booffin-wordmark.svg')}
-            style={[styles.brandLogoImage, isDark && ({ filter: 'invert(1)' } as any)]}
+            source={
+              isDark
+                ? require('../../../assets/images/booffin-wordmark-dark.svg')
+                : require('../../../assets/images/booffin-wordmark.svg')
+            }
+            style={styles.brandLogoImage}
             contentFit="contain"
             accessibilityLabel="BooffIn"
           />

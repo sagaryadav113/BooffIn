@@ -9,7 +9,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing, typography, useTheme } from '../../theme';
 
 interface BooffinIntroAnimationProps {
   size?: number;
@@ -20,6 +20,7 @@ export const BooffinIntroAnimation: React.FC<BooffinIntroAnimationProps> = ({
   size = 110,
   showTagline = true,
 }) => {
+  const { isDark } = useTheme();
   // Shared values for continuous loops
   const pulse = useSharedValue(0);
   const glow = useSharedValue(0);
@@ -140,7 +141,11 @@ export const BooffinIntroAnimation: React.FC<BooffinIntroAnimationProps> = ({
       {showTagline && (
         <View style={styles.textContainer}>
           <Image
-            source={require('../../../assets/images/booffin-wordmark.svg')}
+            source={
+              isDark
+                ? require('../../../assets/images/booffin-wordmark-dark.svg')
+                : require('../../../assets/images/booffin-wordmark.svg')
+            }
             style={styles.brandWordmarkImage}
             contentFit="contain"
             accessibilityLabel="BooffIn"

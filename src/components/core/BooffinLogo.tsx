@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, Text } from 'react-native';
 import { Image } from 'expo-image';
-import { typography, colors, spacing } from '../../theme';
+import { typography, colors, spacing, useTheme } from '../../theme';
 
 export interface BooffinLogoProps {
   size?: number;
@@ -16,17 +16,22 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
   showTagline = false,
   style,
 }) => {
+  const { isDark, colors: themeColors } = useTheme();
+  const wordmarkSource = isDark
+    ? require('../../../assets/images/booffin-wordmark-dark.svg')
+    : require('../../../assets/images/booffin-wordmark.svg');
+
   if (variant === 'wordmark') {
     return (
       <View style={[styles.container, style]}>
         <Image
-          source={require('../../../assets/images/booffin-wordmark.svg')}
+          source={wordmarkSource}
           style={{ width: size * 3.87, height: size }}
           contentFit="contain"
           transition={200}
         />
         {showTagline && (
-          <Text style={styles.tagline}>Research finds its people.</Text>
+          <Text style={[styles.tagline, { color: themeColors.textSecondary }]}>Research finds its people.</Text>
         )}
       </View>
     );
@@ -36,13 +41,13 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
     return (
       <View style={[styles.container, style]}>
         <Image
-          source={require('../../../assets/images/booffin-wordmark.svg')}
+          source={wordmarkSource}
           style={{ width: size * 3.87, height: size }}
           contentFit="contain"
           transition={200}
         />
         {showTagline && (
-          <Text style={styles.tagline}>Research finds its people.</Text>
+          <Text style={[styles.tagline, { color: themeColors.textSecondary }]}>Research finds its people.</Text>
         )}
       </View>
     );
@@ -59,11 +64,11 @@ export const BooffinLogo: React.FC<BooffinLogoProps> = ({
       {showTagline && (
         <View style={styles.taglineContainer}>
           <Image
-            source={require('../../../assets/images/booffin-wordmark.svg')}
+            source={wordmarkSource}
             style={{ width: 140, height: 36, marginBottom: 4 }}
             contentFit="contain"
           />
-          <Text style={styles.tagline}>Research finds its people.</Text>
+          <Text style={[styles.tagline, { color: themeColors.textSecondary }]}>Research finds its people.</Text>
         </View>
       )}
     </View>
