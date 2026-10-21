@@ -836,8 +836,6 @@ export default function WorkspaceHubScreen() {
 
   // Bottom Navigation Bar (4 Tabs: DM, Community, Inner Circle, Settings)
   const renderBottomNav = () => {
-    const activeBorderColor = isDark ? '#10B981' : '#064E3B';
-    const activeBgColor = isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(6, 78, 59, 0.07)';
     const activeTabColor = isDark ? '#10B981' : '#064E3B';
     const inactiveTabColor = '#94A3B8';
 
@@ -855,7 +853,7 @@ export default function WorkspaceHubScreen() {
           {
             backgroundColor: colors.backgroundSecondary,
             borderTopColor: colors.borderLight,
-            height: 58 + (bottomInset > 0 ? bottomInset : 0),
+            height: 56 + (bottomInset > 0 ? bottomInset : 0),
             paddingBottom: bottomInset > 0 ? bottomInset : 4,
           },
         ]}
@@ -870,38 +868,28 @@ export default function WorkspaceHubScreen() {
               onPress={() => setActiveTab(tab.id)}
               style={styles.tabItem}
             >
-              <View
+              <View style={styles.tabIconWrapper}>
+                <IconComp
+                  size={22}
+                  color={isSelected ? activeTabColor : inactiveTabColor}
+                />
+                {tab.badgeCount && tab.badgeCount > 0 ? (
+                  <View style={[styles.tabBadge, { backgroundColor: activeTabColor }]}>
+                    <Text style={styles.tabBadgeText}>
+                      {tab.badgeCount > 99 ? '99+' : tab.badgeCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text
                 style={[
-                  styles.tabItemInner,
-                  isSelected && {
-                    borderColor: activeBorderColor,
-                    backgroundColor: activeBgColor,
-                  },
+                  styles.tabLabel,
+                  { color: isSelected ? activeTabColor : inactiveTabColor },
+                  isSelected && styles.tabLabelActive,
                 ]}
               >
-                <View style={styles.tabIconWrapper}>
-                  <IconComp
-                    size={21}
-                    color={isSelected ? activeTabColor : inactiveTabColor}
-                  />
-                  {tab.badgeCount && tab.badgeCount > 0 ? (
-                    <View style={[styles.tabBadge, { backgroundColor: activeBorderColor }]}>
-                      <Text style={styles.tabBadgeText}>
-                        {tab.badgeCount > 99 ? '99+' : tab.badgeCount}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    { color: isSelected ? activeTabColor : inactiveTabColor },
-                    isSelected && styles.tabLabelActive,
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </View>
+                {tab.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -1706,18 +1694,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    paddingVertical: 3,
-  },
-  tabItemInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 3.5,
-    paddingHorizontal: 4,
-    width: '92%',
-    maxWidth: 72,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+    paddingVertical: 6,
   },
   tabIconWrapper: {
     position: 'relative',
