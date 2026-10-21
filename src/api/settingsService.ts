@@ -1,5 +1,6 @@
 import { supabase, appStorage } from './client';
 import { UserSettings, defaultUserSettings } from '../types/settings';
+import { useAuthStore } from '../store/useAuthStore';
 
 /**
  * Maps database record from public.user_settings to frontend UserSettings model
@@ -169,15 +170,32 @@ export async function updateUserSettings(
       });
 
     if (updates.profileVisibility !== undefined) {
+      const isPriv = updates.profileVisibility === 'private';
       try {
-        await supabase
+        const { error: profError } = await supabase
           .from('profiles')
           .update({
-            visibility_level: updates.profileVisibility,
-            is_private: updates.profileVisibility === 'private',
+            is_private: isPriv,
           })
           .eq('id', userId);
-      } catch {}
+
+        if (profError) {
+          console.warn('[settingsService] Failed to update profiles.is_private:', profError.message);
+        }
+      } catch (e) {
+        console.warn('[settingsService] profiles.is_private update error:', e);
+      }
+
+      // Synchronize active auth user profile state
+      if (useAuthStore.getState().user?.id === userId) {
+        useAuthStore.setState((s) => ({
+          user: {
+            ...s.user,
+            isPrivateRestricted: isPriv,
+            visibilityLevel: updates.profileVisibility,
+          },
+        }));
+      }
     }
 
     if (error) {

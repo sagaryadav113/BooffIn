@@ -146,6 +146,8 @@ export function mapSupabaseProfile(row: any): UserProfile {
       ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
       : 'Recently',
     isFollowing: row.is_following,
+    isPrivateRestricted: Boolean(row.is_private || row.is_private_restricted || row.visibility_level === 'private'),
+    visibilityLevel: (row.is_private ? 'private' : row.visibility_level) || 'public',
   };
 }
 
@@ -1640,7 +1642,20 @@ export async function checkTargetIsPrivate(targetUserId: string): Promise<boolea
       return Boolean((profData as any).is_private);
     }
 
-    // 2. Database-level security definer visibility check if available
+    // 2. Secondary check in user_settings table
+    try {
+      const { data: setData } = await supabase
+        .from('user_settings')
+        .select('profile_visibility')
+        .eq('user_id', targetId)
+        .maybeSingle();
+
+      if (setData && (setData as any).profile_visibility === 'private') {
+        return true;
+      }
+    } catch {}
+
+    // 3. Database-level security definer visibility check if available
     const { data: rpcVis, error: rpcErr } = await supabase.rpc('get_user_profile_visibility', {
       p_user_id: targetId,
     });
@@ -2692,6 +2707,20 @@ export async function fetchUserPosts(
 
       if (blockRow) {
         return { posts: [], error: null };
+      }
+    }
+
+    // Privacy boundary: If target account is private and viewer is not following (and not self), block posts
+    if (currentUserId !== userId) {
+      const isTargetPrivate = await checkTargetIsPrivate(userId);
+      if (isTargetPrivate) {
+        if (!currentUserId) {
+          return { posts: [], error: null };
+        }
+        const isFollowing = await checkIsFollowing(userId, currentUserId);
+        if (!isFollowing) {
+          return { posts: [], error: null };
+        }
       }
     }
 

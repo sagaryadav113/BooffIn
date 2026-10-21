@@ -270,6 +270,9 @@ export default function OtherResearcherProfileScreen() {
           }
           if (priv?.profile_visibility) {
             prof.visibilityLevel = priv.profile_visibility;
+            if (priv.profile_visibility === 'private') {
+              prof.isPrivateRestricted = true;
+            }
           }
         } catch {}
       }
@@ -352,6 +355,9 @@ export default function OtherResearcherProfileScreen() {
 
   const posts = React.useMemo(() => {
     if (!researcher?.id) return [];
+    if (isLocked) {
+      return [];
+    }
     if (researcherPosts.length > 0) {
       const storeMap = new Map(allPosts.map((p) => [p.id, p]));
       return researcherPosts.map((rp) => {
@@ -368,7 +374,7 @@ export default function OtherResearcherProfileScreen() {
       });
     }
     return allPosts.filter((p) => p.author.id === researcher.id || (p.isReposted && p.author.id !== researcher.id));
-  }, [researcherPosts, allPosts, researcher]);
+  }, [researcherPosts, allPosts, researcher, isLocked]);
 
   // Helper to check if a post is a shared research paper or repost of someone else
   const isSharedPost = (p: Post) => {

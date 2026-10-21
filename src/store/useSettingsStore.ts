@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { UserSettings, defaultUserSettings } from '../types/settings';
 import { fetchUserSettings, updateUserSettings } from '../api/settingsService';
+import { useAuthStore } from './useAuthStore';
+import { supabase } from '../api/client';
 
 interface SettingsState {
   settings: UserSettings;
@@ -47,12 +49,39 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       },
     });
 
-    if (!currentSettings.userId) {
+    let effectiveUserId = currentSettings.userId;
+    if (!effectiveUserId || effectiveUserId === 'unknown') {
+      effectiveUserId = useAuthStore.getState().user?.id;
+    }
+    if (!effectiveUserId || effectiveUserId === 'unknown') {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) effectiveUserId = session.user.id;
+      } catch {}
+    }
+
+    if (!effectiveUserId || effectiveUserId === 'unknown') {
       return true;
     }
 
+    if (!currentSettings.userId) {
+      set({ settings: { ...get().settings, userId: effectiveUserId } });
+    }
+
+    // Immediately synchronize local auth user state for profileVisibility
+    if (key === 'profileVisibility') {
+      const isPriv = value === 'private';
+      useAuthStore.setState((s) => ({
+        user: {
+          ...s.user,
+          isPrivateRestricted: isPriv,
+          visibilityLevel: value as any,
+        },
+      }));
+    }
+
     try {
-      const res = await updateUserSettings(currentSettings.userId, {
+      const res = await updateUserSettings(effectiveUserId, {
         [key]: value,
       });
 
@@ -83,17 +112,32 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   saveSettings: async (updates: Partial<UserSettings>) => {
     const currentSettings = get().settings;
-    if (!currentSettings.userId) {
+    let effectiveUserId = currentSettings.userId;
+    if (!effectiveUserId || effectiveUserId === 'unknown') {
+      effectiveUserId = useAuthStore.getState().user?.id;
+    }
+    if (!effectiveUserId || effectiveUserId === 'unknown') {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) effectiveUserId = session.user.id;
+      } catch {}
+    }
+
+    if (!effectiveUserId || effectiveUserId === 'unknown') {
       set({ settings: { ...currentSettings, ...updates } });
       return true;
     }
 
+    if (!currentSettings.userId) {
+      set({ settings: { ...get().settings, userId: effectiveUserId } });
+    }
+
     set({ isSaving: true, error: null });
     try {
-      const res = await updateUserSettings(currentSettings.userId, updates);
+      const res = await updateUserSettings(effectiveUserId, updates);
       if (res.success) {
         set({
-          settings: { ...currentSettings, ...updates },
+          settings: { ...currentSettings, ...updates, userId: effectiveUserId },
           isSaving: false,
           error: null,
         });

@@ -11,6 +11,7 @@ import { SelectModal, SelectOption } from '../../components/settings/SelectModal
 import { Divider } from '../../components/core/Divider';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useWorkspaceSettingsStore } from '../../store/useWorkspaceSettingsStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const PROFILE_VISIBILITY_OPTIONS: SelectOption[] = [
   {
@@ -97,7 +98,14 @@ const EMAIL_VISIBILITY_OPTIONS: SelectOption[] = [
 ];
 
 export default function PrivacySettingsScreen() {
-  const { settings, updateSetting, isSaving } = useSettingsStore();
+  const currentUser = useAuthStore((s) => s.user);
+  const { settings, updateSetting, fetchSettings, isSaving } = useSettingsStore();
+
+  React.useEffect(() => {
+    if (currentUser?.id && currentUser.id !== 'unknown') {
+      fetchSettings(currentUser.id);
+    }
+  }, [currentUser?.id, fetchSettings]);
 
   const [activeModal, setActiveModal] = useState<
     'visibility' | 'connections' | 'messages' | 'email' | null

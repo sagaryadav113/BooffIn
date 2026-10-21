@@ -94,9 +94,9 @@ export function mapProfileRecord(raw: any, fallbackEmail?: string, isFollowing?:
     researchgateUrl: raw.researchgate_url || undefined,
     linkedinUrl: raw.linkedin_url || undefined,
     scopusId: raw.scopus_id || undefined,
-    isPrivateRestricted: Boolean(raw.is_private_restricted),
+    isPrivateRestricted: Boolean(raw.is_private || raw.is_private_restricted || raw.visibility_level === 'private'),
     isBlocked: Boolean(raw.is_blocked),
-    visibilityLevel: raw.visibility_level || 'public',
+    visibilityLevel: (raw.is_private ? 'private' : raw.visibility_level) || 'public',
   };
 }
 
