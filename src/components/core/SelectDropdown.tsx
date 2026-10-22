@@ -138,7 +138,7 @@ export const SelectDropdown: React.FC<SelectDropdownProps> = ({
                     backgroundColor: isSelected
                       ? isDark
                         ? 'rgba(255,255,255,0.06)'
-                        : '#FFF7ED'
+                        : '#F0FDF4'
                       : 'transparent',
                   },
                 ]}
@@ -148,7 +148,7 @@ export const SelectDropdown: React.FC<SelectDropdownProps> = ({
                     style={[
                       styles.optionLabel,
                       {
-                        color: isSelected ? '#F97316' : colors.textPrimary,
+                        color: isSelected ? '#064E3B' : colors.textPrimary,
                         fontWeight: isSelected ? '600' : '400',
                       },
                     ]}
@@ -162,7 +162,7 @@ export const SelectDropdown: React.FC<SelectDropdownProps> = ({
                   )}
                 </View>
 
-                {isSelected && <Check size={18} color="#F97316" strokeWidth={2.4} />}
+                {isSelected && <Check size={18} color="#064E3B" strokeWidth={2.4} />}
               </TouchableOpacity>
             );
           })}

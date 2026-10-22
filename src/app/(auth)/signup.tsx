@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,28 +12,29 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Check, AlertCircle } from 'lucide-react-native';
+import { ArrowLeft, Check, AlertCircle, Mail, RotateCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, spacing, typography } from '../../theme';
+import { colors, radii, spacing } from '../../theme';
 import { Input } from '../../components/core/Input';
+import { OtpInput } from '../../components/core/OtpInput';
 import { GoogleIcon } from '../../components/core/GoogleIcon';
+import { BooffinLogo } from '../../components/core/BooffinLogo';
 import { useAuthStore } from '../../store/useAuthStore';
-import { validatePassword, isProfileComplete } from '../../api/authService';
-
-const BOOFFIN_LOGO = require('../../../assets/images/booffin-symbol.png');
+import { isProfileComplete } from '../../api/authService';
 
 export default function SignupScreen() {
   const params = useLocalSearchParams<{ email?: string }>();
+  const [stage, setStage] = useState<'email' | 'otp'>('email');
   const [email, setEmail] = useState(params.email || '');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [resendCountdown, setResendCountdown] = useState(30);
 
-  const signUp = useAuthStore((s) => s.signUp);
+  const sendOtp = useAuthStore((s) => s.sendOtp);
+  const verifyOtp = useAuthStore((s) => s.verifyOtp);
   const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
   const isLoading = useAuthStore((s) => s.isLoading);
   const authError = useAuthStore((s) => s.authError);
@@ -41,13 +42,32 @@ export default function SignupScreen() {
 
   const cleanEmail = email.trim().toLowerCase();
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail);
-  const passwordValidation = validatePassword(password);
-  const isPasswordValid = passwordValidation.isValid;
+
+  // Resend Countdown Timer
+  useEffect(() => {
+    let interval: any;
+    if (stage === 'otp' && resendCountdown > 0) {
+      interval = setInterval(() => {
+        setResendCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [stage, resendCountdown]);
 
   const handleBack = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
+
+    if (stage === 'otp') {
+      setStage('email');
+      setOtpCode('');
+      setValidationError(null);
+      clearError();
+      return;
+    }
     router.back();
   };
 
@@ -66,12 +86,12 @@ export default function SignupScreen() {
     }
   };
 
-  const handleCreateAccount = async () => {
+  const handleSendOtp = async () => {
     setValidationError(null);
     clearError();
 
     if (!isEmailValid) {
-      setValidationError('Please enter a valid email address.');
+      setValidationError('Please enter a valid academic or personal email address.');
       return;
     }
 
@@ -80,33 +100,74 @@ export default function SignupScreen() {
       return;
     }
 
-    const pwdVal = validatePassword(password);
-    if (!pwdVal.isValid) {
-      setValidationError(pwdVal.error || 'Password must be at least 6 characters.');
-      return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+
+    const res = await sendOtp(cleanEmail);
+    if (res.success) {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      setStage('otp');
+      setResendCountdown(30);
+    } else {
+      setValidationError(res.error || 'Failed to send verification code. Please try again.');
     }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCountdown > 0 || isLoading) return;
+    setValidationError(null);
+    clearError();
 
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
 
-    const success = await signUp({
-      email: cleanEmail,
-      password,
-    });
+    const res = await sendOtp(cleanEmail);
+    if (res.success) {
+      setResendCountdown(30);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+    } else {
+      setValidationError(res.error || 'Failed to resend code.');
+    }
+  };
 
+  const handleVerifyOtp = async (codeToVerify?: string) => {
+    const code = (codeToVerify || otpCode).trim();
+    if (code.length < 6) {
+      setValidationError('Please enter the complete 6-digit verification code.');
+      return;
+    }
+
+    setValidationError(null);
+    clearError();
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+
+    const success = await verifyOtp(cleanEmail, code);
     if (success) {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
-      router.replace('/(auth)/onboarding');
+
+      const activeUser = useAuthStore.getState().user;
+      if (isProfileComplete(activeUser)) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/onboarding');
+      }
+    } else {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } catch {}
     }
   };
-
-  const isAlreadyRegistered =
-    authError?.toLowerCase().includes('already registered') ||
-    authError?.toLowerCase().includes('already in use') ||
-    authError?.toLowerCase().includes('user already exists');
 
   const displayError = validationError || authError;
 
@@ -139,176 +200,257 @@ export default function SignupScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Form Section */}
-              <View style={styles.topSection}>
-                {/* Logo Mark */}
-                <View style={styles.logoRow}>
-                  <View style={styles.logoContainer}>
-                    <Image source={BOOFFIN_LOGO} style={styles.logoImage} resizeMode="contain" />
-                  </View>
-                </View>
+              {stage === 'email' ? (
+                /* STAGE 1: Email Entry */
+                <>
+                  <View style={styles.topSection}>
+                    {/* Vector Crest Logo */}
+                    <View style={styles.logoRow}>
+                      <BooffinLogo size={52} variant="symbol" />
+                    </View>
 
-                <Text style={styles.title}>Create your account</Text>
-                
-                {/* Sign In link */}
-                <View style={styles.subHeaderRow}>
-                  <Text style={styles.subtitleText}>Already have an account? </Text>
-                  <TouchableOpacity
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(auth)/login',
-                        params: { email: cleanEmail || undefined },
-                      })
-                    }
-                  >
-                    <Text style={styles.signInLink}>Sign in</Text>
-                  </TouchableOpacity>
-                </View>
+                    <Text style={styles.title}>Create your account</Text>
 
-                {/* Google Single Sign-On Button */}
-                <TouchableOpacity
-                  style={styles.googleButton}
-                  onPress={handleGoogleSignIn}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel="Continue with Google"
-                >
-                  <GoogleIcon size={18} />
-                  <Text style={styles.googleButtonText}>Continue with Google</Text>
-                </TouchableOpacity>
+                    {/* Sign In link */}
+                    <View style={styles.subHeaderRow}>
+                      <Text style={styles.subtitleText}>Already have an account? </Text>
+                      <TouchableOpacity
+                        onPress={() =>
+                          router.push({
+                            pathname: '/(auth)/login',
+                            params: { email: cleanEmail || undefined },
+                          })
+                        }
+                      >
+                        <Text style={styles.signInLink}>Sign in</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                {/* Divider */}
-                <View style={styles.dividerRow}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>or continue with email</Text>
-                  <View style={styles.dividerLine} />
-                </View>
+                    {/* Google Single Sign-On Button */}
+                    <TouchableOpacity
+                      style={styles.googleButton}
+                      onPress={handleGoogleSignIn}
+                      activeOpacity={0.85}
+                      accessibilityRole="button"
+                      accessibilityLabel="Continue with Google"
+                    >
+                      <GoogleIcon size={18} />
+                      <Text style={styles.googleButtonText}>Continue with Google</Text>
+                    </TouchableOpacity>
 
-                {/* Error Banner */}
-                {displayError && (
-                  <View style={styles.errorBanner}>
-                    <AlertCircle size={15} color={colors.accentRed} style={{ marginRight: 6 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.errorText}>{displayError}</Text>
-                      {isAlreadyRegistered && (
-                        <TouchableOpacity
-                          onPress={() =>
-                            router.push({
-                              pathname: '/(auth)/login',
-                              params: { email: cleanEmail },
-                            })
-                          }
-                          style={{ marginTop: 4 }}
+                    {/* Divider */}
+                    <View style={styles.dividerRow}>
+                      <View style={styles.dividerLine} />
+                      <Text style={styles.dividerText}>or continue with email</Text>
+                      <View style={styles.dividerLine} />
+                    </View>
+
+                    {/* Error Banner */}
+                    {displayError && (
+                      <View style={styles.errorBanner}>
+                        <AlertCircle size={15} color={colors.accentRed} style={{ marginRight: 6 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.errorText}>{displayError}</Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Email Input */}
+                    <Input
+                      label="Email address"
+                      placeholder="scientist@university.edu"
+                      value={email}
+                      onChangeText={(text) => {
+                        setEmail(text);
+                        if (validationError) setValidationError(null);
+                        if (authError) clearError();
+                      }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="off"
+                    />
+
+                    {/* Agreement Checkbox */}
+                    <TouchableOpacity
+                      style={styles.checkboxRow}
+                      activeOpacity={0.8}
+                      onPress={() => setAgreedToTerms(!agreedToTerms)}
+                    >
+                      <View
+                        style={[
+                          styles.checkboxBox,
+                          agreedToTerms && styles.checkboxBoxChecked,
+                        ]}
+                      >
+                        {agreedToTerms && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
+                      </View>
+                      <Text style={styles.checkboxLabel}>
+                        By creating an account, I agree to BooffIn&apos;s{' '}
+                        <Text
+                          style={styles.legalLink}
+                          onPress={() => router.push('/welcome/terms' as any)}
                         >
-                          <Text style={styles.errorActionLink}>Click here to Sign In →</Text>
+                          Terms of Use
+                        </Text>
+                        , and acknowledge its{' '}
+                        <Text
+                          style={styles.legalLink}
+                          onPress={() => router.push('/welcome/policy' as any)}
+                        >
+                          Privacy Policy
+                        </Text>
+                        .
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Bottom Actions */}
+                  <View style={styles.bottomSection}>
+                    <TouchableOpacity
+                      style={[
+                        styles.submitButton,
+                        isEmailValid && agreedToTerms && !isLoading
+                          ? styles.submitButtonActive
+                          : styles.submitButtonDisabled,
+                      ]}
+                      onPress={handleSendOtp}
+                      disabled={!isEmailValid || !agreedToTerms || isLoading}
+                      activeOpacity={0.88}
+                      accessibilityRole="button"
+                      accessibilityLabel="Continue"
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.submitButtonText,
+                            isEmailValid && agreedToTerms
+                              ? styles.submitButtonTextActive
+                              : styles.submitButtonTextDisabled,
+                          ]}
+                        >
+                          Continue
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <Text style={styles.footnote}>
+                      We will send a 6-digit secure code to verify your email. No password needed.
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                /* STAGE 2: OTP Verification */
+                <>
+                  <View style={styles.topSection}>
+                    {/* Vector Crest Logo */}
+                    <View style={styles.logoRow}>
+                      <BooffinLogo size={52} variant="symbol" />
+                    </View>
+
+                    <Text style={styles.title}>Check your inbox</Text>
+
+                    <Text style={styles.otpSubtitle}>
+                      We&apos;ve sent a 6-digit verification code to
+                    </Text>
+                    <View style={styles.emailBadgeRow}>
+                      <Mail size={15} color="#064E3B" style={{ marginRight: 6 }} />
+                      <Text style={styles.emailBadgeText}>{cleanEmail}</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setStage('email');
+                          setOtpCode('');
+                          setValidationError(null);
+                        }}
+                        style={styles.editEmailButton}
+                      >
+                        <Text style={styles.editEmailText}>Edit</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Error Banner */}
+                    {displayError && (
+                      <View style={styles.errorBanner}>
+                        <AlertCircle size={15} color={colors.accentRed} style={{ marginRight: 6 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.errorText}>{displayError}</Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* 6-Digit Discrete OTP Input */}
+                    <OtpInput
+                      length={6}
+                      value={otpCode}
+                      onChange={(code) => {
+                        setOtpCode(code);
+                        if (validationError) setValidationError(null);
+                        if (authError) clearError();
+                      }}
+                      onComplete={(code) => handleVerifyOtp(code)}
+                      disabled={isLoading}
+                      hasError={Boolean(displayError)}
+                    />
+
+                    {/* Resend Code Section */}
+                    <View style={styles.resendRow}>
+                      {resendCountdown > 0 ? (
+                        <Text style={styles.resendCooldownText}>
+                          Resend code in <Text style={{ fontWeight: '700' }}>{resendCountdown}s</Text>
+                        </Text>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={handleResendOtp}
+                          disabled={isLoading}
+                          style={styles.resendActiveButton}
+                          activeOpacity={0.7}
+                        >
+                          <RotateCw size={14} color="#064E3B" style={{ marginRight: 6 }} />
+                          <Text style={styles.resendActiveText}>Resend code</Text>
                         </TouchableOpacity>
                       )}
                     </View>
                   </View>
-                )}
 
-                {/* Email Input */}
-                <Input
-                  label="Email address"
-                  placeholder="scientist@university.edu"
-                  value={email}
-                  onChangeText={(text) => {
-                    setEmail(text);
-                    if (validationError) setValidationError(null);
-                    if (authError) clearError();
-                  }}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoFocus={!email}
-                />
-
-                {/* Password Input */}
-                <Input
-                  label="Password"
-                  placeholder="••••••••••••"
-                  value={password}
-                  onChangeText={(text) => {
-                    setPassword(text);
-                    if (validationError) setValidationError(null);
-                    if (authError) clearError();
-                  }}
-                  secureTextEntry={!showPassword}
-                  autoFocus={!!email}
-                  rightIcon={showPassword ? 'EyeOff' : 'Eye'}
-                  onRightIconPress={() => setShowPassword(!showPassword)}
-                  hint="At least 6 characters with letters and numbers"
-                />
-
-                {/* Agreement Checkbox (Reference 1) */}
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  activeOpacity={0.8}
-                  onPress={() => setAgreedToTerms(!agreedToTerms)}
-                >
-                  <View
-                    style={[
-                      styles.checkboxBox,
-                      agreedToTerms && styles.checkboxBoxChecked,
-                    ]}
-                  >
-                    {agreedToTerms && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
-                  </View>
-                  <Text style={styles.checkboxLabel}>
-                    By creating an account, I agree to BooffIn's{' '}
-                    <Text
-                      style={styles.legalLink}
-                      onPress={() => router.push('/welcome/terms' as any)}
-                    >
-                      Terms of Use
-                    </Text>
-                    , and acknowledge its{' '}
-                    <Text
-                      style={styles.legalLink}
-                      onPress={() => router.push('/welcome/policy' as any)}
-                    >
-                      Privacy Policy
-                    </Text>
-                    .
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Bottom Actions */}
-              <View style={styles.bottomSection}>
-                <TouchableOpacity
-                  style={[
-                    styles.submitButton,
-                    isEmailValid && isPasswordValid && agreedToTerms && !isLoading
-                      ? styles.submitButtonActive
-                      : styles.submitButtonDisabled,
-                  ]}
-                  onPress={handleCreateAccount}
-                  disabled={!isEmailValid || !isPasswordValid || !agreedToTerms || isLoading}
-                  activeOpacity={0.88}
-                  accessibilityRole="button"
-                  accessibilityLabel="Continue"
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text
+                  {/* Bottom Actions */}
+                  <View style={styles.bottomSection}>
+                    <TouchableOpacity
                       style={[
-                        styles.submitButtonText,
-                        isEmailValid && isPasswordValid && agreedToTerms
-                          ? styles.submitButtonTextActive
-                          : styles.submitButtonTextDisabled,
+                        styles.submitButton,
+                        otpCode.length === 6 && !isLoading
+                          ? styles.submitButtonActive
+                          : styles.submitButtonDisabled,
                       ]}
+                      onPress={() => handleVerifyOtp()}
+                      disabled={otpCode.length < 6 || isLoading}
+                      activeOpacity={0.88}
+                      accessibilityRole="button"
+                      accessibilityLabel="Verify and continue"
                     >
-                      Continue
-                    </Text>
-                  )}
-                </TouchableOpacity>
+                      {isLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.submitButtonText,
+                            otpCode.length === 6
+                              ? styles.submitButtonTextActive
+                              : styles.submitButtonTextDisabled,
+                          ]}
+                        >
+                          Verify & Continue
+                        </Text>
+                      )}
+                    </TouchableOpacity>
 
-                <Text style={styles.footnote}>
-                  BooffIn is an open scholarly network for researchers, students, and institutions.
-                </Text>
-              </View>
+                    <Text style={styles.footnote}>
+                      Didn&apos;t get the email? Check your spam folder or request a new code above.
+                    </Text>
+                  </View>
+                </>
+              )}
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
@@ -357,20 +499,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  logoContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#FFF7ED',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#FED7AA',
-  },
-  logoImage: {
-    width: 28,
-    height: 28,
-  },
   title: {
     fontFamily: Platform.select({
       ios: 'Georgia',
@@ -396,8 +524,8 @@ const styles = StyleSheet.create({
   },
   signInLink: {
     fontSize: 14,
-    color: '#F97316',
-    fontWeight: '600',
+    color: '#064E3B',
+    fontWeight: '700',
   },
   googleButton: {
     flexDirection: 'row',
@@ -457,8 +585,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   checkboxBoxChecked: {
-    backgroundColor: '#F97316',
-    borderColor: '#F97316',
+    backgroundColor: '#064E3B',
+    borderColor: '#064E3B',
   },
   checkboxLabel: {
     flex: 1,
@@ -467,8 +595,68 @@ const styles = StyleSheet.create({
     color: '#4B5563',
   },
   legalLink: {
-    color: '#F97316',
+    color: '#064E3B',
+    fontWeight: '600',
     textDecorationLine: 'underline',
+  },
+  otpSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  emailBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: radii.full,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xl,
+  },
+  emailBadgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#064E3B',
+  },
+  editEmailButton: {
+    marginLeft: spacing.sm,
+    paddingLeft: spacing.xs,
+    borderLeftWidth: 1,
+    borderLeftColor: '#BBF7D0',
+  },
+  editEmailText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#047857',
+    textDecorationLine: 'underline',
+  },
+  resendRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+  },
+  resendCooldownText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  resendActiveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.full,
+    backgroundColor: '#F0FDF4',
+  },
+  resendActiveText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#064E3B',
   },
   errorBanner: {
     flexDirection: 'row',
@@ -485,12 +673,6 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     lineHeight: 18,
   },
-  errorActionLink: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#DC2626',
-    textDecorationLine: 'underline',
-  },
   bottomSection: {
     width: '100%',
     paddingTop: spacing.lg,
@@ -504,8 +686,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   submitButtonActive: {
-    backgroundColor: '#F97316',
-    shadowColor: '#F97316',
+    backgroundColor: '#064E3B',
+    shadowColor: '#064E3B',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 5,

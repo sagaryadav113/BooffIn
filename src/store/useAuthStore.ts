@@ -15,6 +15,8 @@ import {
   persistUserProfile,
   SignUpParams,
   extractOAuthParams,
+  sendEmailOtp,
+  verifyEmailOtp,
 } from '../api/authService';
 import {
   toggleFollowUserRpc,
@@ -67,6 +69,8 @@ interface AuthState {
   removeFollowerUser: (followerUserId: string) => Promise<boolean>;
   signIn: (email: string, pass: string) => Promise<boolean>;
   signUp: (params: SignUpParams) => Promise<boolean>;
+  sendOtp: (email: string) => Promise<{ success: boolean; error: string | null }>;
+  verifyOtp: (email: string, token: string) => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
   signInWithORCID: () => Promise<boolean>;
   resetPassword: (email: string) => Promise<{ success: boolean; error: string | null }>;
@@ -347,6 +351,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       authError: null,
       users: [user, ...state.users.filter((u) => u.id !== user.id)],
     }));
+    import('../utils/e2eeCrypto').then(({ getOrCreateUserKeyPair }) => {
+      getOrCreateUserKeyPair(user.id).catch(() => {});
+    });
+    return true;
+  },
+
+  sendOtp: async (email: string) => {
+    set({ isLoading: true, authError: null });
+    const result = await sendEmailOtp(email);
+    set({
+      isLoading: false,
+      authError: result.error,
+    });
+    return result;
+  },
+
+  verifyOtp: async (email: string, token: string) => {
+    set({ isLoading: true, authStatus: 'loading', authError: null });
+    const { user, error } = await verifyEmailOtp(email, token);
+    if (error || !user) {
+      set({
+        isLoading: false,
+        authStatus: 'unauthenticated',
+        isAuthenticated: false,
+        authError: error || 'Verification failed.',
+      });
+      return false;
+    }
+    set((state) => ({
+      user,
+      authStatus: 'authenticated',
+      isAuthenticated: true,
+      isLoading: false,
+      authError: null,
+      users: [user, ...state.users.filter((u) => u.id !== user.id)],
+    }));
+    get().loadFollowingIds(user.id);
     import('../utils/e2eeCrypto').then(({ getOrCreateUserKeyPair }) => {
       getOrCreateUserKeyPair(user.id).catch(() => {});
     });

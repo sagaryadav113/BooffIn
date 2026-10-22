@@ -36,6 +36,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
 import { Input } from '../../components/core/Input';
 import { SelectDropdown } from '../../components/core/SelectDropdown';
+import { BooffinLogo } from '../../components/core/BooffinLogo';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
   validateUsername,
@@ -43,8 +44,6 @@ import {
   normalizeHandle,
 } from '../../api/authService';
 import { pickAvatarImage, uploadProfileAvatar } from '../../api/storageService';
-
-const BOOFFIN_LOGO = require('../../../assets/images/booffin-symbol.png');
 
 // Modalities for Page 2: "Tell us more about what you like" (Reference 2)
 const CONTENT_MODALITIES = [
@@ -438,8 +437,8 @@ export default function OnboardingScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.contentHeader}>
-                <View style={styles.logoBadge}>
-                  <Image source={BOOFFIN_LOGO} style={styles.logoIcon} resizeMode="contain" />
+                <View style={styles.logoRow}>
+                  <BooffinLogo size={46} variant="symbol" />
                 </View>
                 <Text style={styles.pageTitle}>Tell us more about what you like</Text>
                 <Text style={styles.pageSubtitle}>
@@ -471,7 +470,7 @@ export default function OnboardingScreen() {
                         >
                           <IconComp
                             size={18}
-                            color={isSelected ? '#F97316' : '#4B5563'}
+                            color={isSelected ? '#064E3B' : '#4B5563'}
                             strokeWidth={2}
                           />
                         </View>
@@ -522,8 +521,8 @@ export default function OnboardingScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.contentHeader}>
-                <View style={styles.logoBadge}>
-                  <Image source={BOOFFIN_LOGO} style={styles.logoIcon} resizeMode="contain" />
+                <View style={styles.logoRow}>
+                  <BooffinLogo size={46} variant="symbol" />
                 </View>
                 <Text style={styles.pageTitle}>Select 3 topics</Text>
                 <Text style={styles.pageSubtitle}>
@@ -603,8 +602,8 @@ export default function OnboardingScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.contentHeader}>
-                <View style={styles.logoBadge}>
-                  <Image source={BOOFFIN_LOGO} style={styles.logoIcon} resizeMode="contain" />
+                <View style={styles.logoRow}>
+                  <BooffinLogo size={46} variant="symbol" />
                 </View>
                 <Text style={styles.pageTitle}>Tell us about yourself</Text>
                 <Text style={styles.pageSubtitle}>
@@ -762,7 +761,7 @@ export default function OnboardingScreen() {
               <View style={styles.celebrationContent}>
                 {/* Visual Milestone Badge */}
                 <View style={styles.milestoneCircle}>
-                  <Rocket size={44} color="#F97316" strokeWidth={1.8} />
+                  <Rocket size={44} color="#064E3B" strokeWidth={1.8} />
                 </View>
 
                 <Text style={styles.celebrationTitle}>You're all set!</Text>
@@ -773,19 +772,19 @@ export default function OnboardingScreen() {
                 {/* Summary Card */}
                 <View style={styles.summaryCard}>
                   <View style={styles.summaryRow}>
-                    <CheckCircle2 size={16} color="#10B981" />
+                    <CheckCircle2 size={16} color="#064E3B" />
                     <Text style={styles.summaryText}>
                       Profile ready: <Text style={styles.summaryBold}>@{normalizeHandle(handle)}</Text>
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>
-                    <CheckCircle2 size={16} color="#10B981" />
+                    <CheckCircle2 size={16} color="#064E3B" />
                     <Text style={styles.summaryText}>
                       Topics tailored: <Text style={styles.summaryBold}>{selectedTopics.length} fields selected</Text>
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>
-                    <CheckCircle2 size={16} color="#10B981" />
+                    <CheckCircle2 size={16} color="#064E3B" />
                     <Text style={styles.summaryText}>Community safety & verification configured</Text>
                   </View>
                 </View>
@@ -885,10 +884,10 @@ const styles = StyleSheet.create({
   },
   progressDotActive: {
     width: 22,
-    backgroundColor: '#F97316',
+    backgroundColor: '#064E3B',
   },
   progressDotCompleted: {
-    backgroundColor: '#FDBA74',
+    backgroundColor: '#A7F3D0',
   },
   scrollContent: {
     flexGrow: 1,
@@ -900,20 +899,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  logoBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#FFF7ED',
+  logoRow: {
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#FED7AA',
     marginBottom: spacing.md,
-  },
-  logoIcon: {
-    width: 26,
-    height: 26,
   },
   pageTitle: {
     fontFamily: Platform.select({
@@ -954,8 +942,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   gridCardSelected: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#F97316',
+    backgroundColor: '#F0FDF4',
+    borderColor: '#064E3B',
     borderWidth: 1.5,
   },
   gridCardHeader: {
@@ -975,14 +963,14 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   iconCircleSelected: {
-    borderColor: '#FED7AA',
+    borderColor: '#A7F3D0',
     backgroundColor: '#FFFFFF',
   },
   checkPill: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#F97316',
+    backgroundColor: '#064E3B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -993,7 +981,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   gridCardTitleSelected: {
-    color: '#C2410C',
+    color: '#064E3B',
   },
   gridCardDesc: {
     fontSize: 11,
@@ -1024,8 +1012,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   topicChipSelected: {
-    backgroundColor: '#111827',
-    borderColor: '#111827',
+    backgroundColor: '#064E3B',
+    borderColor: '#064E3B',
   },
   topicChipText: {
     fontSize: 13,
@@ -1065,7 +1053,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#F97316',
+    backgroundColor: '#064E3B',
     borderWidth: 2,
     borderColor: '#FFFFFF',
     alignItems: 'center',
@@ -1094,10 +1082,10 @@ const styles = StyleSheet.create({
   primaryButton: {
     height: 50,
     borderRadius: radii.md,
-    backgroundColor: '#F97316',
+    backgroundColor: '#064E3B',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#F97316',
+    shadowColor: '#064E3B',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 5,
@@ -1132,9 +1120,9 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#F0FDF4',
     borderWidth: 1.5,
-    borderColor: '#FED7AA',
+    borderColor: '#A7F3D0',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xl,
@@ -1230,7 +1218,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 46,
     borderRadius: radii.md,
-    backgroundColor: '#111827',
+    backgroundColor: '#064E3B',
     alignItems: 'center',
     justifyContent: 'center',
   },

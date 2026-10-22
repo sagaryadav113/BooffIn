@@ -1095,6 +1095,92 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
 }
 
 /**
+ * Send 6-digit OTP code to user's email for passwordless sign-in / sign-up (Pattern A)
+ */
+export async function sendEmailOtp(email: string): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: cleanEmail,
+      options: {
+        shouldCreateUser: true,
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message || 'Failed to send verification code.' };
+    }
+
+    return { success: true, error: null };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'An unexpected error occurred while sending code.',
+    };
+  }
+}
+
+/**
+ * Verify 6-digit OTP code sent to user's email
+ */
+export async function verifyEmailOtp(email: string, token: string): Promise<AuthResponse> {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanToken = token.trim();
+
+    if (!cleanEmail || !cleanToken) {
+      return { user: null, error: 'Email and 6-digit verification code are required.' };
+    }
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: cleanEmail,
+      token: cleanToken,
+      type: 'email',
+    });
+
+    if (error) {
+      return { user: null, error: error.message || 'Invalid or expired code. Please try again.' };
+    }
+
+    if (data?.user) {
+      let profile = await fetchUserProfile(data.user.id);
+      if (!profile) {
+        // Brand new user from OTP
+        profile = {
+          id: data.user.id,
+          handle: cleanEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() || 'researcher',
+          fullName: data.user.user_metadata?.full_name || 'Researcher',
+          academicTitle: 'Researcher',
+          institution: 'Independent Research',
+          bio: '',
+          orcidVerified: false,
+          followersCount: 0,
+          followingCount: 0,
+          postsCount: 0,
+          savedCount: 0,
+          joinedDate: 'Recently',
+          researchInterests: [],
+        };
+      }
+      setStoredLocalSession(profile);
+      return { user: profile, error: null };
+    }
+
+    return { user: null, error: 'Verification failed. Please try again.' };
+  } catch (err: any) {
+    return {
+      user: null,
+      error: err.message || 'An unexpected error occurred during verification.',
+    };
+  }
+}
+
+
+/**
  * Sign Out & Clear Active Session
  */
 export async function signOutUser(): Promise<void> {
