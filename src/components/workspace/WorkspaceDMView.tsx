@@ -1851,7 +1851,17 @@ export const WorkspaceDMView: React.FC<WorkspaceDMViewProps> = ({ workspace }) =
                   : [styles.otherBubble, { backgroundColor: activeThemeConfig.id === 'default' && isDark ? '#1F2636' : activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' || isDark ? 1 : 0, borderColor: isDark ? colors.borderLight : 'rgba(0,0,0,0.06)' }]
                 : isMe
                 ? [styles.myBubble, { backgroundColor: activeThemeConfig.myBubbleColor }]
-                : [styles.otherBubble, { backgroundColor: activeThemeConfig.otherBubbleColor, borderWidth: activeThemeConfig.id !== 'default' ? 1 : 0, borderColor: 'rgba(0,0,0,0.06)' }],
+                : [
+                    styles.otherBubble,
+                    {
+                      backgroundColor:
+                        activeThemeConfig.id === 'default' && isDark
+                          ? '#1F2636'
+                          : activeThemeConfig.otherBubbleColor,
+                      borderWidth: activeThemeConfig.id !== 'default' || isDark ? 1 : 0,
+                      borderColor: isDark ? colors.borderLight : 'rgba(0,0,0,0.06)',
+                    },
+                  ],
               hasMediaContent && styles.bubbleWithMedia,
             ]}
           >
@@ -4137,30 +4147,30 @@ const createStyles = (isDark: boolean) =>
     borderBottomRightRadius: 3,
   },
   otherBubble: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: isDark ? '#1F2636' : '#F3F4F6',
     borderBottomLeftRadius: 3,
   },
   deletedBubble: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#111827' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#374151' : '#E2E8F0',
     borderStyle: 'dashed',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   cardBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#1F2636' : '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#374151' : '#E2E8F0',
     borderRadius: 14,
     padding: 6,
     width: '100%',
   },
   callLogBubble: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#111827' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#374151' : '#E2E8F0',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -4173,7 +4183,7 @@ const createStyles = (isDark: boolean) =>
   callLogText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0F172A',
+    color: isDark ? '#F1F5F9' : '#0F172A',
   },
   deletedContentRow: {
     flexDirection: 'row',
@@ -4190,17 +4200,17 @@ const createStyles = (isDark: boolean) =>
     color: '#CBD5E1',
   },
   doiBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#1F2636' : '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: isDark ? '#374151' : '#E5E7EB',
     borderRadius: 14,
     padding: 6,
     width: '100%',
   },
   pollBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#1F2636' : '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#374151' : '#E2E8F0',
     borderRadius: 16,
     padding: 12,
     minWidth: 260,
@@ -4222,7 +4232,7 @@ const createStyles = (isDark: boolean) =>
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   quotedBubbleBlockOther: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
   },
   quotedAccentBar: {
     width: 3,
@@ -4233,7 +4243,7 @@ const createStyles = (isDark: boolean) =>
     backgroundColor: '#34D399',
   },
   quotedAccentBarOther: {
-    backgroundColor: '#164E3F',
+    backgroundColor: isDark ? '#34D399' : '#164E3F',
   },
   quotedContentWrap: {
     flex: 1,
@@ -4247,7 +4257,7 @@ const createStyles = (isDark: boolean) =>
     color: '#A7F3D0',
   },
   quotedSenderNameOther: {
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
   },
   quotedSnippetText: {
     fontSize: 12,
@@ -4256,7 +4266,7 @@ const createStyles = (isDark: boolean) =>
     color: '#E2E8F0',
   },
   quotedSnippetTextOther: {
-    color: '#475569',
+    color: isDark ? '#CBD5E1' : '#475569',
   },
   imageMsgContainer: {
     width: 230,
@@ -4432,7 +4442,7 @@ const createStyles = (isDark: boolean) =>
     fontWeight: '500',
   },
   otherMessageText: {
-    color: '#111827',
+    color: isDark ? '#FFFFFF' : '#111827',
   },
   msgFooter: {
     flexDirection: 'row',
@@ -4457,7 +4467,7 @@ const createStyles = (isDark: boolean) =>
     color: '#D1FAE5',
   },
   otherTimestamp: {
-    color: '#6B7280',
+    color: isDark ? '#94A3B8' : '#6B7280',
   },
   doiTimestamp: {
     fontSize: 10,
@@ -4482,16 +4492,16 @@ const createStyles = (isDark: boolean) =>
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#334155' : '#E2E8F0',
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 12,
   },
   reactionBadgePillActive: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#ECFDF5',
+    borderColor: isDark ? '#059669' : '#A7F3D0',
   },
   reactionBadgeEmoji: {
     fontSize: 12,
@@ -4499,18 +4509,18 @@ const createStyles = (isDark: boolean) =>
   reactionBadgeCount: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: isDark ? '#94A3B8' : '#64748B',
   },
   reactionBadgeCountActive: {
-    color: '#164E3F',
+    color: isDark ? '#34D399' : '#164E3F',
   },
   addReactionBadgeBtn: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: isDark ? '#334155' : '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
