@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   TextInput,
@@ -6,6 +6,8 @@ import {
   StyleSheet,
   ViewStyle,
   TouchableOpacity,
+  Pressable,
+  Platform,
 } from 'react-native';
 import { colors as staticColors, radii, spacing, typography, layout, useColors, useIsDark } from '../../theme';
 import { Typography } from './Typography';
@@ -35,6 +37,7 @@ export const Input: React.FC<InputProps> = ({
   const colors = useColors();
   const isDark = useIsDark();
   const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -44,7 +47,8 @@ export const Input: React.FC<InputProps> = ({
         </Typography>
       )}
 
-      <View
+      <Pressable
+        onPress={() => inputRef.current?.focus()}
         style={[
           styles.inputWrapper,
           { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight },
@@ -60,6 +64,7 @@ export const Input: React.FC<InputProps> = ({
         )}
 
         <TextInput
+          ref={inputRef}
           style={[
             styles.input,
             { color: colors.textPrimary },
@@ -82,7 +87,7 @@ export const Input: React.FC<InputProps> = ({
             <Icon name={rightIcon} size="sm" color={colors.textSecondary} />
           </TouchableOpacity>
         )}
-      </View>
+      </Pressable>
 
       {error ? (
         <Typography variant="metadata" color={colors.accentRed} style={styles.helperText}>
@@ -116,6 +121,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: spacing.md + 2,
     minHeight: layout.inputHeights.md,
+    ...(Platform.OS === 'web' ? ({ cursor: 'text' } as any) : {}),
   },
   inputWrapperFocused: {
     borderColor: staticColors.black,
@@ -140,6 +146,7 @@ const styles = StyleSheet.create({
     color: staticColors.textPrimary,
     paddingVertical: spacing.sm + 2,
     fontSize: 15,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', cursor: 'text' } as any) : {}),
   },
   helperText: {
     marginTop: spacing.xs + 1,

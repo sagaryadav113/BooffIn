@@ -9,8 +9,6 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
   ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -174,8 +172,7 @@ export default function SignupScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <View style={styles.wrapper}>
+      <View style={styles.wrapper}>
           {/* Header */}
           <View style={styles.headerRow}>
             <TouchableOpacity
@@ -454,7 +451,6 @@ export default function SignupScreen() {
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
-      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 }
