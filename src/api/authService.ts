@@ -97,6 +97,10 @@ export function mapProfileRecord(raw: any, fallbackEmail?: string, isFollowing?:
     isPrivateRestricted: Boolean(raw.is_private || raw.is_private_restricted || raw.visibility_level === 'private'),
     isBlocked: Boolean(raw.is_blocked),
     visibilityLevel: (raw.is_private ? 'private' : raw.visibility_level) || 'public',
+    gender: raw.gender || undefined,
+    ageBracket: raw.age_bracket || undefined,
+    referralSource: raw.referral_source || undefined,
+    contentPreferences: Array.isArray(raw.content_preferences) ? raw.content_preferences : [],
   };
 }
 
@@ -798,6 +802,15 @@ export async function persistUserProfile(
     if (updates.researchgateUrl !== undefined) dbPayload.researchgate_url = updates.researchgateUrl.trim() || null;
     if (updates.linkedinUrl !== undefined) dbPayload.linkedin_url = updates.linkedinUrl.trim() || null;
     if (updates.scopusId !== undefined) dbPayload.scopus_id = updates.scopusId.trim() || null;
+
+    // Safety & Legal Compliance Gate (COPPA / GDPR)
+    if (updates.ageBracket === 'under_13') {
+      return { success: false, error: 'Account creation restricted: Users must be 13 or older under COPPA regulations.' };
+    }
+    if (updates.gender !== undefined) dbPayload.gender = updates.gender;
+    if (updates.ageBracket !== undefined) dbPayload.age_bracket = updates.ageBracket;
+    if (updates.referralSource !== undefined) dbPayload.referral_source = updates.referralSource ? updates.referralSource.trim() : null;
+    if (updates.contentPreferences !== undefined) dbPayload.content_preferences = Array.isArray(updates.contentPreferences) ? updates.contentPreferences : [];
 
     const { error } = await supabase
       .from('profiles')

@@ -48,6 +48,10 @@ export interface Database {
           orcid_verified: boolean;
           website_url: string | null;
           research_interests: string[];
+          gender?: string | null;
+          age_bracket?: string | null;
+          referral_source?: string | null;
+          content_preferences?: string[] | null;
           followers_count: number;
           following_count: number;
           posts_count: number;
@@ -72,6 +76,10 @@ export interface Database {
           orcid_verified?: boolean;
           website_url?: string | null;
           research_interests?: string[];
+          gender?: string | null;
+          age_bracket?: string | null;
+          referral_source?: string | null;
+          content_preferences?: string[] | null;
           followers_count?: number;
           following_count?: number;
           posts_count?: number;
@@ -96,6 +104,10 @@ export interface Database {
           orcid_verified?: boolean;
           website_url?: string | null;
           research_interests?: string[];
+          gender?: string | null;
+          age_bracket?: string | null;
+          referral_source?: string | null;
+          content_preferences?: string[] | null;
           followers_count?: number;
           following_count?: number;
           posts_count?: number;

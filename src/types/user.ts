@@ -39,6 +39,10 @@ export interface UserProfile {
   isPrivateRestricted?: boolean;
   isBlocked?: boolean;
   visibilityLevel?: 'public' | 'registered' | 'private';
+  gender?: 'male' | 'female' | 'non_binary' | 'prefer_not_to_say' | null;
+  ageBracket?: 'under_13' | '13_17' | '18_24' | '25_34' | '35_44' | '45_plus' | null;
+  referralSource?: string | null;
+  contentPreferences?: string[];
 }
 
 export interface FollowRequest {
