@@ -18,6 +18,7 @@ import {
   Repeat2,
   MoreHorizontal,
   Check,
+  CheckCircle2,
   BookOpen,
   ArrowRight,
   UserPlus,
@@ -113,8 +114,10 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
     await toggleFollowUser(post.author.id);
   };
 
+  const isAiCurator = Boolean(post.author?.handle?.toLowerCase().startsWith('booffin_'));
+
   const showFollowButton =
-    !isSelf && Boolean(post.author?.id) && (!isFollowing || hasToggledInSession);
+    !isSelf && !isAiCurator && Boolean(post.author?.id) && (!isFollowing || hasToggledInSession);
 
   const pathname = usePathname();
   const isCurrentlyOnThisPost = Boolean(
@@ -336,11 +339,17 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
             url={post.author.avatarUrl}
             name={post.author.fullName}
             size="md"
-            verified={post.author.orcidVerified}
+            verified={post.author.orcidVerified || isAiCurator}
+            verifiedColor={isAiCurator ? '#2563EB' : undefined}
           />
           <View style={styles.authorMeta}>
             <View style={styles.nameHandleRow}>
-              <Text style={[styles.authorName, { color: colors.textPrimary }]}>{post.author.fullName}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={[styles.authorName, { color: colors.textPrimary }]}>{post.author.fullName}</Text>
+                {isAiCurator && (
+                  <CheckCircle2 size={13} color="#2563EB" />
+                )}
+              </View>
               <Text style={[styles.handleText, { color: colors.textSecondary }]}>
                 @{post.author.handle} · {post.createdAt}
               </Text>

@@ -724,6 +724,18 @@ export function validateUsername(handle: string): UsernameValidationResult {
       error: 'Username cannot contain consecutive underscores.',
     };
   }
+  if (
+    normalized.startsWith('booffin_') ||
+    normalized.startsWith('booffin.') ||
+    normalized.startsWith('booffin-') ||
+    normalized === 'booffin'
+  ) {
+    return {
+      isValid: false,
+      normalized,
+      error: 'Usernames starting with "booffin_" are reserved for official system nodes.',
+    };
+  }
   if (RESERVED_USERNAMES.has(normalized)) {
     return {
       isValid: false,

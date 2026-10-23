@@ -20,6 +20,7 @@ interface AvatarProps {
   size?: AvatarSize;
   style?: StyleProp<ViewStyle>;
   verified?: boolean;
+  verifiedColor?: string;
 }
 
 export const Avatar: React.FC<AvatarProps> = ({
@@ -29,6 +30,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   size = 'md',
   style,
   verified = false,
+  verifiedColor,
 }) => {
   const pixelSize = typeof size === 'number' ? size : sizeMap[size] || layout.avatarSizes.md;
   const imageSource = uri || url;
@@ -70,7 +72,13 @@ export const Avatar: React.FC<AvatarProps> = ({
         </View>
       )}
       {verified && (
-        <View style={[styles.verifiedBadge, { right: -1, bottom: -1 }]}>
+        <View
+          style={[
+            styles.verifiedBadge,
+            { right: -1, bottom: -1 },
+            verifiedColor ? { backgroundColor: verifiedColor } : null,
+          ]}
+        >
           <Text style={styles.verifiedCheck}>✓</Text>
         </View>
       )}

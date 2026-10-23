@@ -9,7 +9,75 @@ export class RuleBasedFeedRanker implements IFeedRanker {
    */
   public rank(posts: Post[], context: UserRankingContext): Post[] {
     const scored = this.rankWithDetails(posts, context);
-    return scored.map((item) => item.post);
+    const sortedPosts = scored.map((item) => item.post);
+
+    const userPosts: Post[] = [];
+    const aiCuratorPosts: Post[] = [];
+
+    for (const post of sortedPosts) {
+      const isAiCurator = Boolean(
+        post.author?.handle?.toLowerCase().startsWith('booffin_') ||
+        (post.author as any)?.is_ai_curator
+      );
+      if (isAiCurator) {
+        aiCuratorPosts.push(post);
+      } else {
+        userPosts.push(post);
+      }
+    }
+
+    // If either pool is empty, return whatever is available
+    if (aiCuratorPosts.length === 0) return userPosts;
+    if (userPosts.length === 0) return aiCuratorPosts;
+
+    // Strategic psychological interleaving:
+    // [1 user post] -> [1 AI curator paper] -> [2 user posts] -> [1 AI curator paper] ...
+    const interleaved: Post[] = [];
+    let userIdx = 0;
+    let aiIdx = 0;
+    let cycleStep = 0; // 0: 1 user post, 1: 1 AI post, 2: 2 user posts, 3: 1 AI post
+
+    while (userIdx < userPosts.length || aiIdx < aiCuratorPosts.length) {
+      if (cycleStep === 0) {
+        // Step 0: 1 user post
+        if (userIdx < userPosts.length) {
+          interleaved.push(userPosts[userIdx++]);
+        }
+        cycleStep = 1;
+      } else if (cycleStep === 1) {
+        // Step 1: 1 AI paper
+        if (aiIdx < aiCuratorPosts.length) {
+          interleaved.push(aiCuratorPosts[aiIdx++]);
+        }
+        cycleStep = 2;
+      } else if (cycleStep === 2) {
+        // Step 2: 2 user posts
+        if (userIdx < userPosts.length) {
+          interleaved.push(userPosts[userIdx++]);
+        }
+        if (userIdx < userPosts.length) {
+          interleaved.push(userPosts[userIdx++]);
+        }
+        cycleStep = 3;
+      } else if (cycleStep === 3) {
+        // Step 3: 1 AI paper
+        if (aiIdx < aiCuratorPosts.length) {
+          interleaved.push(aiCuratorPosts[aiIdx++]);
+        }
+        cycleStep = 0; // loop back to 1 user post
+      }
+
+      // If user posts are exhausted, drain remaining AI posts with safe spacing
+      if (userIdx >= userPosts.length && aiIdx < aiCuratorPosts.length) {
+        interleaved.push(aiCuratorPosts[aiIdx++]);
+      }
+      // If AI posts are exhausted, append remaining user posts
+      if (aiIdx >= aiCuratorPosts.length && userIdx < userPosts.length) {
+        interleaved.push(userPosts[userIdx++]);
+      }
+    }
+
+    return interleaved;
   }
 
   /**

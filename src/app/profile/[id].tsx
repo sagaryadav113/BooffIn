@@ -125,6 +125,10 @@ export default function OtherResearcherProfileScreen() {
 
   const isPrivateAccount = researcher?.visibilityLevel === 'private' || Boolean(researcher?.isPrivateRestricted);
   const isLocked = !isOwnProfile && !isFollowing && isPrivateAccount;
+  const isAiCurator = Boolean(
+    (researcher as any)?.is_ai_curator ||
+    (researcher?.handle && researcher.handle.toLowerCase().startsWith('booffin_'))
+  );
 
   // Fetch real 28-day research impressions when viewing own profile via [id].tsx
   useEffect(() => {
@@ -925,46 +929,56 @@ export default function OtherResearcherProfileScreen() {
               url={researcher.avatarUrl}
               name={researcher.fullName}
               size={84}
-              verified={researcher.orcidVerified}
+              verified={isAiCurator ? true : researcher.orcidVerified}
+              verifiedColor={isAiCurator ? '#2563EB' : undefined}
               style={styles.avatarOverBanner}
             />
 
             <View style={styles.actionButtonsGroup}>
-              {/* Follow / Edit Profile Button */}
-              {!researcher.isBlocked && (
-                <Button
-                  title={
-                    isOwnProfile
-                      ? 'Edit Profile'
-                      : isFollowing
-                      ? 'Following'
-                      : isRequested
-                      ? 'Requested'
-                      : followsYou
-                      ? 'Follow Back'
-                      : 'Follow'
-                  }
-                  variant={isOwnProfile || isFollowing || isRequested ? 'outline' : 'primary'}
-                  size="sm"
-                  loading={isFollowLoading}
-                  disabled={isFollowLoading}
-                  onPress={handleFollowToggle}
-                  style={styles.followButton}
-                />
-              )}
+              {isAiCurator ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radii.full, backgroundColor: isDark ? '#1E293B' : '#EFF6FF', borderWidth: 1, borderColor: '#3B82F6' }}>
+                  <Sparkles size={14} color="#2563EB" />
+                  <Text style={{ ...typography.captionBold, color: isDark ? '#93C5FD' : '#2563EB' }}>Official Intelligence Node</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Follow / Edit Profile Button */}
+                  {!researcher.isBlocked && (
+                    <Button
+                      title={
+                        isOwnProfile
+                          ? 'Edit Profile'
+                          : isFollowing
+                          ? 'Following'
+                          : isRequested
+                          ? 'Requested'
+                          : followsYou
+                          ? 'Follow Back'
+                          : 'Follow'
+                      }
+                      variant={isOwnProfile || isFollowing || isRequested ? 'outline' : 'primary'}
+                      size="sm"
+                      loading={isFollowLoading}
+                      disabled={isFollowLoading}
+                      onPress={handleFollowToggle}
+                      style={styles.followButton}
+                    />
+                  )}
 
-              {/* BooffIn Workspace 1-on-1 DM Button */}
-              {!isOwnProfile && !researcher.isBlocked && !isLocked && (
-                <Button
-                  title="Message"
-                  variant="outline"
-                  size="sm"
-                  loading={isMessageLoading}
-                  disabled={isMessageLoading}
-                  onPress={handleStartDM}
-                  style={styles.messageButton}
-                  textStyle={isDark ? { color: '#34D399' } : undefined}
-                />
+                  {/* BooffIn Workspace 1-on-1 DM Button */}
+                  {!isOwnProfile && !researcher.isBlocked && !isLocked && (
+                    <Button
+                      title="Message"
+                      variant="outline"
+                      size="sm"
+                      loading={isMessageLoading}
+                      disabled={isMessageLoading}
+                      onPress={handleStartDM}
+                      style={styles.messageButton}
+                      textStyle={isDark ? { color: '#34D399' } : undefined}
+                    />
+                  )}
+                </>
               )}
             </View>
           </View>
@@ -973,12 +987,17 @@ export default function OtherResearcherProfileScreen() {
           <View style={styles.nameSection}>
             <View style={styles.nameRow}>
               <Text style={styles.fullName}>{researcher.fullName}</Text>
-              {researcher.orcidVerified && (
+              {isAiCurator ? (
+                <View style={[styles.verifiedTag, { backgroundColor: isDark ? '#1E293B' : '#EFF6FF', borderColor: '#3B82F6' }]}>
+                  <CheckCircle2 size={15} color="#2563EB" />
+                  <Text style={[styles.verifiedText, { color: isDark ? '#93C5FD' : '#2563EB' }]}>Verified Node</Text>
+                </View>
+              ) : researcher.orcidVerified ? (
                 <View style={styles.verifiedTag}>
                   <CheckCircle2 size={15} color={colors.accentGreen} />
                   <Text style={styles.verifiedText}>ORCID Verified</Text>
                 </View>
-              )}
+              ) : null}
             </View>
             <Text style={styles.handle}>@{researcher.handle}</Text>
           </View>
@@ -1044,54 +1063,65 @@ export default function OtherResearcherProfileScreen() {
           </View>
 
           {/* Join Researcher Community Button */}
-          <TouchableOpacity
-            style={styles.joinCommunityBox}
-            onPress={() => {
-              try {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              } catch {}
-              setCommunitiesModalVisible(true);
-            }}
-            activeOpacity={0.8}
-          >
-            <Users size={13} color="#FFFFFF" />
-            <Text style={styles.joinCommunityText}>
-              Join {researcher.fullName ? `${researcher.fullName.split(' ')[0]}'s` : 'Author'} Community
-            </Text>
-          </TouchableOpacity>
+          {!isAiCurator && (
+            <TouchableOpacity
+              style={styles.joinCommunityBox}
+              onPress={() => {
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch {}
+                setCommunitiesModalVisible(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Users size={13} color="#FFFFFF" />
+              <Text style={styles.joinCommunityText}>
+                Join {researcher.fullName ? `${researcher.fullName.split(' ')[0]}'s` : 'Author'} Community
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {/* Following / Followers Stats */}
           <View style={styles.statsRow}>
-            <TouchableOpacity
-              onPress={handleOpenFollowing}
-              style={[styles.statItem, isLocked && { opacity: 0.85 }]}
-              activeOpacity={isLocked ? 1 : 0.7}
-              disabled={isLocked}
-            >
-              <Text style={styles.statNumber}>{researcher.followingCount}</Text>
-              <Text style={styles.statLabel}>Following</Text>
-            </TouchableOpacity>
+            {isAiCurator ? (
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{posts.length}</Text>
+                <Text style={styles.statLabel}>Curated Papers</Text>
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity
+                  onPress={handleOpenFollowing}
+                  style={[styles.statItem, isLocked && { opacity: 0.85 }]}
+                  activeOpacity={isLocked ? 1 : 0.7}
+                  disabled={isLocked}
+                >
+                  <Text style={styles.statNumber}>{researcher.followingCount}</Text>
+                  <Text style={styles.statLabel}>Following</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={handleOpenFollowers}
-              style={[styles.statItem, isLocked && { opacity: 0.85 }]}
-              activeOpacity={isLocked ? 1 : 0.7}
-              disabled={isLocked}
-            >
-              <Text style={styles.statNumber}>
-                {formatCount(
-                  isOwnProfile
-                    ? currentUser.followersCount
-                    : (researcher.followersCount + (isFollowing && !researcher.isFollowing ? 1 : !isFollowing && researcher.isFollowing ? -1 : 0))
-                )}
-              </Text>
-              <Text style={styles.statLabel}>Followers</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleOpenFollowers}
+                  style={[styles.statItem, isLocked && { opacity: 0.85 }]}
+                  activeOpacity={isLocked ? 1 : 0.7}
+                  disabled={isLocked}
+                >
+                  <Text style={styles.statNumber}>
+                    {formatCount(
+                      isOwnProfile
+                        ? currentUser.followersCount
+                        : (researcher.followersCount + (isFollowing && !researcher.isFollowing ? 1 : !isFollowing && researcher.isFollowing ? -1 : 0))
+                    )}
+                  </Text>
+                  <Text style={styles.statLabel}>Followers</Text>
+                </TouchableOpacity>
 
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{posts.length}</Text>
-              <Text style={styles.statLabel}>Posts & Shares</Text>
-            </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statNumber}>{posts.length}</Text>
+                  <Text style={styles.statLabel}>Posts & Shares</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -1149,34 +1179,46 @@ export default function OtherResearcherProfileScreen() {
         ) : (
           <>
             {/* Sub-Tabs: Posts | Scholars | Activity */}
-            <View style={styles.tabsRow}>
-              {(['Posts', 'Scholars', 'Activity'] as const).map((tab) => (
-                <TouchableOpacity
-                  key={tab}
-                  onPress={() => setActiveSubTab(tab)}
-                  style={[
-                    styles.tabButton,
-                    activeSubTab === tab && styles.tabButtonActive,
-                  ]}
-                  activeOpacity={0.7}
-                >
-                  <Text
+            {isAiCurator ? (
+              <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderColor: colors.border }}>
+                <Text style={{ ...typography.contentTitle, color: colors.textPrimary, fontWeight: '700' }}>
+                  Curated Breakthrough Papers & Discussions
+                </Text>
+                <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }}>
+                  Daily breakthrough research papers and active peer discussions curated by BooffIn.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.tabsRow}>
+                {(['Posts', 'Scholars', 'Activity'] as const).map((tab) => (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => setActiveSubTab(tab)}
                     style={[
-                      styles.tabText,
-                      activeSubTab === tab && styles.tabTextActive,
+                      styles.tabButton,
+                      activeSubTab === tab && styles.tabButtonActive,
                     ]}
+                    activeOpacity={0.7}
                   >
-                    {tab === 'Posts' ? 'All Posts & Shares' : tab === 'Scholars' ? 'BooffIn Scholars' : 'Activity'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <Text
+                      style={[
+                        styles.tabText,
+                        activeSubTab === tab && styles.tabTextActive,
+                      ]}
+                    >
+                      {tab === 'Posts' ? 'All Posts & Shares' : tab === 'Scholars' ? 'BooffIn Scholars' : 'Activity'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Tab Content */}
-            {activeSubTab === 'Posts' && (
+            {(isAiCurator || activeSubTab === 'Posts') && (
               <View style={styles.postsList}>
-                {/* Filter Chips: All | Hyped | Articles | Shared */}
-                <View style={styles.filterRow}>
+                {/* Filter Chips: All | Hyped | Articles | Shared (Hidden for AI curators) */}
+                {!isAiCurator && (
+                  <View style={styles.filterRow}>
                   {availableFilters.map((filter) => {
                     const count =
                       filter === 'All'
@@ -1223,6 +1265,7 @@ export default function OtherResearcherProfileScreen() {
                     );
                   })}
                 </View>
+                )}
 
                 {isLoadingPosts && posts.length === 0 ? (
                   <View style={{ paddingVertical: spacing.xl * 2, alignItems: 'center', justifyContent: 'center' }}>

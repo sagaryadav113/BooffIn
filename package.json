@@ -68,6 +68,7 @@
     "lint": "expo lint",
     "eas:switch-booffin": "node ./scripts/switch-eas-account.js booffin",
     "eas:switch-personal": "node ./scripts/switch-eas-account.js personal",
+    "harvest:papers": "node ./scripts/harvest-daily-papers.js",
     "electron:start": "electron electron/main.js",
     "electron:build": "npm run export && electron-builder --win"
   },
