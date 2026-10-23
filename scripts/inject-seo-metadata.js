@@ -48,7 +48,7 @@ const metaTags = `
     <meta name="author" content="BooffIn Inc." />
 
     <!-- Bing Webmaster Tools Verification -->
-    <meta name="msvalidate.01" content="5BD637C4E03A690F2E3F5B7A6A0550C8" />
+    <meta name="msvalidate.01" content="5BD637C4E03A69DF2E3F5B7A6A0550CB" />
 
     <!-- Open Graph / WhatsApp / Facebook / LinkedIn / Telegram -->
     <meta property="og:site_name" content="BooffIn" />
