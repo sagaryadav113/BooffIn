@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
   Image,
+  TextInput,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -31,6 +32,8 @@ import {
   CheckCircle2,
   ShieldAlert,
   Rocket,
+  Search,
+  X,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography } from '../../theme';
@@ -44,6 +47,7 @@ import {
   normalizeHandle,
 } from '../../api/authService';
 import { pickAvatarImage, uploadProfileAvatar } from '../../api/storageService';
+import { searchResearchTaxonomy } from '../../data/researchTaxonomy';
 
 // Modalities for Page 2: "Tell us more about what you like" (Reference 2)
 const CONTENT_MODALITIES = [
@@ -148,6 +152,24 @@ const REFERRAL_OPTIONS = [
   { label: 'Other', value: 'other' },
 ];
 
+export const ACADEMIC_ROLE_OPTIONS = [
+  { label: 'PhD Scholar / Candidate', value: 'PhD Scholar' },
+  { label: 'Postdoctoral Researcher', value: 'Postdoctoral Researcher' },
+  { label: 'Professor / Faculty', value: 'Professor' },
+  { label: 'Research Scientist', value: 'Research Scientist' },
+  { label: 'Research Assistant', value: 'Research Assistant' },
+  { label: "Master's Student", value: "Master's Student" },
+  { label: 'Undergraduate Researcher', value: 'Undergraduate Researcher' },
+  { label: 'Industry Researcher / R&D', value: 'Industry Researcher' },
+  { label: 'Independent Researcher', value: 'Independent Researcher' },
+  { label: 'Other Academic Title', value: 'Other' },
+];
+
+function generateFallbackAvatar(seed: string): string {
+  const cleanSeed = seed.trim() || 'Scholar';
+  return `https://api.dicebear.com/7.x/initials/png?seed=${encodeURIComponent(cleanSeed)}&backgroundColor=064e3b,047857&textColor=ffffff`;
+}
+
 export default function OnboardingScreen() {
   const user = useAuthStore((s) => s.user);
   const updateProfile = useAuthStore((s) => s.updateProfile);
@@ -166,10 +188,18 @@ export default function OnboardingScreen() {
     'academic_discussions',
   ]);
 
-  // --- Step 2 State: Curated Topics ---
+  // --- Step 2 State: Curated Topics & 1,200+ Taxonomy Search ---
   const [selectedTopics, setSelectedTopics] = useState<string[]>(
-    Array.isArray(user?.researchInterests) ? user.researchInterests : []
+    Array.isArray(user?.researchInterests) ? user.researchInterests.slice(0, 4) : []
   );
+  const [topicSearchQuery, setTopicSearchQuery] = useState('');
+  const [topicsLimitWarning, setTopicsLimitWarning] = useState<string | null>(null);
+
+  // Live searched taxonomy items from 1,200+ fields
+  const taxonomySearchResults = useMemo(() => {
+    if (!topicSearchQuery.trim()) return [];
+    return searchResearchTaxonomy(topicSearchQuery.trim(), 25);
+  }, [topicSearchQuery]);
 
   // --- Step 3 State: Profile Details, Demographics & Referral ---
   const initialName =
@@ -182,8 +212,30 @@ export default function OnboardingScreen() {
   const [ageBracket, setAgeBracket] = useState<string | null>(user?.ageBracket || null);
   const [referralSource, setReferralSource] = useState<string | null>(user?.referralSource || null);
   const [bio, setBio] = useState('');
-  const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatarUrl || null);
+
+  // Auto-fetch profile picture from Google account, or generate a tailored avatar based on user's email/name
+  const hasGoogleAvatar = Boolean(user?.avatarUrl && !user.avatarUrl.includes('dicebear.com'));
+  const [hasCustomAvatar, setHasCustomAvatar] = useState<boolean>(hasGoogleAvatar);
+  const [avatarUri, setAvatarUri] = useState<string | null>(
+    user?.avatarUrl || generateFallbackAvatar(initialName || user?.email?.split('@')[0] || 'Scholar')
+  );
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  // Sync avatar if user account details rehydrate from Google OAuth
+  React.useEffect(() => {
+    if (user?.avatarUrl && !hasCustomAvatar) {
+      setAvatarUri(user.avatarUrl);
+      setHasCustomAvatar(true);
+    }
+  }, [user?.avatarUrl]);
+
+  const handleNameChange = (text: string) => {
+    setFullName(text);
+    if (stepError) setStepError(null);
+    if (!hasCustomAvatar) {
+      setAvatarUri(generateFallbackAvatar(text || user?.email?.split('@')[0] || 'Scholar'));
+    }
+  };
 
   // Validation & Safety States
   const [stepError, setStepError] = useState<string | null>(null);
@@ -271,15 +323,30 @@ export default function OnboardingScreen() {
     }
   };
 
-  // Toggle research topic chip
+  // Toggle research topic chip with min 2, max 4 constraints
   const toggleTopic = (topic: string) => {
-    try {
-      Haptics.selectionAsync();
-    } catch {}
-    if (selectedTopics.includes(topic)) {
-      setSelectedTopics(selectedTopics.filter((t) => t !== topic));
+    const cleanTopic = topic.trim();
+    const isSelected = selectedTopics.some((t) => t.toLowerCase() === cleanTopic.toLowerCase());
+
+    if (isSelected) {
+      try {
+        Haptics.selectionAsync();
+      } catch {}
+      setTopicsLimitWarning(null);
+      setSelectedTopics((prev) => prev.filter((t) => t.toLowerCase() !== cleanTopic.toLowerCase()));
     } else {
-      setSelectedTopics([...selectedTopics, topic]);
+      if (selectedTopics.length >= 4) {
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        } catch {}
+        setTopicsLimitWarning('You can select a maximum of 4 topics.');
+        return;
+      }
+      try {
+        Haptics.selectionAsync();
+      } catch {}
+      setTopicsLimitWarning(null);
+      setSelectedTopics((prev) => [...prev, cleanTopic]);
     }
   };
 
@@ -292,6 +359,7 @@ export default function OnboardingScreen() {
     if (res.cancelled || !res.asset) return;
 
     setAvatarUri(res.asset.uri);
+    setHasCustomAvatar(true);
 
     if (user?.id) {
       setIsUploadingAvatar(true);
@@ -513,28 +581,83 @@ export default function OnboardingScreen() {
           )}
 
           {/* ============================================================ */}
-          {/* STEP 2 (Page 3 overall): Select 3 topics                    */}
+          {/* STEP 2 (Page 3 overall): Select 2 to 4 topics               */}
           {/* ============================================================ */}
           {step === 2 && (
             <ScrollView
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               <View style={styles.contentHeader}>
                 <View style={styles.logoRow}>
                   <BooffinLogo size={46} variant="symbol" />
                 </View>
-                <Text style={styles.pageTitle}>Select 3 topics</Text>
+                <Text style={styles.pageTitle}>Select 2 to 4 topics</Text>
                 <Text style={styles.pageSubtitle}>
-                  We'll recommend papers, preprints, and researchers that fit your interests.
+                  Choose between 2 and 4 research fields to personalize your home feed, preprint alerts, and recommendations.
                 </Text>
+
+                {/* Counter & Status Badge */}
+                <View style={styles.topicSelectionCounterRow}>
+                  <View
+                    style={[
+                      styles.selectionCounterPill,
+                      selectedTopics.length >= 2 && selectedTopics.length <= 4
+                        ? styles.selectionCounterPillValid
+                        : styles.selectionCounterPillPending,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.selectionCounterPillText,
+                        selectedTopics.length >= 2 && selectedTopics.length <= 4
+                          ? styles.selectionCounterPillTextValid
+                          : styles.selectionCounterPillTextPending,
+                      ]}
+                    >
+                      {selectedTopics.length}/4 selected {selectedTopics.length < 2 ? '(min. 2 required)' : '✓'}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
-              {/* Topic Chips Container */}
+              {/* Warning if user attempted to select more than 4 */}
+              {topicsLimitWarning && (
+                <View style={styles.topicWarningBanner}>
+                  <AlertCircle size={15} color="#B45309" style={{ marginRight: 6 }} />
+                  <Text style={styles.topicWarningText}>{topicsLimitWarning}</Text>
+                </View>
+              )}
+
+              {/* Selected Topics Tray */}
+              {selectedTopics.length > 0 && (
+                <View style={styles.selectedTopicsTray}>
+                  <Text style={styles.sectionSubHeader}>YOUR SELECTIONS ({selectedTopics.length}/4)</Text>
+                  <View style={styles.selectedChipsWrap}>
+                    {selectedTopics.map((topic) => (
+                      <TouchableOpacity
+                        key={topic}
+                        onPress={() => toggleTopic(topic)}
+                        style={styles.selectedTopicBadge}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={styles.selectedTopicBadgeText}>{topic}</Text>
+                        <X size={12} color="#FFFFFF" strokeWidth={2.8} style={{ marginLeft: 5 }} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Popular Fields Section */}
               <View style={styles.topicsWrapper}>
+                <Text style={styles.sectionSubHeader}>POPULAR FIELDS</Text>
                 <View style={styles.chipsContainer}>
                   {CURATED_TOPICS.map((topic) => {
-                    const isSelected = selectedTopics.includes(topic);
+                    const isSelected = selectedTopics.some(
+                      (t) => t.toLowerCase() === topic.toLowerCase()
+                    );
                     return (
                       <TouchableOpacity
                         key={topic}
@@ -545,6 +668,9 @@ export default function OnboardingScreen() {
                         ]}
                         activeOpacity={0.75}
                       >
+                        {isSelected && (
+                          <Check size={12} color="#FFFFFF" strokeWidth={3} style={{ marginRight: 5 }} />
+                        )}
                         <Text
                           style={[
                             styles.topicChipText,
@@ -559,14 +685,104 @@ export default function OnboardingScreen() {
                 </View>
               </View>
 
+              {/* Search 1,200+ Fields Section */}
+              <View style={styles.searchTaxonomyWrapper}>
+                <Text style={styles.sectionSubHeader}>SEARCH 1,200+ FIELDS & SPECIALTIES</Text>
+                <View style={styles.taxonomySearchBar}>
+                  <Search size={16} color="#64748B" style={{ marginRight: 8 }} />
+                  <TextInput
+                    style={styles.taxonomySearchInput}
+                    placeholder="Search subfields, disciplines, or topics..."
+                    placeholderTextColor="#94A3B8"
+                    value={topicSearchQuery}
+                    onChangeText={(text) => {
+                      setTopicSearchQuery(text);
+                      if (topicsLimitWarning) setTopicsLimitWarning(null);
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  {topicSearchQuery.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setTopicSearchQuery('')}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <X size={16} color="#64748B" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Search Results Display */}
+                {topicSearchQuery.trim().length > 0 && (
+                  <View style={styles.searchResultsContainer}>
+                    {taxonomySearchResults.length > 0 ? (
+                      <View style={styles.searchResultsList}>
+                        {taxonomySearchResults.map((item) => {
+                          const isSelected = selectedTopics.some(
+                            (t) => t.toLowerCase() === item.name.toLowerCase()
+                          );
+                          return (
+                            <TouchableOpacity
+                              key={item.id}
+                              style={[
+                                styles.searchResultRow,
+                                isSelected && styles.searchResultRowSelected,
+                              ]}
+                              onPress={() => toggleTopic(item.name)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={[
+                                    styles.searchResultName,
+                                    isSelected && styles.searchResultNameSelected,
+                                  ]}
+                                >
+                                  {item.name}
+                                </Text>
+                                <Text style={styles.searchResultHierarchy}>
+                                  {item.hierarchy || item.familyName}
+                                </Text>
+                              </View>
+                              <View
+                                style={[
+                                  styles.searchResultCheckPill,
+                                  isSelected && styles.searchResultCheckPillSelected,
+                                ]}
+                              >
+                                {isSelected ? (
+                                  <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                                ) : (
+                                  <Text style={styles.searchResultAddText}>+</Text>
+                                )}
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <View style={styles.noResultsBox}>
+                        <Text style={styles.noResultsText}>
+                          No fields matching &quot;{topicSearchQuery}&quot;
+                        </Text>
+                        <Text style={styles.noResultsSubtext}>
+                          Try searching by another discipline, subfield, or broader specialty.
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+
               {/* Bottom Action with Dynamic Counter Button */}
               <View style={styles.bottomBar}>
                 <TouchableOpacity
                   style={[
                     styles.primaryButton,
-                    selectedTopics.length < 3 && styles.primaryButtonDisabled,
+                    (selectedTopics.length < 2 || selectedTopics.length > 4) &&
+                      styles.primaryButtonDisabled,
                   ]}
-                  disabled={selectedTopics.length < 3}
+                  disabled={selectedTopics.length < 2 || selectedTopics.length > 4}
                   onPress={() => {
                     try {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -578,14 +794,15 @@ export default function OnboardingScreen() {
                   <Text
                     style={[
                       styles.primaryButtonText,
-                      selectedTopics.length < 3 && styles.primaryButtonTextDisabled,
+                      (selectedTopics.length < 2 || selectedTopics.length > 4) &&
+                        styles.primaryButtonTextDisabled,
                     ]}
                   >
                     {selectedTopics.length === 0
-                      ? 'Select 3 more to continue'
-                      : selectedTopics.length < 3
-                      ? `Select ${3 - selectedTopics.length} more to continue`
-                      : 'Continue'}
+                      ? 'Select at least 2 topics to continue'
+                      : selectedTopics.length === 1
+                      ? 'Select 1 more to continue'
+                      : `Continue (${selectedTopics.length}/4 selected)`}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -649,10 +866,7 @@ export default function OnboardingScreen() {
                 label="Name *"
                 placeholder="Type your name..."
                 value={fullName}
-                onChangeText={(text) => {
-                  setFullName(text);
-                  if (stepError) setStepError(null);
-                }}
+                onChangeText={handleNameChange}
               />
 
               {/* Handle */}
@@ -676,17 +890,19 @@ export default function OnboardingScreen() {
                 error={cleanHandle && handleStatus.available === false ? (handleStatus.message || 'Username taken') : undefined}
               />
 
-              {/* Academic Title */}
-              <Input
+              {/* Academic Title or Role */}
+              <SelectDropdown
                 label="Academic Title or Role"
-                placeholder="e.g. PhD Candidate, Neuroscientist, Student"
+                placeholder="Select your academic role..."
                 value={academicTitle}
-                onChangeText={setAcademicTitle}
+                options={ACADEMIC_ROLE_OPTIONS}
+                onSelect={(val) => setAcademicTitle(val)}
+                sheetTitle="Select Academic Role"
               />
 
-              {/* Institution */}
+              {/* Institution or Affiliations */}
               <Input
-                label="Institution or University"
+                label="Institution or Affiliations"
                 placeholder="e.g. MIT, Stanford University, Independent"
                 value={institution}
                 onChangeText={setInstitution}
@@ -1022,6 +1238,180 @@ const styles = StyleSheet.create({
   topicChipTextSelected: {
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  topicSelectionCounterRow: {
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  selectionCounterPill: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: radii.full,
+    borderWidth: 1,
+  },
+  selectionCounterPillPending: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  selectionCounterPillValid: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  selectionCounterPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  selectionCounterPillTextPending: {
+    color: '#6B7280',
+  },
+  selectionCounterPillTextValid: {
+    color: '#065F46',
+  },
+  topicWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: radii.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  topicWarningText: {
+    fontSize: 12,
+    color: '#92400E',
+    fontWeight: '500',
+    flex: 1,
+  },
+  selectedTopicsTray: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  sectionSubHeader: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: spacing.xs,
+  },
+  selectedChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  selectedTopicBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#064E3B',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: radii.full,
+  },
+  selectedTopicBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  searchTaxonomyWrapper: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  taxonomySearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    height: 42,
+    marginTop: spacing.xs,
+  },
+  taxonomySearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#111827',
+    height: '100%',
+    padding: 0,
+  },
+  searchResultsContainer: {
+    marginTop: spacing.sm,
+    maxHeight: 220,
+  },
+  searchResultsList: {
+    gap: 4,
+  },
+  searchResultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: radii.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  searchResultRowSelected: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#064E3B',
+  },
+  searchResultName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  searchResultNameSelected: {
+    color: '#064E3B',
+  },
+  searchResultHierarchy: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 1,
+  },
+  searchResultCheckPill: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  searchResultCheckPillSelected: {
+    backgroundColor: '#064E3B',
+  },
+  searchResultAddText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  noResultsBox: {
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  noResultsText: {
+    fontSize: 13,
+    color: '#4B5563',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  noResultsSubtext: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 2,
   },
   // Step 3: Avatar & Inputs
   avatarRow: {

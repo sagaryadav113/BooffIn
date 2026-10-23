@@ -137,7 +137,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     setIsAuthModalOpen(false);
-    router.push('/(auth)/email');
+    router.push('/(auth)/login');
   };
 
   const handleSignUp = () => {
@@ -279,7 +279,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
             <View style={styles.mobileHeaderRight}>
               <TouchableOpacity 
                 style={styles.mobileHeaderSignInBtn} 
-                onPress={handleOpenAuthModal}
+                onPress={handleEmailAuth}
                 activeOpacity={0.8}
               >
                 <Text style={styles.mobileHeaderSignInText}>Sign In</Text>
@@ -379,7 +379,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
               <TouchableOpacity 
                 style={styles.navSignInBtn} 
-                onPress={handleOpenAuthModal}
+                onPress={handleEmailAuth}
                 activeOpacity={0.7}
               >
                 <Text style={styles.navSignInText}>Sign In</Text>
@@ -555,7 +555,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
                       styles.primaryCtaBtn,
                       isMobile && { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }
                     ]} 
-                    onPress={handleOpenAuthModal}
+                    onPress={handleSignUp}
                     activeOpacity={0.8}
                   >
                     <Text style={styles.primaryCtaBtnText}>Get Started</Text>
@@ -566,7 +566,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
                       styles.secondaryLinkBtn,
                       isMobile && { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', borderRadius: 8 }
                     ]} 
-                    onPress={handleOpenAuthModal}
+                    onPress={handleEmailAuth}
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.secondaryLinkText, isMobile && { color: '#0F172A', fontWeight: '600' }]}>Log In</Text>
@@ -745,7 +745,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
                       styles.primaryCtaBtn,
                       isMobile && { paddingVertical: 11, paddingHorizontal: 20 }
                     ]} 
-                    onPress={handleOpenAuthModal}
+                    onPress={handleSignUp}
                     activeOpacity={0.8}
                   >
                     <Text style={styles.primaryCtaBtnText}>Explore All Features</Text>
@@ -753,7 +753,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
                   <TouchableOpacity 
                     style={styles.secondaryLinkBtn} 
-                    onPress={handleOpenAuthModal}
+                    onPress={handleSignUp}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.secondaryLinkText}>Start For Free</Text>
@@ -835,7 +835,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
                       styles.primaryCtaBtn,
                       isMobile && { paddingVertical: 11, paddingHorizontal: 20 }
                     ]} 
-                    onPress={handleOpenAuthModal}
+                    onPress={handleSignUp}
                     activeOpacity={0.8}
                   >
                     <Text style={styles.primaryCtaBtnText}>Join the Community</Text>
@@ -843,7 +843,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
 
                   <TouchableOpacity 
                     style={styles.secondaryLinkBtn} 
-                    onPress={handleOpenAuthModal}
+                    onPress={handleSignUp}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.secondaryLinkText}>Browse Groups</Text>
@@ -1004,7 +1004,7 @@ export default function WelcomeScreen({ initialTab: propTab }: WelcomeScreenProp
                 activeOpacity={0.8}
               >
                 <Mail size={16} color="#0F172A" />
-                <Text style={styles.emailAuthBtnText}>Sign In with Email</Text>
+                <Text style={styles.emailAuthBtnText}>Sign In with Password</Text>
               </TouchableOpacity>
 
               {/* Email Sign Up Button */}

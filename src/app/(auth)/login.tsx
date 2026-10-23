@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Platform, TextInput } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, spacing, typography, layout } from '../../theme';
@@ -135,6 +135,14 @@ export default function LoginScreen() {
 
         {/* Form Inputs */}
         <View style={styles.form}>
+          {/* Hidden autofill shield on web to intercept aggressive browser credential autofill */}
+          {Platform.OS === 'web' && (
+            <View style={styles.autofillShield} pointerEvents="none" aria-hidden={true}>
+              <TextInput style={styles.autofillDummy} tabIndex={-1} autoComplete="off" />
+              <TextInput secureTextEntry style={styles.autofillDummy} tabIndex={-1} autoComplete="new-password" />
+            </View>
+          )}
+
           <Input
             label="Email Address or Username"
             placeholder="scientist@university.edu or @handle"
@@ -143,7 +151,11 @@ export default function LoginScreen() {
               setEmail(text);
               if (validationError) setValidationError(null);
             }}
+            keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="off"
+            textContentType="none"
             leftIcon="Inbox"
           />
 
@@ -156,6 +168,10 @@ export default function LoginScreen() {
               if (validationError) setValidationError(null);
             }}
             secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="new-password"
+            textContentType="newPassword"
             leftIcon="Shield"
             rightIcon={showPassword ? 'EyeOff' : 'Eye'}
             onRightIconPress={() => setShowPassword(!showPassword)}
@@ -302,5 +318,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.sm,
+  },
+  autofillShield: {
+    height: 0,
+    width: 0,
+    opacity: 0,
+    overflow: 'hidden',
+    position: 'absolute',
+  },
+  autofillDummy: {
+    height: 0,
+    width: 0,
+    opacity: 0,
   },
 });

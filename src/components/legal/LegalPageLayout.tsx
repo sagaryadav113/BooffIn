@@ -78,7 +78,7 @@ export function LegalPageLayout({ document }: LegalPageLayoutProps) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
     setIsAuthModalOpen(false);
-    router.push('/(auth)/email');
+    router.push('/(auth)/login');
   };
 
   const handleSignUp = () => {

@@ -486,10 +486,29 @@ export async function signUpWithEmail(
     });
 
     if (error) {
+      const msg = (error.message || '').toLowerCase();
+      if (
+        msg.includes('already registered') ||
+        msg.includes('already in use') ||
+        msg.includes('user already exists')
+      ) {
+        return {
+          user: null,
+          error: 'An account with this email already exists. Please sign in instead.',
+        };
+      }
       return { user: null, error: error.message };
     }
 
     if (data.user) {
+      // Supabase returns an empty identities array if user is already registered (obfuscated response)
+      if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        return {
+          user: null,
+          error: 'An account with this email already exists. Please sign in instead.',
+        };
+      }
+
       let profile = await fetchUserProfile(data.user.id);
       if (!profile) {
         profile = {
@@ -529,6 +548,29 @@ export async function signUpWithEmail(
       user: null,
       error: err.message || 'An unexpected error occurred during account creation.',
     };
+  }
+}
+
+/**
+ * Check if an email is already registered in the system (pre-flight check)
+ */
+export async function checkEmailExists(email: string): Promise<boolean> {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) return false;
+
+    const { data, error } = await supabase.rpc('check_email_exists', {
+      p_email: cleanEmail,
+    });
+
+    if (!error && typeof data === 'boolean') {
+      return data;
+    }
+
+    // Direct fallback check if profiles has email or RPC is not present
+    return false;
+  } catch {
+    return false;
   }
 }
 
@@ -600,8 +642,8 @@ export function validatePassword(password: string): PasswordValidationResult {
   if (!password) {
     return { isValid: false, error: 'Password is required.' };
   }
-  if (password.length < 6) {
-    return { isValid: false, error: 'Password must be at least 6 characters long.' };
+  if (password.length < 8) {
+    return { isValid: false, error: 'Password must be at least 8 characters long.' };
   }
   if (password.length > 128) {
     return { isValid: false, error: 'Password cannot exceed 128 characters.' };
@@ -614,6 +656,9 @@ export function validatePassword(password: string): PasswordValidationResult {
   }
   if (!/[0-9]/.test(password)) {
     return { isValid: false, error: 'Password must contain at least one number.' };
+  }
+  if (!/[^a-zA-Z0-9\s]/.test(password)) {
+    return { isValid: false, error: 'Password must contain at least one special character (e.g. !@#$%^&*).' };
   }
   return { isValid: true, error: null };
 }
