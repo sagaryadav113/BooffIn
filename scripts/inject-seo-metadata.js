@@ -117,11 +117,19 @@ const metaTags = `
     </script>
 `;
 
-// Replace <title>BooffIn</title> with rich title
+// Replace <title>BooffIn</title> with optimized title (<60 chars for SEO)
 html = html.replace(
   /<title>.*?<\/title>/i,
-  '<title>BooffIn | Research Finds Its People — Scientific Collaboration Platform</title>'
+  '<title>BooffIn — Where Research Finds Its People</title>'
 );
+
+// Inject semantic H1 for search engine crawlers if not already present
+if (!html.includes('<h1')) {
+  html = html.replace(
+    '<body>',
+    '<body>\n    <h1 style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">BooffIn — Where Research Finds Its People</h1>'
+  );
+}
 
 // Inject before </head>
 if (html.includes('</head>')) {

@@ -122,7 +122,7 @@ export default function Root({ children }: PropsWithChildren) {
         />
 
         {/* Primary SEO Meta Tags */}
-        <title>BooffIn | Research Finds Its People — Scientific Collaboration Platform</title>
+        <title>BooffIn — Where Research Finds Its People</title>
         <meta
           name="description"
           content="Join BooffIn — the premier platform connecting researchers, academics, and science enthusiasts globally. Share scientific insights, collaborate on breakthroughs, and discover research."
@@ -219,7 +219,12 @@ export default function Root({ children }: PropsWithChildren) {
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <h1 style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+          BooffIn — Where Research Finds Its People
+        </h1>
+        {children}
+      </body>
     </html>
   );
 }
