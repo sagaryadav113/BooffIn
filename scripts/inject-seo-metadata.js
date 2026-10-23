@@ -10,8 +10,23 @@ if (!fs.existsSync(distHtmlPath)) {
   process.exit(0);
 }
 
-// 1. Ensure preview images are in dist
-const filesToSync = ['og-preview.jpg', 'og-preview.png', 'icon-512.png', 'icon-192.png', 'favicon.png', 'manifest.json', 'robots.txt', 'sitemap.xml'];
+// 1. Ensure preview images and favicons are in dist
+const filesToSync = [
+  'og-preview.jpg',
+  'og-preview.png',
+  'icon-512.png',
+  'icon-192.png',
+  'favicon.png',
+  'favicon.ico',
+  'favicon-48x48.png',
+  'favicon-32x32.png',
+  'favicon-16x16.png',
+  'apple-touch-icon.png',
+  'apple-touch-icon-precomposed.png',
+  'manifest.json',
+  'robots.txt',
+  'sitemap.xml'
+];
 for (const file of filesToSync) {
   const src = path.join(publicDir, file);
   const dest = path.join(distDir, file);
@@ -56,9 +71,17 @@ const metaTags = `
     <meta name="twitter:image" content="https://www.letsbooffin.com/og-preview.jpg" />
     <meta name="twitter:image:alt" content="BooffIn - Research finds its people" />
 
+    <!-- Favicons & Search Engine Webmaster Icons (Bing, Google, Apple) -->
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/apple-touch-icon-precomposed.png" />
+
     <!-- Icons & Manifest -->
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
 
