@@ -47,6 +47,9 @@ const metaTags = `
     <meta name="keywords" content="BooffIn, letsbooffin, scientific research, academic collaboration, researcher network, biology, AI in science, neuroscience, research papers, scientific discovery" />
     <meta name="author" content="BooffIn Inc." />
 
+    <!-- Bing Webmaster Tools Verification -->
+    <meta name="msvalidate.01" content="5BD637C4E03A690F2E3F5B7A6A0550C8" />
+
     <!-- Open Graph / WhatsApp / Facebook / LinkedIn / Telegram -->
     <meta property="og:site_name" content="BooffIn" />
     <meta property="og:type" content="website" />

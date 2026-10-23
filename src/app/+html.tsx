@@ -133,6 +133,10 @@ export default function Root({ children }: PropsWithChildren) {
         />
         <meta name="author" content="BooffIn Inc." />
         <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+
+        {/* Bing Webmaster Tools Verification */}
+        <meta name="msvalidate.01" content="5BD637C4E03A690F2E3F5B7A6A0550C8" />
+
         <link rel="canonical" href="https://www.letsbooffin.com" />
 
         {/* Open Graph / Facebook / WhatsApp / LinkedIn */}
