@@ -988,10 +988,7 @@ export default function OtherResearcherProfileScreen() {
             <View style={styles.nameRow}>
               <Text style={styles.fullName}>{researcher.fullName}</Text>
               {isAiCurator ? (
-                <View style={[styles.verifiedTag, { backgroundColor: isDark ? '#1E293B' : '#EFF6FF', borderColor: '#3B82F6' }]}>
-                  <CheckCircle2 size={15} color="#2563EB" />
-                  <Text style={[styles.verifiedText, { color: isDark ? '#93C5FD' : '#2563EB' }]}>Verified Node</Text>
-                </View>
+                <CheckCircle2 size={18} color="#2563EB" />
               ) : researcher.orcidVerified ? (
                 <View style={styles.verifiedTag}>
                   <CheckCircle2 size={15} color={colors.accentGreen} />
@@ -1004,9 +1001,17 @@ export default function OtherResearcherProfileScreen() {
 
           {/* Academic Role & Institution */}
           <View style={styles.roleBox}>
-            <Text style={styles.roleTitle}>{researcher.academicTitle}</Text>
-            {researcher.institution && (
-              <Text style={styles.institutionText}>{researcher.institution}</Text>
+            {isAiCurator ? (
+              <Text style={styles.roleTitle}>{researcher.institution || 'BooffIn Research Intelligence'}</Text>
+            ) : (
+              <>
+                {Boolean(researcher.academicTitle && researcher.academicTitle !== 'Official BooffIn Curator') && (
+                  <Text style={styles.roleTitle}>{researcher.academicTitle}</Text>
+                )}
+                {Boolean(researcher.institution) && (
+                  <Text style={styles.institutionText}>{researcher.institution}</Text>
+                )}
+              </>
             )}
           </View>
 

@@ -251,7 +251,7 @@ export const PaperCard: React.FC<PaperCardProps> = ({
           <View style={styles.footerRow}>
             <View style={styles.journalRow}>
               <Badge
-                label={paper.journal}
+                label={(paper.journal || '').replace(/\s*Breakthrough\s*Preprints/gi, '').trim() || 'Academic Paper'}
                 variant={getJournalVariant(paper.journal)}
               />
             </View>

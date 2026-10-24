@@ -32,10 +32,11 @@ export const Badge: React.FC<BadgeProps> = ({ label, variant = 'generic', style 
   };
 
   const c = getColors();
+  const cleanedLabel = (label || '').replace(/\s*Breakthrough\s*Preprints/gi, '').trim();
 
   return (
     <View style={[styles.badge, { backgroundColor: c.bg }, style]}>
-      <Text style={[styles.label, { color: c.text }]}>{label}</Text>
+      <Text style={[styles.label, { color: c.text }]}>{cleanedLabel}</Text>
     </View>
   );
 };

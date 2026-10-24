@@ -286,7 +286,14 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({
     toggleSave(post.id, currentUser?.id);
   };
 
-  const authorRole = [post.author.academicTitle, post.author.institution]
+  const authorRole = (
+    isAiCurator
+      ? [post.author.institution || 'BooffIn Research Intelligence']
+      : [
+          post.author.academicTitle === 'Official BooffIn Curator' ? '' : post.author.academicTitle,
+          post.author.institution,
+        ]
+  )
     .filter(Boolean)
     .join(' · ');
 

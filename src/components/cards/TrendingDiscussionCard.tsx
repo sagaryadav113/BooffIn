@@ -25,7 +25,15 @@ export const TrendingDiscussionCard: React.FC<TrendingDiscussionCardProps> = ({
     });
   };
 
-  const authorRole = [post.author.academicTitle, post.author.institution]
+  const isAiCurator = Boolean(post.author?.handle?.toLowerCase().startsWith('booffin_'));
+  const authorRole = (
+    isAiCurator
+      ? [post.author.institution || 'BooffIn Research Intelligence']
+      : [
+          post.author.academicTitle === 'Official BooffIn Curator' ? '' : post.author.academicTitle,
+          post.author.institution,
+        ]
+  )
     .filter(Boolean)
     .join(' · ');
 
