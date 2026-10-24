@@ -471,9 +471,21 @@ export function mapSupabasePost(row: any, currentUserId?: string): Post {
   const author = mapSupabaseProfile(row.author);
   const paper = row.paper ? mapSupabasePaper(row.paper, currentUserId) : undefined;
 
-  const topics: string[] = Array.isArray(row.post_topics)
+  let topics: string[] = Array.isArray(row.post_topics)
     ? row.post_topics.map((pt: any) => pt.topic?.name).filter(Boolean)
     : [];
+
+  // If topics is empty and author is a BooffIn AI Curator, extract the curator domain into topics
+  const authorHandle = (author?.handle || (author as any)?.username || '').toLowerCase();
+  if (topics.length === 0 && authorHandle.startsWith('booffin_')) {
+    if (author?.fullName && author.fullName.toLowerCase().startsWith('booffin ')) {
+      const dName = author.fullName.replace(/^booffin\s+/i, '').trim();
+      if (dName) topics = [dName];
+    } else {
+      const cleanSlug = authorHandle.replace('booffin_', '').replace(/_/g, ' ');
+      if (cleanSlug) topics = [cleanSlug];
+    }
+  }
 
   const isLiked =
     isPostLikedSync(row.id, currentUserId) ||
@@ -752,16 +764,50 @@ export async function fetchFeed(
         followedTopicNames.forEach((name) => context.followedTopicNames.add(name));
       }
 
-      filtered = getFeedRanker().rank(mappedPosts, context);
+      // BooffIn AI Curator Filtering:
+      // Only display BooffIn AI curator posts for domains the user has actively selected in their research interests.
+      // Do not display AI posts from unselected disciplines. Real user/human posts remain visible.
+      let eligiblePosts = mappedPosts;
+      if (followedTopicNames.length > 0) {
+        eligiblePosts = mappedPosts.filter((p) => {
+          const uName = (p.author?.handle || (p.author as any)?.username || '').toLowerCase();
+          const isAICurator = uName.startsWith('booffin_');
+          if (!isAICurator) return true; // Human researcher posts always stay eligible
+
+          const postTopics = (p.topics || []).map((t) => t.toLowerCase());
+          const authorFullName = (p.author?.fullName || (p.author as any)?.name || '').toLowerCase().replace(/^booffin\s+/i, '');
+          const domainFromUsername = uName.replace('booffin_', '').replace(/_/g, ' ');
+
+          return followedTopicNames.some((interest) => {
+            const cleanInterest = interest.toLowerCase().trim();
+            const cleanInterestSlug = cleanInterest.replace(/[^a-z0-9]+/g, ' ');
+            return (
+              postTopics.some((t) => t.includes(cleanInterest) || cleanInterest.includes(t)) ||
+              (authorFullName && (authorFullName.includes(cleanInterest) || cleanInterest.includes(authorFullName))) ||
+              (domainFromUsername && (domainFromUsername.includes(cleanInterestSlug) || cleanInterestSlug.includes(domainFromUsername)))
+            );
+          });
+        });
+      }
+
+      filtered = getFeedRanker().rank(eligiblePosts, context);
     } else if (tab !== 'For You' && tab !== 'Following') {
-      const targetTopic = tab.toLowerCase();
-      filtered = mappedPosts.filter((p) =>
-        Array.isArray(p.topics) &&
-        p.topics.some((t) => {
-          const lower = t.toLowerCase();
-          return lower.includes(targetTopic) || targetTopic.includes(lower);
-        })
-      );
+      const targetTopic = tab.toLowerCase().trim();
+      const targetTopicSlug = targetTopic.replace(/[^a-z0-9]+/g, '_');
+      filtered = mappedPosts.filter((p) => {
+        const uName = (p.author?.handle || (p.author as any)?.username || '').toLowerCase();
+        const authorFullName = (p.author?.fullName || (p.author as any)?.name || '').toLowerCase();
+        const matchesTopic =
+          Array.isArray(p.topics) &&
+          p.topics.some((t) => {
+            const lower = t.toLowerCase();
+            return lower.includes(targetTopic) || targetTopic.includes(lower);
+          });
+        const matchesCurator =
+          uName.includes(targetTopicSlug) ||
+          authorFullName.includes(targetTopic);
+        return matchesTopic || matchesCurator;
+      });
     }
 
     const postsWithPolls = await populatePollVotes(filtered, resolvedUserId);

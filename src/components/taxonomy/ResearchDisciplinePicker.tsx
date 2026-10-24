@@ -14,6 +14,7 @@ import {
   Plus,
   Check,
   CheckCircle2,
+  AlertCircle,
   Sparkles,
   Compass,
   ChevronRight,
@@ -34,6 +35,7 @@ export interface ResearchDisciplinePickerProps {
   onToggleTopic: (topic: string) => void;
   onRemoveTopic?: (topic: string) => void;
   onClearAll?: () => void;
+  maxSelections?: number;
   showPopularSection?: boolean;
   showBrowseSection?: boolean;
   searchPlaceholder?: string;
@@ -45,6 +47,7 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
   onToggleTopic,
   onRemoveTopic,
   onClearAll,
+  maxSelections = 4,
   showPopularSection = true,
   showBrowseSection = true,
   searchPlaceholder = 'Search 1,000+ fields, subfields, or topics...',
@@ -55,12 +58,23 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState<string>('all');
   const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
+  const [limitWarning, setLimitWarning] = useState<string | null>(null);
 
   const isTopicSelected = (topic: string) => {
     return selectedTopics.some((t) => t.toLowerCase() === topic.toLowerCase());
   };
 
   const handleToggle = (topic: string) => {
+    const isSelected = isTopicSelected(topic);
+    if (!isSelected && selectedTopics.length >= maxSelections) {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch {}
+      setLimitWarning(`Maximum ${maxSelections} disciplines allowed. Remove one to add "${topic}".`);
+      return;
+    }
+
+    setLimitWarning(null);
     try {
       Haptics.selectionAsync();
     } catch {}
@@ -68,6 +82,7 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
   };
 
   const handleRemove = (topic: string) => {
+    setLimitWarning(null);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
@@ -91,8 +106,67 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
     return RESEARCH_TAXONOMY_FAMILIES.filter((f) => f.id === selectedFamilyFilter);
   }, [selectedFamilyFilter]);
 
+  const hasExceededLimit = selectedTopics.length > maxSelections;
+
   return (
     <View style={styles.container}>
+      {/* Limit Warning / Notice Banner */}
+      {(limitWarning || hasExceededLimit) && (
+        <View
+          style={[
+            styles.limitWarningBanner,
+            {
+              backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
+              borderColor: isDark ? 'rgba(239, 68, 68, 0.35)' : '#FCA5A5',
+            },
+          ]}
+        >
+          <AlertCircle size={18} color="#DC2626" style={{ marginRight: 8, marginTop: 2 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.limitWarningText, { color: isDark ? '#FCA5A5' : '#B91C1C' }]}>
+              {limitWarning ||
+                `You currently have ${selectedTopics.length} disciplines selected. Maximum allowed is ${maxSelections}.`}
+            </Text>
+            {hasExceededLimit && onClearAll && (
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    const topN = selectedTopics.slice(0, maxSelections);
+                    onClearAll();
+                    topN.forEach((t) => onToggleTopic(t));
+                  }}
+                  style={{
+                    backgroundColor: '#DC2626',
+                    paddingHorizontal: 12,
+                    paddingVertical: 5,
+                    borderRadius: radii.sm,
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                    Keep First {maxSelections}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={onClearAll}
+                  style={{
+                    backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                    paddingHorizontal: 12,
+                    paddingVertical: 5,
+                    borderRadius: radii.sm,
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: isDark ? '#FFFFFF' : '#334155', fontSize: 12, fontWeight: '600' }}>
+                    Clear All
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
       {/* Search Input Bar */}
       <View style={[styles.searchBarContainer, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderLight }]}>
         <Search size={17} color={colors.textSecondary} style={styles.searchIcon} />
@@ -101,7 +175,10 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
           placeholder={searchPlaceholder}
           placeholderTextColor={colors.textMuted}
           value={searchQuery}
-          onChangeText={setSearchQuery}
+          onChangeText={(text) => {
+            setSearchQuery(text);
+            if (limitWarning) setLimitWarning(null);
+          }}
           autoCapitalize="none"
           autoCorrect={false}
           clearButtonMode="while-editing"
@@ -121,8 +198,8 @@ export const ResearchDisciplinePicker: React.FC<ResearchDisciplinePickerProps> =
       {/* Selected Topics Chips Summary */}
       <View style={[styles.selectedContainer, { backgroundColor: isDark ? colors.backgroundSecondary : '#F8FAFC', borderColor: colors.borderLight }]}>
         <View style={styles.selectedHeader}>
-          <Text style={[styles.selectedHeaderText, { color: colors.textSecondary }]}>
-            SELECTED DISCIPLINES ({selectedTopics.length})
+          <Text style={[styles.selectedHeaderText, { color: hasExceededLimit ? '#DC2626' : colors.textSecondary }]}>
+            SELECTED DISCIPLINES ({selectedTopics.length}/{maxSelections})
           </Text>
           {selectedTopics.length > 0 && onClearAll && (
             <TouchableOpacity onPress={onClearAll} activeOpacity={0.7}>
@@ -853,6 +930,22 @@ const styles = StyleSheet.create({
   interdisciplinaryContainer: {
     gap: spacing.xs + 2,
     marginTop: 4,
+  },
+
+  limitWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    marginBottom: spacing.md,
+  },
+  limitWarningText: {
+    ...typography.captionBold,
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   hintText: {

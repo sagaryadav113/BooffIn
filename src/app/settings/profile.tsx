@@ -18,6 +18,7 @@ import {
   checkUsernameAvailability,
   normalizeHandle,
 } from '../../api/authService';
+import { supabase } from '../../api/client';
 import {
   pickAvatarImage,
   pickBannerImage,
@@ -138,6 +139,22 @@ export default function ProfileSettingsScreen() {
     };
   }, [cleanHandle, isCurrentHandle, valResult?.isValid, user?.id]);
 
+  // Synchronize fields from authenticated user when profile finishes loading
+  useEffect(() => {
+    if (user) {
+      if (user.fullName && !fullName) setFullName(user.fullName);
+      if (user.handle && !handle) setHandle(user.handle);
+      if (user.academicTitle && !academicTitle) setAcademicTitle(user.academicTitle);
+      if (user.institution && !institution) setInstitution(user.institution);
+      if (user.bio && !bio) setBio(user.bio);
+      if (user.avatarUrl && !avatarUrl) setAvatarUrl(user.avatarUrl);
+      if (user.bannerUrl && !bannerUrl) setBannerUrl(user.bannerUrl);
+      if (Array.isArray(user.researchInterests) && user.researchInterests.length > 0 && interests.length === 0) {
+        setInterests(user.researchInterests);
+      }
+    }
+  }, [user]);
+
   const handleAddInterest = () => {
     const trimmed = interestInput.trim();
     if (trimmed && !interests.includes(trimmed)) {
@@ -236,27 +253,55 @@ export default function ProfileSettingsScreen() {
   };
 
   const handleSave = async () => {
-    if (!user?.id) return;
+    let currentUserId: string | undefined = user?.id;
+    if (!currentUserId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        currentUserId = session?.user?.id;
+      } catch {}
+    }
+
+    if (!currentUserId) {
+      const msg = 'User session not found. Please log in again.';
+      setErrorMessage(msg);
+      Alert.alert('Session Error', msg);
+      return;
+    }
+
     if (!fullName.trim()) {
-      setErrorMessage('Full name is required.');
+      const msg = 'Full name is required.';
+      setErrorMessage(msg);
+      Alert.alert('Validation Error', msg);
       return;
     }
 
     const cleanHandle = normalizeHandle(handle);
-    const val = validateUsername(cleanHandle);
-    if (!val.isValid) {
-      setErrorMessage(val.error || 'Please enter a valid handle.');
-      return;
+    const isCurrentHandle =
+      cleanHandle === normalizeHandle(user?.handle) ||
+      cleanHandle === normalizeHandle((user as any)?.username);
+
+    if (!isCurrentHandle && cleanHandle) {
+      const val = validateUsername(cleanHandle);
+      if (!val.isValid) {
+        const msg = val.error || 'Please enter a valid handle.';
+        setErrorMessage(msg);
+        Alert.alert('Invalid Handle', msg);
+        return;
+      }
+
+      if (handleStatus.available === false) {
+        const msg = handleStatus.message || 'This handle is not available.';
+        setErrorMessage(msg);
+        Alert.alert('Handle Taken', msg);
+        return;
+      }
     }
 
-    if (handleStatus.checking) {
-      setErrorMessage('Checking handle availability...');
-      return;
-    }
-
-    if (handleStatus.available === false) {
-      setErrorMessage(handleStatus.message || 'This handle is not available.');
-      return;
+    // Auto-trim to top 4 if user had more than 4 selected so save NEVER gets blocked
+    let finalInterests = [...interests];
+    if (finalInterests.length > 4) {
+      finalInterests = finalInterests.slice(0, 4);
+      setInterests(finalInterests);
     }
 
     setIsSaving(true);
@@ -276,7 +321,7 @@ export default function ProfileSettingsScreen() {
       bannerUrl: bannerUrl.trim() || undefined,
       hasCustomAvatar: true,
       hasCustomBanner: true,
-      researchInterests: interests,
+      researchInterests: finalInterests,
     };
 
     const res = await updateProfile(updates);
@@ -284,10 +329,14 @@ export default function ProfileSettingsScreen() {
     setIsSaving(false);
 
     if (res.success) {
-      setSuccessMessage('Profile updated successfully.');
+      const msg = 'Profile updated successfully.';
+      setSuccessMessage(msg);
+      Alert.alert('Profile Saved', 'Your profile and research disciplines have been saved successfully!');
       setTimeout(() => setSuccessMessage(null), 4000);
     } else {
-      setErrorMessage(res.error || 'Failed to update profile. Please try again.');
+      const msg = res.error || 'Failed to update profile. Please try again.';
+      setErrorMessage(msg);
+      Alert.alert('Save Failed', msg);
     }
   };
 
@@ -538,21 +587,51 @@ export default function ProfileSettingsScreen() {
       <SettingsCardGroup style={styles.cardPadding}>
         <ResearchDisciplinePicker
           selectedTopics={interests}
+          maxSelections={4}
           onToggleTopic={(topic) => {
             if (interests.some((t) => t.toLowerCase() === topic.toLowerCase())) {
               setInterests(interests.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
+              setErrorMessage(null);
             } else {
+              if (interests.length >= 4) {
+                setErrorMessage('Maximum 4 disciplines allowed. Please remove one before adding another.');
+                return;
+              }
               setInterests([...interests, topic]);
+              setErrorMessage(null);
             }
           }}
           onRemoveTopic={(topic) => {
             setInterests(interests.filter((t) => t.toLowerCase() !== topic.toLowerCase()));
+            setErrorMessage(null);
           }}
-          onClearAll={() => setInterests([])}
+          onClearAll={() => {
+            setInterests([]);
+            setErrorMessage(null);
+          }}
           searchPlaceholder="Search 1,000+ fields, subfields, or topics..."
-          hint="Your selected disciplines configure your home feed top tabs and preprint recommendations."
+          hint="Your selected disciplines configure your home feed top tabs and preprint recommendations (maximum 4)."
         />
       </SettingsCardGroup>
+
+      {/* Bottom Save Status Feedback (Visible directly above Save button) */}
+      {errorMessage ? (
+        <View style={[styles.errorBanner, { marginTop: spacing.md, marginBottom: 0 }]}>
+          <Icon name="AlertTriangle" size="sm" color={colors.error} />
+          <Typography variant="caption" color={colors.error} style={{ marginLeft: 8, flex: 1, fontWeight: '600' }}>
+            {errorMessage}
+          </Typography>
+        </View>
+      ) : null}
+
+      {successMessage ? (
+        <View style={[styles.successBanner, { marginTop: spacing.md, marginBottom: 0 }]}>
+          <Icon name="CheckCircle2" size="sm" color="#166534" />
+          <Typography variant="caption" color="#166534" style={{ marginLeft: 8, flex: 1, fontWeight: '600' }}>
+            {successMessage}
+          </Typography>
+        </View>
+      ) : null}
 
       {/* Action Buttons */}
       <View style={styles.actionsRow}>

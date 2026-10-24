@@ -7,7 +7,28 @@
  * - Dedicated Personas: Posts under official verified accounts (e.g., @booffin_neuroscience).
  */
 
+const fs = require('fs');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+
+// Auto-load .env file if running locally
+const envPath = path.join(__dirname, '..', '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  envContent.split('\n').forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        const key = trimmed.slice(0, eqIdx).trim();
+        const val = trimmed.slice(eqIdx + 1).trim();
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  });
+}
 
 // 1. Environment & Configuration
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -73,13 +94,14 @@ async function getActiveUserDomains() {
 
 /**
  * Step 2: Ensure the official Curator profile exists in Supabase
+ * Creates an auth.users entry first (required FK), then creates the profile.
  */
 async function getOrCreateCuratorProfile(domain) {
   const cleanSlug = slugify(domain);
   const handle = `booffin_${cleanSlug}`;
   const fullName = `BooffIn ${domain}`;
 
-  // Check if profile exists
+  // Check if profile already exists
   const { data: existing } = await supabase
     .from('profiles')
     .select('id, username')
@@ -91,14 +113,39 @@ async function getOrCreateCuratorProfile(domain) {
   }
 
   console.log(`[Curator] Provisioning new AI curator profile: @${handle}`);
-  
-  // Use a deterministic UUID for system curator nodes
-  const crypto = require('crypto');
-  const namespace = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-  const hash = crypto.createHash('sha1').update(namespace + handle).digest('hex');
-  const curatorId = `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-8${hash.substring(17, 20)}-${hash.substring(20, 32)}`;
 
-  const { data: created, error } = await supabase
+  // 1. Create an auth.users entry via Supabase Admin API (service_role required)
+  const fakeEmail = `${handle}@system.booffin.internal`;
+  const crypto = require('crypto');
+  const randomPassword = crypto.randomBytes(32).toString('hex');
+
+  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+    email: fakeEmail,
+    password: randomPassword,
+    email_confirm: true,
+    user_metadata: {
+      full_name: fullName,
+      is_ai_curator: true,
+      curator_domain: domain,
+    },
+  });
+
+  if (authError) {
+    // User might already exist in auth but not profiles
+    console.warn(`[Curator] Auth user creation notice for @${handle}:`, authError.message);
+    
+    // Try to find existing auth user by email
+    const { data: userList } = await supabase.auth.admin.listUsers({ perPage: 1 });
+    // Fallback: look for existing profile by any means
+    const { data: fallback } = await supabase.from('profiles').select('id').limit(1).single();
+    if (fallback?.id) return fallback.id;
+    return null;
+  }
+
+  const curatorId = authUser.user.id;
+
+  // 2. Now create the profile row (the auth.users FK is satisfied)
+  const { error: profileError } = await supabase
     .from('profiles')
     .upsert({
       id: curatorId,
@@ -108,29 +155,76 @@ async function getOrCreateCuratorProfile(domain) {
       academic_title: 'Official BooffIn Curator',
       institution: 'BooffIn Research Intelligence',
       bio: `Official BooffIn intelligence node curating daily breakthrough discoveries for researchers in ${domain}.`,
-      is_verified: true,
-      orcid_verified: false,
-      visibility_level: 'public',
+      orcid_verified: true,
       is_private: false,
-    }, { onConflict: 'username' })
+    }, { onConflict: 'id' })
     .select('id')
     .single();
 
-  if (error) {
-    console.warn(`[Curator] Failed to insert profile for @${handle}:`, error.message);
-    // Fallback: try to find any system user or return existing
-    const { data: fallback } = await supabase.from('profiles').select('id').limit(1).single();
-    return fallback?.id || curatorId;
+  if (profileError) {
+    console.warn(`[Curator] Profile creation notice for @${handle}:`, profileError.message);
   }
 
-  return created.id;
+  console.log(`[Curator] ✅ Created AI curator @${handle} (${curatorId})`);
+  return curatorId;
 }
 
 /**
- * Step 3: Fetch latest breakthrough papers from OpenAlex
+ * Step 3: Fetch latest breakthrough papers from arXiv & OpenAlex
  */
+async function fetchPapersFromArxiv(domain) {
+  try {
+    const queryUrl = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(domain)}&start=0&max_results=2&sortBy=submittedDate&sortOrder=descending`;
+    const res = await fetch(queryUrl);
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const entries = xml.split('<entry>').slice(1);
+
+    return entries.map((entry) => {
+      const titleMatch = entry.match(/<title>([\s\S]*?)<\/title>/);
+      const summaryMatch = entry.match(/<summary>([\s\S]*?)<\/summary>/);
+      const idMatch = entry.match(/<id>([\s\S]*?)<\/id>/);
+      const publishedMatch = entry.match(/<published>([\s\S]*?)<\/published>/);
+      const authors = [];
+      const authorMatches = entry.matchAll(/<author>[\s\S]*?<name>(.*?)<\/name>[\s\S]*?<\/author>/g);
+      for (const m of authorMatches) {
+        if (m[1]) authors.push(m[1].trim());
+      }
+
+      const rawTitle = titleMatch ? titleMatch[1].replace(/\s+/g, ' ').trim() : '';
+      const rawSummary = summaryMatch ? summaryMatch[1].replace(/\s+/g, ' ').trim() : '';
+      const rawId = idMatch ? idMatch[1].trim() : '';
+      const arxivId = rawId.split('/abs/').pop() || rawId;
+
+      return {
+        title: rawTitle,
+        abstract: rawSummary,
+        doi: `arxiv.${arxivId}`,
+        canonicalUrl: `https://arxiv.org/abs/${arxivId}`,
+        openAccessPdfUrl: `https://arxiv.org/pdf/${arxivId}.pdf`,
+        journal: 'arXiv Breakthrough Preprints',
+        publicationYear: new Date(publishedMatch ? publishedMatch[1] : Date.now()).getFullYear(),
+        publicationDate: publishedMatch ? publishedMatch[1].split('T')[0] : new Date().toISOString().split('T')[0],
+        authors: authors.slice(0, 5),
+        domain,
+      };
+    }).filter((p) => p.title && p.openAccessPdfUrl);
+  } catch (err) {
+    console.warn(`[Curator] arXiv fetch error for ${domain}:`, err.message);
+    return [];
+  }
+}
+
 async function fetchPapersForDomain(domain) {
-  console.log(`[Curator] Searching OpenAlex for breakthrough papers in: ${domain}`);
+  console.log(`[Curator] Searching academic databases for breakthrough papers in: ${domain}`);
+  
+  // 1. Try arXiv first (Fast, reliable, open access PDF)
+  const arxivPapers = await fetchPapersFromArxiv(domain);
+  if (arxivPapers.length > 0) {
+    return arxivPapers;
+  }
+
+  // 2. OpenAlex fallback
   try {
     const queryUrl = `https://api.openalex.org/works?search=${encodeURIComponent(domain)}&filter=open_access.is_oa:true,type:article&sort=publication_date:desc&per-page=2`;
     const res = await fetch(queryUrl, {
@@ -181,16 +275,17 @@ async function fetchPapersForDomain(domain) {
 }
 
 /**
- * Step 4: Synthesize Human-Researcher Discussion Post using Gemini 1.5 Flash
+ * Step 4: Synthesize Human-Researcher Discussion Post using Gemini Flash
  */
+const GEMINI_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+
 async function generateHumanPost(paper, domain) {
   if (!GEMINI_API_KEY) {
     // High-quality deterministic fallback if no API key is provided
     return `Notable new findings in #${slugify(domain)}: "${paper.title}".\n\nThe authors present compelling data challenging conventional assumptions in the field. How does this methodology hold up compared to recent benchmarks in your lab?\n\n📄 Paper: ${paper.title}\n#${slugify(domain)} #AcademicResearch #ScientificDiscovery`;
   }
 
-  try {
-    const prompt = `You are an opinionated, brilliant senior researcher in ${domain} sharing a freshly published paper with your peers on BooffIn.
+  const prompt = `You are an opinionated, brilliant senior researcher in ${domain} sharing a freshly published paper with your peers on BooffIn.
 Write a natural, conversational scientific discussion post (under 120 words) analyzing this paper.
 
 Paper Title: "${paper.title}"
@@ -205,30 +300,47 @@ STRICT RULES:
 📄 Paper: ${paper.title}
 #${slugify(domain)} #ResearchDiscovery`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 250,
-        }
-      })
-    });
+  // Try each model in the fallback chain
+  for (const model of GEMINI_MODELS) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.85,
+            maxOutputTokens: 1200,
+          }
+        })
+      });
 
-    if (!response.ok) {
-      console.warn('[Curator] Gemini API returned error:', response.status);
-      return `Notable new findings in #${slugify(domain)}: "${paper.title}".\n\nThe authors present compelling data challenging conventional assumptions in the field. How does this methodology hold up compared to recent benchmarks in your lab?\n\n📄 Paper: ${paper.title}\n#${slugify(domain)} #AcademicResearch`;
+      if (!response.ok) {
+        console.warn(`[Curator] ${model} returned ${response.status}, trying next model...`);
+        continue;
+      }
+
+      const resJson = await response.json();
+      const candidateParts = resJson.candidates?.[0]?.content?.parts || [];
+      const candidateText = candidateParts
+        .filter((p) => !p.thought && typeof p.text === 'string')
+        .map((p) => p.text)
+        .join('')
+        .trim();
+
+      if (candidateText && candidateText.length > 50) {
+        console.log(`[Curator] ✅ Generated post with ${model} (${candidateText.length} chars)`);
+        return candidateText;
+      }
+      console.warn(`[Curator] ${model} returned empty or truncated response, trying next...`);
+    } catch (err) {
+      console.warn(`[Curator] ${model} exception: ${err.message}, trying next...`);
     }
-
-    const resJson = await response.json();
-    const candidateText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
-    return candidateText ? candidateText.trim() : `Exciting developments in #${slugify(domain)}: "${paper.title}". What are your thoughts on their methodology?\n\n📄 Paper: ${paper.title}\n#${slugify(domain)}`;
-  } catch (err) {
-    console.warn('[Curator] Gemini generation exception:', err.message);
-    return `New research in #${slugify(domain)}: "${paper.title}".\n\n📄 Paper: ${paper.title}\n#${slugify(domain)}`;
   }
+
+  // All models failed — use deterministic fallback
+  console.warn('[Curator] All Gemini models failed, using template fallback');
+  return `Notable new findings in #${slugify(domain)}: "${paper.title}".\n\nThe authors present compelling data challenging conventional assumptions in the field. How does this methodology hold up compared to recent benchmarks in your lab?\n\n📄 Paper: ${paper.title}\n#${slugify(domain)} #AcademicResearch`;
 }
 
 /**
