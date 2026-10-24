@@ -24,7 +24,6 @@ import {
   CheckCircle2,
   ArrowLeft,
   Share2,
-  Sparkles,
   Clock,
   Users,
   UserPlus,
@@ -935,12 +934,7 @@ export default function OtherResearcherProfileScreen() {
             />
 
             <View style={styles.actionButtonsGroup}>
-              {isAiCurator ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radii.full, backgroundColor: isDark ? '#1E293B' : '#EFF6FF', borderWidth: 1, borderColor: '#3B82F6' }}>
-                  <Sparkles size={14} color="#2563EB" />
-                  <Text style={{ ...typography.captionBold, color: isDark ? '#93C5FD' : '#2563EB' }}>Official Intelligence Node</Text>
-                </View>
-              ) : (
+              {!isAiCurator && (
                 <>
                   {/* Follow / Edit Profile Button */}
                   {!researcher.isBlocked && (
