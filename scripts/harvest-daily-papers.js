@@ -40,6 +40,15 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
+// Ensure global WebSocket is available for @supabase/supabase-js in Node runtimes
+if (typeof global.WebSocket === 'undefined') {
+  try {
+    global.WebSocket = require('ws');
+  } catch (e) {
+    global.WebSocket = class {};
+  }
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false },
 });
